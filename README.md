@@ -14,9 +14,9 @@ The app provides an all-in-one solution to simplify and digitize the way clubs, 
 - 👥 Manage members and assign roles transparently  
 - ✅ Task assignment with deadlines & reminders  
 - 📅 Automatic meeting & event scheduling  
-- 💰 Budget and financial tracking  
+- 💰 Budget and cost tracking  
 - ⚠️ Risk management & contingency plans  
-- 📊 Auto-generated reports (progress, finance, evaluation)  
+- 📊 Auto-generated reports (progress, cost, evaluation)  
 
 ### 🔹 For Members
 - 🔔 Receive clear task assignments and reminders  
@@ -25,9 +25,7 @@ The app provides an all-in-one solution to simplify and digitize the way clubs, 
 - 💡 Provide feedback easily  
 
 ### 🔹 For Event Participants
-- 🎟️ Buy or register tickets online  
-- 📲 QR code for fast check-in  
-- 🔔 Notifications for event updates (time, location)  
+- 🔔 Follow event information
 - 📝 Post-event feedback & rating  
 
 ---
