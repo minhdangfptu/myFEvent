@@ -19,7 +19,13 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",
-    "express": "^4.21.2"
+    "bcrypt": "^6.0.0",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "googleapis": "^161.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.22.10",
