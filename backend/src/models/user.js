@@ -26,11 +26,11 @@ const UserSchema = new Schema({
     default: 'active',
   },
   isFirstLogin: { type: Boolean, default: true },
-  roles: [{
+  role: {
     type: String,
     enum: ['user', 'admin', 'mentor','IC-PDP'],
     default: 'user',
-  }],
+  },
 }, { timestamps: true });
 
 export default mongoose.model('User', UserSchema);

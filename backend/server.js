@@ -1,60 +1,75 @@
-const dotenv = require('dotenv');
-dotenv.config();
-const express = require('express');
-const { connect } = require('mongoose');
-const router = require('./src/routes');
-const morgan = require('morgan');
-var cors = require('cors');
-const bodyParser = require('body-parser');
-const connectDB = require('./src/config/db.js');
+import express from 'express';
+import morgan from 'morgan';
+import { config, connectDB, corsConfig } from './src/config/index.js';
+import routes from './src/routes/index.js';
 
 const app = express();
-const passport = require('passport');
 
-const corsOptions = {
-  origin: [
-    'http://localhost:3000', // React development server
-    'http://localhost:5173', // Vite development server  
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-    process.env.FRONTEND_URL,
-    process.env.FRONTEND_URL2
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
-
-app.use(cors(corsOptions));
-
-
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
-
+// Middleware
+app.use(corsConfig);
 app.use(morgan('dev'));
-
-//Connection to MongoDB
-connectDB();
-
-// For parsing application/json - Increase limit for base64 images
 app.use(express.json({ limit: '10mb' }));
-app.use(bodyParser.json({ limit: '10mb' }));
-
-// For parsing application/x-www-form-urlencoded - Increase limit for base64 images
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-app.use('/reptitist', router);
+// Routes
+app.use('/api', routes);
 
-// Test route should be inside the router or moved before mounting
-app.get("/test", (req, res) => {
-  res.send("<h1>Hello World!</h1>");
+// Health check
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'myFEvent API Server is running!',
+    version: '1.0.0',
+    environment: config.NODE_ENV
+  });
 });
+
+// Test route
+app.get('/test', (req, res) => {
+  res.send('<h1>Hello World!</h1>');
+});
+
+// Request logging middleware
 app.use((req, res, next) => {
-  console.log(`Request received: ${req.method} ${req.url}`);
+  console.log(`Request: ${req.method} ${req.url}`);
   next();
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log(`server is running at http://localhost:${process.env.PORT}`);
+// Validation error handler
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ message: 'Invalid JSON' });
+  }
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({ message: err.message });
+  }
+  next(err);
 });
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err.stack);
+  res.status(500).json({ 
+    message: 'Something went wrong!',
+    error: config.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(config.PORT, () => {
+      console.log(`Server is running at http://localhost:${config.PORT}`);
+      console.log(`Environment: ${config.NODE_ENV}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

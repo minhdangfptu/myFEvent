@@ -11,7 +11,7 @@ export const authenticateToken = async (req, res, next) => {
             return res.status(401).json({ message: 'Access token is required!' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, config.JWT_SECRET);
         const user = await User.findById(decoded.userId);
         
         if (!user) {
@@ -50,7 +50,7 @@ export const authenticateRefreshToken = async (req, res, next) => {
             return res.status(401).json({ message: 'Refresh token is required!' });
         }
 
-        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET);
         const authToken = await AuthToken.findOne({ 
             token: refreshToken, 
             userId: decoded.userId,

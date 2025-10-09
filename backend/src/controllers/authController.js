@@ -4,7 +4,9 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
-import { OAuth2Client } from 'googleapis';
+import pkg from 'googleapis';
+const { OAuth2Client } = pkg;
+import { config } from '../config/environment.js';
 
 const signup = async (req,res) => {
     try {
@@ -19,14 +21,14 @@ const signup = async (req,res) => {
         return res.status(400).json({message: 'Phone number already exists!'});
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const newUser = new User({
         email,
         passwordHash,
         fullName,
-        phone
+        phone,
     });
 
     await newUser.save();
@@ -53,14 +55,14 @@ const login = async (req, res) => {
         
         const accessToken = jwt.sign(
             { userId: user._id, email: user.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '15m' }
+            config.JWT_SECRET,
+            { expiresIn: config.JWT_EXPIRE }
         );
         
         const refreshToken = jwt.sign(
             { userId: user._id },
-            process.env.JWT_REFRESH_SECRET,
-            { expiresIn: '7d' }
+            config.JWT_REFRESH_SECRET,
+            { expiresIn: config.JWT_REFRESH_EXPIRE }
         );
         
         const authToken = new AuthToken({
@@ -82,7 +84,7 @@ const login = async (req, res) => {
                 email: user.email,
                 fullName: user.fullName,
                 avatarUrl: user.avatarUrl,
-                roles: user.roles
+                role: user.role
             }
         });
     } catch (error) {
@@ -100,11 +102,11 @@ const loginWithGoogle = async (req, res) => {
             return res.status(400).json({ message: 'Google token is required!' });
         }
         
-        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
         
         const ticket = await client.verifyIdToken({
             idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID,
+            audience: config.GOOGLE_CLIENT_ID,
         });
         
         const payload = ticket.getPayload();
@@ -127,14 +129,14 @@ const loginWithGoogle = async (req, res) => {
         
         const accessToken = jwt.sign(
             { userId: user._id, email: user.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '15m' }
+            config.JWT_SECRET,
+            { expiresIn: config.JWT_EXPIRE }
         );
         
         const refreshToken = jwt.sign(
             { userId: user._id },
-            process.env.JWT_REFRESH_SECRET,
-            { expiresIn: '7d' }
+            config.JWT_REFRESH_SECRET,
+            { expiresIn: config.JWT_REFRESH_EXPIRE }
         );
         
         const authToken = new AuthToken({
@@ -173,7 +175,7 @@ const refreshToken = async (req, res) => {
             return res.status(400).json({ message: 'Refresh token is required!' });
         }
         
-        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET);
         const authToken = await AuthToken.findOne({ 
             token: refreshToken, 
             userId: decoded.userId,
