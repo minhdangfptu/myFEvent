@@ -3,29 +3,27 @@
  * "A bit of fragrance clings to the hand that gives flowers!"
 */
 
-import express from 'express'
-import { mapOrder } from '~/utils/sorts.js'
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import routes from './src/routes/index.js';
 
-const app = express()
+dotenv.config();
 
-const hostname = 'localhost'
-const port = 8017
+const app = express();
+const hostname = 'localhost';
+const port = 8017;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use('/api', routes);
 
 app.get('/', (req, res) => {
-  // Test Absolute import mapOrder
-  console.log(mapOrder(
-    [ { id: 'id-1', name: 'One' },
-      { id: 'id-2', name: 'Two' },
-      { id: 'id-3', name: 'Three' },
-      { id: 'id-4', name: 'Four' },
-      { id: 'id-5', name: 'Five' } ],
-    ['id-5', 'id-4', 'id-2', 'id-3', 'id-1'],
-    'id'
-  ))
-  res.end('<h1>Hello World!</h1><hr>')
-})
+  res.json({ message: 'myFEvent API Server is running!' });
+});
 
 app.listen(port, hostname, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server is running at http://${ hostname }:${ port }/`)
-})
+  console.log(`Server is running at http://${hostname}:${port}/`);
+});
