@@ -1,4 +1,7 @@
-/**
- * Updated by MinhDang on FA25
- * "A bit of fragrance clings to the hand that gives flowers!"
-*/
+const express = require('express');
+const router = express.Router();
+const authRoute = require('./authRoute');
+
+router.use('/auth', authRoute);
+
+module.exports = router;

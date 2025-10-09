@@ -37,5 +37,59 @@ const signup = async (req,res) => {
     }
 }
 
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid email or password!' });
+        }
+        
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid email or password!' });
+        }
+        
+        const accessToken = jwt.sign(
+            { userId: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+        
+        const refreshToken = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_REFRESH_SECRET,
+            { expiresIn: '7d' }
+        );
+        
+        const authToken = new AuthToken({
+            userId: user._id,
+            token: refreshToken,
+            userAgent: req.get('User-Agent'),
+            ipAddress: req.ip || req.connection.remoteAddress,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        });
+        
+        await authToken.save();
+        
+        return res.status(200).json({
+            message: 'Login successful!',
+            accessToken,
+            refreshToken,
+            user: {
+                id: user._id,
+                email: user.email,
+                fullName: user.fullName,
+                avatarUrl: user.avatarUrl,
+                roles: user.roles
+            }
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: 'Fail to login!' });
+    }
+};
 
-export { signup };
+
+export { signup, login, loginWithGoogle };
