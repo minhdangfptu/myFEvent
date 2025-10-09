@@ -2,36 +2,40 @@ import mongoose from 'mongoose';
 import { config } from './environment.js';
 
 const connectDB = async () => {
-    try {
-        const options = {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        };
+  try {
+    const options = {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      family: 4,
+    };
 
-        const conn = await mongoose.connect(config.MONGODB_URI, options);
-        
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
-        
-        // Handle connection events
-        mongoose.connection.on('error', (err) => {
-            console.error('MongoDB connection error:', err);
-        });
+    const conn = await mongoose.connect(config.MONGODB_URI, options);
+    console.log('MongoDB Connected!');
 
-        mongoose.connection.on('disconnected', () => {
-            console.log('MongoDB disconnected');
-        });
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+    });
 
-        // Graceful shutdown
-        process.on('SIGINT', async () => {
-            await mongoose.connection.close();
-            console.log('MongoDB connection closed through app termination');
-            process.exit(0);
-        });
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected');
+    });
 
-    } catch (error) {
-        console.error('MongoDB connection failed:', error.message);
-        process.exit(1);
-    }
+    const graceful = async (signal) => {
+      try {
+        await mongoose.connection.close();
+        console.log(`MongoDB connection closed (${signal})`);
+      } finally {
+        process.exit(0);
+      }
+    };
+    process.on('SIGINT', () => graceful('SIGINT'));
+    process.on('SIGTERM', () => graceful('SIGTERM'));
+  } catch (error) {
+    console.error('MongoDB connection failed:', error);
+    process.exit(1);
+  }
 };
 
 export default connectDB;
