@@ -5,7 +5,7 @@ import {
   Container,
   Typography,
   Button,
-  Link,
+  Link as MUILink,
   useTheme,
   Stack,
 } from "@mui/material";
@@ -78,7 +78,7 @@ export default function ErrorPage401() {
           </Box>
 
           <Button
-            component={Link}
+            component={MUILink}
             onClick={() => navigate(-1)}
             color="primary.main"
             variant="text"
