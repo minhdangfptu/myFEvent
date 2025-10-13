@@ -27,7 +27,7 @@ import {
   
   export default function FPTEvent_MUI() {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#fff", overflowX: "hidden" }}>
+      <Box sx={{ minHeight: "100vh",minWidth: "100vw", bgcolor: "#fff", overflowX: "hidden" }}>
         <CssBaseline />
   
         {/* Header */}

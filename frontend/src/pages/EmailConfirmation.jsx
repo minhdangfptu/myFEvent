@@ -26,7 +26,7 @@ export default function EmailConfirmationPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
+    <Box sx={{ minHeight: "100dvh",minWidth: "100vw", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
       <Container maxWidth="sm">
         {/* Logo */}
         <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>

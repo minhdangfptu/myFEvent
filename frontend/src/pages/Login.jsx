@@ -1,56 +1,237 @@
-import { Box, Paper, Typography, Button, Divider, Avatar } from "@mui/material"
-import { Google, PersonAdd } from "@mui/icons-material"
-
-const mockAccounts = [
-  { name: "Sarah Johnson", email: "sarah.johnson@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+1" },
-  { name: "Michael Chen", email: "michael.chen@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+2" },
-  { name: "David Rodriguez", email: "david.rodriguez@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+3" }
-]
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { Box, Container, TextField, Button, Typography, Divider, Link, Paper, Avatar, Alert, CircularProgress } from "@mui/material"
+import GoogleIcon from "@mui/icons-material/Google"
+import { authApi } from "../apis/authApi"
 
 export default function LoginPage() {
+  const navigate = useNavigate()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    console.log('Attempting login with:', { email, password })
+
+    try {
+      const response = await authApi.login(email, password)
+      console.log('Login response:', response)
+      
+      if (response.access_token || response.accessToken) {
+        const accessToken = response.access_token || response.accessToken
+        const refreshToken = response.refresh_token || response.refreshToken
+        const user = response.user
+        
+        localStorage.setItem('access_token', accessToken)
+        localStorage.setItem('refresh_token', refreshToken)
+        localStorage.setItem('user', JSON.stringify(user))
+        
+        console.log('Tokens saved:', { accessToken, refreshToken, user })
+        
+        // Dispatch event để AuthContext cập nhật state
+        window.dispatchEvent(new CustomEvent('auth:login', { 
+          detail: { user: response.user } 
+        }))
+        
+        console.log('Login successful, redirecting to landing page...')
+        navigate('/landingpage')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setError(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = () => {
+    console.log("Google sign in clicked")
+    setError("Tính năng đăng nhập Google đang được phát triển. Vui lòng sử dụng đăng nhập thông thường.")
+  }
+
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f8f9fa" }}>
-      <Paper elevation={0} sx={{ width: "100%", maxWidth: 450, p: 5, borderRadius: 3, border: "1px solid #dadce0", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}>
-        <Box sx={{ textAlign: "center", mb: 4 }}>
-          <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Google sx={{ color: "#4285f4", fontSize: 28 }} />
+    <Box
+      sx={{
+        minHeight: "100vh",
+        minWidth: "100vw",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#f5f5f5",
+        padding: 2,
+      }}
+    >
+      <Container 
+        maxWidth="sm" 
+        sx={{ 
+          display: "flex", 
+          justifyContent: "center", 
+          alignItems: "center",
+          width: "100%"
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            padding: 4,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            backgroundColor: "white",
+            borderRadius: 2,
+            width: "100%",
+            maxWidth: 450,
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          {/* Logo */}
+          <Box
+            component="img"
+            src="../logo-03.png"
+            alt="myFEvent Logo"
+            sx={{
+              width: 200,
+              height: "auto",
+              marginBottom: 4,
+            }}
+          />
+
+          {/* Login Form */}
+          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%", maxWidth: 400 }}>
+            {error && (
+              <Alert severity="error" sx={{ marginBottom: 2 }}>
+                {error}
+              </Alert>
+            )}
+            
+            <TextField
+              fullWidth
+              label="Email"
+              placeholder="Nhập địa chỉ email của bạn"
+              variant="outlined"
+              margin="normal"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              sx={{ marginBottom: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Mật khẩu"
+              placeholder="Nhập mật khẩu của bạn"
+              type="password"
+              variant="outlined"
+              margin="normal"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              sx={{ marginBottom: 3 }}
+            />
+
+            <Button
+              fullWidth
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={loading}
+              sx={{
+                backgroundColor: "#f44336",
+                color: "white",
+                textTransform: "none",
+                fontSize: "16px",
+                padding: "12px",
+                marginBottom: 3,
+                "&:hover": {
+                  backgroundColor: "#d32f2f",
+                },
+                "&:disabled": {
+                  backgroundColor: "#ccc",
+                },
+              }}
+            >
+              {loading ? (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CircularProgress size={20} color="inherit" />
+                  Đang đăng nhập...
+                </Box>
+              ) : (
+                "Đăng nhập"
+              )}
+            </Button>
+
+            {/* Divider with "Hoặc" */}
+            <Divider sx={{ marginBottom: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Hoặc
+              </Typography>
+            </Divider>
+
+            {/* Google Sign In */}
+            <Button
+              fullWidth
+              variant="outlined"
+              size="large"
+              disabled={googleLoading}
+              startIcon={
+                googleLoading ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <Avatar
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    <GoogleIcon sx={{ color: "#4285f4", fontSize: 20 }} />
+                  </Avatar>
+                )
+              }
+              onClick={handleGoogleSignIn}
+              sx={{
+                textTransform: "none",
+                fontSize: "14px",
+                padding: "10px",
+                marginBottom: 3,
+                borderColor: "#ddd",
+                color: "#666",
+                "&:hover": {
+                  borderColor: "#999",
+                  backgroundColor: "#f9f9f9",
+                },
+                "&:disabled": {
+                  borderColor: "#ccc",
+                  color: "#999",
+                },
+              }}
+            >
+              {googleLoading ? "Đang đăng nhập..." : "Sign in with Google"}
+            </Button>
+
+            {/* Register Link */}
+            <Box sx={{ textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                Bạn chưa có tài khoản?{" "}
+                <Link
+                  href="/signup0"
+                  underline="hover"
+                  sx={{
+                    color: "#1976d2",
+                    fontWeight: 500,
+                  }}
+                >
+                  Đăng kí
+                </Link>
+              </Typography>
             </Box>
           </Box>
-          <Typography variant="body1" sx={{ fontSize: "16px", color: "#5f6368", mb: 0.5 }}>Google</Typography>
-          <Typography variant="h5" sx={{ fontWeight: 400, fontSize: "24px", color: "#202124" }}>Choose an</Typography>
-          <Typography variant="h5" sx={{ fontWeight: 400, fontSize: "24px", color: "#202124" }}>
-            <Box component="span" sx={{ fontWeight: 500 }}>account</Box>
-          </Typography>
-          <Typography sx={{ fontSize: "14px", color: "#5f6368", mt: 1.5 }}>
-            to continue to <Box component="span" sx={{ fontWeight: 500 }}>myFEvent</Box>
-          </Typography>
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          {mockAccounts.map((account, index) => (
-            <Button key={index} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", p: 2, mb: 1, border: "1px solid #dadce0", borderRadius: 1, backgroundColor: "#fff", "&:hover": { backgroundColor: "#f8f9fa", border: "1px solid #d2d3d4" } }}>
-              <Avatar src={account.avatar} alt={account.name} sx={{ width: 36, height: 36, mr: 2 }} />
-              <Box sx={{ textAlign: "left", flex: 1 }}>
-                <Typography sx={{ fontSize: "14px", fontWeight: 500, color: "#3c4043" }}>{account.name}</Typography>
-                <Typography sx={{ fontSize: "13px", color: "#5f6368" }}>{account.email}</Typography>
-              </Box>
-            </Button>
-          ))}
-        </Box>
-
-        <Button fullWidth startIcon={<PersonAdd sx={{ fontSize: 20 }} />} sx={{ justifyContent: "flex-start", textTransform: "none", color: "#1a73e8", fontWeight: 500, fontSize: "14px", py: 2, px: 2, borderRadius: 1, "&:hover": { backgroundColor: "#f8f9fa" } }}>Use another account</Button>
-
-        <Divider sx={{ my: 3 }} />
-
-        <Typography sx={{ fontSize: "12px", color: "#5f6368", textAlign: "center", lineHeight: 1.7 }}>
-          To continue, Google will share your name, email address, and profile picture with myFEvent. See myFEvent's {" "}
-          <Box component="a" href="#" sx={{ color: "#1a73e8", textDecoration: "none" }}>Privacy Policy</Box> and {" "}
-          <Box component="a" href="#" sx={{ color: "#1a73e8", textDecoration: "none" }}>Terms of Service</Box>.
-        </Typography>
-      </Paper>
+        </Paper>
+      </Container>
     </Box>
   )
 }
-
-

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { CssBaseline } from '@mui/material';
+import { AuthProvider } from './contexts/AuthContext';
 import AboutUs from './pages/AboutUs';
 import HomePage from './pages/Normal/HomePage';   
 import ErrorPage404 from './pages/Errors/ErrorPage404'; 
@@ -19,7 +20,7 @@ import Login from './pages/Login';
 
 export default function App() {
   return (
-    <>
+    <AuthProvider>
       <CssBaseline />
       <BrowserRouter>
         <Routes>
@@ -40,6 +41,6 @@ export default function App() {
           <Route path="*" element={<ErrorPage404 />} /> 
         </Routes>
       </BrowserRouter>
-    </>
+    </AuthProvider>
   );
 }

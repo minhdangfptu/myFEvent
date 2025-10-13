@@ -1,10 +1,71 @@
-import { Link as RouterLink } from "react-router-dom"
-import { Box, Button, Container, TextField, Typography, Divider, Link as MUILink } from "@mui/material"
+import { useState } from "react"
+import { Link as RouterLink, useNavigate } from "react-router-dom"
+import { Box, Button, Container, TextField, Typography, Divider, Link as MUILink, Alert, CircularProgress, Snackbar } from "@mui/material"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
+import { authApi } from "../apis/authApi"
 
 export default function Signup1Page() {
+  const navigate = useNavigate()
+  const [formData, setFormData] = useState({
+    email: "",
+    fullName: "",
+    phone: "",
+    password: "",
+    confirmPassword: ""
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    // Validation
+    if (formData.password !== formData.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp!")
+      setLoading(false)
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Mật khẩu phải có ít nhất 6 ký tự!")
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Remove confirmPassword from data sent to API
+      const { confirmPassword, ...registerData } = formData
+      const response = await authApi.signup(registerData)
+      console.log('Signup response:', response)
+      
+      // Show success toast
+      setSuccess(true)
+      
+      // Redirect to login page after 2 seconds
+      setTimeout(() => {
+        navigate('/login')
+      }, 2000)
+    } catch (error) {
+      console.error('Signup error:', error)
+      setError(error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
+    <Box sx={{ minHeight: "100dvh",minWidth: "100vw", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
       <Container maxWidth="sm">
         {/* Logo */}
         <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
@@ -20,7 +81,13 @@ export default function Signup1Page() {
             p: 4,
           }}
         >
-          <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
             {/* Email Field */}
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
@@ -28,9 +95,13 @@ export default function Signup1Page() {
               </Typography>
               <TextField
                 fullWidth
+                name="email"
                 type="email"
+                value={formData.email}
+                onChange={handleInputChange}
                 placeholder="Nhập địa chỉ email của bạn"
                 variant="outlined"
+                required
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     "& fieldset": {
@@ -44,16 +115,20 @@ export default function Signup1Page() {
               />
             </Box>
 
-            {/* Username Field */}
+            {/* Phone Field */}
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
-                Tên người dùng
+                Số điện thoại
               </Typography>
               <TextField
                 fullWidth
-                type="text"
-                placeholder="Nhập tên người dùng của bạn"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleInputChange}
+                placeholder="Nhập số điện thoại của bạn"
                 variant="outlined"
+                required
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     "& fieldset": {
@@ -74,9 +149,13 @@ export default function Signup1Page() {
               </Typography>
               <TextField
                 fullWidth
+                name="fullName"
                 type="text"
+                value={formData.fullName}
+                onChange={handleInputChange}
                 placeholder="Nhập tên đầy đủ của bạn"
                 variant="outlined"
+                required
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     "& fieldset": {
@@ -97,9 +176,40 @@ export default function Signup1Page() {
               </Typography>
               <TextField
                 fullWidth
+                name="password"
                 type="password"
+                value={formData.password}
+                onChange={handleInputChange}
                 placeholder="Nhập mật khẩu của bạn"
                 variant="outlined"
+                required
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: "#d1d5db",
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "#9ca3af",
+                    },
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Confirm Password Field */}
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
+                Xác nhận mật khẩu
+              </Typography>
+              <TextField
+                fullWidth
+                name="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                placeholder="Nhập lại mật khẩu của bạn"
+                variant="outlined"
+                required
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     "& fieldset": {
@@ -115,10 +225,10 @@ export default function Signup1Page() {
 
             {/* Register Button */}
             <Button
-              component={RouterLink}
-              to="/email-confirmation"
+              type="submit"
               variant="contained"
               fullWidth
+              disabled={loading}
               sx={{
                 bgcolor: "#ef4444",
                 color: "white",
@@ -128,9 +238,19 @@ export default function Signup1Page() {
                 "&:hover": {
                   bgcolor: "#dc2626",
                 },
+                "&:disabled": {
+                  backgroundColor: "#ccc",
+                },
               }}
             >
-              Đăng ký
+              {loading ? (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CircularProgress size={20} color="inherit" />
+                  Đang đăng ký...
+                </Box>
+              ) : (
+                "Đăng ký"
+              )}
             </Button>
 
             {/* Divider */}
@@ -171,6 +291,22 @@ export default function Signup1Page() {
           </Typography>
         </Box>
       </Container>
+
+      {/* Success Toast */}
+      <Snackbar
+        open={success}
+        autoHideDuration={2000}
+        onClose={() => setSuccess(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSuccess(false)} 
+          severity="success" 
+          sx={{ width: '100%' }}
+        >
+          Đăng ký thành công! Đang chuyển về trang đăng nhập...
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }

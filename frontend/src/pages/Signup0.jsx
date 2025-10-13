@@ -5,7 +5,7 @@ import EmailIcon from "@mui/icons-material/Email"
 
 export default function Signup0Page() {
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
+    <Box sx={{ minHeight: "100dvh",minWidth: "100vw", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
       <Container maxWidth="sm">
         {/* Logo */}
         <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
@@ -66,7 +66,7 @@ export default function Signup0Page() {
                 },
               }}
             >
-              Đăng nhập với Email
+              Đăng kí với Email
             </Button>
 
             {/* Divider */}

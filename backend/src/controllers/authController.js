@@ -220,6 +220,7 @@ const refreshToken = async (req, res) => {
 const logout = async (req, res) => {
     try {
         const { refreshToken } = req.body;
+        console.log('Revoking refresh token:', refreshToken);
         
         if (!refreshToken) {
             return res.status(400).json({ message: 'Refresh token is required!' });
@@ -229,6 +230,7 @@ const logout = async (req, res) => {
         
         if (authToken) {
             authToken.revoked = true;
+            console.log('Revoked refresh token:', refreshToken);
             await authToken.save();
         }
         
