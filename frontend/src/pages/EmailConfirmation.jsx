@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Box, Button, Container, Typography } from "@mui/material"
+import { Link as RouterLink } from "react-router-dom"
 
 export default function EmailConfirmationPage() {
   const [code, setCode] = useState(["", "", "", "", "", ""])
@@ -26,43 +26,24 @@ export default function EmailConfirmationPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
-      <Container maxWidth="sm">
-        {/* Logo */}
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-          <img src="/logo-03.png" alt="myFEvent Logo" style={{ height: "96px" }} />
-        </Box>
+    <div className="d-flex align-items-center justify-content-center px-2" style={{ minHeight: '100dvh', backgroundColor: '#f9fafb' }}>
+      <div className="container" style={{ maxWidth: 560 }}>
+        <div className="d-flex justify-content-center mb-4">
+          <img src="/logo-03.png" alt="myFEvent Logo" style={{ height: 96 }} />
+        </div>
 
-        {/* Main Card */}
-        <Box
-          sx={{
-            bgcolor: "white",
-            borderRadius: 2,
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            p: 4,
-          }}
-        >
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {/* Title */}
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: "#111827", mb: 1 }}>
-                Nhập mã xác nhận
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#6b7280" }}>
-                Chúng tôi đã gửi mã xác nhận cho bạn trong email. Hãy nhập để tiếp tục.
-              </Typography>
-            </Box>
-
-            {/* Code Input */}
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1.5 }}>
-                Mã xác nhận
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1, justifyContent: "space-between" }}>
+        <div className="card border-0 shadow-sm">
+          <div className="card-body p-4">
+            <div className="mb-3">
+              <div className="fw-semibold mb-1" style={{ color: '#111827' }}>Nhập mã xác nhận</div>
+              <div className="text-secondary" style={{ fontSize: 14 }}>Chúng tôi đã gửi mã xác nhận cho bạn trong email. Hãy nhập để tiếp tục.</div>
+            </div>
+            <div className="mb-3">
+              <div className="fw-medium mb-2" style={{ fontSize: 14, color: '#111827' }}>Mã xác nhận</div>
+              <div className="d-flex gap-2 justify-content-between">
                 {code.map((digit, index) => (
-                  <Box
+                  <input
                     key={index}
-                    component="input"
                     id={`code-${index}`}
                     type="text"
                     inputMode="numeric"
@@ -70,63 +51,20 @@ export default function EmailConfirmationPage() {
                     value={digit}
                     onChange={(e) => handleCodeChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
-                    sx={{
-                      width: 48,
-                      height: 56,
-                      textAlign: "center",
-                      fontSize: "1.5rem",
-                      fontWeight: 600,
-                      border: "1px solid #d1d5db",
-                      borderRadius: 1,
-                      outline: "none",
-                      "&:focus": {
-                        borderColor: "#ef4444",
-                        borderWidth: 2,
-                      },
-                    }}
+                    className="form-control text-center fw-semibold"
+                    style={{ width: 48, height: 56, fontSize: '1.5rem' }}
                   />
                 ))}
-              </Box>
-              <Typography variant="body2" sx={{ color: "#6b7280", mt: 1.5 }}>
-                Không nhận được mã?{" "}
-                <Box
-                  component="button"
-                  sx={{
-                    color: "#ef4444",
-                    fontWeight: 500,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    p: 0,
-                  }}
-                >
-                  Nhấp để gửi lại.
-                </Box>
-              </Typography>
-            </Box>
+              </div>
+              <div className="text-secondary mt-2" style={{ fontSize: 14 }}>
+                Không nhận được mã? <button className="btn btn-link p-0 align-baseline" style={{ color: '#ef4444' }}>Nhấp để gửi lại.</button>
+              </div>
+            </div>
 
-            {/* Continue Button */}
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              sx={{
-                bgcolor: "#ef4444",
-                color: "white",
-                textTransform: "none",
-                py: 1.5,
-                fontSize: "1rem",
-                "&:hover": {
-                  bgcolor: "#dc2626",
-                },
-              }}
-            >
-              Tiếp tục
-            </Button>
-          </Box>
-        </Box>
-      </Container>
-    </Box>
+            <button className="btn btn-danger w-100 py-2">Tiếp tục</button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

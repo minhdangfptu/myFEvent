@@ -1,50 +1,92 @@
-import { Container, Box, TextField, Typography, Grid, Card, CardMedia, CardContent, Chip, IconButton, Link as MUILink } from "@mui/material"
-import { Search, Facebook, Instagram, YouTube } from "@mui/icons-material"
+import * as React from 'react'
 import { Link as RouterLink } from "react-router-dom"
 import Header from "../components/Header"
 import Footer from "../components/Footer"
 
-const events = [
-  { id: 1, title: "Halloween 2025", date: "12/12/2025", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=Halloween+event", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit. Exercitation veniam consequat sunt nostrud amet." },
-  { id: 2, title: "International Day 2025", date: "15/01/2026", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=International+Day+event", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit. Exercitation veniam consequat sunt nostrud amet." },
-  { id: 3, title: "Halloween 2024", date: "31/10/2024", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=Halloween+2024+event", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit. Exercitation veniam consequat sunt nostrud amet." },
-  { id: 4, title: "Title Blog", date: "01/01/2025", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=Blog+event", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit." },
-  { id: 5, title: "Title Blog", date: "05/02/2025", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=Blog+event+2", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit." },
-  { id: 6, title: "Title Blog", date: "10/03/2025", location: "Hà Nội", image: "https://placeholder.svg?height=200&width=350&query=Blog+event+3", description: "Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit." }
+const baseEvents = [
+  { id: 1, title: "Halloween 2025", date: "12/12/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1504270997636-07ddfbd48945?q=80&w=1200&auto=format&fit=crop", description: "Sự kiện Halloween với nhiều hoạt động hóa trang và trò chơi thú vị." },
+  { id: 2, title: "International Day 2025", date: "15/01/2026", location: "Hà Nội", image: "https://images.unsplash.com/photo-1520975979651-6f61dcole1a0?q=80&w=1200&auto=format&fit=crop", description: "Ngày hội giao lưu văn hoá quốc tế với nhiều gian hàng và biểu diễn đa dạng." },
+  { id: 3, title: "Halloween 2024", date: "31/10/2024", location: "Hà Nội", image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200&auto=format&fit=crop", description: "Không khí Halloween sôi động cùng cosplay và âm nhạc." },
+  { id: 4, title: "Workshop Startup", date: "01/01/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1542744095-291d1f67b221?q=80&w=1200&auto=format&fit=crop", description: "Chia sẻ về khởi nghiệp và xây dựng mô hình kinh doanh bền vững." },
+  { id: 5, title: "Tech Talk AI", date: "05/02/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?q=80&w=1200&auto=format&fit=crop", description: "Cập nhật xu hướng trí tuệ nhân tạo và ứng dụng thực tế." },
+  { id: 6, title: "Football Friendly", date: "10/03/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=1200&auto=format&fit=crop", description: "Giao hữu bóng đá giữa các câu lạc bộ sinh viên." },
+  { id: 7, title: "Music Night", date: "20/04/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1483412033650-1015ddeb83d1?q=80&w=1200&auto=format&fit=crop", description: "Đêm nhạc sinh viên với nhiều tiết mục đặc sắc." },
+  { id: 8, title: "Volunteer Day", date: "12/05/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1499933374294-4584851497cc?q=80&w=1200&auto=format&fit=crop", description: "Hoạt động tình nguyện vì cộng đồng do CLB tình nguyện tổ chức." },
 ]
 
+const events = Array.from({ length: 16 }, (_, i) => ({
+  ...baseEvents[i % baseEvents.length],
+  id: i + 1,
+}))
+
 export default function EventsPage() {
+  const [keyword, setKeyword] = React.useState("")
+  const [page, setPage] = React.useState(1)
+  const perPage = 9
+
+  const filtered = React.useMemo(() => {
+    const k = keyword.trim().toLowerCase()
+    if (!k) return events
+    return events.filter(e => e.title.toLowerCase().includes(k))
+  }, [keyword])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const start = (currentPage - 1) * perPage
+  const visible = filtered.slice(start, start + perPage)
+
   return (
     <>
       <Header />
 
-      <Container maxWidth="xl" sx={{ py: 6 }}>
-        <Box sx={{ mb: 4, maxWidth: 700, mx: "auto" }}>
-          <TextField fullWidth placeholder="Search sự kiện..." variant="outlined" InputProps={{ startAdornment: <Search sx={{ color: "#999", mr: 1 }} /> }} sx={{ backgroundColor: "#f5f5f5", borderRadius: 1, "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: "#e0e0e0" }, "&.Mui-focused fieldset": { borderColor: "#ff5757" } } }} />
-        </Box>
+      <div className="container-xl py-4">
+        <div className="mx-auto" style={{ maxWidth: 700 }}>
+          <div className="input-group mb-4">
+            <span className="input-group-text bg-white"><i className="bi bi-search text-muted" /></span>
+            <input type="text" className="form-control" placeholder="Tìm kiếm sự kiện..." value={keyword} onChange={e => { setPage(1); setKeyword(e.target.value) }} />
+          </div>
+        </div>
 
-        <Box sx={{ border: "2px solid #ff5757", borderRadius: 2, p: 4 }}>
-          <Typography variant="h5" sx={{ color: "#ff5757", fontWeight: 700, mb: 4, fontSize: "22px" }}>Tất cả sự kiện</Typography>
+        <div className="border rounded-3 p-3 p-sm-4" style={{ borderColor: '#fca5a5' }}>
+          <div className="text-danger fw-bold mb-3 mb-sm-4" style={{ fontSize: 20 }}>Tất cả sự kiện</div>
 
-          <Grid container spacing={3}>
-            {events.map((event) => (
-              <Grid item xs={12} md={4} key={event.id}>
-                <Card component={RouterLink} to={`/events/${event.id}`} sx={{ textDecoration: "none", height: "100%", cursor: "pointer", borderRadius: 2, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", transition: "all 0.3s ease", "&:hover": { transform: "translateY(-6px)", boxShadow: "0 8px 16px rgba(0,0,0,0.15)" } }}>
-                  <CardMedia component="img" height="200" image={event.image} alt={event.title} sx={{ backgroundColor: "#e0e0e0" }} />
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1.5, fontSize: "18px" }}>{event.title}</Typography>
-                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-                      <Chip label={event.date} size="small" sx={{ backgroundColor: "#f0f0f0", fontSize: "12px", height: "24px", fontWeight: 500 }} />
-                      <Chip label={event.location} size="small" sx={{ backgroundColor: "#f0f0f0", fontSize: "12px", height: "24px", fontWeight: 500 }} />
-                    </Box>
-                    <Typography variant="body2" sx={{ color: "#666", fontSize: "14px", lineHeight: 1.6 }}>{event.description}</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
+          <div className="row row-cols-1 row-cols-md-3 g-3">
+            {visible.map((event) => (
+              <div className="col" key={event.id}>
+                <RouterLink to={`/events/${event.id}`} state={{ event }} className="text-decoration-none text-reset">
+                  <div className="card h-100 shadow-sm border-0">
+                    <img src={event.image} alt={event.title} className="card-img-top" style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }} />
+                    <div className="card-body">
+                      <div className="fw-semibold mb-2" style={{ fontSize: 16, color: '#111827' }}>{event.title}</div>
+                      <div className="d-flex gap-2 mb-2">
+                        <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.date}</span>
+                        <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.location}</span>
+                      </div>
+                      <div className="text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{event.description}</div>
+                    </div>
+                  </div>
+                </RouterLink>
+              </div>
             ))}
-          </Grid>
-        </Box>
-      </Container>
+          </div>
+
+          <div className="d-flex justify-content-center mt-4">
+            <div className="d-flex align-items-center" style={{ gap: 16 }}>
+              <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="btn" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid #e5e7eb', background: '#fff', color: '#9ca3af', padding: 0 }}>
+                <i className="bi bi-chevron-left" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                <button key={n} type="button" onClick={() => setPage(n)} className="btn" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid ' + (n === currentPage ? '#f97316' : '#e5e7eb'), background: n === currentPage ? '#f97316' : '#fff', color: n === currentPage ? '#fff' : '#111827', padding: 0 }}>
+                  {n}
+                </button>
+              ))}
+              <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="btn" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid #e5e7eb', background: '#fff', color: '#9ca3af', padding: 0 }}>
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <Footer />
     </>

@@ -1,110 +1,22 @@
 // src/pages/ErrorPage403.jsx
 import * as React from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Link as MUILink,
-  useTheme,
-  Stack,
-} from "@mui/material";
-import KeyboardReturnOutlinedIcon from "@mui/icons-material/KeyboardReturnOutlined";
 import error403 from "~/assets/errors/403.png";
 import { useNavigate } from "react-router-dom";
 
 export default function ErrorPage403() {
-  const theme = useTheme();
   const navigate = useNavigate();
   return (
-    <Box
-      sx={{
-        minHeight: "90vh",
-        minWidth: "100vw",
-        bgcolor: "background.default",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        py: { xs: 6, md: 8 },
-      }}
-    >
-      <Container disableGutters>
-        <Stack
-          direction="column"
-          alignItems="center"
-          textAlign="center"
-          spacing={3}
-        >
-          <Typography
-            variant="h1"
-            sx={{
-              fontSize: { xs: "100px", md: "96px" },
-              lineHeight: 1.05,
-              fontWeight: 800,
-            }}
-          >
-            403
-          </Typography>
-
-          <Typography
-            variant="h3"
-            sx={{
-              fontSize: { xs: 24, md: 22 },
-              fontWeight: 700,
-              color: "text.primary",
-            }}
-          >
-            ERROR - Forbidden Page
-          </Typography>
-          <Box
-            sx={{
-              mt: 1,
-              mb: 2,
-              width: "100%",
-              maxWidth: 420,
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={error403}
-              alt="404 illustration"
-              style={{
-                width: "130%",
-                height: "auto",
-                objectFit: "contain",
-              }}
-            />
-          </Box>
-
-          <Button
-            component={MUILink}
-            onClick={() => navigate(-1)}
-            color="primary.main"
-            variant="text"
-            startIcon={<KeyboardReturnOutlinedIcon />}
-            sx={{
-              fontWeight: 700,
-              fontSize: (theme) => theme.typography.h3.fontSize,
-              color: 'text.primary',
-              textUnderlineOffset: "6px",
-              textTransform:"none",
-              textDecoration:"none",
-              "&:hover": {
-                bgcolor: "transparent",
-                textDecoration: "underline",
-                fontWeight: 800,
-                textDecorationThickness: "3px",
-                color: 'text.primary',
-                backgroundColor: "transparent",
-                transition: "all 0.3s ease-in-out",
-              },
-            }}
-          >
-            Về Trang trước
-          </Button>
-        </Stack>
-      </Container>
-    </Box>
+    <div className="d-flex align-items-center justify-content-center py-5" style={{ minHeight: '90vh' }}>
+      <div className="container text-center">
+        <div className="display-1 fw-bold">403</div>
+        <div className="h4 fw-bold mt-2">ERROR - Forbidden Page</div>
+        <div className="d-flex justify-content-center my-3">
+          <img src={error403} alt="403 illustration" style={{ width: '80%', maxWidth: 420 }} />
+        </div>
+        <button className="btn btn-link fw-bold" onClick={() => navigate(-1)}>
+          <i className="bi bi-arrow-left me-2" />Về Trang trước
+        </button>
+      </div>
+    </div>
   );
 }

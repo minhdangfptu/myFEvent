@@ -1,5 +1,4 @@
-import { Box, Paper, Typography, Button, Divider, Avatar } from "@mui/material"
-import { Google, PersonAdd } from "@mui/icons-material"
+import { Link as RouterLink } from "react-router-dom"
 
 const mockAccounts = [
   { name: "Sarah Johnson", email: "sarah.johnson@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+1" },
@@ -9,47 +8,45 @@ const mockAccounts = [
 
 export default function LoginPage() {
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f8f9fa" }}>
-      <Paper elevation={0} sx={{ width: "100%", maxWidth: 450, p: 5, borderRadius: 3, border: "1px solid #dadce0", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}>
-        <Box sx={{ textAlign: "center", mb: 4 }}>
-          <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Google sx={{ color: "#4285f4", fontSize: 28 }} />
-            </Box>
-          </Box>
-          <Typography variant="body1" sx={{ fontSize: "16px", color: "#5f6368", mb: 0.5 }}>Google</Typography>
-          <Typography variant="h5" sx={{ fontWeight: 400, fontSize: "24px", color: "#202124" }}>Choose an</Typography>
-          <Typography variant="h5" sx={{ fontWeight: 400, fontSize: "24px", color: "#202124" }}>
-            <Box component="span" sx={{ fontWeight: 500 }}>account</Box>
-          </Typography>
-          <Typography sx={{ fontSize: "14px", color: "#5f6368", mt: 1.5 }}>
-            to continue to <Box component="span" sx={{ fontWeight: 500 }}>myFEvent</Box>
-          </Typography>
-        </Box>
+    <div className="d-flex align-items-center justify-content-center" style={{ height: '100dvh', backgroundColor: '#f8f9fa' }}>
+      <div className="card shadow-sm border-0" style={{ width: '100%', maxWidth: 450, borderRadius: 16 }}>
+        <div className="card-body p-4">
+          <div className="text-center mb-4">
+            <div className="d-flex justify-content-center mb-2">
+              <div className="rounded-circle bg-white d-flex align-items-center justify-content-center" style={{ width: 48, height: 48 }}>
+                <i className="bi bi-google" style={{ color: '#4285f4', fontSize: 24 }}></i>
+              </div>
+            </div>
+            <div className="text-muted" style={{ fontSize: 16, marginBottom: 4 }}>Google</div>
+            <div className="fs-4" style={{ color: '#202124' }}>Choose an</div>
+            <div className="fs-4" style={{ color: '#202124' }}><span className="fw-semibold">account</span></div>
+            <div className="text-muted mt-2" style={{ fontSize: 14 }}>to continue to <span className="fw-semibold">myFEvent</span></div>
+          </div>
 
-        <Box sx={{ mb: 2 }}>
-          {mockAccounts.map((account, index) => (
-            <Button key={index} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", p: 2, mb: 1, border: "1px solid #dadce0", borderRadius: 1, backgroundColor: "#fff", "&:hover": { backgroundColor: "#f8f9fa", border: "1px solid #d2d3d4" } }}>
-              <Avatar src={account.avatar} alt={account.name} sx={{ width: 36, height: 36, mr: 2 }} />
-              <Box sx={{ textAlign: "left", flex: 1 }}>
-                <Typography sx={{ fontSize: "14px", fontWeight: 500, color: "#3c4043" }}>{account.name}</Typography>
-                <Typography sx={{ fontSize: "13px", color: "#5f6368" }}>{account.email}</Typography>
-              </Box>
-            </Button>
-          ))}
-        </Box>
+          <div className="mb-2">
+            {mockAccounts.map((account, index) => (
+              <button key={index} className="btn btn-light w-100 text-start mb-2 d-flex align-items-center" style={{ padding: '10px 12px', border: '1px solid #dadce0' }}>
+                <img src={account.avatar} alt={account.name} className="me-2 rounded-circle" style={{ width: 36, height: 36 }} />
+                <div className="text-start flex-grow-1">
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#3c4043' }}>{account.name}</div>
+                  <div className="text-muted" style={{ fontSize: 13 }}>{account.email}</div>
+                </div>
+              </button>
+            ))}
+          </div>
 
-        <Button fullWidth startIcon={<PersonAdd sx={{ fontSize: 20 }} />} sx={{ justifyContent: "flex-start", textTransform: "none", color: "#1a73e8", fontWeight: 500, fontSize: "14px", py: 2, px: 2, borderRadius: 1, "&:hover": { backgroundColor: "#f8f9fa" } }}>Use another account</Button>
+          <button className="btn w-100 text-start" style={{ color: '#1a73e8' }}>
+            <i className="bi bi-person-plus me-2" />Use another account
+          </button>
 
-        <Divider sx={{ my: 3 }} />
+          <hr className="my-3" />
 
-        <Typography sx={{ fontSize: "12px", color: "#5f6368", textAlign: "center", lineHeight: 1.7 }}>
-          To continue, Google will share your name, email address, and profile picture with myFEvent. See myFEvent's {" "}
-          <Box component="a" href="#" sx={{ color: "#1a73e8", textDecoration: "none" }}>Privacy Policy</Box> and {" "}
-          <Box component="a" href="#" sx={{ color: "#1a73e8", textDecoration: "none" }}>Terms of Service</Box>.
-        </Typography>
-      </Paper>
-    </Box>
+          <div className="text-center text-muted" style={{ fontSize: 12, lineHeight: 1.7 }}>
+            To continue, Google will share your name, email address, and profile picture with myFEvent. See myFEvent's <a href="#" className="text-decoration-none" style={{ color: '#1a73e8' }}>Privacy Policy</a> and <a href="#" className="text-decoration-none" style={{ color: '#1a73e8' }}>Terms of Service</a>.
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

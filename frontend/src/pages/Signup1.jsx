@@ -1,176 +1,50 @@
 import { Link as RouterLink } from "react-router-dom"
-import { Box, Button, Container, TextField, Typography, Divider, Link as MUILink } from "@mui/material"
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
 
 export default function Signup1Page() {
   return (
-    <Box sx={{ minHeight: "100dvh", width: "100%", bgcolor: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
-      <Container maxWidth="sm">
-        {/* Logo */}
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-          <img src="/logo-03.png" alt="myFEvent Logo" style={{ height: "96px" }} />
-        </Box>
+    <div className="d-flex align-items-center justify-content-center px-2" style={{ minHeight: '100dvh', backgroundColor: '#f9fafb' }}>
+      <div className="container" style={{ maxWidth: 560 }}>
+        <div className="d-flex justify-content-center mb-4">
+          <img src="/logo-03.png" alt="myFEvent Logo" style={{ height: 96 }} />
+        </div>
 
-        {/* Main Card */}
-        <Box
-          sx={{
-            bgcolor: "white",
-            borderRadius: 2,
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            p: 4,
-          }}
-        >
-          <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            {/* Email Field */}
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
-                Email
-              </Typography>
-              <TextField
-                fullWidth
-                type="email"
-                placeholder="Nhập địa chỉ email của bạn"
-                variant="outlined"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#d1d5db",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#9ca3af",
-                    },
-                  },
-                }}
-              />
-            </Box>
+        <div className="card border-0 shadow-sm">
+          <div className="card-body p-4">
+            <form className="d-grid gap-3">
+              <div>
+                <div className="form-label mb-1 fw-medium" style={{ color: '#111827' }}>Email</div>
+                <input type="email" className="form-control" placeholder="Nhập địa chỉ email của bạn" />
+              </div>
+              <div>
+                <div className="form-label mb-1 fw-medium" style={{ color: '#111827' }}>Tên người dùng</div>
+                <input type="text" className="form-control" placeholder="Nhập tên người dùng của bạn" />
+              </div>
+              <div>
+                <div className="form-label mb-1 fw-medium" style={{ color: '#111827' }}>Tên đầy đủ</div>
+                <input type="text" className="form-control" placeholder="Nhập tên đầy đủ của bạn" />
+              </div>
+              <div>
+                <div className="form-label mb-1 fw-medium" style={{ color: '#111827' }}>Mật khẩu</div>
+                <input type="password" className="form-control" placeholder="Nhập mật khẩu của bạn" />
+              </div>
 
-            {/* Username Field */}
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
-                Tên người dùng
-              </Typography>
-              <TextField
-                fullWidth
-                type="text"
-                placeholder="Nhập tên người dùng của bạn"
-                variant="outlined"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#d1d5db",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#9ca3af",
-                    },
-                  },
-                }}
-              />
-            </Box>
+              <RouterLink to="/email-confirmation" className="btn btn-danger w-100 py-2">Đăng ký</RouterLink>
 
-            {/* Full Name Field */}
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
-                Tên đầy đủ
-              </Typography>
-              <TextField
-                fullWidth
-                type="text"
-                placeholder="Nhập tên đầy đủ của bạn"
-                variant="outlined"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#d1d5db",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#9ca3af",
-                    },
-                  },
-                }}
-              />
-            </Box>
+              <div className="text-secondary text-center">Hoặc</div>
 
-            {/* Password Field */}
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#111827", mb: 1 }}>
-                Mật khẩu
-              </Typography>
-              <TextField
-                fullWidth
-                type="password"
-                placeholder="Nhập mật khẩu của bạn"
-                variant="outlined"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#d1d5db",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#9ca3af",
-                    },
-                  },
-                }}
-              />
-            </Box>
+              <button type="button" className="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-2">
+                <img src="/google-logo.png" alt="Google" width="20" height="20" />
+                <span className="text-dark">Sign in with Google</span>
+                <i className="bi bi-caret-down-fill text-secondary" />
+              </button>
+            </form>
+          </div>
+        </div>
 
-            {/* Register Button */}
-            <Button
-              component={RouterLink}
-              to="/email-confirmation"
-              variant="contained"
-              fullWidth
-              sx={{
-                bgcolor: "#ef4444",
-                color: "white",
-                textTransform: "none",
-                py: 1.5,
-                fontSize: "1rem",
-                "&:hover": {
-                  bgcolor: "#dc2626",
-                },
-              }}
-            >
-              Đăng ký
-            </Button>
-
-            {/* Divider */}
-            <Divider sx={{ color: "#6b7280" }}>Hoặc</Divider>
-
-            {/* Google Sign In */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-                p: 1.5,
-                border: "1px solid #d1d5db",
-                borderRadius: 1,
-                cursor: "pointer",
-                "&:hover": {
-                  bgcolor: "#f9fafb",
-                },
-              }}
-            >
-              <img src="/google-logo.png" alt="Google" style={{ width: "20px", height: "20px" }} />
-              <Typography variant="body2" sx={{ color: "#374151", flex: 1 }}>
-                Sign in with Google
-              </Typography>
-              <KeyboardArrowDownIcon sx={{ fontSize: 20, color: "#9ca3af" }} />
-            </Box>
-          </Box>
-        </Box>
-
-        {/* Footer */}
-        <Box sx={{ mt: 3, textAlign: "center" }}>
-          <Typography variant="body2" sx={{ color: "#6b7280" }}>
-            Bạn có tài khoản?{" "}
-            <MUILink component={RouterLink} to="/login" underline="none" sx={{ color: "#111827", fontWeight: 500 }}>
-              Đăng nhập
-            </MUILink>
-          </Typography>
-        </Box>
-      </Container>
-    </Box>
+        <div className="text-center mt-3 text-secondary">
+          Bạn có tài khoản? <RouterLink to="/login" className="text-dark fw-medium text-decoration-none">Đăng nhập</RouterLink>
+        </div>
+      </div>
+    </div>
   )
 }
