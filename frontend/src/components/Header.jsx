@@ -25,7 +25,7 @@ export default function Header() {
           </ul>
           <div className="d-none d-sm-flex gap-2">
             <RouterLink to="/login" className="btn btn-link text-secondary">Đăng nhập</RouterLink>
-            <RouterLink to="/signup0" className="btn btn-danger">Đăng ký</RouterLink>
+            <RouterLink to="/signup" className="btn btn-danger">Đăng ký</RouterLink>
           </div>
         </div>
       </div>

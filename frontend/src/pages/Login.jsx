@@ -1,53 +1,127 @@
-import { Link as RouterLink } from "react-router-dom"
-
-const mockAccounts = [
-  { name: "Sarah Johnson", email: "sarah.johnson@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+1" },
-  { name: "Michael Chen", email: "michael.chen@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+2" },
-  { name: "David Rodriguez", email: "david.rodriguez@fpt.edu.vn", avatar: "https://placeholder.svg?height=40&width=40&query=person+avatar+3" }
-]
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      await login(email, password);
+      navigate('/');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setLoading(true);
+      await loginWithGoogle(credentialResponse.credential);
+      navigate('/');
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError(error.response?.data?.message || 'Đăng nhập Google thất bại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Đăng nhập Google thất bại. Vui lòng thử lại.');
+  };
+
   return (
-    <div className="d-flex align-items-center justify-content-center" style={{ height: '100dvh', backgroundColor: '#f8f9fa' }}>
-      <div className="card shadow-sm border-0" style={{ width: '100%', maxWidth: 450, borderRadius: 16 }}>
-        <div className="card-body p-4">
-          <div className="text-center mb-4">
-            <div className="d-flex justify-content-center mb-2">
-              <div className="rounded-circle bg-white d-flex align-items-center justify-content-center" style={{ width: 48, height: 48 }}>
-                <i className="bi bi-google" style={{ color: '#4285f4', fontSize: 24 }}></i>
-              </div>
+    <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+      <div className="container" style={{ maxWidth: 520 }}>
+        <div className="card shadow-sm border-0">
+          <div className="card-body p-4">
+            <div className="d-flex justify-content-center mb-4">
+              <img src="/logo-03.png" alt="myFEvent Logo" style={{ width: 200, height: 'auto' }} />
             </div>
-            <div className="text-muted" style={{ fontSize: 16, marginBottom: 4 }}>Google</div>
-            <div className="fs-4" style={{ color: '#202124' }}>Choose an</div>
-            <div className="fs-4" style={{ color: '#202124' }}><span className="fw-semibold">account</span></div>
-            <div className="text-muted mt-2" style={{ fontSize: 14 }}>to continue to <span className="fw-semibold">myFEvent</span></div>
-          </div>
 
-          <div className="mb-2">
-            {mockAccounts.map((account, index) => (
-              <button key={index} className="btn btn-light w-100 text-start mb-2 d-flex align-items-center" style={{ padding: '10px 12px', border: '1px solid #dadce0' }}>
-                <img src={account.avatar} alt={account.name} className="me-2 rounded-circle" style={{ width: 36, height: 36 }} />
-                <div className="text-start flex-grow-1">
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#3c4043' }}>{account.name}</div>
-                  <div className="text-muted" style={{ fontSize: 13 }}>{account.email}</div>
-                </div>
+            {error && (
+              <div className="alert alert-danger" role="alert">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3">
+                <label htmlFor="email" className="form-label">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="form-control"
+                  placeholder="Nhập địa chỉ email của bạn"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="password" className="form-label">Mật khẩu</label>
+                <input
+                  id="password"
+                  type="password"
+                  className="form-control"
+                  placeholder="Nhập mật khẩu của bạn"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn btn-danger w-100 mb-3" disabled={loading}>
+                {loading ? (
+                  <span className="d-inline-flex align-items-center gap-2">
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Đang đăng nhập...
+                  </span>
+                ) : (
+                  'Đăng nhập'
+                )}
               </button>
-            ))}
-          </div>
 
-          <button className="btn w-100 text-start" style={{ color: '#1a73e8' }}>
-            <i className="bi bi-person-plus me-2" />Use another account
-          </button>
+              <div className="text-center text-secondary mb-3">Hoặc</div>
 
-          <hr className="my-3" />
+              <div className="d-flex justify-content-center mb-3">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  size="large"
+                  text="signin_with"
+                  shape="rectangular"
+                  width="100%"
+                />
+              </div>
 
-          <div className="text-center text-muted" style={{ fontSize: 12, lineHeight: 1.7 }}>
-            To continue, Google will share your name, email address, and profile picture with myFEvent. See myFEvent's <a href="#" className="text-decoration-none" style={{ color: '#1a73e8' }}>Privacy Policy</a> and <a href="#" className="text-decoration-none" style={{ color: '#1a73e8' }}>Terms of Service</a>.
+              <div className="text-center">
+                <span className="text-secondary">Bạn chưa có tài khoản? </span>
+                <a href="/signup" className="fw-medium">Đăng ký</a>
+              </div>
+            </form>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
 

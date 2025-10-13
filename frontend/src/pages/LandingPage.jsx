@@ -20,8 +20,8 @@ export default function FPTEvent_Landing() {
                 <RouterLink to="/about" className="btn btn-outline-secondary">Xem thêm</RouterLink>
               </div>
             </div>
-            <div className="col-12 col-sm-6 d-flex justify-content-sm-end justify-content-center">
-              <div className="card shadow" style={{ maxWidth: 640, background: 'linear-gradient(135deg, #0f172a 0%, #111827 100%)' }}>
+            <div className="col-12 col-sm-6 d-flex justify-content-sm-end justify-content-center ps-sm-0 ms-sm-n3">
+              <div className="card shadow w-100" style={{ maxWidth: 720, background: 'linear-gradient(135deg, #0f172a 0%, #111827 100%)' }}>
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <div>
@@ -85,7 +85,7 @@ export default function FPTEvent_Landing() {
 
       <section className="py-5" style={{ backgroundColor: '#f9fafb' }}>
         <div className="container-xl px-2">
-          <div className="row g-4 align-items-center">
+          <div className="row gx-5 gy-4 align-items-center">
             <div className="col-12 col-sm-6">
               <h2 className="fw-bold" style={{ color: '#111827' }}>Xem tổng quan sự kiện, theo dõi tiến độ và kết quả</h2>
               <p className="text-secondary fs-5">Dashboard trực quan giúp bạn nắm bắt toàn bộ thông tin về sự kiện và đưa ra quyết định dựa trên dữ liệu thực tế.</p>
@@ -143,7 +143,7 @@ export default function FPTEvent_Landing() {
 
       <section className="py-5 bg-white">
         <div className="container-xl px-2">
-          <div className="row g-4 align-items-center">
+          <div className="row gx-5 gy-4 align-items-center">
             <div className="col-12 col-sm-6 order-2 order-sm-1">
               <div className="card shadow-sm" style={{ background: 'linear-gradient(135deg,#f1f5f9 0%,#e5e7eb 100%)' }}>
                 <div className="card-body">
