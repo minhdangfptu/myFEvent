@@ -5,8 +5,7 @@ export default function Header() {
     <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top">
       <div className="container-xl px-2">
         <RouterLink to="/landingpage" className="navbar-brand d-flex align-items-center gap-2 text-dark">
-          <img src="/logo-03.png" alt="myFEvent" style={{ height: 32, width: 'auto' }} />
-          <span style={{ fontWeight: 600, color: '#111827', fontSize: 20 }}>FPT Event</span>
+          <img src="/logo-03.png" alt="myFEvent" style={{ height: 60, width: 'auto' }} />
         </RouterLink>
 
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">

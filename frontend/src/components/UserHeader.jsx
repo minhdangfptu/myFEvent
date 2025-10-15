@@ -1,20 +1,65 @@
 import { useAuth } from '../contexts/AuthContext';
 
 export default function UserHeader({ title, showSearch = false, showEventAction = false, onSearch, onEventAction }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <>
+      <style>{`
+        .brand-red      { color:#EF4444; }
+        .btn-brand-red  { background:#EF4444; color:#fff; border:none; }
+        .btn-brand-red:hover { background:#DC2626; color:#fff; }
+
+        /* Search input mềm mại */
+        .soft-input { background:#F9FAFB; border:1px solid #E5E7EB; height:44px; border-radius:12px; transition:.2s; }
+        .soft-input:focus { background:#fff; border-color:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,0.1); }
+
+        /* ====== DROPDOWN THEME (ĐỎ) ====== */
+        .dropdown-menu-red {
+          border:1px solid #F3F4F6;
+          border-radius:12px;
+          box-shadow:0 12px 24px rgba(0,0,0,.08);
+          padding:6px;
+        }
+        .dropdown-menu-red .dropdown-item {
+          border-radius:8px;
+          padding:8px 12px;
+        }
+        .dropdown-menu-red .dropdown-item:hover,
+        .dropdown-menu-red .dropdown-item:focus {
+          background:#FEE2E2;      /* đỏ nhạt */
+          color:#991B1B;           /* chữ đỏ đậm */
+        }
+        .dropdown-menu-red .dropdown-item.active {
+          background:#FEE2E2;
+          color:#991B1B;
+        }
+        .dropdown-menu-red .dropdown-divider {
+          margin:.35rem .25rem;
+        }
+
+        /* Nút icon xám nhạt cho thông báo & menu phụ */
+        .btn-ghost {
+          background:#fff;
+          border:1px solid #E5E7EB;
+          color:#374151;
+        }
+        .btn-ghost:hover {
+          background:#F9FAFB;
+          color:#111827;
+        }
+      `}</style>
+
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
           <button 
-            className="btn btn-outline-secondary me-3"
+            className="btn btn-ghost me-3"
             onClick={() => {
-              // This will be handled by parent component
               const event = new CustomEvent('toggleSidebar');
               window.dispatchEvent(event);
             }}
+            aria-label="Mở/đóng thanh bên"
           >
             <i className="bi bi-list"></i>
           </button>
@@ -22,18 +67,35 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
         </div>
         
         <div className="d-flex align-items-center gap-3">
-          <button className="btn btn-outline-secondary">
+          <button className="btn btn-ghost" aria-label="Thông báo">
             <i className="bi bi-bell"></i>
           </button>
+
+          {/* Account dropdown */}
           <div className="dropdown">
-            <button className="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <button
+              className="btn btn-ghost dropdown-toggle d-flex align-items-center gap-2"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              aria-label="Mở menu tài khoản"
+            >
               <i className="bi bi-person"></i>
+              <span
+                className="text-muted"
+                style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={user?.fullName || user?.name || user?.email || 'Tài khoản'}
+              >
+                {user?.fullName || user?.name || user?.email || 'Tài khoản'}
+              </span>
             </button>
-            <ul className="dropdown-menu">
+            <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
               <li><a className="dropdown-item" href="/user-profile">Hồ sơ</a></li>
               <li><a className="dropdown-item" href="/setting">Cài đặt</a></li>
               <li><hr className="dropdown-divider" /></li>
-              <li><button className="dropdown-item" onClick={logout}>Đăng xuất</button></li>
+              <li>
+                <button className="dropdown-item" onClick={logout}>Đăng xuất</button>
+              </li>
             </ul>
           </div>
         </div>
@@ -42,37 +104,58 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
       {/* Search and Action Bar */}
       {(showSearch || showEventAction) && (
         <div className="bg-light border-bottom p-3">
-          <div className="d-flex gap-3">
+          <div className="d-flex gap-3 align-items-center">
             {showSearch && (
               <div className="flex-grow-1">
-                <div className="input-group">
-                  <span className="input-group-text">
-                    <i className="bi bi-search"></i>
-                  </span>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Search sự kiện..."
+                <div className="position-relative">
+                  <i
+                    className="bi bi-search position-absolute"
+                    style={{ left: 12, top: 12, color: '#9CA3AF' }}
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="text"
+                    className="form-control soft-input ps-5"
+                    placeholder="Tìm kiếm sự kiện..."
                     onChange={(e) => onSearch && onSearch(e.target.value)}
+                    aria-label="Tìm kiếm sự kiện"
                   />
                 </div>
               </div>
             )}
-            
+
             {showEventAction && (
               <div className="dropdown">
-                <button 
-                  className="btn btn-danger d-flex align-items-center gap-2"
-                  type="button" 
+                <button
+                  className="btn btn-brand-red d-flex align-items-center gap-2"
+                  type="button"
                   data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  aria-label="Mở menu tạo/tham gia sự kiện"
                 >
                   <i className="bi bi-plus"></i>
-                  TẠO/THAM GIA SỰ KIỆN
+                  Tạo/Tham gia sự kiện
                   <i className="bi bi-chevron-down"></i>
                 </button>
-                <ul className="dropdown-menu">
-                  <li><button className="dropdown-item" onClick={() => onEventAction && onEventAction('create')}>Tạo sự kiện</button></li>
-                  <li><button className="dropdown-item" onClick={() => onEventAction && onEventAction('join')}>Tham gia sự kiện</button></li>
+                <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => onEventAction && onEventAction('create')}
+                    >
+                      <i className="bi bi-calendar-plus me-2"></i>
+                      Tạo sự kiện
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => onEventAction && onEventAction('join')}
+                    >
+                      <i className="bi bi-box-arrow-in-right me-2"></i>
+                      Tham gia sự kiện
+                    </button>
+                  </li>
                 </ul>
               </div>
             )}

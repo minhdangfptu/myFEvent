@@ -18,6 +18,11 @@ const UserSchema = new Schema({
     required: true
   },
   avatarUrl: String,
+  bio: { type: String, default: '' },
+  highlight: { type: String, default: '' },
+  tags: { type: [String], default: [] },
+  totalEvents: { type: Number, default: 0 },
+  verified: { type: Boolean, default: false },
   phone: {
     type: String,
     required: true,

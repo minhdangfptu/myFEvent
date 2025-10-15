@@ -18,7 +18,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      navigate('/');
+      navigate('/user-landing-page', { replace: true });
     } catch (error) {
       console.error('Login error:', error);
       setError(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -31,7 +31,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
       await loginWithGoogle(credentialResponse.credential);
-      navigate('/');
+      navigate('/user-landing-page', { replace: true });
     } catch (error) {
       console.error('Google login error:', error);
       setError(error.response?.data?.message || 'Đăng nhập Google thất bại.');

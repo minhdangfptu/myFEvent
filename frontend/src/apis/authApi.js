@@ -89,4 +89,41 @@ export const authApi = {
       throw error;
     }
   }
+  ,
+  getProfile: async () => {
+    try {
+      const response = await axiosClient.get('/api/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  updateProfile: async (payload) => {
+    try {
+      const response = await axiosClient.put('/api/auth/profile', payload);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  uploadAvatar: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const response = await axiosClient.post('/api/auth/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  removeTag: async (value) => {
+    try {
+      const response = await axiosClient.delete('/api/auth/profile/tag', { data: { value } });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
 };
