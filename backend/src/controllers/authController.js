@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { google } from 'googleapis';
+import nodemailer from 'nodemailer';
 import { config } from '../config/environment.js';
 
 // Initialize Google OAuth2 client
@@ -291,4 +292,76 @@ export const logoutAll = async (req, res) => {
         console.error('Logout all error:', error);
         return res.status(500).json({ message: 'Failed to logout from all devices!' });
     }
+};
+
+// FORGOT PASSWORD - send email with reset link
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetJwt = jwt.sign({ userId: user._id, token: resetToken }, config.JWT_SECRET, { expiresIn: '15m' });
+
+    const resetLink = `${config.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${resetJwt}`;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    await transporter.verify();
+
+    await transporter.sendMail({
+      from: `myFEvent <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Đặt lại mật khẩu myFEvent',
+      html: `
+        <div style="font-family:Arial,sans-serif;font-size:14px;color:#111827">
+          <h2>Đặt lại mật khẩu</h2>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản myFEvent.</p>
+          <p>Nhấn vào nút bên dưới để đặt lại mật khẩu (liên kết có hiệu lực trong 15 phút):</p>
+          <p><a href="${resetLink}" style="display:inline-block;background:#ef4444;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Đặt lại mật khẩu</a></p>
+          <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+        </div>
+      `
+    });
+
+    return res.status(200).json({ message: 'Reset email sent' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ message: 'Failed to send reset email' });
+  }
+};
+
+// RESET PASSWORD - verify token and set new password
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Token and new password are required' });
+    }
+
+    const decoded = jwt.verify(token, config.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    if (!user) return res.status(400).json({ message: 'Invalid token' });
+
+    const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    return res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: 'Token expired' });
+    }
+    return res.status(500).json({ message: 'Failed to reset password' });
+  }
 };

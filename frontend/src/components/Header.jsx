@@ -1,4 +1,4 @@
-import { Link as RouterLink } from "react-router-dom"
+import { NavLink, Link as RouterLink } from "react-router-dom"
 
 export default function Header() {
   return (
@@ -17,9 +17,13 @@ export default function Header() {
           <ul className="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-5 gap-lg-4">
             {["/landingpage","/events","/clubs","/about","/policy","/contact"].map((path, i) => (
               <li className="nav-item" key={path}>
-                <RouterLink to={path} className="nav-link" style={{ color: '#4b5563', fontSize: 14 }}>
+                <NavLink
+                  to={path}
+                  className={({ isActive }) => `nav-link ${isActive ? 'fw-semibold text-dark active' : 'text-secondary'}`}
+                  style={{ fontSize: 14, transition: 'color .2s ease' }}
+                >
                   {["Trang chủ","Sự kiện tới","Câu lạc bộ","Về chúng tôi","Chính sách","Liên hệ"][i]}
-                </RouterLink>
+                </NavLink>
               </li>
             ))}
           </ul>

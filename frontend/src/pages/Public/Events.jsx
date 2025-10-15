@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link as RouterLink } from "react-router-dom"
-import Header from "../components/Header"
-import Footer from "../components/Footer"
+import Header from "../../components/Header"
+import Footer from "../../components/Footer"
 
 const baseEvents = [
   { id: 1, title: "Halloween 2025", date: "12/12/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1504270997636-07ddfbd48945?q=80&w=1200&auto=format&fit=crop", description: "Sự kiện Halloween với nhiều hoạt động hóa trang và trò chơi thú vị." },

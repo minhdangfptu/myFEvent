@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
 
 export default function SignupPage() {
@@ -184,7 +184,6 @@ export default function SignupPage() {
                   size="large"
                   text="signup_with"
                   shape="rectangular"
-                  width="100%"
                 />
               </div>
             </form>

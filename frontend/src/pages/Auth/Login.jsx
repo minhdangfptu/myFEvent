@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
@@ -109,7 +109,6 @@ export default function LoginPage() {
                   size="large"
                   text="signin_with"
                   shape="rectangular"
-                  width="100%"
                 />
               </div>
 

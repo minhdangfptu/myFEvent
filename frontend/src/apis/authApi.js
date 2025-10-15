@@ -68,5 +68,25 @@ export const authApi = {
     } catch (error) {
       throw error;
     }
+  },
+
+  // Request password reset email
+  forgotPassword: async (email) => {
+    try {
+      const response = await axiosClient.post('/api/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Reset password with token
+  resetPassword: async ({ token, newPassword }) => {
+    try {
+      const response = await axiosClient.post('/api/auth/reset-password', { token, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 };

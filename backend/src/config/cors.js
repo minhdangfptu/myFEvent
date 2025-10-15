@@ -34,4 +34,4 @@ const corsOptions = {
     ]
 };
 
-export default cors(corsOptions);
+export const corsConfig = cors(corsOptions);
