@@ -158,7 +158,7 @@ const loginWithGoogle = async (req, res) => {
                 email: user.email,
                 fullName: user.fullName,
                 avatarUrl: user.avatarUrl,
-                roles: user.roles
+                roles: user.role
             }
         });
     } catch (error) {
