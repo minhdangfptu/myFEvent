@@ -5,7 +5,7 @@ import {
   Typography,
   Stack,
   Button,
-  Link,
+  Link as MUILink,
   useTheme,
   Avatar,
 } from "@mui/material";
@@ -121,7 +121,7 @@ export default function ErrorPage502() {
 
           {/* Button back */}
           <Button
-            component={Link}
+            component={MUILink}
             onClick={() => navigate(-1)}
             startIcon={<KeyboardReturnOutlinedIcon />}
             sx={{
@@ -144,7 +144,7 @@ export default function ErrorPage502() {
 
           {/* Contact */}
           <Typography variant="body2" sx={{ mt: 3, color: "text.secondary" }}>
-            Gửi <Link href="mailto:support@myfevent.com">email</Link> hoặc kết
+            Gửi <MUILink href="mailto:support@myfevent.com">email</MUILink> hoặc kết
             nối qua Mạng Xã Hội với chúng tôi.
           </Typography>
 
@@ -156,11 +156,11 @@ export default function ErrorPage502() {
               mt: 1,
             }}
           >
-            <Link href="#">
+            <MUILink href="#">
               {/* <img src="/icons/instagram.svg" alt="Instagram" width="24" /> */}
-            </Link>
+            </MUILink>
 
-            <Link href="#">
+            <MUILink href="#">
               <Avatar
                 sx={{
                   bgcolor: "primary.main",
@@ -174,8 +174,8 @@ export default function ErrorPage502() {
               >
                 <EmailIcon sx={{ color: "constrastText", fontSize: 20 }} />
               </Avatar>
-            </Link>
-            <Link href="#">
+            </MUILink>
+            <MUILink href="#">
               <Avatar
                 sx={{
                   bgcolor: "primary.main",
@@ -189,8 +189,8 @@ export default function ErrorPage502() {
               >
                 <FacebookIcon sx={{ color: "constrastText", fontSize: 20 }} />
               </Avatar>
-            </Link>
-            <Link href="#">
+            </MUILink>
+            <MUILink href="#">
               <Avatar
                 sx={{
                   bgcolor: "primary.main",
@@ -204,8 +204,8 @@ export default function ErrorPage502() {
               >
                 <InstagramIcon sx={{ color: "constrastText", fontSize: 20 }} />
               </Avatar>
-            </Link>
-            <Link href="#">
+            </MUILink>
+            <MUILink href="#">
               <Avatar
                 sx={{
                   bgcolor: "primary.main",
@@ -219,8 +219,8 @@ export default function ErrorPage502() {
               >
                 <TwitterIcon sx={{ color: "constrastText", fontSize: 20 }} />
               </Avatar>
-            </Link>
-            <Link href="#">
+            </MUILink>
+            <MUILink href="#">
               <Avatar
                 sx={{
                   bgcolor: "primary.main",
@@ -234,7 +234,7 @@ export default function ErrorPage502() {
               >
                 <YouTubeIcon sx={{ color: "constrastText", fontSize: 20 }} />
               </Avatar>
-            </Link>
+            </MUILink>
           </Stack>
         </Stack>
       </Container>

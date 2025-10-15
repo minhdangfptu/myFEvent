@@ -13,13 +13,23 @@
     "clean": "rm -rf build && mkdir build",
     "build-babel": "babel ./src -d ./build/src",
     "build": "npm run clean && npm run build-babel",
-    "start": "node ./build/src/server.js",
+    "start": "node server.js",
     "production": "npm run build && npm run start",
     "dev": "nodemon --exec babel-node ./src/server.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",
-    "express": "^4.21.2"
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "googleapis": "^161.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1",
+    "morgan": "^1.10.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.22.10",

@@ -5,10 +5,11 @@ import {
   Container,
   Typography,
   Button,
-  Link,
+  Link as MUILink,
   useTheme,
   Stack,
 } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import KeyboardReturnOutlinedIcon from "@mui/icons-material/KeyboardReturnOutlined";
 import error404 from "~/assets/errors/404.png";
 
@@ -77,8 +78,8 @@ export default function ErrorPage404() {
           </Box>
 
           <Button
-            component={Link}
-            href="/"
+            component={RouterLink}
+            to="/"
         
             color="primary.main"
             variant="text"
