@@ -33,7 +33,7 @@ export default defineConfig([
       'react-hooks/exhaustive-deps': 'warn',
       'react/prop-types': 0, // Disable type cua props
       'react/display-name': 0, // Disable display-name rule as it can be noisy in some cases
-      'no-console': 1, // Warn on console statements
+      // 'no-console': 1, // Warn on console statements
       'no-lonely-if': 1, // Warn on lonely if statements
       'no-unused-vars': 1, // Warn on unused variables
       'no-trailing-spaces': 1, // Warn on dau cach
