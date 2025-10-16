@@ -29,6 +29,8 @@ const signup = async (req,res) => {
         passwordHash,
         fullName,
         phone,
+        googleId: null,
+        authProvider: 'local',
     });
 
     await newUser.save();
@@ -119,10 +121,8 @@ const loginWithGoogle = async (req, res) => {
                 email,
                 fullName: name,
                 avatarUrl: picture,
-                passwordHash: crypto.randomBytes(32).toString('hex'),
-                phone: `google_${sub}`,
-                status: 'active',
-                isFirstLogin: true
+                phone: '',
+                googleId: sub,
             });
             await user.save();
         }
