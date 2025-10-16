@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Box, Container, TextField, Button, Typography, Divider, Link, Paper, Avatar, Alert, CircularProgress } from "@mui/material"
 import GoogleIcon from "@mui/icons-material/Google"
 import { authApi } from "../apis/authApi"
+import { signInWithGoogle } from "../services/googleAuth"
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -50,10 +51,36 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleSignIn = () => {
-    console.log("Google sign in clicked")
-    setError("Tính năng đăng nhập Google đang được phát triển. Vui lòng sử dụng đăng nhập thông thường.")
-  }
+  const handleGoogleSignIn = async () => {
+    console.log("🔍 DEBUG: Google sign in clicked");
+    console.log("🔍 VITE_GOOGLE_CLIENT_ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
+    console.log("🔍 window.google:", window.google);
+    
+    setError(""); 
+    setGoogleLoading(true);
+    
+    try {
+      console.log("🔍 Calling signInWithGoogle...");
+      const { credential, g_csrf_token } = await signInWithGoogle();
+      console.log("🔍 Got credential:", credential ? "Present" : "Missing");
+      console.log("🔍 Got CSRF token:", g_csrf_token);
+
+      console.log("🔍 Calling authApi.googleLogin...");
+      const data = await authApi.googleLogin({ credential, g_csrf_token });
+      console.log("🔍 API response:", data);
+
+      localStorage.setItem("access_token", data.accessToken);
+      localStorage.setItem("refresh_token", data.refreshToken || "");
+      localStorage.setItem("user", JSON.stringify(data.user || {}));
+      window.dispatchEvent(new CustomEvent("auth:login", { detail: { user: data.user } }));
+      navigate("/landingpage");
+    } catch (e) {
+      console.error("❌ Google login error:", e);
+      setError(e.message || "Google login thất bại");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <Box
@@ -172,44 +199,16 @@ export default function LoginPage() {
             </Divider>
 
             {/* Google Sign In */}
-            <Button
-              fullWidth
-              variant="outlined"
-              size="large"
-              disabled={googleLoading}
-              startIcon={
-                googleLoading ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <Avatar
-                    sx={{
-                      width: 20,
-                      height: 20,
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    <GoogleIcon sx={{ color: "#4285f4", fontSize: 20 }} />
-                  </Avatar>
-                )
-              }
+            <Button fullWidth variant="outlined" size="large" disabled={googleLoading}
+              startIcon={googleLoading ? <CircularProgress size={20} /> : (
+                <Avatar sx={{ width:20, height:20, bgcolor:"transparent" }}>
+                  <GoogleIcon sx={{ color:"#4285f4", fontSize:20 }} />
+                </Avatar>
+              )}
               onClick={handleGoogleSignIn}
-              sx={{
-                textTransform: "none",
-                fontSize: "14px",
-                padding: "10px",
-                marginBottom: 3,
-                borderColor: "#ddd",
-                color: "#666",
-                "&:hover": {
-                  borderColor: "#999",
-                  backgroundColor: "#f9f9f9",
-                },
-                "&:disabled": {
-                  borderColor: "#ccc",
-                  color: "#999",
-                },
-              }}
-            >
+              sx={{ textTransform:"none", fontSize:"14px", p:"10px", mb:3, borderColor:"#ddd", color:"#666",
+                    "&:hover":{ borderColor:"#999", bgcolor:"#f9f9f9" },
+                    "&:disabled":{ borderColor:"#ccc", color:"#999" }}}>
               {googleLoading ? "Đang đăng nhập..." : "Sign in with Google"}
             </Button>
 

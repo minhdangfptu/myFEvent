@@ -24,6 +24,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-validator": "^7.2.1",
+    "google-auth-library": "^10.4.1",
     "googleapis": "^161.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
@@ -41,5 +42,8 @@
     "babel-plugin-module-resolver": "^5.0.0",
     "eslint": "^8.47.0",
     "nodemon": "^3.1.10"
+  },
+  "overrides": {
+    "mongodb": "6.9.0"
   }
 }

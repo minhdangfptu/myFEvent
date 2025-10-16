@@ -34,7 +34,5 @@ const UserSchema = new Schema({
     default: 'user',
   },
 }, { timestamps: true });
-UserSchema.index({ googleId: 1 }, { unique: true, sparse: true });
-UserSchema.index({ email: 1 }, { unique: true });
 
 export default mongoose.model('User', UserSchema);
