@@ -11,13 +11,11 @@ export const config = {
     MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/myFEvent',
     
     // JWT
-    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
-    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-this-in-production',
+    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key',
     JWT_EXPIRE: process.env.JWT_EXPIRE || '15m',
     JWT_REFRESH_EXPIRE: process.env.JWT_REFRESH_EXPIRE || '7d',
-    
-    // Bcrypt
-    BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10,
+    JWT_REFRESH_SALT_ROUNDS: process.env.JWT_REFRESH_SALT_ROUNDS || 10,
     
     // Google OAuth
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

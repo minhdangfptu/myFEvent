@@ -2,121 +2,175 @@ import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
 import nodemailer from 'nodemailer';
 import { config } from '../config/environment.js';
 
-// Initialize Google OAuth2 client
+import User from '../models/User.js';
+import AuthToken from '../models/AuthToken.js';
+
 const oauth2Client = new google.auth.OAuth2(
-    config.GOOGLE_CLIENT_ID,
-    config.GOOGLE_CLIENT_SECRET,
-    config.GOOGLE_REDIRECT_URI
+  config.GOOGLE_CLIENT_ID,
+  config.GOOGLE_CLIENT_SECRET,
+  config.GOOGLE_REDIRECT_URI
 );
 
-// Helper function to create tokens
 const createTokens = (userId, email) => {
-    const accessToken = jwt.sign(
-        { userId, email },
-        config.JWT_SECRET,
-        { expiresIn: config.JWT_EXPIRE }
-    );
-    
-    const refreshToken = jwt.sign(
-        { userId },
-        config.JWT_REFRESH_SECRET,
-        { expiresIn: config.JWT_REFRESH_EXPIRE }
-    );
-    
-    return { accessToken, refreshToken };
+  const accessToken = jwt.sign(
+    { userId, email },
+    config.JWT_SECRET,
+    { expiresIn: config.JWT_EXPIRE }
+  );
+
+  const refreshToken = jwt.sign(
+    { userId },
+    config.JWT_REFRESH_SECRET,
+    { expiresIn: config.JWT_REFRESH_EXPIRE } 
+  );
+
+  return { accessToken, refreshToken };
 };
 
-// Helper function to save refresh token
 const saveRefreshToken = async (userId, token, req) => {
-    const authToken = new AuthToken({
-        userId,
-        token,
-        userAgent: req.get('User-Agent'),
-        ipAddress: req.ip || req.connection.remoteAddress,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    });
-    
-    await authToken.save();
+  const authToken = new AuthToken({
+    userId,
+    token,
+    userAgent: req.get('User-Agent'),
+    ipAddress: req.ip || req.connection?.remoteAddress,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+  await authToken.save();
 };
 
-// SIGNUP
 export const signup = async (req, res) => {
-    try {
-        const { email, password, fullName, phone } = req.body;
+  try {
+    const { email, password, fullName, phone } = req.body;
 
-        // Check if email already exists
-        const existingEmail = await User.findOne({ email });
-        if (existingEmail) {
-            return res.status(400).json({ message: 'Email already exists!' });
-        }
-
-        // Check if phone already exists
-        const existingPhone = await User.findOne({ phone });
-        if (existingPhone) {
-            return res.status(400).json({ message: 'Phone number already exists!' });
-        }
-
-        // Hash password
-        const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
-        const passwordHash = await bcrypt.hash(password, salt);
-
-        // Create new user
-        const newUser = new User({
-            email,
-            passwordHash,
-            fullName,
-            phone,
-            status: 'active'
-        });
-
-        await newUser.save();
-
-        return res.status(201).json({ 
-            message: 'User created successfully!',
-            user: {
-                id: newUser._id,
-                email: newUser.email,
-                fullName: newUser.fullName
-            }
-        });
-    } catch (error) {
-        console.error('Signup error:', error);
-        return res.status(500).json({ message: 'Failed to signup!' });
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ message: 'Email already exists!' });
     }
+
+    if (phone) {
+      const existingPhone = await User.findOne({ phone });
+      if (existingPhone) {
+        return res.status(400).json({ message: 'Phone number already exists!' });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(password, salt);
+    const newUser = new User({
+      email,
+      passwordHash,
+      fullName,
+      phone,
+      status: 'active',
+    });
+
+    await newUser.save();
+
+    const { accessToken, refreshToken } = createTokens(newUser._id, newUser.email);
+    await saveRefreshToken(newUser._id, refreshToken, req);
+
+    return res.status(201).json({
+      message: 'User created successfully!',
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        fullName: newUser.fullName,
+      },
+      tokens: { accessToken, refreshToken },
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    return res.status(500).json({ message: 'Failed to signup!' });
+  }
 };
 
-// LOGIN
 export const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        
-        // Find user by email
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials!' });
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(400).json({ message: 'Invalid credentials!' });
+
+    const { accessToken, refreshToken } = createTokens(user._id, user.email);
+    await saveRefreshToken(user._id, refreshToken, req);
+    return res.json({
+      message: 'Login successful!',
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+      },
+      tokens: { accessToken, refreshToken },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ message: 'Failed to login!' });
+  }
+};
+
+export const refreshToken = async (req, res) => {
+  try {
+    const { token } = req.body; 
+    if (!token) return res.status(401).json({ message: 'Missing refresh token' });
+
+    const stored = await AuthToken.findOne({ token });
+    if (!stored) return res.status(401).json({ message: 'Invalid refresh token' });
+
+    const payload = jwt.verify(token, config.JWT_REFRESH_SECRET);
+    const user = await User.findById(payload.userId);
+    if (!user) return res.status(401).json({ message: 'Invalid refresh token' });
+
+    const { accessToken, refreshToken: newRefresh } = createTokens(user._id, user.email);
+
+    await AuthToken.deleteOne({ _id: stored._id });
+    await saveRefreshToken(user._id, newRefresh, req);
+
+    return res.json({ accessToken, refreshToken: newRefresh });
+  } catch (err) {
+    console.error('Refresh error:', err);
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: 'Invalid email or password!' });
         }
         
-        // Check password
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid email or password!' });
         }
         
-        // Check user status
-        if (user.status !== 'active') {
-            return res.status(403).json({ message: 'Account is not active!' });
-        }
+        const accessToken = jwt.sign(
+            { userId: user._id, email: user.email },
+            config.JWT_SECRET,
+            { expiresIn: config.JWT_EXPIRE }
+        );
         
-        // Create tokens
-        const { accessToken, refreshToken } = createTokens(user._id, user.email);
+        const refreshToken = jwt.sign(
+            { userId: user._id },
+            config.JWT_REFRESH_SECRET,
+            { expiresIn: config.JWT_REFRESH_EXPIRE }
+        );
         
-        // Save refresh token to database
-        await saveRefreshToken(user._id, refreshToken, req);
+        const authToken = new AuthToken({
+            userId: user._id,
+            token: refreshToken,
+            userAgent: req.get('User-Agent'),
+            ipAddress: req.ip || req.connection.remoteAddress,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        });
+        
+        await authToken.save();
         
         return res.status(200).json({
             message: 'Login successful!',
@@ -196,13 +250,86 @@ export const loginWithGoogle = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Google login error:', error);
-        return res.status(500).json({ message: 'Failed to login with Google!' });
+        console.log(error);
+        return res.status(500).json({ message: 'Fail to login!' });
     }
 };
 
-// REFRESH TOKEN
-export const refreshToken = async (req, res) => {
+
+const loginWithGoogle = async (req, res) => {
+    try {
+        const { token } = req.body;
+        
+        if (!token) {
+            return res.status(400).json({ message: 'Google token is required!' });
+        }
+        
+        const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+        
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: config.GOOGLE_CLIENT_ID,
+        });
+        
+        const payload = ticket.getPayload();
+        const { email, name, picture, sub } = payload;
+        
+        let user = await User.findOne({ email });
+        
+        if (!user) {
+            user = new User({
+                email,
+                fullName: name,
+                avatarUrl: picture,
+                passwordHash: crypto.randomBytes(32).toString('hex'),
+                phone: `google_${sub}`,
+                status: 'active',
+                isFirstLogin: true
+            });
+            await user.save();
+        }
+        
+        const accessToken = jwt.sign(
+            { userId: user._id, email: user.email },
+            config.JWT_SECRET,
+            { expiresIn: config.JWT_EXPIRE }
+        );
+        
+        const refreshToken = jwt.sign(
+            { userId: user._id },
+            config.JWT_REFRESH_SECRET,
+            { expiresIn: config.JWT_REFRESH_EXPIRE }
+        );
+        
+        const authToken = new AuthToken({
+            userId: user._id,
+            token: refreshToken,
+            userAgent: req.get('User-Agent'),
+            ipAddress: req.ip || req.connection.remoteAddress,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        });
+        
+        await authToken.save();
+        
+        return res.status(200).json({
+            message: 'Google login successful!',
+            accessToken,
+            refreshToken,
+            user: {
+                id: user._id,
+                email: user.email,
+                fullName: user.fullName,
+                avatarUrl: user.avatarUrl,
+                roles: user.role
+            }
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: 'Fail to login with Google!' });
+    }
+};
+
+const refreshToken = async (req, res) => {
     try {
         const { refreshToken } = req.body;
         
@@ -210,10 +337,7 @@ export const refreshToken = async (req, res) => {
             return res.status(400).json({ message: 'Refresh token is required!' });
         }
         
-        // Verify refresh token
         const decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET);
-        
-        // Check if token exists in database and is not revoked
         const authToken = await AuthToken.findOne({ 
             token: refreshToken, 
             userId: decoded.userId,
@@ -224,22 +348,19 @@ export const refreshToken = async (req, res) => {
             return res.status(401).json({ message: 'Invalid refresh token!' });
         }
         
-        // Check if token is expired
         if (authToken.expiresAt < new Date()) {
             return res.status(401).json({ message: 'Refresh token has expired!' });
         }
         
-        // Find user
         const user = await User.findById(decoded.userId);
         if (!user || user.status !== 'active') {
             return res.status(401).json({ message: 'Invalid user!' });
         }
         
-        // Create new access token
         const newAccessToken = jwt.sign(
             { userId: user._id, email: user.email },
-            config.JWT_SECRET,
-            { expiresIn: config.JWT_EXPIRE }
+            process.env.JWT_SECRET,
+            { expiresIn: '15m' }
         );
         
         return res.status(200).json({
@@ -253,41 +374,39 @@ export const refreshToken = async (req, res) => {
         if (error.name === 'JsonWebTokenError') {
             return res.status(401).json({ message: 'Invalid refresh token!' });
         }
-        console.error('Refresh token error:', error);
-        return res.status(500).json({ message: 'Failed to refresh token!' });
+        console.log(error);
+        return res.status(500).json({ message: 'Fail to refresh token!' });
     }
 };
 
-// LOGOUT
-export const logout = async (req, res) => {
+const logout = async (req, res) => {
     try {
         const { refreshToken } = req.body;
+        console.log('Revoking refresh token:', refreshToken);
         
         if (!refreshToken) {
             return res.status(400).json({ message: 'Refresh token is required!' });
         }
         
-        // Find and revoke the token
         const authToken = await AuthToken.findOne({ token: refreshToken });
         
         if (authToken) {
             authToken.revoked = true;
+            console.log('Revoked refresh token:', refreshToken);
             await authToken.save();
         }
         
         return res.status(200).json({ message: 'Logout successful!' });
     } catch (error) {
-        console.error('Logout error:', error);
-        return res.status(500).json({ message: 'Failed to logout!' });
+        console.log(error);
+        return res.status(500).json({ message: 'Fail to logout!' });
     }
 };
 
-// LOGOUT ALL DEVICES
-export const logoutAll = async (req, res) => {
+const logoutAll = async (req, res) => {
     try {
         const userId = req.user.id;
         
-        // Revoke all refresh tokens for this user
         await AuthToken.updateMany(
             { userId, revoked: false },
             { revoked: true }

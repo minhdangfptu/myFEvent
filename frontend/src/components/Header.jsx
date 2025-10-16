@@ -1,6 +1,60 @@
 import { NavLink, Link as RouterLink } from "react-router-dom"
 
 export default function Header() {
+  const { user, isAuthenticated, logout, logoutAllDevices } = useAuth()
+  const navigate = useNavigate()
+  const [anchorEl, setAnchorEl] = useState(null)
+  const [logoutLoading, setLogoutLoading] = useState(false)
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
+
+  const handleLogout = async () => {
+    if (logoutLoading) return // Tránh double-click
+    
+    setLogoutLoading(true)
+    try {
+      await logout()
+      handleMenuClose()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Vẫn đóng menu và redirect dù có lỗi
+      handleMenuClose()
+      navigate('/login')
+    } finally {
+      setLogoutLoading(false)
+    }
+  }
+  const handleLogoutAllDevices = async () => {
+    if (logoutLoading) return 
+    
+    setLogoutLoading(true)
+    try {
+      await logoutAllDevices()
+      handleMenuClose()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Vẫn đóng menu và redirect dù có lỗi
+      handleMenuClose()
+      navigate('/login')
+    } finally {
+      setLogoutLoading(false)
+    }
+  }
+
+  const handleProfile = () => {
+    handleMenuClose()
+    // Navigate to profile page or show profile modal
+    console.log('Navigate to profile')
+  }
+
   return (
     <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top">
       <div className="container-xl px-2">

@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = localStorage.getItem('access_token');
         const userData = localStorage.getItem('user');
-        
         if (token && userData) {
           setUser(JSON.parse(userData));
         }
@@ -36,104 +35,66 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
 
-    // Listen for auth events
     const handleLogout = () => {
       setUser(null);
     };
-
     const handleLogin = (event) => {
       setUser(event.detail.user);
     };
 
     window.addEventListener('auth:logout', handleLogout);
     window.addEventListener('auth:login', handleLogin);
-    
     return () => {
       window.removeEventListener('auth:logout', handleLogout);
       window.removeEventListener('auth:login', handleLogin);
     };
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      const response = await authApi.login(email, password);
-      
-      const accessToken = response.accessToken;
-      const refreshToken = response.refreshToken;
-      const userData = response.user;
-      
-      // Save to localStorage
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Update state
-      setUser(userData);
-      
-      // Dispatch event
-      window.dispatchEvent(new CustomEvent('auth:login', { 
-        detail: { user: userData } 
-      }));
-      
-      return response;
-    } catch (error) {
-      throw error;
+  const persistAuth = (response) => {
+    // Backend may return tokens at top-level or nested under tokens
+    const accessToken = response.accessToken || response.tokens?.accessToken;
+    const refreshToken = response.refreshToken || response.tokens?.refreshToken;
+    const userData = response.user || null;
+
+    if (accessToken) localStorage.setItem('access_token', accessToken);
+    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    if (userData) localStorage.setItem('user', JSON.stringify(userData));
+    if (userData) setUser(userData);
+
+    if (userData) {
+      window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } }));
     }
+    return { accessToken, refreshToken, user: userData };
+  };
+
+  const login = async (email, password) => {
+    const response = await authApi.login(email, password);
+    return persistAuth(response);
   };
 
   const loginWithGoogle = async (googleToken) => {
-    try {
-      const response = await authApi.loginWithGoogle(googleToken);
-      
-      const accessToken = response.accessToken;
-      const refreshToken = response.refreshToken;
-      const userData = response.user;
-      
-      // Save to localStorage
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Update state
-      setUser(userData);
-      
-      // Dispatch event
-      window.dispatchEvent(new CustomEvent('auth:login', { 
-        detail: { user: userData } 
-      }));
-      
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await authApi.loginWithGoogle(googleToken);
+    return persistAuth(response);
   };
 
   const signup = async (userData) => {
-    try {
-      const response = await authApi.signup(userData);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await authApi.signup(userData);
+    return response;
   };
 
   const logout = async () => {
     try {
       const refreshToken = localStorage.getItem('refresh_token');
-      
       if (refreshToken) {
         await authApi.logout(refreshToken);
       }
     } catch (error) {
       console.error('Logout API error:', error);
     } finally {
-      // Always clear local storage
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       setUser(null);
-      
-      // Dispatch logout event
       window.dispatchEvent(new CustomEvent('auth:logout'));
     }
   };
@@ -141,18 +102,15 @@ export const AuthProvider = ({ children }) => {
   const logoutAllDevices = async () => {
     try {
       await authApi.logoutAllDevices();
-      
-      // Clear local storage
+    } catch (error) {
+      console.error('Logout all devices API error:', error);
+      throw error;
+    } finally {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       setUser(null);
-      
-      // Dispatch logout event
       window.dispatchEvent(new CustomEvent('auth:logout'));
-    } catch (error) {
-      console.error('Logout all devices API error:', error);
-      throw error;
     }
   };
 
@@ -164,7 +122,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     logoutAllDevices,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   };
 
   return (

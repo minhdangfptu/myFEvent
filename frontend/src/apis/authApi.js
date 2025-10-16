@@ -6,7 +6,7 @@ export const authApi = {
     try {
       const response = await axiosClient.post('/api/auth/login', {
         email,
-        password
+        password,
       });
       return response.data;
     } catch (error) {
@@ -18,7 +18,7 @@ export const authApi = {
   loginWithGoogle: async (googleToken) => {
     try {
       const response = await axiosClient.post('/api/auth/google-login', {
-        token: googleToken
+        token: googleToken, // backend expects { token }
       });
       return response.data;
     } catch (error) {
@@ -36,11 +36,12 @@ export const authApi = {
     }
   },
 
-  // Refresh access token
+  // Refresh access token (send both keys to be compatible with backend variants)
   refreshToken: async (refreshToken) => {
     try {
       const response = await axiosClient.post('/api/auth/refresh-token', {
-        refreshToken: refreshToken
+        token: refreshToken,
+        refreshToken: refreshToken,
       });
       return response.data;
     } catch (error) {
@@ -52,7 +53,7 @@ export const authApi = {
   logout: async (refreshToken) => {
     try {
       const response = await axiosClient.post('/api/auth/logout', {
-        refreshToken: refreshToken
+        refreshToken: refreshToken,
       });
       return response.data;
     } catch (error) {
@@ -88,8 +89,9 @@ export const authApi = {
     } catch (error) {
       throw error;
     }
-  }
-  ,
+  },
+
+  // Profile APIs
   getProfile: async () => {
     try {
       const response = await axiosClient.get('/api/auth/profile');
@@ -111,7 +113,7 @@ export const authApi = {
       const formData = new FormData();
       formData.append('avatar', file);
       const response = await axiosClient.post('/api/auth/profile/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     } catch (error) {
@@ -125,5 +127,5 @@ export const authApi = {
     } catch (error) {
       throw error;
     }
-  }
+  },
 };

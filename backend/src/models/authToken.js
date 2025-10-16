@@ -1,16 +1,14 @@
-import mongoose, { Schema } from 'mongoose'
+import mongoose, { Schema, Types } from 'mongoose';
 
 const AuthTokenSchema = new Schema({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  token: { type: String, required: true },
-  userAgent: String,
+  userId: { type: Types.ObjectId, ref: 'User', required: true },
+  token: { type: String, required: true, index: true },
+  userAgent: String,        
   ipAddress: String,
+  expiresAt: { type: Date, required: true },
   revoked: { type: Boolean, default: false },
-  expiresAt: { type: Date, required: true }
-}, { timestamps: true })
+}, { timestamps: true });
 
-export default mongoose.model('AuthToken', AuthTokenSchema)
+AuthTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-
-
-
+export default mongoose.model('AuthToken', AuthTokenSchema);

@@ -1,12 +1,8 @@
-import express from 'express'
-import authRoutes from './authRoute.js'
+import express from 'express';
+import authRoute from './authRoute.js';
 
-const router = express.Router()
+const router = express.Router();
 
-router.use('/auth', authRoutes)
+router.use('/auth', authRoute);
 
-export default router
-/**
- * Updated by MinhDang on FA25
- * "A bit of fragrance clings to the hand that gives flowers!"
-*/
+export default router;
