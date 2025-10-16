@@ -89,6 +89,7 @@ export default function ErrorPageOffline() {
             color="primary"
             onClick={handleReload}
             sx={{
+              backgroundColor: "red",
               mt: 1,
               px: 3,
               py: 1,
@@ -97,7 +98,7 @@ export default function ErrorPageOffline() {
               fontWeight: 500,
               boxShadow: "none",
               "&:hover": {
-                boxShadow: "none",
+                boxShadow: "20px 10px 30px rgba(255, 0, 0, 0.2)",
                 transition: "all 0.3s ease-in-out",
               },
               "&:active": {
@@ -126,7 +127,7 @@ export default function ErrorPageOffline() {
               href="#"
               underline="hover"
               sx={{
-                color: "primary.main",
+                color: "red",
                 fontWeight: 600,
               }}
             >
