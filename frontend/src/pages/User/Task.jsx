@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
+import { useTranslation } from 'react-i18next';
 
 export default function Task() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('Tên');
   const [filterPriority, setFilterPriority] = useState('Tất cả');
@@ -82,7 +84,7 @@ export default function Task() {
   };
 
   return (
-    <UserLayout title="Công việc" activePage="task">
+    <UserLayout title={t('taskPage.title')} activePage="task">
       <style>{`
         .task-header { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
         .stat-card { background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; transition: all 0.2s; }
@@ -108,6 +110,18 @@ export default function Task() {
 
         /* Đẩy lề trái cho cột tên để thoáng hơn */
         .col-name { padding-left: 20px !important; }
+
+        /* ===== Panel chi tiết trượt từ PHẢI ===== */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 999; }
+        .task-detail-panel {
+          position: fixed; right: 0; top: 0; bottom: 0;
+          width: 420px; max-width: 92vw; background: #fff;
+          box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+          z-index: 1000;
+          transform: translateX(100%);
+          transition: transform .3s ease;
+        }
+        .task-detail-panel.open { transform: translateX(0); }
       `}</style>
 
       <div className="container-fluid" style={{ maxWidth: 1200 }}>
@@ -115,21 +129,21 @@ export default function Task() {
         <div className="task-header">
           <div className="row align-items-center">
             <div className="col-md-6">
-              <h3 className="mb-2">📋 Quản lý Nhiệm vụ</h3>
-              <p className="mb-0 opacity-75">Theo dõi và quản lý tất cả các nhiệm vụ của sự kiện</p>
+              <h3 className="mb-2">{t('taskPage.headerTitle')}</h3>
+              <p className="mb-0 opacity-75">{t('taskPage.headerSubtitle')}</p>
             </div>
             <div className="col-md-6">
               <div className="row g-2">
                 <div className="col-6">
                   <div className="stat-card text-center" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white' }}>
                     <div className="fs-4 fw-bold">{taskStats.completed}/{taskStats.total}</div>
-                    <div className="small">Hoàn thành</div>
+                    <div className="small">{t('taskPage.stats.completed')}</div>
                   </div>
                 </div>
                 <div className="col-6">
                   <div className="stat-card text-center" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white' }}>
                     <div className="fs-4 fw-bold">{taskStats.highPriority}</div>
-                    <div className="small">Ưu tiên cao</div>
+                    <div className="small">{t('taskPage.stats.high')}</div>
                   </div>
                 </div>
               </div>
@@ -142,7 +156,7 @@ export default function Task() {
           <input 
             value={search} 
             onChange={(e) => setSearch(e.target.value)} 
-            placeholder="🔍 Tìm kiếm nhiệm vụ..." 
+            placeholder={t('taskPage.searchPlaceholder')} 
             className="form-control soft-input" 
             style={{ width: 320, paddingLeft: 16 }} 
           />
@@ -155,7 +169,7 @@ export default function Task() {
             onChange={(e) => setFilterStatus(e.target.value)}
             aria-label="Lọc theo trạng thái"
           >
-            <option value="Tất cả">Tất cả trạng thái</option>
+            <option value="Tất cả">{t('taskPage.filters.allStatus')}</option>
             <option value="Đang làm">Đang làm</option>
             <option value="Hoàn thành">Hoàn thành</option>
             <option value="Tạm hoãn">Tạm hoãn</option>
@@ -169,7 +183,7 @@ export default function Task() {
               onChange={(e) => setFilterPriority(e.target.value)}
               aria-label="Lọc theo mức độ ưu tiên"
             >
-              <option value="Tất cả">Tất cả mức độ</option>
+              <option value="Tất cả">{t('taskPage.filters.allPriority')}</option>
               <option value="Cao">Cao</option>
               <option value="Trung bình">Trung bình</option>
               <option value="Thấp">Thấp</option>
@@ -182,13 +196,13 @@ export default function Task() {
               onChange={(e) => setSortBy(e.target.value)}
               aria-label="Sắp xếp"
             >
-              <option value="Tên">Tên</option>
-              <option value="Hạn chót">Hạn chót</option>
-              <option value="Ưu tiên">Ưu tiên</option>
+              <option value="Tên">{t('home.sorts.az')}</option>
+              <option value="Hạn chót">Deadline</option>
+              <option value="Ưu tiên">{t('taskPage.columns.priority')}</option>
             </select>
 
-            <button className="add-btn" onClick={() => setShowAddModal(true)}>
-              + Thêm nhiệm vụ
+            <button className="add-btn btn btn-primary" onClick={() => setShowAddModal(true)}>
+              + {t('taskPage.add')}
             </button>
           </div>
         </div>
@@ -199,11 +213,11 @@ export default function Task() {
             <table className="table align-middle">
               <thead>
                 <tr className="text-muted">
-                  <th className="py-3 col-name" style={{ width: '35%' }}>Tên nhiệm vụ</th>
-                  <th className="py-3" style={{ width: '20%' }}>Người phụ trách</th>
-                  <th className="py-3" style={{ width: '12%' }}>Hạn chót</th>
-                  <th className="py-3" style={{ width: '18%' }}>Trạng thái</th>
-                  <th className="py-3" style={{ width: '15%' }}>Mức độ</th>
+                  <th className="py-3 col-name" style={{ width: '35%' }}>{t('taskPage.columns.name')}</th>
+                  <th className="py-3" style={{ width: '20%' }}>{t('taskPage.columns.owner')}</th>
+                  <th className="py-3" style={{ width: '12%' }}>{t('taskPage.columns.due')}</th>
+                  <th className="py-3" style={{ width: '18%' }}>{t('taskPage.columns.status')}</th>
+                  <th className="py-3" style={{ width: '15%' }}>{t('taskPage.columns.priority')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,44 +225,42 @@ export default function Task() {
                   <tr>
                     <td colSpan="5" className="text-center py-5 text-muted">
                       <div style={{ fontSize: 48 }}>📭</div>
-                      <div className="mt-2">Không tìm thấy nhiệm vụ nào</div>
+                      <div className="mt-2">{t('taskPage.empty')}</div>
                     </td>
                   </tr>
                 ) : (
-                  filteredTasks.map((t) => (
-                    <tr key={t.id} className="task-row" onClick={() => setSelectedTask(t)}>
+                  filteredTasks.map((task) => (
+                    <tr key={task.id} className="task-row" onClick={() => setSelectedTask(task)}>
                       <td className="py-3 col-name">
-                        <div className="fw-medium">{t.name}</div>
+                        <div className="fw-medium">{task.name}</div>
                       </td>
-                      <td className="py-3 text-muted small">{t.owner}</td>
-                      <td className="py-3">
-                        <span className="small text-muted">📅 {t.due}</span>
-                      </td>
+                      <td className="py-3 text-muted small">{task.owner}</td>
+                      <td className="py-3"><span className="small text-muted">📅 {task.due}</span></td>
                       <td className="py-3">
                         <span 
                           className="status-badge"
-                          style={{ background: statusColor(t.status).bg, color: statusColor(t.status).color }}
+                          style={{ background: statusColor(task.status).bg, color: statusColor(task.status).color }}
                           onClick={(e) => {
                             e.stopPropagation();
                             const statuses = ['Đang làm', 'Hoàn thành', 'Tạm hoãn'];
-                            const currentIndex = statuses.indexOf(t.status);
+                            const currentIndex = statuses.indexOf(task.status);
                             const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-                            handleUpdateTaskStatus(t.id, nextStatus);
+                            handleUpdateTaskStatus(task.id, nextStatus);
                           }}
                         >
-                          {t.status}
+                          {task.status}
                         </span>
                       </td>
                       <td className="py-3">
                         <span 
                           className="priority-badge"
                           style={{ 
-                            background: priorityColor(t.priority).bg,
-                            color: priorityColor(t.priority).color,
-                            borderColor: priorityColor(t.priority).border
+                            background: priorityColor(task.priority).bg,
+                            color: priorityColor(task.priority).color,
+                            borderColor: priorityColor(task.priority).border
                           }}
                         >
-                          {t.priority}
+                          {task.priority}
                         </span>
                       </td>
                     </tr>
@@ -260,30 +272,36 @@ export default function Task() {
         </div>
       </div>
 
-      {/* Task Detail Panel */}
+      {/* ===== Panel chi tiết TRƯỢT TỪ PHẢI ===== */}
       {selectedTask && (
         <>
           <div className="overlay" onClick={() => setSelectedTask(null)} />
           <div className={`task-detail-panel ${selectedTask ? 'open' : ''}`}>
             <div className="p-4" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div className="d-flex justify-content-between align-items-start mb-4">
-                <h5 className="mb-0">Chi tiết nhiệm vụ</h5>
-                <button className="btn btn-sm btn-light rounded-circle" style={{ width: 32, height: 32 }} onClick={() => setSelectedTask(null)}>×</button>
+                <h5 className="mb-0">{t('taskPage.detail.title')}</h5>
+                <button 
+                  className="btn btn-sm btn-light rounded-circle" 
+                  style={{ width: 32, height: 32 }}
+                  onClick={() => setSelectedTask(null)}
+                >
+                  ×
+                </button>
               </div>
 
               <div className="flex-grow-1 overflow-auto">
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Tên nhiệm vụ</label>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.name')}</label>
                   <div className="fw-semibold fs-5">{selectedTask.name}</div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Mô tả</label>
-                  <div className="text-muted">{selectedTask.description || 'Chưa có mô tả'}</div>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.description')}</label>
+                  <div className="text-muted">{selectedTask.description || t('taskPage.detail.noDesc')}</div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Người phụ trách</label>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.owner')}</label>
                   <div className="d-flex align-items-center gap-2">
                     <span style={{ fontSize: 20 }}>👤</span>
                     <span>{selectedTask.owner}</span>
@@ -291,7 +309,7 @@ export default function Task() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Hạn chót</label>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.due')}</label>
                   <div className="d-flex align-items-center gap-2">
                     <span style={{ fontSize: 20 }}>📅</span>
                     <span>{selectedTask.due}</span>
@@ -299,8 +317,12 @@ export default function Task() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Trạng thái</label>
-                  <select className="form-select" value={selectedTask.status} onChange={(e) => handleUpdateTaskStatus(selectedTask.id, e.target.value)}>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.status')}</label>
+                  <select 
+                    className="form-select"
+                    value={selectedTask.status}
+                    onChange={(e) => handleUpdateTaskStatus(selectedTask.id, e.target.value)}
+                  >
                     <option value="Đang làm">Đang làm</option>
                     <option value="Hoàn thành">Hoàn thành</option>
                     <option value="Tạm hoãn">Tạm hoãn</option>
@@ -308,7 +330,7 @@ export default function Task() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-muted small mb-2">Mức độ ưu tiên</label>
+                  <label className="text-muted small mb-2">{t('taskPage.detail.priority')}</label>
                   <div>
                     <span 
                       className="priority-badge"
@@ -325,8 +347,11 @@ export default function Task() {
               </div>
 
               <div className="border-top pt-3">
-                <button className="btn btn-danger w-100" onClick={() => handleDeleteTask(selectedTask.id)}>
-                  🗑️ Xóa nhiệm vụ
+                <button 
+                  className="btn btn-danger w-100"
+                  onClick={() => handleDeleteTask(selectedTask.id)}
+                >
+                  🗑️ {t('taskPage.detail.delete')}
                 </button>
               </div>
             </div>

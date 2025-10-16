@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
+import { useTranslation } from 'react-i18next';
 
 export default function Risk() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('Tên');
   const [filterLevel, setFilterLevel] = useState('Tất cả');
   const [filterStatus, setFilterStatus] = useState('Tất cả');
 
+  // ====== Modal thêm ======
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRisk, setNewRisk] = useState({
     name: '',
@@ -83,7 +86,7 @@ export default function Risk() {
   };
 
   return (
-    <UserLayout title="Rủi ro" activePage="risk">
+    <UserLayout title={t('riskPage.title')} activePage="risk">
       <style>{`
         .task-header { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
         .stat-card { background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; transition: all 0.2s; }
@@ -106,6 +109,18 @@ export default function Risk() {
 
         /* Đẩy lề trái cho cột tên rủi ro */
         .col-name { padding-left: 20px !important; }
+
+        /* ===== Panel chi tiết TRƯỢT TỪ PHẢI ===== */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 999; }
+        .detail-panel {
+          position: fixed; right: 0; top: 0; bottom: 0;
+          width: 420px; max-width: 92vw; background: #fff;
+          box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+          z-index: 1000;
+          transform: translateX(100%);     /* Ẩn ở bên PHẢI */
+          transition: transform .3s ease;  /* Hiệu ứng trượt */
+        }
+        .detail-panel.open { transform: translateX(0); }
       `}</style>
 
       <div className="container-fluid" style={{ maxWidth: 1200 }}>
@@ -113,21 +128,21 @@ export default function Risk() {
         <div className="task-header">
           <div className="row align-items-center">
             <div className="col-md-6">
-              <h3 className="mb-2">⚠️ Quản lý Rủi ro</h3>
-              <p className="mb-0 opacity-75">Theo dõi, giảm thiểu và xử lý rủi ro của sự kiện</p>
+              <h3 className="mb-2">{t('riskPage.headerTitle')}</h3>
+              <p className="mb-0 opacity-75">{t('riskPage.headerSubtitle')}</p>
             </div>
             <div className="col-md-6">
               <div className="row g-2">
                 <div className="col-6">
                   <div className="stat-card text-center" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white' }}>
                     <div className="fs-4 fw-bold">{riskStats.high}/{riskStats.total}</div>
-                    <div className="small">Mức độ cao</div>
+                    <div className="small">{t('riskPage.stats.high')}</div>
                   </div>
                 </div>
                 <div className="col-6">
                   <div className="stat-card text-center" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white' }}>
                     <div className="fs-4 fw-bold">{riskStats.resolved}</div>
-                    <div className="small">Đã xử lý</div>
+                    <div className="small">{t('riskPage.stats.resolved')}</div>
                   </div>
                 </div>
               </div>
@@ -140,7 +155,7 @@ export default function Risk() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Tìm kiếm rủi ro..."
+            placeholder={t('riskPage.search')}
             className="form-control soft-input"
             style={{ width: 320, paddingLeft: 16 }}
           />
@@ -154,7 +169,7 @@ export default function Risk() {
               onChange={(e) => setFilterStatus(e.target.value)}
               aria-label="Lọc theo trạng thái"
             >
-              <option value="Tất cả">Tất cả trạng thái</option>
+              <option value="Tất cả">{t('riskPage.filters.allStatus')}</option>
               <option value="Đang xử lý">Đang xử lý</option>
               <option value="Đã xử lý">Đã xử lý</option>
               <option value="Tạm hoãn">Tạm hoãn</option>
@@ -168,7 +183,7 @@ export default function Risk() {
               onChange={(e) => setFilterLevel(e.target.value)}
               aria-label="Lọc theo mức độ"
             >
-              <option value="Tất cả">Tất cả mức độ</option>
+              <option value="Tất cả">{t('riskPage.filters.allLevel')}</option>
               <option value="Cao">Cao</option>
               <option value="Trung bình">Trung bình</option>
               <option value="Thấp">Thấp</option>
@@ -182,13 +197,17 @@ export default function Risk() {
               onChange={(e) => setSortBy(e.target.value)}
               aria-label="Sắp xếp"
             >
-              <option value="Tên">Tên</option>
-              <option value="Mức độ">Mức độ</option>
-              <option value="Trạng thái">Trạng thái</option>
+              <option value="Tên">{t('home.sorts.az')}</option>
+              <option value="Mức độ">{t('riskPage.columns.level')}</option>
+              <option value="Trạng thái">{t('riskPage.columns.status')}</option>
             </select>
 
-            <button className="add-btn" onClick={() => setShowAddModal(true)} style={{ background: '#EF4444', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 500 }}>
-              + Thêm rủi ro
+            <button
+              className="add-btn"
+              onClick={() => setShowAddModal(true)}
+              style={{ background: '#EF4444', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 500 }}
+            >
+              + {t('riskPage.add')}
             </button>
           </div>
         </div>
@@ -199,10 +218,10 @@ export default function Risk() {
             <table className="table align-middle">
               <thead>
                 <tr className="text-muted">
-                  <th className="py-3 col-name" style={{ width: '38%' }}>Tên rủi ro</th>
-                  <th className="py-3" style={{ width: '24%' }}>Người chịu trách nhiệm</th>
-                  <th className="py-3" style={{ width: '18%' }}>Trạng thái</th>
-                  <th className="py-3" style={{ width: '20%' }}>Mức độ</th>
+                  <th className="py-3 col-name" style={{ width: '38%' }}>{t('riskPage.columns.name')}</th>
+                  <th className="py-3" style={{ width: '24%' }}>{t('riskPage.columns.owner')}</th>
+                  <th className="py-3" style={{ width: '18%' }}>{t('riskPage.columns.status')}</th>
+                  <th className="py-3" style={{ width: '20%' }}>{t('riskPage.columns.level')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,7 +229,7 @@ export default function Risk() {
                   <tr>
                     <td colSpan="4" className="text-center py-5 text-muted">
                       <div style={{ fontSize: 48 }}>🫙</div>
-                      <div className="mt-2">Không tìm thấy rủi ro nào</div>
+                      <div className="mt-2">No risks found</div>
                     </td>
                   </tr>
                 ) : (
@@ -255,7 +274,7 @@ export default function Risk() {
         </div>
       </div>
 
-      {/* Panel chi tiết */}
+      {/* ===== Panel chi tiết TRƯỢT TỪ PHẢI ===== */}
       {selectedRisk && (
         <>
           <div className="overlay" onClick={() => setSelectedRisk(null)} />

@@ -1,7 +1,9 @@
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function UserHeader({ title, showSearch = false, showEventAction = false, onSearch, onEventAction }) {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <>
@@ -67,7 +69,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
         </div>
         
         <div className="d-flex align-items-center gap-3">
-          <button className="btn btn-ghost" aria-label="Thông báo">
+          <button className="btn btn-ghost" aria-label={t('nav.notifications')}>
             <i className="bi bi-bell"></i>
           </button>
 
@@ -84,17 +86,17 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
               <span
                 className="text-muted"
                 style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                title={user?.fullName || user?.name || user?.email || 'Tài khoản'}
+                title={user?.fullName || user?.name || user?.email || 'Account'}
               >
-                {user?.fullName || user?.name || user?.email || 'Tài khoản'}
+                {user?.fullName || user?.name || user?.email || 'Account'}
               </span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
-              <li><a className="dropdown-item" href="/user-profile">Hồ sơ</a></li>
-              <li><a className="dropdown-item" href="/setting">Cài đặt</a></li>
+              <li><a className="dropdown-item" href="/user-profile">{t('nav.profile')}</a></li>
+              <li><a className="dropdown-item" href="/setting">{t('nav.settings')}</a></li>
               <li><hr className="dropdown-divider" /></li>
               <li>
-                <button className="dropdown-item" onClick={logout}>Đăng xuất</button>
+                <button className="dropdown-item" onClick={logout}>{t('actions.logout')}</button>
               </li>
             </ul>
           </div>
@@ -116,9 +118,9 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                   <input
                     type="text"
                     className="form-control soft-input ps-5"
-                    placeholder="Tìm kiếm sự kiện..."
+                    placeholder={t('searchPlaceholder')}
                     onChange={(e) => onSearch && onSearch(e.target.value)}
-                    aria-label="Tìm kiếm sự kiện"
+                    aria-label={t('searchPlaceholder')}
                   />
                 </div>
               </div>
@@ -134,7 +136,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                   aria-label="Mở menu tạo/tham gia sự kiện"
                 >
                   <i className="bi bi-plus"></i>
-                  Tạo/Tham gia sự kiện
+                  {t('createEvent')}/{t('joinEvent')}
                   <i className="bi bi-chevron-down"></i>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
@@ -144,7 +146,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                       onClick={() => onEventAction && onEventAction('create')}
                     >
                       <i className="bi bi-calendar-plus me-2"></i>
-                      Tạo sự kiện
+                      {t('createEvent')}
                     </button>
                   </li>
                   <li>
@@ -153,7 +155,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                       onClick={() => onEventAction && onEventAction('join')}
                     >
                       <i className="bi bi-box-arrow-in-right me-2"></i>
-                      Tham gia sự kiện
+                      {t('joinEvent')}
                     </button>
                   </li>
                 </ul>

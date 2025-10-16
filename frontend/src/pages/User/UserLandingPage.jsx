@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import UserLayout from '../../components/UserLayout';
 
 export default function UserHomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // ====== DATA DEMO ======
   const events = useMemo(() => ([
@@ -42,11 +44,11 @@ export default function UserHomePage() {
   ]), []);
 
   // ====== FILTERS / SORT ======
-  const STATUS_OPTIONS = ['Tất cả', 'Sắp diễn ra', 'Đang diễn ra', 'Đã kết thúc'];
-  const SORT_OPTIONS = ['Mới nhất', 'Cũ nhất', 'A-Z'];
+  const STATUS_OPTIONS = [t('home.statuses.all'), t('home.statuses.upcoming'), t('home.statuses.ongoing'), t('home.statuses.past')];
+  const SORT_OPTIONS = [t('home.sorts.newest'), t('home.sorts.oldest'), t('home.sorts.az')];
 
-  const [statusFilter, setStatusFilter] = useState('Tất cả');
-  const [sortBy, setSortBy] = useState('Mới nhất');
+  const [statusFilter, setStatusFilter] = useState(t('home.statuses.all'));
+  const [sortBy, setSortBy] = useState(t('home.sorts.newest'));
 
   // Dropdown UI state
   const [openMenu, setOpenMenu] = useState(null); // 'status' | 'sort' | null
@@ -80,7 +82,7 @@ export default function UserHomePage() {
 
   return (
     <UserLayout
-      title="Trang chủ"
+      title={t('home.title')}
       activePage="home"
       showSearch={true}
       showEventAction={true}
@@ -159,7 +161,7 @@ export default function UserHomePage() {
       {/* ====== SECTION: Events ====== */}
       <div className="mb-5">
         <div className="section-head">
-          <h4 className="section-title">Tất cả sự kiện</h4>
+          <h4 className="section-title">{t('home.allEvents')}</h4>
 
           {/* Filters */}
           <div className="filters position-relative">
@@ -170,12 +172,12 @@ export default function UserHomePage() {
                 className={`dropdown-trigger ${openMenu === 'status' ? 'active-red' : ''}`}
                 onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === 'status' ? null : 'status'); }}
               >
-                <span>Trạng thái: <strong>{statusFilter}</strong></span>
+                <span>{t('home.status')}: <strong>{statusFilter}</strong></span>
                 <i className={`bi ${openMenu === 'status' ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
               </button>
               {openMenu === 'status' && (
                 <div className="dropdown-panel">
-                  <div className="dropdown-header">Chọn trạng thái</div>
+                  <div className="dropdown-header">{t('home.status')}</div>
                   {STATUS_OPTIONS.map(opt => (
                     <div
                       key={opt}
@@ -197,12 +199,12 @@ export default function UserHomePage() {
                 className={`dropdown-trigger ${openMenu === 'sort' ? 'active-red' : ''}`}
                 onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === 'sort' ? null : 'sort'); }}
               >
-                <span>Sắp xếp: <strong>{sortBy}</strong></span>
+                <span>{t('home.sort')}: <strong>{sortBy}</strong></span>
                 <i className={`bi ${openMenu === 'sort' ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
               </button>
               {openMenu === 'sort' && (
                 <div className="dropdown-panel">
-                  <div className="dropdown-header">Chọn cách sắp xếp</div>
+                  <div className="dropdown-header">{t('home.sort')}</div>
                   {SORT_OPTIONS.map(opt => (
                     <div
                       key={opt}
@@ -243,10 +245,10 @@ export default function UserHomePage() {
                   <p className="event-desc mb-3">{event.description}</p>
                   <div className="d-flex justify-content-between">
                     <button className="ghost-btn" onClick={() => navigate('/event-detail')}>
-                      Xem chi tiết
+                      {t('actions.viewDetails')}
                     </button>
                     <button className="btn btn-danger" onClick={() => setShowJoinModal(true)}>
-                      Tham gia
+                      {t('actions.join')}
                     </button>
                   </div>
                 </div>
@@ -256,7 +258,7 @@ export default function UserHomePage() {
           {filteredEvents.length === 0 && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                Không có sự kiện phù hợp.
+                {t('home.noEvents')}
               </div>
             </div>
           )}
@@ -266,7 +268,7 @@ export default function UserHomePage() {
       {/* ====== SECTION: Blog ====== */}
       <div>
         <div className="section-head">
-          <h4 className="section-title">Blog</h4>
+          <h4 className="section-title">{t('home.blog')}</h4>
         </div>
         <div className="row g-4">
           {blogs.map((blog) => (
@@ -290,7 +292,7 @@ export default function UserHomePage() {
           {blogs.length === 0 && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                Chưa có bài viết nào.
+                {t('home.noPosts')}
               </div>
             </div>
           )}
@@ -305,20 +307,20 @@ export default function UserHomePage() {
               <div className="modal-header border-0">
                 <div className="d-flex align-items-center">
                   <i className="bi bi-clipboard-data brand-red me-2"></i>
-                  <h5 className="modal-title fw-bold">Tham gia sự kiện</h5>
+                  <h5 className="modal-title fw-bold">{t('joinEvent')}</h5>
                 </div>
                 <button type="button" className="btn-close" onClick={() => setShowJoinModal(false)}></button>
               </div>
               <div className="modal-body">
-                <p className="text-muted mb-3">Hãy nhập mã sự kiện được cấp để tham gia.</p>
+                <p className="text-muted mb-3">{t('joinEvent')}</p>
                 <form onSubmit={(e) => { e.preventDefault(); setShowJoinModal(false); }}>
                   <div className="mb-3">
-                    <label htmlFor="eventCode" className="form-label fw-bold">Mã sự kiện</label>
-                    <input type="text" className="form-control soft-input" id="eventCode" placeholder="Nhập mã sự kiện" required />
+                    <label htmlFor="eventCode" className="form-label fw-bold">Code</label>
+                    <input type="text" className="form-control soft-input" id="eventCode" placeholder="Event code" required />
                   </div>
                   <div className="d-flex gap-2 justify-content-end">
-                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowJoinModal(false)}>Hủy</button>
-                    <button type="submit" className="btn btn-danger">Xác nhận</button>
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowJoinModal(false)}>{t('actions.cancel')}</button>
+                    <button type="submit" className="btn btn-danger">OK</button>
                   </div>
                 </form>
               </div>

@@ -8,6 +8,10 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { googleClientId } from './config'
+import './i18n'
+import { applyTheme, getSavedTheme } from './theme'
+
+applyTheme(getSavedTheme());
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

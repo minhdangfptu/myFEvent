@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 'home' }) {
   const { logout } = useAuth();
+  const { t } = useTranslation();
 
   const menuItems = useMemo(() => ([
-    { id: 'home',     icon: 'bi-house-door',            label: 'Trang chủ', path: '/user-landing-page' },
-    { id: 'members',  icon: 'bi-people',                label: 'Thành viên', path: '/member' },
-    { id: 'stats',    icon: 'bi-bar-chart',             label: 'Số liệu',     path: '/dashboard' },
-    { id: 'calendar', icon: 'bi-calendar',              label: 'Lịch',        path: '/calendar' },
-    // Những mục sau Calendar
-    { id: 'task',     icon: 'bi-clipboard-check',       label: 'Công việc',   path: '/task' },
-    { id: 'risk',     icon: 'bi-exclamation-triangle',  label: 'Rủi ro',      path: '/risk' },
-    { id: 'documents',icon: 'bi-file-text',             label: 'Tài liệu',    path: '/documents' },
-  ]), []);
+    { id: 'home',     icon: 'bi-house-door',            label: t('nav.home'),     path: '/user-landing-page' },
+    { id: 'members',  icon: 'bi-people',                label: t('nav.members'),  path: '/member' },
+    { id: 'stats',    icon: 'bi-bar-chart',             label: t('nav.stats'),    path: '/dashboard' },
+    { id: 'calendar', icon: 'bi-calendar',              label: t('nav.calendar'), path: '/calendar' },
+    { id: 'task',     icon: 'bi-clipboard-check',       label: t('nav.task'),     path: '/task' },
+    { id: 'risk',     icon: 'bi-exclamation-triangle',  label: t('nav.risk'),     path: '/risk' },
+    { id: 'documents',icon: 'bi-file-text',             label: t('nav.documents'),path: '/documents' },
+  ]), [t]);
 
   // === Sự kiện: đóng mặc định + nhớ trạng thái ===
   const [eventsOpen, setEventsOpen] = useState(() => {
@@ -38,8 +39,8 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
   ];
 
   const settingItems = [
-    { id: 'notifications', icon: 'bi-bell', label: 'Thông báo', path: '/notifications' },
-    { id: 'settings',      icon: 'bi-gear', label: 'Cài đặt',   path: '/setting' }
+    { id: 'notifications', icon: 'bi-bell', label: t('nav.notifications'), path: '/notifications' },
+    { id: 'settings',      icon: 'bi-gear', label: t('nav.settings'),       path: '/setting' }
   ];
 
   // Tách menu để render nhóm "Sự kiện" ngay sau Calendar
@@ -114,7 +115,7 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
 
         {/* NAV: CHÍNH */}
         <div className="mb-4">
-          <h6 className="group-title">CHÍNH</h6>
+          <h6 className="group-title">{t('sections.main')}</h6>
 
           {/* Tới hết Calendar */}
           <div className="d-flex flex-column gap-2">
@@ -139,11 +140,11 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
             <button
               className="btn btn-nav d-flex align-items-center justify-content-between w-100"
               onClick={() => setEventsOpen(prev => !prev)}
-              title="Sự kiện"
+              title={t('nav.events')}
             >
               <span className="d-flex align-items-center">
                 <i className="bi bi-graph-up me-2" />
-                {sidebarOpen && <span className="fw-semibold">Sự kiện</span>}
+                {sidebarOpen && <span className="fw-semibold">{t('nav.events')}</span>}
                 {!sidebarOpen && <span />}
               </span>
               {sidebarOpen && (
@@ -196,7 +197,7 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
 
         {/* CÀI ĐẶT */}
         <div className="mb-4">
-          <h6 className="group-title">CÀI ĐẶT</h6>
+          <h6 className="group-title">{t('sections.settings')}</h6>
           <div className="d-flex flex-column gap-2">
             {settingItems.map((item) => {
               const isActive = activePage === item.id;
