@@ -1,4 +1,8 @@
-/**
- * Updated by MinhDang on FA25
- * "A bit of fragrance clings to the hand that gives flowers!"
-*/
+import express from 'express';
+import authRoute from './authRoute.js';
+
+const router = express.Router();
+
+router.use('/auth', authRoute);
+
+export default router;
