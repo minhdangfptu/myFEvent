@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { baseUrl } from '../config';
+import { baseUrl } from '../config/index.js';
 
 const axiosClient = axios.create({
   baseURL: baseUrl,

@@ -5,6 +5,14 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
   const { user, logout } = useAuth();
   const { t } = useTranslation();
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      window.location.href = '/landingpage';
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -12,11 +20,9 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
         .btn-brand-red  { background:#EF4444; color:#fff; border:none; }
         .btn-brand-red:hover { background:#DC2626; color:#fff; }
 
-        /* Search input mềm mại */
         .soft-input { background:#F9FAFB; border:1px solid #E5E7EB; height:44px; border-radius:12px; transition:.2s; }
         .soft-input:focus { background:#fff; border-color:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,0.1); }
 
-        /* ====== DROPDOWN THEME (ĐỎ) ====== */
         .dropdown-menu-red {
           border:1px solid #F3F4F6;
           border-radius:12px;
@@ -29,8 +35,8 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
         }
         .dropdown-menu-red .dropdown-item:hover,
         .dropdown-menu-red .dropdown-item:focus {
-          background:#FEE2E2;      /* đỏ nhạt */
-          color:#991B1B;           /* chữ đỏ đậm */
+          background:#FEE2E2;
+          color:#991B1B;
         }
         .dropdown-menu-red .dropdown-item.active {
           background:#FEE2E2;
@@ -40,7 +46,6 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
           margin:.35rem .25rem;
         }
 
-        /* Nút icon xám nhạt cho thông báo & menu phụ */
         .btn-ghost {
           background:#fff;
           border:1px solid #E5E7EB;
@@ -55,7 +60,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
-          <button 
+          <button
             className="btn btn-ghost me-3"
             onClick={() => {
               const event = new CustomEvent('toggleSidebar');
@@ -67,7 +72,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
           </button>
           <h5 className="mb-0 text-muted">{title}</h5>
         </div>
-        
+
         <div className="d-flex align-items-center gap-3">
           <button className="btn btn-ghost" aria-label={t('nav.notifications')}>
             <i className="bi bi-bell"></i>
@@ -96,7 +101,9 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
               <li><a className="dropdown-item" href="/setting">{t('nav.settings')}</a></li>
               <li><hr className="dropdown-divider" /></li>
               <li>
-                <button className="dropdown-item" onClick={logout}>{t('actions.logout')}</button>
+                <button className="dropdown-item" onClick={handleLogout}>
+                  {t('actions.logout')}
+                </button>
               </li>
             </ul>
           </div>

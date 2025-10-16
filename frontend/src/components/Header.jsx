@@ -1,4 +1,6 @@
-import { NavLink, Link as RouterLink } from "react-router-dom"
+import { NavLink, Link as RouterLink, useNavigate } from "react-router-dom"
+import { useState } from "react"
+import { useAuth } from "../contexts/AuthContext"
 
 export default function Header() {
   const { user, isAuthenticated, logout, logoutAllDevices } = useAuth()

@@ -1,7 +1,7 @@
 import express from 'express';
 import { config } from './config/environment.js';
-import { connectDB } from './config/mongodb.js';
-import { corsConfig } from './config/cors.js';
+import connectDB from './config/mongodb.js';
+import corsConfig from './config/cors.js';
 import routes from './routes/index.js';
 
 const app = express();

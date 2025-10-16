@@ -38,10 +38,8 @@ import ErrorPageOffline from './pages/Errors/ErrorPageOffline';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CssBaseline />
-      <BrowserRouter>
-        <Routes>
+    <BrowserRouter>
+      <Routes>
           {/* Default Route */}
           <Route path="/" element={<Navigate to="/landingpage" replace />} />
           
@@ -146,8 +144,7 @@ export default function App() {
           
           {/* 404 Route - Must be last */}
           <Route path="*" element={<ErrorPage404 />} /> 
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </Routes>
+    </BrowserRouter>
   );
 }
