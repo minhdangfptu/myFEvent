@@ -1,8 +1,8 @@
 import { Link as RouterLink } from "react-router-dom"
 
-export default function Footer() {
+export default function Footer({ sidebarOpen = true }) {
   return (
-    <footer className="bg-dark text-white pt-5 pb-4 mt-5">
+    <footer className="bg-dark text-white pt-5 pb-4 mt-5" style={{ marginLeft: sidebarOpen ? '250px' : '70px', transition: 'margin-left 0.3s ease' }}>
       <div className="container-xl px-2">
         <div className="text-center mb-4">
           <div className="d-inline-flex align-items-center gap-2">

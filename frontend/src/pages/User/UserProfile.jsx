@@ -138,7 +138,7 @@ export default function UserProfilePage() {
         .mp-badge { border: 1px solid #e5e7eb; border-radius: 90px; background: #f3f4f6; color: #374151; padding: 6px 10px; font-size: 14px; }
         .mp-section { max-width: 1100px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
         .mp-header { height: 180px; border-radius: 16px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); position: relative; }
-        .mp-gear { background: #fee2e2; border: 1px solid #fecaca; color: #991B1B; border-radius: 12px; width: 44px; height: 44px; display: grid; place-items: center; }
+        .mp-gear { background: #fee2e2; border: 1px solid #fecaca; color: #991B1B; border-radius: 12px; width: 84px; height: 84px; display: grid; place-items: center; }
         .mp-info-row { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; transition: all 0.2s; }
         .mp-info-row:hover { background: #f3f4f6; }
         .mp-avatar-wrapper { position: relative; cursor: pointer; }

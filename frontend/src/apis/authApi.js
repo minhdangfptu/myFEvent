@@ -28,6 +28,24 @@ export const authApi = {
       throw error;
     }
   },
+  // Resend verification
+  resendVerification: async (email) => {
+    try {
+      const response = await axiosClient.post('/api/auth/resend-verification', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  // Verify 6-digit code
+  verifyEmailCode: async ({ email, code }) => {
+    try {
+      const response = await axiosClient.post('/api/auth/verify-email', { email, code });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 
   // Refresh access token (send both keys to be compatible with backend variants)
   refreshToken: async (refreshToken) => {
@@ -78,6 +96,16 @@ export const authApi = {
   resetPassword: async ({ token, newPassword }) => {
     try {
       const response = await axiosClient.post('/api/auth/reset-password', { token, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Change password (requires auth)
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await axiosClient.post('/api/auth/change-password', { currentPassword, newPassword });
       return response.data;
     } catch (error) {
       throw error;

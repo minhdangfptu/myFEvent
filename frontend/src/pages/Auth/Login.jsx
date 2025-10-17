@@ -1,15 +1,25 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext"; // giữ giống mẫu của bạn
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, loginWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === '1') {
+      setInfo('Tài khoản của bạn đã được xác minh. Hãy đăng nhập.');
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,13 +27,14 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/user-landing-page", { replace: true });
-    } catch (err) {
-      console.error("Login error:", err);
-      setError(
-        err?.response?.data?.message ||
-          "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
-      );
+      navigate('/user-landing-page', { replace: true });
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error?.response?.status === 403) {
+        navigate('/email-confirmation', { state: { email } });
+        return;
+      }
+      setError(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setLoading(false);
     }
@@ -52,6 +63,11 @@ export default function LoginPage() {
               <img src="/logo-03.png" alt="myFEvent Logo" style={{ width: 200, height: 'auto' }} />
             </div>
 
+            {info && (
+              <div className="alert alert-success" role="alert">
+                {info}
+              </div>
+            )}
             {error && (
               <div className="alert alert-danger" role="alert">
                 {error}
@@ -85,6 +101,9 @@ export default function LoginPage() {
                   disabled={loading}
                   required
                 />
+                <div className="mt-2">
+                  <a href="/forgot-password" className="text-decoration-none">Quên mật khẩu?</a>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-danger w-100 mb-3" disabled={loading}>

@@ -1,8 +1,21 @@
-import { useState } from "react"
-import { Link as RouterLink } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { authApi } from "../../apis/authApi"
 
 export default function EmailConfirmationPage() {
-  const [code, setCode] = useState(["", "", "", "", "", ""])
+  const [code, setCode] = useState(["", "", "", "", "", ""]) 
+  const [email, setEmail] = useState("")
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (location?.state?.email) {
+      setEmail(location.state.email)
+    }
+  }, [location?.state?.email])
 
   const handleCodeChange = (index, value) => {
     if (value.length <= 1 && /^\d*$/.test(value)) {
@@ -25,6 +38,26 @@ export default function EmailConfirmationPage() {
     }
   }
 
+  const handleSubmit = async () => {
+    const joined = code.join("");
+    setError("");
+    setMessage("");
+    if (joined.length !== 6) {
+      setError("Vui lòng nhập đủ 6 số.");
+      return;
+    }
+    try {
+      setLoading(true);
+      await authApi.verifyEmailCode({ email, code: joined });
+      navigate('/register-complete');
+    } catch (e) {
+      const msg = e.response?.data?.message || "Xác minh thất bại. Hãy thử lại.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="d-flex align-items-center justify-content-center px-2" style={{ minHeight: '100dvh', backgroundColor: '#f9fafb' }}>
       <div className="container" style={{ maxWidth: 560 }}>
@@ -36,7 +69,7 @@ export default function EmailConfirmationPage() {
           <div className="card-body p-4">
             <div className="mb-3">
               <div className="fw-semibold mb-1" style={{ color: '#111827' }}>Nhập mã xác nhận</div>
-              <div className="text-secondary" style={{ fontSize: 14 }}>Chúng tôi đã gửi mã xác nhận cho bạn trong email. Hãy nhập để tiếp tục.</div>
+              <div className="text-secondary" style={{ fontSize: 14 }}>Chúng tôi đã gửi mã xác nhận cho bạn trong email. Mã có hiệu lực trong 1 phút.</div>
             </div>
             <div className="mb-3">
               <div className="fw-medium mb-2" style={{ fontSize: 14, color: '#111827' }}>Mã xác nhận</div>
@@ -57,11 +90,32 @@ export default function EmailConfirmationPage() {
                 ))}
               </div>
               <div className="text-secondary mt-2" style={{ fontSize: 14 }}>
-                Không nhận được mã? <button className="btn btn-link p-0 align-baseline" style={{ color: '#ef4444' }}>Nhấp để gửi lại.</button>
+                Không nhận được email?{' '}
+                <button
+                  className="btn btn-link p-0 align-baseline"
+                  style={{ color: '#ef4444' }}
+                  disabled={loading}
+                  onClick={async () => {
+                    setError("")
+                    setMessage("")
+                    try {
+                      setLoading(true)
+                      await authApi.resendVerification(email)
+                      setMessage("Đã gửi lại email xác minh. Vui lòng kiểm tra hộp thư của bạn.")
+                    } catch (e) {
+                      const msg = e.response?.data?.message || "Gửi lại email thất bại. Hãy thử lại."
+                      setError(msg)
+                    } finally {
+                      setLoading(false)
+                    }
+                  }}
+                >Nhấp để gửi lại.</button>
               </div>
             </div>
-
-            <button className="btn btn-danger w-100 py-2">Tiếp tục</button>
+            {message && <div className="alert alert-success">{message}</div>}
+            {error && <div className="alert alert-danger">{error}</div>}
+            <button onClick={handleSubmit} disabled={loading} className="btn btn-danger w-100 py-2">Xác minh</button>
+            <div className="mt-2 text-center"><a href="/login">Về trang đăng nhập</a></div>
           </div>
         </div>
       </div>

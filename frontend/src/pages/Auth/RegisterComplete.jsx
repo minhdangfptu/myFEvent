@@ -10,8 +10,8 @@ export default function RegisterComplete() {
             <i className="bi bi-check2-circle" />
           </div>
           <div className="fw-semibold mb-1" style={{ color: '#111827' }}>Kích hoạt tài khoản thành công</div>
-          <div className="text-secondary mb-3" style={{ fontSize: 14 }}>Tài khoản của bạn đã được kích hoạt. Tiếp theo, tới trang chủ để bắt đầu duyệt sự kiện thôi!</div>
-          <RouterLink to="/" className="btn btn-danger w-100">Tới trang chủ</RouterLink>
+          <div className="text-secondary mb-3" style={{ fontSize: 14 }}>Tài khoản của bạn đã được kích hoạt. Tiếp theo, hãy đăng nhập để bắt đầu sử dụng.</div>
+          <RouterLink to="/login" className="btn btn-danger w-100">Tới trang đăng nhập</RouterLink>
         </div>
       </div>
     </div>
