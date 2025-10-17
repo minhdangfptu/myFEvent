@@ -2,44 +2,12 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
-import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/environment.js';
 import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
 
-const oauth2Client = new google.auth.OAuth2(
-  config.GOOGLE_CLIENT_ID,
-  config.GOOGLE_CLIENT_SECRET,
-  config.GOOGLE_REDIRECT_URI
-);
 
-const createTokens = (userId, email) => {
-  const accessToken = jwt.sign(
-    { userId, email },
-    config.JWT_SECRET,
-    { expiresIn: config.JWT_EXPIRE }
-  );
-
-  const refreshToken = jwt.sign(
-    { userId },
-    config.JWT_REFRESH_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRE }
-  );
-
-  return { accessToken, refreshToken };
-};
-
-const saveRefreshToken = async (userId, token, req) => {
-  const authToken = new AuthToken({
-    userId,
-    token,
-    userAgent: req.get('User-Agent'),
-    ipAddress: req.ip || req.connection?.remoteAddress,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  });
-  await authToken.save();
-};
 
 export const signup = async (req, res) => {
   try {
@@ -70,9 +38,6 @@ export const signup = async (req, res) => {
 
     await newUser.save();
 
-    const { accessToken, refreshToken } = createTokens(newUser._id, newUser.email);
-    await saveRefreshToken(newUser._id, refreshToken, req);
-
     return res.status(201).json({
       message: 'User created successfully!',
       user: {
@@ -80,7 +45,6 @@ export const signup = async (req, res) => {
         email: newUser.email,
         fullName: newUser.fullName,
       },
-      tokens: { accessToken, refreshToken },
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -88,7 +52,7 @@ export const signup = async (req, res) => {
   }
 };
 
-const login = async (req, res) => {
+export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         
@@ -143,7 +107,7 @@ const login = async (req, res) => {
 };
 
 
-const loginWithGoogle = async (req, res) => {
+export const loginWithGoogle = async (req, res) => {
     try {
       const { credential, g_csrf_token } = req.body;           
       if (!credential) return res.status(400).json({ message: 'Missing Google credential!' });
@@ -270,6 +234,29 @@ export const logoutAll = async (req, res) => {
   } catch (error) {
     console.error('Logout all error:', error);
     return res.status(500).json({ message: 'Failed to logout from all devices!' });
+  }
+};
+
+// REFRESH TOKEN - issue a new access token using a valid refresh token (validated by middleware)
+export const refreshToken = async (req, res) => {
+  try {
+    // `authenticateRefreshToken` has validated the refresh token and populated req.user
+    // For consistency with login responses, we include `role` when available
+    const user = await User.findById(req.user.id).lean();
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid user!' });
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      config.JWT_SECRET,
+      { expiresIn: config.JWT_EXPIRE }
+    );
+
+    return res.status(200).json({ accessToken });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(500).json({ message: 'Failed to refresh token' });
   }
 };
 

@@ -9,7 +9,6 @@ const UserSchema = new Schema({
     trim: true,
   },
   passwordHash: {
-  passwordHash: {
     type: String,
     required: function () { return this.authProvider === 'local'; }
   },
@@ -41,7 +40,7 @@ const UserSchema = new Schema({
   role: {
     type: String,
     enum: ['user', 'admin', 'mentor', 'IC-PDP'],
-    enum: ['user', 'admin', 'mentor', 'IC-PDP'],
+    required: true,
     default: 'user',
   },
 }, { timestamps: true });
