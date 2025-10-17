@@ -10,7 +10,8 @@ import {
   forgotPassword,
   resetPassword,
   verifyEmail,
-  resendVerification
+  resendVerification,
+  changePassword
 } from '../controllers/authController.js';
 import { authenticateToken, authenticateRefreshToken } from '../middlewares/authMiddleware.js';
 import User from '../models/user.js';
@@ -23,7 +24,8 @@ import {
   forgotPasswordValidation,
   resetPasswordValidation,
   resendVerificationValidation,
-  verifyCodeValidation
+  verifyCodeValidation,
+  changePasswordValidation
 } from '../validations/authValidation.js';
 
 const router = express.Router();
@@ -46,6 +48,7 @@ router.post('/forgot-password', forgotPasswordValidation, handleValidationErrors
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, resetPassword);
 router.post('/verify-email', verifyCodeValidation, handleValidationErrors, verifyEmail);
 router.post('/resend-verification', resendVerificationValidation, handleValidationErrors, resendVerification);
+router.post('/change-password', authenticateToken, changePasswordValidation, handleValidationErrors, changePassword);
 
 router.get('/profile', authenticateToken, async (req, res) => {
   try {

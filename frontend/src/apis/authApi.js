@@ -109,6 +109,16 @@ export const authApi = {
     }
   },
 
+  // Change password (requires auth)
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await axiosClient.post('/api/auth/change-password', { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Profile APIs
   getProfile: async () => {
     try {

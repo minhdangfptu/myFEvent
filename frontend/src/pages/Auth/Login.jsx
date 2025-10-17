@@ -104,6 +104,9 @@ export default function LoginPage() {
                   disabled={loading}
                   required
                 />
+                <div className="mt-2">
+                  <a href="/forgot-password" className="text-decoration-none">Quên mật khẩu?</a>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-danger w-100 mb-3" disabled={loading}>

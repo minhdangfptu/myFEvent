@@ -58,7 +58,7 @@ export default function UserLayout({
       </div>
 
       {/* Footer */}
-      <UserFooter />
+      <UserFooter sidebarOpen={sidebarOpen} />
     </div>
   );
 }

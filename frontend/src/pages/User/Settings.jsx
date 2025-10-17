@@ -2,16 +2,53 @@ import { useEffect, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
 import { useTranslation } from 'react-i18next';
 import { applyTheme, getSavedTheme } from '../../theme';
+import { authApi } from '../../apis/authApi';
 
 export default function SystemSettingsPage() {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState('General Settings');
   const [settings, setSettings] = useState({ language: i18n.language?.split('-')[0] || 'vi', backgroundColor: getSavedTheme() === 'dark' ? 'Tối' : 'Sáng', notifications: true });
+  const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [pwdError, setPwdError] = useState('');
 
   const tabs = [t('settings.tabs.general'), t('settings.tabs.agents'), t('settings.tabs.users'), t('settings.tabs.maintenance'), t('settings.tabs.security')];
 
   const handleSettingChange = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handlePwdChange = (key, value) => {
+    setPwdForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const submitChangePassword = async (e) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess('');
+    if (!pwdForm.currentPassword || !pwdForm.newPassword) {
+      setPwdError('Vui lòng nhập đầy đủ thông tin');
+      return;
+    }
+    if (pwdForm.newPassword.length < 6) {
+      setPwdError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      return;
+    }
+    if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+      setPwdError('Xác nhận mật khẩu không khớp');
+      return;
+    }
+    try {
+      setPwdLoading(true);
+      await authApi.changePassword({ currentPassword: pwdForm.currentPassword, newPassword: pwdForm.newPassword });
+      setPwdSuccess('Đổi mật khẩu thành công');
+      setPwdForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPwdError(err.response?.data?.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setPwdLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -45,7 +82,7 @@ export default function SystemSettingsPage() {
           ))}
         </div>
 
-        <div className="set-card p-4">
+        <div className="set-card p-4 mb-4">
           <div className="fw-semibold mb-3">{t('general')}</div>
           <div className="row gy-4">
             <div className="col-md-6">
@@ -75,6 +112,57 @@ export default function SystemSettingsPage() {
               <button className="btn btn-primary-soft px-4" onClick={handleSave}>{t('save')}</button>
             </div>
           </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="set-card p-4">
+          <div className="fw-semibold mb-3">Đổi mật khẩu</div>
+          <form onSubmit={submitChangePassword} className="row gy-3">
+            <div className="col-md-6">
+              <div className="mb-2 small text-muted">Mật khẩu hiện tại</div>
+              <input
+                type="password"
+                className="form-control input-soft"
+                placeholder="Nhập mật khẩu hiện tại"
+                value={pwdForm.currentPassword}
+                onChange={(e) => handlePwdChange('currentPassword', e.target.value)}
+                required
+                disabled={pwdLoading}
+              />
+            </div>
+            <div className="col-md-6" />
+            <div className="col-md-6">
+              <div className="mb-2 small text-muted">Mật khẩu mới</div>
+              <input
+                type="password"
+                className="form-control input-soft"
+                placeholder="Nhập mật khẩu mới"
+                value={pwdForm.newPassword}
+                onChange={(e) => handlePwdChange('newPassword', e.target.value)}
+                required
+                disabled={pwdLoading}
+              />
+            </div>
+            <div className="col-md-6">
+              <div className="mb-2 small text-muted">Xác nhận mật khẩu mới</div>
+              <input
+                type="password"
+                className="form-control input-soft"
+                placeholder="Nhập lại mật khẩu mới"
+                value={pwdForm.confirmPassword}
+                onChange={(e) => handlePwdChange('confirmPassword', e.target.value)}
+                required
+                disabled={pwdLoading}
+              />
+            </div>
+            <div className="col-12 d-flex justify-content-end align-items-end mt-2">
+              <button className="btn btn-primary-soft px-4" disabled={pwdLoading} type="submit">
+                {pwdLoading ? 'Đang cập nhật...' : 'Đổi mật khẩu'}
+              </button>
+            </div>
+            {pwdSuccess && <div className="col-12"><div className="alert alert-success mb-0">{pwdSuccess}</div></div>}
+            {pwdError && <div className="col-12"><div className="alert alert-danger mb-0">{pwdError}</div></div>}
+          </form>
         </div>
       </div>
     </UserLayout>
