@@ -13,9 +13,9 @@
     "clean": "rm -rf build && mkdir build",
     "build-babel": "babel ./src -d ./build/src",
     "build": "npm run clean && npm run build-babel",
-    "start": "node server.js",
+    "start": "node ./src/index.js",
     "production": "npm run build && npm run start",
-    "dev": "nodemon --exec babel-node ./src/server.js"
+    "dev": "nodemon ./src/index.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",
@@ -30,6 +30,7 @@
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
     "passport": "^0.7.0",
+    "nodemailer": "^6.9.14",
     "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {

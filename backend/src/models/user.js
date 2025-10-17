@@ -9,11 +9,21 @@ const UserSchema = new Schema({
     trim: true,
   },
   passwordHash: {
+  passwordHash: {
     type: String,
     required: function () { return this.authProvider === 'local'; }
   },
-  fullName: { type: String, trim: true },
+  fullName: { 
+    type: String, 
+    trim: true,
+    required: true
+  },
   avatarUrl: String,
+  bio: { type: String, default: '' },
+  highlight: { type: String, default: '' },
+  tags: { type: [String], default: [] },
+  totalEvents: { type: Number, default: 0 },
+  verified: { type: Boolean, default: false },
   phone: {
     type: String,
     required: function () { return this.authProvider === 'local'; },
@@ -30,6 +40,7 @@ const UserSchema = new Schema({
   isFirstLogin: { type: Boolean, default: true },
   role: {
     type: String,
+    enum: ['user', 'admin', 'mentor', 'IC-PDP'],
     enum: ['user', 'admin', 'mentor', 'IC-PDP'],
     default: 'user',
   },
