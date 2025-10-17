@@ -2,10 +2,30 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
-import nodemailer from 'nodemailer';
+import { sendMail } from '../mailer.js';
 import { config } from '../config/environment.js';
 import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
+
+// In-memory store for email verification codes (1-minute TTL)
+// Keyed by email to avoid having to look up by user first
+const emailVerificationStore = new Map();
+
+const setEmailVerificationCode = (email) => {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const ttlMs = 60 * 1000; // 1 minute
+  const expiresAt = new Date(Date.now() + ttlMs);
+
+  const existing = emailVerificationStore.get(email);
+  if (existing?.timeout) clearTimeout(existing.timeout);
+
+  const timeout = setTimeout(() => {
+    emailVerificationStore.delete(email);
+  }, ttlMs);
+
+  emailVerificationStore.set(email, { code, expiresAt, timeout });
+  return { code, expiresAt };
+};
 
 const oauth2Client = new google.auth.OAuth2(
   config.GOOGLE_CLIENT_ID,
@@ -40,6 +60,27 @@ const saveRefreshToken = async (userId, token, req) => {
   await authToken.save();
 };
 
+// Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
+const sendVerificationEmail = async (user, req) => {
+  const { code } = setEmailVerificationCode(user.email);
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;font-size:14px;color:#111827">
+      <h2>Mã xác nhận tài khoản</h2>
+      <p>Chào ${user.fullName || user.email},</p>
+      <p>Mã xác nhận của bạn là:</p>
+      <div style="font-size:28px;font-weight:700;letter-spacing:6px;">${code}</div>
+      <p>Mã có hiệu lực trong 1 phút. Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+    </div>
+  `;
+
+  await sendMail({
+    to: user.email,
+    subject: 'Mã xác nhận - myFEvent',
+    html,
+  });
+};
+
 export const signup = async (req, res) => {
   try {
     const { email, password, fullName, phone } = req.body;
@@ -63,22 +104,21 @@ export const signup = async (req, res) => {
       passwordHash,
       fullName,
       phone,
-      status: 'active',
+      verified: false,
+      status: 'pending',
     });
 
     await newUser.save();
 
-    const { accessToken, refreshToken } = createTokens(newUser._id, newUser.email);
-    await saveRefreshToken(newUser._id, refreshToken, req);
+    await sendVerificationEmail(newUser, req);
 
     return res.status(201).json({
-      message: 'User created successfully!',
+      message: 'User created successfully! Please verify your email to activate your account.',
       user: {
         id: newUser._id,
         email: newUser.email,
         fullName: newUser.fullName,
-      },
-      tokens: { accessToken, refreshToken },
+      }
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -95,6 +135,10 @@ export const login = async (req, res) => {
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Invalid credentials!' });
+
+    if (!user.verified || user.status !== 'active') {
+      return res.status(403).json({ message: 'Tài khoản chưa được xác minh. Vui lòng kiểm tra email để xác minh tài khoản.' });
+    }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
     await saveRefreshToken(user._id, refreshToken, req);
@@ -216,32 +260,77 @@ export const logoutAll = async (req, res) => {
   }
 };
 
+// VERIFY EMAIL - via token link
+export const verifyEmail = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ message: 'Email and code are required' });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Invalid email' });
+
+    const entry = emailVerificationStore.get(email);
+    if (!entry) return res.status(400).json({ message: 'Code not found. Please resend.' });
+    if (entry.expiresAt < new Date()) {
+      emailVerificationStore.delete(email);
+      return res.status(400).json({ message: 'Code expired. Please resend.' });
+    }
+
+    if (entry.code !== code) {
+      return res.status(400).json({ message: 'Invalid code' });
+    }
+
+    // Consume code
+    if (entry.timeout) clearTimeout(entry.timeout);
+    emailVerificationStore.delete(email);
+
+    user.verified = true;
+    user.status = 'active';
+    await user.save();
+
+    return res.status(200).json({ message: 'Verified successfully' });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    return res.status(500).json({ message: 'Failed to verify email' });
+  }
+};
+
+// RESEND VERIFICATION - send again if not verified
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(200).json({ message: 'If the email exists, a verification link has been sent.' });
+
+    if (user.verified) {
+      return res.status(200).json({ message: 'Account already verified.' });
+    }
+
+    await sendVerificationEmail(user, req);
+    return res.status(200).json({ message: 'Verification email sent.' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    return res.status(500).json({ message: 'Failed to send verification email' });
+  }
+};
+
 // FORGOT PASSWORD - send email with reset link
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
+    const dbUser = await User.findOne({ email });
+    if (!dbUser) {
       return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetJwt = jwt.sign({ userId: user._id, token: resetToken }, config.JWT_SECRET, { expiresIn: '15m' });
+    const resetJwt = jwt.sign({ userId: dbUser._id, token: resetToken }, config.JWT_SECRET, { expiresIn: '15m' });
 
     const resetLink = `${config.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${resetJwt}`;
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      }
-    });
-
-    await transporter.verify();
-
-    await transporter.sendMail({
-      from: `myFEvent <${process.env.EMAIL_USER}>`,
+    await sendMail({
       to: email,
       subject: 'Đặt lại mật khẩu myFEvent',
       html: `
@@ -252,7 +341,7 @@ export const forgotPassword = async (req, res) => {
           <p><a href="${resetLink}" style="display:inline-block;background:#ef4444;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Đặt lại mật khẩu</a></p>
           <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
         </div>
-      `
+      `,
     });
 
     return res.status(200).json({ message: 'Reset email sent' });

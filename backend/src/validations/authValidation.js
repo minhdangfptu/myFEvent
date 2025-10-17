@@ -54,4 +54,13 @@ export const resetPasswordValidation = [
   body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ]
 
+export const resendVerificationValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Email must be valid')
+]
+
+export const verifyCodeValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Email must be valid'),
+  body('code').isLength({ min: 6, max: 6 }).withMessage('Code must be 6 digits')
+]
+
 

@@ -46,12 +46,11 @@ export default function SignupPage() {
       const { confirmPassword, ...registerData } = formData;
       await signup(registerData);
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      navigate('/email-confirmation', { state: { email: registerData.email } });
     } catch (error) {
       console.error('Signup error:', error);
-      setError(error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+      const msg = error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

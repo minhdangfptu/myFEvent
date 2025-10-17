@@ -8,7 +8,9 @@ import {
   logout,
   logoutAll,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail,
+  resendVerification
 } from '../controllers/authController.js';
 import { authenticateToken, authenticateRefreshToken } from '../middlewares/authMiddleware.js';
 import User from '../models/user.js';
@@ -19,7 +21,9 @@ import {
   refreshTokenValidation,
   logoutValidation,
   forgotPasswordValidation,
-  resetPasswordValidation
+  resetPasswordValidation,
+  resendVerificationValidation,
+  verifyCodeValidation
 } from '../validations/authValidation.js';
 
 const router = express.Router();
@@ -40,6 +44,8 @@ router.post('/logout', logoutValidation, handleValidationErrors, logout);
 router.post('/logout-all', authenticateToken, logoutAll);
 router.post('/forgot-password', forgotPasswordValidation, handleValidationErrors, forgotPassword);
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, resetPassword);
+router.post('/verify-email', verifyCodeValidation, handleValidationErrors, verifyEmail);
+router.post('/resend-verification', resendVerificationValidation, handleValidationErrors, resendVerification);
 
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
