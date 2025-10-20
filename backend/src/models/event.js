@@ -8,6 +8,7 @@ const EventSchema = new Schema({
     organizerName: { type: Types.ObjectId, ref: 'User', required: true },
     image: [{ type: String }],
     status: { type: String, enum: ['cancelled', 'completed', 'ongoing', 'scheduled'], default: 'scheduled' },
+    joinCode: { type: String, unique: true, index: true },
 }, { timestamps: true, versionKey: false });
 
 export default mongoose.model('Event', EventSchema);

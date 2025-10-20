@@ -1,23 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
+import { eventApi } from '../../apis/eventApi';
+import { useLocation } from 'react-router-dom';
 
 export default function EventDetailPage() {
-  // ====== DỮ LIỆU SỰ KIỆN (DEMO) ======
-  const event = useMemo(() => ({
-    id: 1,
-    title: 'Halloween 2025',
-    date: '12/12/2025',
-    location: 'Đường 30m, Đại học FPT Hà Nội',
-    status: 'Sắp diễn ra',
-    organizer: 'FBGC',
-    cover: '/api/placeholder/1200/600',
-    summary: `Sự kiện Halloween 2025 hứa hẹn đem đến một không khí sôi động, các khu vực trải nghiệm phong phú và những hoạt động hóa trang hấp dẫn.`,
-    details: [
-      `Sự kiện nhằm tạo sân chơi kết nối sinh viên, lan tỏa tinh thần sáng tạo và tinh thần cộng đồng.`,
-      `Khu vực hoạt động chính: check-in, gian hàng, sân khấu biểu diễn và không gian trải nghiệm.`,
-      `Vui lòng theo dõi thông báo từ Ban tổ chức để cập nhật timeline chi tiết và sơ đồ khu vực.`,
-    ]
-  }), []);
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const eventId = params.get('id');
+
+  const [event, setEvent] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await eventApi.getById(eventId);
+        if (!ignore) {
+          setEvent(res.data.event);
+          setMembers(res.data.members || []);
+        }
+      } catch (e) {
+        if (!ignore) setError(e.response?.data?.message || 'Không thể tải sự kiện');
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [eventId]);
 
   // ====== TRẠNG THÁI ĐÁNH GIÁ ======
   const [comments, setComments] = useState([
@@ -126,38 +139,55 @@ export default function EventDetailPage() {
       `}</style>
 
       {/* ====== HERO / TỔNG QUAN SỰ KIỆN ====== */}
+      {loading && <div className="alert alert-info">Đang tải sự kiện...</div>}
+      {error && <div className="alert alert-danger">{error}</div>}
+      {!loading && event && (
       <div className="hero mb-4">
         <div
           className="hero-cover"
-          style={{ backgroundImage: `url(${event.cover})` }}
+          style={{ backgroundImage: `url(${event.cover || '/api/placeholder/1200/600'})` }}
         />
         <div className="hero-body">
           <div className="row g-3 align-items-center">
             <div className="col-lg-8">
-              <h2 className="mb-1">{event.title}</h2>
-              <p className="muted mb-2">{event.summary}</p>
+              <h2 className="mb-1">{event.name || event.title}</h2>
+              {event.description && <p className="muted mb-2">{event.description}</p>}
               <div className="d-flex flex-wrap gap-2">
                 <span className="chip">
                   <i className="bi bi-lightning-charge-fill"></i>
-                  {event.status}
+                  {event.status || 'scheduled'}
                 </span>
                 <span className="chip">
                   <i className="bi bi-calendar-event"></i>
-                  {event.date}
+                  {new Date(event.eventDate || Date.now()).toLocaleDateString('vi-VN')}
                 </span>
                 <span className="chip">
                   <i className="bi bi-geo-alt"></i>
-                  {event.location}
+                  {event.location || 'FPT University'}
                 </span>
                 <span className="chip">
                   <i className="bi bi-people-fill"></i>
-                  Đơn vị tổ chức: <b className="text-danger">{event.organizer}</b>
+                  Đơn vị tổ chức: <b className="text-danger">{event.organizer || 'HoOC'}</b>
                 </span>
+              </div>
+            </div>
+            <div className="col-lg-4">
+              <div className="card-soft p-3">
+                <div className="fw-semibold mb-2">Thành viên ({members.length})</div>
+                <div className="d-flex flex-wrap gap-2">
+                  {members.slice(0, 9).map((m, i) => (
+                    <img key={m._id || i} src={`https://i.pravatar.cc/100?img=${(i+7)%70}`} className="rounded-circle" style={{ width:32, height:32 }} title={m.userId?.fullName || m.userId?.email || 'Member'} />
+                  ))}
+                  {members.length > 9 && (
+                    <div className="rounded-circle d-flex align-items-center justify-content-center bg-light border" style={{ width:32, height:32 }}>+{members.length - 9}</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+      )}
 
       {/* ====== CHI TIẾT SỰ KIỆN ====== */}
       <div className="card-soft p-4 mb-4">
@@ -165,16 +195,16 @@ export default function EventDetailPage() {
         <div className="row g-3">
           <div className="col-lg-6">
             <p className="muted">
-              {event.details[0]}
+              Sự kiện nhằm tạo sân chơi kết nối sinh viên, lan tỏa tinh thần sáng tạo và tinh thần cộng đồng.
             </p>
             <p className="muted">
-              {event.details[1]}
+              Khu vực hoạt động chính: check-in, gian hàng, sân khấu biểu diễn và không gian trải nghiệm.
             </p>
           </div>
           <div className="col-lg-6">
             <div className="p-3 rounded-12" style={{ background:'#FFF7ED', border:'1px solid #FED7AA' }}>
               <div className="fw-semibold mb-1">Lưu ý từ Ban tổ chức</div>
-              <div className="muted">{event.details[2]}</div>
+              <div className="muted">Vui lòng theo dõi thông báo từ Ban tổ chức để cập nhật timeline chi tiết và sơ đồ khu vực.</div>
             </div>
           </div>
         </div>

@@ -30,7 +30,6 @@ import Menber from './pages/User/Menber';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';
-import ManageMember from './pages/User/ManageMember';
 
 // Error Pages
 import ErrorPage404 from './pages/Errors/ErrorPage404'; 
@@ -73,7 +72,6 @@ export default function App() {
             } 
           />
           <Route path="/notifications" element={<Notifications />} />
-          <Route path="/manage-member" element={<ManageMember />} />
           <Route 
             path="/event-detail" 
             element={

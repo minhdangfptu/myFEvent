@@ -40,7 +40,7 @@ const UserSchema = new Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'mentor', 'IC-PDP'],
+    enum: ['user', 'admin', 'mentor', 'IC-PDP', 'HoOC'],
     default: 'user',
   },
 }, { timestamps: true });

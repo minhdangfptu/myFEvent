@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { eventApi } from '../apis/eventApi';
 
 export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 'home' }) {
   const { logout } = useAuth();
@@ -31,12 +32,18 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
   }, [sidebarOpen]);
 
   const [activeEventId, setActiveEventId] = useState(null);
-  const eventItems = [
-    { id: 'e2025',    label: 'Halloween 2025', path: '/event-detail' },
-    { id: 'e2024',    label: 'Halloween 2024', path: '/event-detail' },
-    { id: 'e2023',    label: 'Halloween 2023', path: '/event-detail' },
-    { id: 'eTet2023', label: 'Tết 2023',       path: '/event-detail' }
-  ];
+  const [myEvents, setMyEvents] = useState([]);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await eventApi.listMyEvents();
+        if (!ignore) setMyEvents(res.data || []);
+      } catch {}
+    })();
+    return () => { ignore = true };
+  }, []);
 
   const settingItems = [
     { id: 'notifications', icon: 'bi-bell', label: t('nav.notifications'), path: '/notifications' },
@@ -135,7 +142,8 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
             })}
           </div>
 
-          {/* === Sự kiện: ngay sau Calendar === */}
+          {/* === Sự kiện: ngay sau Calendar (chỉ hiện nếu có sự kiện đã/đang tham gia) === */}
+          {myEvents.length > 0 && (
           <div className="mt-2">
             <button
               className="btn btn-nav d-flex align-items-center justify-content-between w-100"
@@ -155,19 +163,19 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
             {eventsOpen && (
               <div className={`mt-2 ${sidebarOpen ? 'events-branch' : ''}`}>
                 <div className="d-flex flex-column gap-2">
-                  {eventItems.map(ev => {
-                    const isActiveEvent = activeEventId === ev.id;
+                  {myEvents.map(ev => {
+                    const isActiveEvent = activeEventId === String(ev._id);
                     return (
                       <button
-                        key={ev.id}
+                        key={ev._id}
                         className={`btn btn-event text-start ${isActiveEvent ? 'active-red' : ''}`}
                         onClick={() => {
-                          setActiveEventId(ev.id);
-                          window.location.href = ev.path;
+                          setActiveEventId(String(ev._id));
+                          window.location.href = `/event-detail?id=${ev._id}`;
                         }}
-                        title={ev.label}
+                        title={ev.name}
                       >
-                        {ev.label}
+                        {ev.name}
                       </button>
                     );
                   })}
@@ -175,6 +183,7 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
               </div>
             )}
           </div>
+          )}
 
           {/* Sau Calendar (Task, Risk, Documents) */}
           <div className="mt-3 d-flex flex-column gap-2">

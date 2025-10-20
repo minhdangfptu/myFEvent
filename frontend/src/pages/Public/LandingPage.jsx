@@ -1,3 +1,34 @@
+import { useMemo, useState } from 'react'
+import UserLayout from '../../components/UserLayout'
+
+export function PublicEventsView() {
+  const [q, setQ] = useState('')
+  const events = useMemo(() => ([
+    { id: 1, title: 'Halloween 2025', desc: 'Sự kiện hóa trang sôi động', cover: '/api/placeholder/600/360' },
+    { id: 2, title: 'International Day 2025', desc: 'Ngày hội văn hóa', cover: '/api/placeholder/600/360' },
+  ]), [])
+  const list = events.filter(e => e.title.toLowerCase().includes(q.toLowerCase()))
+
+  return (
+    <UserLayout title="Sự kiện" activePage="home" showSearch onSearch={setQ}>
+      <div className="row g-4">
+        {list.map(ev => (
+          <div key={ev.id} className="col-xl-4 col-lg-4 col-md-6">
+            <div className="card border-0 shadow-sm h-100">
+              <div style={{ height: 180, background:`url(${ev.cover}) center/cover` }} />
+              <div className="card-body">
+                <div className="fw-semibold mb-1">{ev.title}</div>
+                <div className="text-secondary mb-3" style={{ fontSize: 14 }}>{ev.desc}</div>
+                <a href={`/event-detail`} className="btn btn-danger">Xem chi tiết</a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </UserLayout>
+  )
+}
+
 import { Link as RouterLink } from "react-router-dom"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
