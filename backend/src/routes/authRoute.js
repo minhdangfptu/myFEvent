@@ -40,7 +40,7 @@ const handleValidationErrors = (req, res, next) => {
 
 router.post('/signup', signupValidation, handleValidationErrors, signup);
 router.post('/login', loginValidation, handleValidationErrors, login);
-router.post('/google-login', googleLoginValidation, handleValidationErrors, loginWithGoogle);
+router.post('/google', googleLoginValidation, handleValidationErrors, loginWithGoogle);
 router.post('/refresh-token', refreshTokenValidation, handleValidationErrors, authenticateRefreshToken, refreshToken);
 router.post('/logout', logoutValidation, handleValidationErrors, logout);
 router.post('/logout-all', authenticateToken, logoutAll);

@@ -10,7 +10,7 @@ const UserSchema = new Schema({
   },
   passwordHash: {
     type: String,
-    required: true,
+    required: function () { return this.authProvider === 'local'; }
   },
   fullName: { 
     type: String, 
@@ -25,7 +25,7 @@ const UserSchema = new Schema({
   verified: { type: Boolean, default: false },
   phone: {
     type: String,
-    required: true,
+    required: function () { return this.authProvider === 'local'; },
     unique: true,
     trim: true,
   },
@@ -34,10 +34,9 @@ const UserSchema = new Schema({
     enum: ['active', 'pending', 'banned'],
     default: 'active',
   },
-  isFirstLogin: { 
-    type: Boolean, 
-    default: true 
-  },
+  googleId: { type: String, unique: true, sparse: true },
+  authProvider: { type: String, enum: ['local', 'google'], default: 'google' },
+  isFirstLogin: { type: Boolean, default: true },
   role: {
     type: String,
     enum: ['user', 'admin', 'mentor', 'IC-PDP', 'HoOC'],

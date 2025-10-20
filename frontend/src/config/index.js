@@ -1,5 +1,5 @@
 // API Configuration
-export const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8017';
+export const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8017';
 
 // Google OAuth Configuration
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';

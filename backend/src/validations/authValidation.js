@@ -28,9 +28,13 @@ export const loginValidation = [
 ];
 
 export const googleLoginValidation = [
-    body('token')
+    body('credential')
         .notEmpty()
-        .withMessage('Google token is required')
+        .withMessage('Google credential is required'),
+    body('g_csrf_token')
+        .optional()
+        .isString()
+        .withMessage('CSRF token must be a string')
 ];
 
 export const refreshTokenValidation = [
