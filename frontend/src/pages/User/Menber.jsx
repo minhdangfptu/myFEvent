@@ -44,6 +44,7 @@ export default function ThanhVienPage() {
               <option>Newest</option>
               <option>Oldest</option>
             </select>
+            <a className="btn btn-danger" href="/manage-member">Quản lý thành viên</a>
           </div>
         </div>
 
