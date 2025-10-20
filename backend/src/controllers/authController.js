@@ -7,8 +7,6 @@ import { config } from '../config/environment.js';
 import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
 
-// In-memory store for email verification codes (1-minute TTL)
-// Keyed by email to avoid having to look up by user first
 const emailVerificationStore = new Map();
 
 const setEmailVerificationCode = (email) => {
@@ -61,13 +59,13 @@ const saveRefreshToken = async (userId, token, req) => {
 };
 
 // Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
-const sendVerificationEmail = async (user, req) => {
-  const { code } = setEmailVerificationCode(user.email);
+const sendVerificationEmail = async (email, fullName, req) => {
+  const { code } = setEmailVerificationCode(email);
 
   const html = `
     <div style="font-family:Arial,sans-serif;font-size:14px;color:#111827">
       <h2>Mã xác nhận tài khoản</h2>
-      <p>Chào ${user.fullName || user.email},</p>
+      <p>Chào ${fullName || email},</p>
       <p>Mã xác nhận của bạn là:</p>
       <div style="font-size:28px;font-weight:700;letter-spacing:6px;">${code}</div>
       <p>Mã có hiệu lực trong 1 phút. Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
@@ -75,7 +73,7 @@ const sendVerificationEmail = async (user, req) => {
   `;
 
   await sendMail({
-    to: user.email,
+    to: email,
     subject: 'Mã xác nhận - myFEvent',
     html,
   });
@@ -99,26 +97,23 @@ export const signup = async (req, res) => {
 
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     const passwordHash = await bcrypt.hash(password, salt);
-    const newUser = new User({
+
+    // Store pending registration data instead of creating user
+    const pendingUser = {
       email,
       passwordHash,
       fullName,
       phone,
       verified: false,
       status: 'pending',
-    });
+    };
+    
+    pendingRegistrations.set(email, pendingUser);
+    await sendVerificationEmail(email, fullName, req);
 
-    await newUser.save();
-
-    await sendVerificationEmail(newUser, req);
-
-    return res.status(201).json({
+    return res.status(200).json({
       message: 'User created successfully! Please verify your email to activate your account.',
-      user: {
-        id: newUser._id,
-        email: newUser.email,
-        fullName: newUser.fullName,
-      }
+      email
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -265,9 +260,10 @@ export const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
     if (!email || !code) return res.status(400).json({ message: 'Email and code are required' });
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid email' });
+    
+    // Get pending registration data
+    const pendingUser = pendingRegistrations.get(email);
+    if (!pendingUser) return res.status(400).json({ message: 'No pending registration found for this email' });
 
     const entry = emailVerificationStore.get(email);
     if (!entry) return res.status(400).json({ message: 'Code not found. Please resend.' });
@@ -283,12 +279,25 @@ export const verifyEmail = async (req, res) => {
     // Consume code
     if (entry.timeout) clearTimeout(entry.timeout);
     emailVerificationStore.delete(email);
+    
+    // Create and save the verified user
+    const newUser = new User({
+      ...pendingUser,
+      verified: true,
+      status: 'active'
+    });
+    
+    await newUser.save();
+    pendingRegistrations.delete(email);
 
-    user.verified = true;
-    user.status = 'active';
-    await user.save();
-
-    return res.status(200).json({ message: 'Verified successfully' });
+    return res.status(201).json({ 
+      message: 'Verified successfully',
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        fullName: newUser.fullName
+      }
+    });
   } catch (error) {
     console.error('Verify email error:', error);
     return res.status(500).json({ message: 'Failed to verify email' });
@@ -301,14 +310,20 @@ export const resendVerification = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(200).json({ message: 'If the email exists, a verification link has been sent.' });
-
-    if (user.verified) {
-      return res.status(200).json({ message: 'Account already verified.' });
+    // Check if there's a pending registration
+    const pendingUser = pendingRegistrations.get(email);
+    if (!pendingUser) {
+      const existingUser = await User.findOne({ email });
+      if (!existingUser) {
+        return res.status(400).json({ message: 'No pending registration found for this email' });
+      }
+      if (existingUser.verified) {
+        return res.status(400).json({ message: 'Account already verified.' });
+      }
+      return res.status(400).json({ message: 'Please register again.' });
     }
 
-    await sendVerificationEmail(user, req);
+    await sendVerificationEmail(email, pendingUser.fullName, req);
     return res.status(200).json({ message: 'Verification email sent.' });
   } catch (error) {
     console.error('Resend verification error:', error);

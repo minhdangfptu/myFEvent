@@ -1,9 +1,12 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 export default function UserHeader({ title, showSearch = false, showEventAction = false, onSearch, onEventAction }) {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
+  const { notifications, unreadCount, markAllRead } = useNotifications();
+  const unread = notifications.filter(n => n.unread).slice(0, 5);
 
   const handleLogout = async () => {
     try {
@@ -74,9 +77,43 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
         </div>
 
         <div className="d-flex align-items-center gap-3">
-          <button className="btn btn-ghost" aria-label={t('nav.notifications')}>
-            <i className="bi bi-bell"></i>
-          </button>
+          <div className="dropdown">
+            <button className="btn btn-ghost position-relative" aria-label={t('nav.notifications')} data-bs-toggle="dropdown" aria-expanded="false">
+              <i className="bi bi-bell"></i>
+              {unreadCount > 0 && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+            <div className="dropdown-menu dropdown-menu-end p-0" style={{ width: 360 }}>
+              <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                <div className="fw-semibold">Thông báo</div>
+                <button className="btn btn-link btn-sm text-decoration-none" onClick={markAllRead}>Đánh dấu tất cả đã đọc</button>
+              </div>
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                {unread.length === 0 && (
+                  <div className="px-3 py-3 text-secondary">Không có thông báo mới</div>
+                )}
+                {unread.map(n => (
+                  <div key={n.id} className="px-3 py-3 border-bottom d-flex align-items-start gap-2">
+                    <div className="mt-1"><i className={n.icon} style={{ color:'#ef4444' }} /></div>
+                    <div className="flex-grow-1">
+                      <div>
+                        <span className="badge rounded-pill me-2" style={{ background:n.color+'22', color:n.color }}>{n.category}</span>
+                        <span className="fw-semibold" style={{ color:'#111827' }}>{n.title}</span>
+                      </div>
+                      <div className="text-secondary small">Vừa xong</div>
+                    </div>
+                    <span className="bg-primary rounded-circle" style={{ width:8, height:8 }} />
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2 text-center">
+                <a href="/notifications" className="text-decoration-none">Xem tất cả</a>
+              </div>
+            </div>
+          </div>
 
           {/* Account dropdown */}
           <div className="dropdown">
