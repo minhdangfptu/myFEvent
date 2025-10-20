@@ -59,9 +59,9 @@ export default function LoginPage() {
 
   return (
     <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <div className="container" style={{ maxWidth: 520 }}>
-        <div className="card shadow-sm border-0">
-          <div className="card-body p-4">
+      <div  className="container" style={{ maxWidth: 480 }}>
+        <div  className="card shadow-sm border-0">
+          <div  className="card-body p-4">
             <div className="d-flex justify-content-center mb-4">
               <img src="/logo-03.png" alt="myFEvent Logo" style={{ width: 200, height: 'auto' }} />
             </div>

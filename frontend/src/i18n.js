@@ -71,13 +71,13 @@ const resources = {
         product: 'Sản phẩm',
         support: 'Hỗ trợ',
         follow: 'Theo dõi chúng tôi',
-        eventAtFPT: 'Sự kiện tại FPT',
+        eventAtFPT: 'Sự kiện tại FPTU',
         login: 'Đăng nhập',
         signup: 'Đăng ký',
         contact: 'Liên hệ',
         about: 'Về chúng tôi',
         policy: 'Chính sách',
-        copyright: '© 2025 myFEvent. All rights reserved.'
+        copyright: '© 2025 myFEvent. Tất cả đã được bảo hộ.'
       },
       home: {
         title: 'Trang chủ',
