@@ -51,4 +51,4 @@ EventBudgetPlanSchema.pre('save', function () {
   }
 });
 
-module.exports = mongoose.model('EventBudgetPlan', EventBudgetPlanSchema);
+export default mongoose.model('EventBudgetPlan', EventBudgetPlanSchema);

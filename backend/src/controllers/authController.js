@@ -2,12 +2,15 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
 import { sendMail } from '../mailer.js';
 import { config } from '../config/environment.js';
 import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
 
 const emailVerificationStore = new Map();
+// Pending registrations kept in-memory until verified
+const pendingRegistrations = new Map();
 
 const setEmailVerificationCode = (email) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();

@@ -26,4 +26,4 @@ const TaskSchema = new Schema({
 TaskSchema.index({ eventId: 1, departmentId: 1, dueDate: 1 });
 TaskSchema.index({ assigneeId: 1, status: 1 });
 
-module.exports = mongoose.model('Task', TaskSchema);
+export default mongoose.model('Task', TaskSchema);

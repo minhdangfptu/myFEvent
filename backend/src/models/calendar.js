@@ -15,4 +15,4 @@ const CalendarSchema = new Schema({
 
 CalendarSchema.index({ departmentId: 1 }, { unique: true });
 
-module.exports = mongoose.model('Calendar', CalendarSchema);
+export default mongoose.model('Calendar', CalendarSchema);
