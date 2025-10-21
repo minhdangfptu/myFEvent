@@ -4,57 +4,15 @@ import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import { eventService } from '../../services/eventService';
 import { formatDate } from '../../utils/formatDate';
+import {deriveEventStatus} from '../../utils/getEventStatus';
 
-const baseEvents = [
-  { id: 1, title: "Halloween 2025", date: "12/12/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1504270997636-07ddfbd48945?q=80&w=1200&auto=format&fit=crop", description: "Sự kiện Halloween với nhiều hoạt động hóa trang và trò chơi thú vị." },
-  { id: 2, title: "International Day 2025", date: "15/01/2026", location: "Hà Nội", image: "https://images.unsplash.com/photo-1520975979651-6f61dcole1a0?q=80&w=1200&auto=format&fit=crop", description: "Ngày hội giao lưu văn hoá quốc tế với nhiều gian hàng và biểu diễn đa dạng." },
-  { id: 3, title: "Halloween 2024", date: "31/10/2024", location: "Hà Nội", image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200&auto=format&fit=crop", description: "Không khí Halloween sôi động cùng cosplay và âm nhạc." },
-  { id: 4, title: "Workshop Startup", date: "01/01/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1542744095-291d1f67b221?q=80&w=1200&auto=format&fit=crop", description: "Chia sẻ về khởi nghiệp và xây dựng mô hình kinh doanh bền vững." },
-  { id: 5, title: "Tech Talk AI", date: "05/02/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?q=80&w=1200&auto=format&fit=crop", description: "Cập nhật xu hướng trí tuệ nhân tạo và ứng dụng thực tế." },
-  { id: 6, title: "Football Friendly", date: "10/03/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=1200&auto=format&fit=crop", description: "Giao hữu bóng đá giữa các câu lạc bộ sinh viên." },
-  { id: 7, title: "Music Night", date: "20/04/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1483412033650-1015ddeb83d1?q=80&w=1200&auto=format&fit=crop", description: "Đêm nhạc sinh viên với nhiều tiết mục đặc sắc." },
-  { id: 8, title: "Volunteer Day", date: "12/05/2025", location: "Hà Nội", image: "https://images.unsplash.com/photo-1499933374294-4584851497cc?q=80&w=1200&auto=format&fit=crop", description: "Hoạt động tình nguyện vì cộng đồng do CLB tình nguyện tổ chức." },
-]
-
-// fallback mock if API fails / empty
-const fallbackEvents = Array.from({ length: 16 }, (_, i) => ({
-  ...baseEvents[i % baseEvents.length],
-  id: i + 1,
-}))
-
-const STATUS_STYLE = {
-  SCHEDULED: { text: 'Sắp diễn ra', className: 'bg-warning text-dark' },
-  ONGOING: { text: 'Đang diễn ra', className: 'bg-success' },
-  COMPLETED: { text: 'Đã kết thúc', className: 'bg-secondary' },
-  CANCELLED: { text: 'Đã hủy', className: 'bg-danger' },
-}
-
-function deriveStatus(event) {
-
-  const explicit = (event.status || '').toUpperCase()
-  if (explicit && STATUS_STYLE[explicit]) return explicit
-
-
-  const rawDate = event.eventDate || event.date
-  const start = rawDate ? new Date(rawDate) : null
-  if (!start || isNaN(start)) return 'SCHEDULED'
-
-  const now = new Date()
-
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-
-  if (now < start) return 'SCHEDULED'
-  if (now >= start && now <= end) return 'ONGOING'
-  return 'COMPLETED'
-}
 
 export default function EventsPage() {
   const [keyword, setKeyword] = useState("")
   const [page, setPage] = useState(1)
   const perPage = 9
 
-  const [eventsList, setEventsList] = useState(fallbackEvents)
+  const [eventsList, setEventsList] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -90,10 +48,10 @@ export default function EventsPage() {
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase()
     return eventsList
-      .filter(e => (k ? ((e.title || e.name || '').toLowerCase().includes(k)) : true))
+      .filter(e => (k ? (( e.name || '').toLowerCase().includes(k)) : true))
       .filter(e => {
         if (statusFilter === 'ALL') return true
-        return deriveStatus(e) === statusFilter
+        return e.status.toUpperCase() === statusFilter
       })
   }, [keyword, eventsList, statusFilter])
 
@@ -148,8 +106,7 @@ export default function EventsPage() {
 
           <div className="row row-cols-1 row-cols-md-3 g-3">
             {visible.map((event) => {
-              const status = deriveStatus(event)
-              const style = STATUS_STYLE[status] || STATUS_STYLE.UPCOMING
+              const status = deriveEventStatus(event)
               const name = event.name || event.title
               const defaultImage = "/default-events.jpg"
               const img =  Array.isArray(event.image) ? (event.image[0] || defaultImage) : (event.image || defaultImage) 
@@ -158,8 +115,7 @@ export default function EventsPage() {
               return (
                 <div className="col" key={event._id ?? event.id}>
                   <RouterLink
-                    to={`/events/${event._id ?? event.id}`}
-                    state={{ event }}
+                    to={`/events/${event._id}`}
                     className="text-decoration-none text-reset"
                   >
                     <div className="card h-100 shadow-sm border-0">
@@ -171,10 +127,10 @@ export default function EventsPage() {
                           style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }}
                         />
                         <span
-                          className={`badge position-absolute ${style.className}`}
+                          className={`badge position-absolute ${status.className}`}
                           style={{ top: 10, left: 10, fontSize: 12, padding: '6px 10px', borderRadius: 8 }}
                         >
-                          {style.text}
+                          {status.text}
                         </span>
                       </div>
 
