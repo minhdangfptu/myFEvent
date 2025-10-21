@@ -61,6 +61,7 @@ export default function EventsPage() {
                       <div className="d-flex gap-2 mb-2">
                         <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.date}</span>
                         <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.location}</span>
+                        <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.location}</span>
                       </div>
                       <div className="text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{event.description}</div>
                     </div>

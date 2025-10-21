@@ -1,18 +1,24 @@
-import { useAuth } from '../contexts/AuthContext';
-import { useTranslation } from 'react-i18next';
-import { useNotifications } from '../contexts/NotificationsContext';
+import { useAuth } from "../contexts/AuthContext";
+import { useTranslation } from "react-i18next";
+import { useNotifications } from "../contexts/NotificationsContext";
 
-export default function UserHeader({ title, showSearch = false, showEventAction = false, onSearch, onEventAction }) {
+export default function UserHeader({
+  title,
+  showSearch = false,
+  showEventAction = false,
+  onSearch,
+  onEventAction,
+}) {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const { notifications, unreadCount, markAllRead } = useNotifications();
-  const unread = notifications.filter(n => n.unread).slice(0, 5);
+  const unread = notifications.filter((n) => n.unread).slice(0, 5);
 
   const handleLogout = async () => {
     try {
       await logout();
     } finally {
-      window.location.href = '/landingpage';
+      window.location.href = "/landingpage";
     }
   };
 
@@ -63,7 +69,7 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
-          <button
+          {/* <button
             className="btn btn-ghost me-3"
             onClick={() => {
               const event = new CustomEvent('toggleSidebar');
@@ -72,13 +78,18 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
             aria-label="Mở/đóng thanh bên"
           >
             <i className="bi bi-list"></i>
-          </button>
+          </button> */}
           <h5 className="mb-0 text-muted">{title}</h5>
         </div>
 
         <div className="d-flex align-items-center gap-3">
           <div className="dropdown">
-            <button className="btn btn-ghost position-relative" aria-label={t('nav.notifications')} data-bs-toggle="dropdown" aria-expanded="false">
+            <button
+              className="btn btn-ghost position-relative"
+              aria-label={t("nav.notifications")}
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
               <i className="bi bi-bell"></i>
               {unreadCount > 0 && (
                 <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
@@ -86,31 +97,61 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                 </span>
               )}
             </button>
-            <div className="dropdown-menu dropdown-menu-end p-0" style={{ width: 360 }}>
+            <div
+              className="dropdown-menu dropdown-menu-end p-0"
+              style={{ width: 360 }}
+            >
               <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
                 <div className="fw-semibold">Thông báo</div>
-                <button className="btn btn-link btn-sm text-decoration-none" onClick={markAllRead}>Đánh dấu tất cả đã đọc</button>
+                <button
+                  className="btn btn-link btn-sm text-decoration-none"
+                  onClick={markAllRead}
+                >
+                  Đánh dấu tất cả đã đọc
+                </button>
               </div>
-              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              <div style={{ maxHeight: 320, overflowY: "auto" }}>
                 {unread.length === 0 && (
-                  <div className="px-3 py-3 text-secondary">Không có thông báo mới</div>
+                  <div className="px-3 py-3 text-secondary">
+                    Không có thông báo mới
+                  </div>
                 )}
-                {unread.map(n => (
-                  <div key={n.id} className="px-3 py-3 border-bottom d-flex align-items-start gap-2">
-                    <div className="mt-1"><i className={n.icon} style={{ color:'#ef4444' }} /></div>
+                {unread.map((n) => (
+                  <div
+                    key={n.id}
+                    className="px-3 py-3 border-bottom d-flex align-items-start gap-2"
+                  >
+                    <div className="mt-1">
+                      <i className={n.icon} style={{ color: "#ef4444" }} />
+                    </div>
                     <div className="flex-grow-1">
                       <div>
-                        <span className="badge rounded-pill me-2" style={{ background:n.color+'22', color:n.color }}>{n.category}</span>
-                        <span className="fw-semibold" style={{ color:'#111827' }}>{n.title}</span>
+                        <span
+                          className="badge rounded-pill me-2"
+                          style={{ background: n.color + "22", color: n.color }}
+                        >
+                          {n.category}
+                        </span>
+                        <span
+                          className="fw-semibold"
+                          style={{ color: "#111827" }}
+                        >
+                          {n.title}
+                        </span>
                       </div>
                       <div className="text-secondary small">Vừa xong</div>
                     </div>
-                    <span className="bg-primary rounded-circle" style={{ width:8, height:8 }} />
+                    <span
+                      className="bg-primary rounded-circle"
+                      style={{ width: 8, height: 8 }}
+                    />
                   </div>
                 ))}
               </div>
               <div className="px-3 py-2 text-center">
-                <a href="/notifications" className="text-decoration-none">Xem tất cả</a>
+                <a href="/notifications" className="text-decoration-none">
+                  Xem tất cả
+                </a>
               </div>
             </div>
           </div>
@@ -127,19 +168,34 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
               <i className="bi bi-person"></i>
               <span
                 className="text-muted"
-                style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                title={user?.fullName || user?.name || user?.email || 'Account'}
+                style={{
+                  maxWidth: 160,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={user?.fullName || user?.name || user?.email || "Account"}
               >
-                {user?.fullName || user?.name || user?.email || 'Account'}
+                {user?.fullName || user?.name || user?.email || "Account"}
               </span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
-              <li><a className="dropdown-item" href="/user-profile">{t('nav.profile')}</a></li>
-              <li><a className="dropdown-item" href="/setting">{t('nav.settings')}</a></li>
-              <li><hr className="dropdown-divider" /></li>
+              <li>
+                <a className="dropdown-item" href="/user-profile">
+                  {t("nav.profile")}
+                </a>
+              </li>
+              <li>
+                <a className="dropdown-item" href="/setting">
+                  {t("nav.settings")}
+                </a>
+              </li>
+              <li>
+                <hr className="dropdown-divider" />
+              </li>
               <li>
                 <button className="dropdown-item" onClick={handleLogout}>
-                  {t('actions.logout')}
+                  {t("actions.logout")}
                 </button>
               </li>
             </ul>
@@ -156,15 +212,15 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                 <div className="position-relative">
                   <i
                     className="bi bi-search position-absolute"
-                    style={{ left: 12, top: 12, color: '#9CA3AF' }}
+                    style={{ left: 12, top: 12, color: "#9CA3AF" }}
                     aria-hidden="true"
                   />
                   <input
                     type="text"
                     className="form-control soft-input ps-5"
-                    placeholder={t('searchPlaceholder')}
+                    placeholder={t("searchPlaceholder")}
                     onChange={(e) => onSearch && onSearch(e.target.value)}
-                    aria-label={t('searchPlaceholder')}
+                    aria-label={t("searchPlaceholder")}
                   />
                 </div>
               </div>
@@ -180,26 +236,28 @@ export default function UserHeader({ title, showSearch = false, showEventAction 
                   aria-label="Mở menu tạo/tham gia sự kiện"
                 >
                   <i className="bi bi-plus"></i>
-                  {t('createEvent')}/{t('joinEvent')}
+                  {t("createEvent")}/{t("joinEvent")}
                   <i className="bi bi-chevron-down"></i>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
                   <li>
                     <button
-                      className="dropdown-item"
-                      onClick={() => onEventAction && onEventAction('create')}
+                      className="dropdown-item d-flex align-items-center"
+                      onClick={() => onEventAction && onEventAction("create")}
+                      style={{ textAlign: "left", paddingLeft: "16px" }}
                     >
                       <i className="bi bi-calendar-plus me-2"></i>
-                      {t('createEvent')}
+                      {t("createEvent")}
                     </button>
                   </li>
                   <li>
                     <button
-                      className="dropdown-item"
-                      onClick={() => onEventAction && onEventAction('join')}
+                      className="dropdown-item d-flex align-items-center"
+                      onClick={() => onEventAction && onEventAction("join")}
+                      style={{ textAlign: "left", paddingLeft: "16px" }}
                     >
                       <i className="bi bi-box-arrow-in-right me-2"></i>
-                      {t('joinEvent')}
+                      {t("joinEvent")}
                     </button>
                   </li>
                 </ul>

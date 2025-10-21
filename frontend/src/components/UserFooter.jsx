@@ -5,7 +5,7 @@ export default function Footer({ sidebarOpen = true }) {
     <footer
       className="bg-dark text-white pt-5 pb-4 mt-5"
       style={{
-        marginLeft: sidebarOpen ? "250px" : "70px",
+        marginLeft: sidebarOpen ? "230px" : "70px",
         transition: "margin-left 0.3s ease",
       }}
     >
