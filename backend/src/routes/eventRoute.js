@@ -22,7 +22,6 @@ const router = express.Router();
 router.get('/public', listPublicEvents);
 router.get('/:id', getPublicEventDetail);
 
-// Nested resources under event (protected)
 router.post('/:eventId/milestones', authenticateToken, createMilestone);
 router.get('/:eventId/milestones', authenticateToken, listMilestones);
 router.get('/:eventId/milestones/:milestoneId', authenticateToken, getMilestoneDetail);
