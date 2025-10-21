@@ -27,7 +27,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/user-landing-page', { replace: true });
+      if (user?.role === 'HoOC') {
+        navigate('/hooc-landing-page', { replace: true });
+      } else {
+        navigate('/user-landing-page', { replace: true });
+      }
     } catch (error) {
       console.error('Login error:', error);
       if (error?.response?.status === 403) {
@@ -45,7 +49,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      navigate("/user-landing-page", { replace: true });
+      if (user?.role === 'HoOC') {
+        navigate('/hooc-landing-page', { replace: true });
+      } else {
+        navigate('/user-landing-page', { replace: true });
+      }
     } catch (err) {
       console.error("Google login error:", err.message);
       setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");

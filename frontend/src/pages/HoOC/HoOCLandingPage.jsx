@@ -5,10 +5,14 @@ import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function UserHomePage() {
+export default function HoOCHomePage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', description: '' });
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const navigate = useNavigate();
@@ -68,8 +72,12 @@ export default function UserHomePage() {
       title={t('home.title')}
       activePage="home"
       showSearch={true}
-      showEventAction={false}  // User thường không có action ở header
+      showEventAction={true}  // HoOC có action ở header
       onSearch={setSearchQuery}
+      onEventAction={(action) => {
+        if (action === 'join') setShowJoinModal(true);
+        if (action === 'create') setShowCreateModal(true);
+      }}
     >
       <style>{`
         .brand-red { color: #EF4444; }
@@ -294,6 +302,69 @@ export default function UserHomePage() {
         </div>
       )}
 
+      {/* ====== CREATE EVENT MODAL: chỉ HoOC ====== */}
+      {showCreateModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header border-0">
+                <div className="d-flex align-items-center">
+                  <i className="bi bi-flag brand-red me-2"></i>
+                  <h5 className="modal-title fw-bold">Tạo sự kiện</h5>
+                </div>
+                <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="text-muted mb-3" style={{ fontSize: 14 }}>Hãy tạo sự kiện mới của riêng mình thôi!</div>
+                {createError && <div className="alert alert-danger py-2" role="alert">{createError}</div>}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setCreateError('');
+                  if (!createForm.name.trim()) { setCreateError('Vui lòng nhập tên sự kiện'); return; }
+                  try {
+                    setCreateSubmitting(true);
+                    const res = await eventApi.create({ name: createForm.name, description: createForm.description, type: 'private' });
+                    setShowCreateModal(false);
+                    setCreateForm({ name: '', description: '' });
+                    alert(`Mã tham gia: ${res.data.joinCode}`);
+                  } finally {
+                    setCreateSubmitting(false);
+                  }
+                }}>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Tên sự kiện*</label>
+                    <input
+                      type="text"
+                      className="form-control soft-input"
+                      placeholder="Tên sự kiện"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                      required
+                      disabled={createSubmitting}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Mô tả*</label>
+                    <textarea
+                      className="form-control soft-input"
+                      rows={4}
+                      placeholder="Hãy mô tả sự kiện của bạn"
+                      value={createForm.description}
+                      onChange={(e) => setCreateForm(f => ({ ...f, description: e.target.value }))}
+                      required
+                      disabled={createSubmitting}
+                    />
+                  </div>
+                  <div className="d-flex gap-2 justify-content-end">
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowCreateModal(false)}>Hủy</button>
+                    <button type="submit" className="btn btn-danger" disabled={createSubmitting}>{createSubmitting ? 'Đang tạo...' : 'Xác nhận'}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </UserLayout>
   );
 }

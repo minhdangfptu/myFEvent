@@ -15,7 +15,7 @@
     "build": "npm run clean && npm run build-babel",
     "start": "node ./src/index.js",
     "production": "npm run build && npm run start",
-    "dev": "nodemon ./src/index.js",
+    "dev": "nodemon ./src/server.js",
     "send:test-mail": "node ./sendTestMail.js"
   },
   "dependencies": {

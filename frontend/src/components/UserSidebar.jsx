@@ -4,11 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { eventApi } from '../apis/eventApi';
 
 export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 'home' }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useTranslation();
 
   const menuItems = useMemo(() => ([
-    { id: 'home',     icon: 'bi-house-door',            label: t('nav.home'),     path: '/user-landing-page' },
+    { id: 'home',     icon: 'bi-house-door',            label: t('nav.home'),     path: user?.role === 'HoOC' ? '/hooc-landing-page' : '/user-landing-page' },
     { id: 'members',  icon: 'bi-people',                label: t('nav.members'),  path: '/member' },
     { id: 'stats',    icon: 'bi-bar-chart',             label: t('nav.stats'),    path: '/dashboard' },
     { id: 'calendar', icon: 'bi-calendar',              label: t('nav.calendar'), path: '/calendar' },

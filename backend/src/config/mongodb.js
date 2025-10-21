@@ -3,6 +3,10 @@ import { config } from './environment.js';
 
 const connectDB = async () => {
   try {
+    // Tạm thời bypass MongoDB để test
+    console.log('MongoDB connection bypassed for testing');
+    return;
+    
     const options = {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,

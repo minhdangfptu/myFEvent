@@ -22,6 +22,7 @@ import EmailConfirmation from './pages/Auth/EmailConfirmation';
 
 // User Dashboard Pages
 import UserLandingPage from './pages/User/UserLandingPage';
+import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
 import UserProfile from './pages/User/UserProfile';
 import UserEventDetail from './pages/User/EventDetail';
 import Settings from './pages/User/Settings';
@@ -64,7 +65,22 @@ export default function App() {
           <Route path="/email-confirmation" element={<EmailConfirmation />} />
           
           {/* Protected User Routes */}
-          <Route path="/user-landing-page" element={<UserLandingPage />} />
+          <Route 
+            path="/user-landing-page" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UserLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-landing-page" 
+            element={
+              <ProtectedRoute requiredRole="HoOC">
+                <HoOCLandingPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/user-profile" 
             element={
