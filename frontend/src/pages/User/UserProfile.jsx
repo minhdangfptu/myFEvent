@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
 import { authApi } from '../../apis/authApi';
 
@@ -6,13 +6,13 @@ export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ===== Toast/Window Notice state + helper =====
   const [notice, setNotice] = useState({ open: false, type: 'success', message: '' });
   const showNotice = (type, message) => {
     setNotice({ open: true, type, message });
     window.clearTimeout(showNotice._t);
     showNotice._t = window.setTimeout(() => setNotice(n => ({ ...n, open: false })), 3200);
   };
+  const notify = (type, msg) => showNotice(type, msg);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,12 +31,20 @@ export default function UserProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ fullName: '', phone: '', bio: '', highlight: '', tags: [] });
+
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [unsavedAvatar, setUnsavedAvatar] = useState(false);      // NEW: cờ ảnh chưa lưu
+  const objectUrlRef = useRef(null);                              // NEW: lưu URL để revoke
+
   const [showModal, setShowModal] = useState(false);
   const [modalSelected, setModalSelected] = useState(new Set());
+
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);  // modal xem lớn
+  const [showAvatarConfirm, setShowAvatarConfirm] = useState(false);  // NEW: modal xác nhận lưu
+  const [performingAvatarSave, setPerformingAvatarSave] = useState(false); // NEW: loading khi lưu avatar
+
   const display = (value) => value || '';
 
   useEffect(() => {
@@ -49,35 +57,101 @@ export default function UserProfilePage() {
         tags: Array.isArray(profile.tags) ? profile.tags : []
       });
       setAvatarPreview(profile?.avatarUrl || null);
+      setUnsavedAvatar(false);
+      cleanupObjectUrl();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
+  const cleanupObjectUrl = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  };
+
+  // Cảnh báo khi rời trang nếu còn ảnh chưa lưu
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (unsavedAvatar) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    if (unsavedAvatar) {
+      window.addEventListener('beforeunload', onBeforeUnload);
+      return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }
+  }, [unsavedAvatar]);
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  // Lưu toàn bộ hồ sơ (bao gồm avatar nếu có)
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
     try {
       const payload = { ...form };
-      await authApi.updateProfile(payload);
-
       if (avatarFile) {
         try {
-          await authApi.uploadAvatar(avatarFile);
+          const b64 = await fileToBase64(avatarFile);
+          payload.avatarUrl = b64;
         } catch (_) {
-          // Upload ảnh lỗi: vẫn xem là lưu hồ sơ thành công nhưng cảnh báo
-          showNotice('warning', 'Hồ sơ đã lưu, nhưng tải ảnh đại diện thất bại.');
+          notify('warning', 'Không thể đọc ảnh đại diện. Vui lòng thử lại.');
         }
       }
 
+      await authApi.updateProfile(payload);
+
+      // reload profile từ server để chắc chắn ảnh đã lưu
       const res = await authApi.getProfile();
       setProfile(res?.data || res || null);
+
       setEditing(false);
       setAvatarFile(null);
+      setUnsavedAvatar(false);
+      cleanupObjectUrl();
 
-      showNotice('success', 'Lưu thay đổi thành công!');
+      notify('success', 'Lưu thay đổi thành công!');
+      if (payload.avatarUrl) {
+        notify('success', 'Ảnh đại diện đã được cập nhật.');
+      }
     } catch (e) {
-      showNotice('error', 'Lưu thất bại. Vui lòng thử lại.');
+      notify('error', 'Lưu thất bại. Vui lòng thử lại.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Chỉ lưu avatar (giống Facebook: chọn ảnh → xác nhận → lưu)
+  const handleConfirmSaveAvatar = async () => {
+    if (!avatarFile) {
+      setShowAvatarConfirm(false);
+      notify('warning', 'Chưa chọn ảnh mới.');
+      return;
+    }
+    setPerformingAvatarSave(true);
+    try {
+      const b64 = await fileToBase64(avatarFile);
+      await authApi.updateProfile({ avatarUrl: b64 });
+
+      const res = await authApi.getProfile();
+      setProfile(res?.data || res || null);
+
+      setShowAvatarConfirm(false);
+      setUnsavedAvatar(false);
+      setAvatarFile(null);
+      cleanupObjectUrl();
+      notify('success', 'Ảnh đại diện đã được lưu.');
+    } catch (e) {
+      notify('error', 'Lưu ảnh đại diện thất bại. Vui lòng thử lại.');
+    } finally {
+      setPerformingAvatarSave(false);
     }
   };
 
@@ -88,8 +162,12 @@ export default function UserProfilePage() {
   const handleAvatarChange = (file) => {
     if (!file) return;
     setAvatarFile(file);
+    cleanupObjectUrl();
     const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
+    objectUrlRef.current = url;
+    setAvatarPreview(url);     // hiển thị ngay
+    setUnsavedAvatar(true);    // đánh dấu chưa lưu
+    notify('warning', 'Ảnh đại diện mới chưa được lưu.');
   };
 
   const openTagModal = () => {
@@ -148,7 +226,7 @@ export default function UserProfilePage() {
         .mp-dropdown-item { padding: 12px 16px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px; font-size: 14px; }
         .mp-dropdown-item:hover { background: #f3f4f6; }
 
-        /* ==== Toast/Window notice ==== */
+        /* Toast */
         .mp-toast {
           position: fixed; right: 20px; top: 20px; z-index: 3000;
           min-width: 280px; max-width: 92vw;
@@ -164,13 +242,21 @@ export default function UserProfilePage() {
         .mp-toast-error   { border-left-color: #EF4444; }
         .mp-toast-warning { border-left-color: #F59E0B; }
         @keyframes mp-slide-in { from { transform: translateY(-8px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+
+        /* Banner nổi góc phải (kiểu Facebook khi đổi avatar) */
+        .mp-fab-banner {
+          position: fixed; right: 20px; top: 90px; z-index: 2500;
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+          padding: 12px; min-width: 300px; display: flex; align-items: center; gap: 10px;
+          animation: mp-slide-in .2s ease-out;
+        }
       `}</style>
 
       <div className="container-fluid">
         <div className="position-relative" style={{ minHeight: 120 }}>
           <div className="mp-header d-flex align-items-start justify-content-between" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 0 }}>
-          <div className="mp-section text-white fw-semibold p-3 fs-4 mt-4">MY PROFILE </div>
-
+            <div className="mp-section text-white fw-semibold p-3 fs-4 mt-4">MY PROFILE </div>
           </div>
 
           <div className="mp-section position-relative" style={{ zIndex: 1, paddingTop: 120 }}>
@@ -364,6 +450,8 @@ export default function UserProfilePage() {
                               });
                               setAvatarPreview(profile?.avatarUrl || null);
                               setAvatarFile(null);
+                              setUnsavedAvatar(false);
+                              cleanupObjectUrl();
                             }
                           }}
                         >
@@ -381,6 +469,43 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Banner góc phải: Ảnh đại diện chưa lưu */}
+      {unsavedAvatar && (
+        <div className="mp-fab-banner">
+          <img
+            src={avatarPreview}
+            alt="preview"
+            className="rounded-circle"
+            style={{ width: 48, height: 48, objectFit: 'cover' }}
+          />
+          <div className="flex-grow-1">
+            <div className="fw-semibold">Ảnh đại diện chưa lưu</div>
+            <div className="text-muted" style={{ fontSize: 13 }}>Hãy lưu để áp dụng thay đổi.</div>
+          </div>
+          <div className="d-flex gap-2">
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => {
+                // Bỏ thay đổi: revert về ảnh server
+                setAvatarPreview(profile?.avatarUrl || null);
+                setAvatarFile(null);
+                setUnsavedAvatar(false);
+                cleanupObjectUrl();
+                notify('warning', 'Đã bỏ thay đổi ảnh đại diện.');
+              }}
+            >
+              Bỏ
+            </button>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => setShowAvatarConfirm(true)}
+            >
+              Lưu
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal xem ảnh đại diện phóng to */}
       {showAvatarModal && (
@@ -414,6 +539,40 @@ export default function UserProfilePage() {
                     className="img-fluid rounded-4"
                     style={{ maxHeight: '70vh', objectFit: 'contain' }}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal xác nhận lưu ảnh đại diện (kiểu Facebook) */}
+      {showAvatarConfirm && (
+        <>
+          <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 1050 }} onClick={() => setShowAvatarConfirm(false)} />
+          <div className="modal d-block" tabIndex={-1} style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Lưu ảnh đại diện?</h5>
+                  <button type="button" className="btn-close" onClick={() => setShowAvatarConfirm(false)} />
+                </div>
+                <div className="modal-body">
+                  <div className="d-flex align-items-center gap-3">
+                    <img
+                      src={avatarPreview}
+                      alt="preview"
+                      className="rounded-circle"
+                      style={{ width: 64, height: 64, objectFit: 'cover' }}
+                    />
+                    <div className="text-muted">Ảnh mới sẽ thay thế ảnh đại diện hiện tại.</div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setShowAvatarConfirm(false)}>Hủy</button>
+                  <button type="button" className="btn btn-danger" onClick={handleConfirmSaveAvatar} disabled={performingAvatarSave}>
+                    {performingAvatarSave ? 'Đang lưu…' : 'Lưu'}
+                  </button>
                 </div>
               </div>
             </div>
