@@ -116,8 +116,8 @@ export default function UserSidebar({ sidebarOpen, setSidebarOpen, activePage = 
       <div className="p-3">
         {/* Logo */}
         <div className="d-flex align-items-center mb-4">
-          <img src="/logo-03.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
-          {sidebarOpen && <span className="ms-2 fw-bold text-dark">myFEvent</span>}
+          <img src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+          {sidebarOpen && <span className="ms-2 fw-bold text-dark">MYFEVENT</span>}
         </div>
 
         {/* NAV: CHÍNH */}

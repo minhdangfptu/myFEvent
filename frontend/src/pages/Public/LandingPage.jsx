@@ -43,7 +43,7 @@ export default function FPTEvent_Landing() {
           <div className="row align-items-center g-4">
             <div className="col-12 col-sm-6">
               <h1 className="fw-bold" style={{ color: '#111827', lineHeight: 1.15, fontSize: '3rem' }}>
-                Quản lý sự kiện tại trường ĐH FPT <span style={{ color: '#ef4444' }}>dễ dàng đến thế!</span>
+                Quản lý sự kiện tại trường ĐH FPT chưa bao giờ <span style={{ color: '#ef4444' }}>  dễ dàng đến thế!</span>
               </h1>
               <p className="text-secondary fs-5">Giúp bạn tổ chức, tạo và quản lý mọi hoạt động trong các sự kiện của mình một cách dễ dàng và chuyên nghiệp.</p>
               <div className="d-flex gap-2 flex-wrap">
