@@ -1,48 +1,114 @@
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
-import { useLocation } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { formatDate } from '../../utils/formatDate'
+import { eventService } from '../../services/eventService'
+import { getEventImage } from '../../utils/getEventImage'
+import { deriveEventStatus } from '../../utils/getEventStatus'
 
 export default function EventDetailPage() {
-  const location = useLocation()
-  const event = location.state?.event || {
-    title: 'Halloween 2025',
-    date: '12/12/2025',
-    location: 'Hà Nội',
-    image: 'https://images.unsplash.com/photo-1504270997636-07ddfbd48945?q=80&w=1200&auto=format&fit=crop',
-    description: `Lorem ipsum dolor sit amet, consectetur adipiscing elit...`,
-    organizer: 'FBGC',
-    status: 'Sắp diễn ra',
-    address: 'Đường 30m, Đại học FPT Hà Nội',
+  const { id } = useParams()
+  const [event, setEvent] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+  const loadDetail = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await eventService.fetchEventById(id)
+      const payload = res?.data ?? res
+      setEvent(payload)
+    } catch (err) {
+      console.error('fetch event detail error', err)
+      setError('Không thể tải chi tiết sự kiện')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  loadDetail()
+}, [id])
+
+  const defaultImg = '/default-events.jpg'
+  const imageUrl = getEventImage(event ?? {}, defaultImg)
+  const title =  event?.name || 'Sự kiện'
+  const dateText = formatDate(event?.eventDate ) 
+  const address = event?.location || ''
+  const statusText = deriveEventStatus(event).text
+
   return (
     <>
       <Header />
 
       <div className="container-xl py-4">
         <div className="bg-white rounded-3 shadow-sm overflow-hidden">
-          <div style={{ width: '100%', height: 320, backgroundImage: `url(${event.image})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: '#a0a0a0' }} />
+          {/* Banner ảnh */}
+          <div
+            style={{
+              width: '100%',
+              height: 320,
+              backgroundImage: `url(${imageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundColor: '#a0a0a0'
+            }}
+          />
 
           <div className="p-4 p-md-5">
-            <h2 className="fw-bold text-danger mb-4" style={{ fontSize: 28 }}>{event.title}</h2>
+            <h2 className="fw-bold text-danger mb-4" style={{ fontSize: 28 }}>
+              {title}
+            </h2>
 
-            <div className="row g-4 mb-4">
-              <div className="col-12 col-md-6">
-                <div className="mb-2" style={{ fontSize: 15, color: '#333' }}><strong>Thời gian:</strong> {event.date}</div>
-                <div style={{ fontSize: 15, color: '#333' }}><strong>Địa điểm:</strong> {event.address || event.location}</div>
-              </div>
-              <div className="col-12 col-md-6">
-                <div className="mb-2" style={{ fontSize: 15, color: '#333' }}><strong>Trạng thái sự kiện:</strong> {event.status || 'Sắp diễn ra'}</div>
-                <div className="d-flex align-items-center gap-2" style={{ fontSize: 15, color: '#333' }}>
-                  <strong>Đơn vị tổ chức:</strong>
-                  <span className="badge" style={{ backgroundColor: '#ffe0e0', color: '#ff5757' }}>{event.organizer || 'FBGC'}</span>
+            {loading && <div className="text-center py-3">Đang tải...</div>}
+            {error && <div className="text-danger mb-3">{error}</div>}
+
+            {event && (
+              <>
+                <div className="row g-4 mb-4">
+                  <div className="col-12 col-md-6">
+                    <div className="mb-2" style={{ fontSize: 15, color: '#333' }}>
+                      <strong>Thời gian:</strong> {dateText}
+                    </div>
+                    <div style={{ fontSize: 15, color: '#333' }}>
+                      <strong>Địa điểm:</strong> {address}
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-md-6">
+                    <div className="mb-2" style={{ fontSize: 15, color: '#333' }}>
+                      <strong>Trạng thái sự kiện:</strong> {statusText}
+                    </div>
+                    <div
+                      className="d-flex align-items-center gap-2"
+                      style={{ fontSize: 15, color: '#333' }}
+                    >
+                      <strong>Đơn vị tổ chức:</strong>
+                      <span
+                        className="badge"
+                        style={{ backgroundColor: '#ffe0e0', color: '#ff5757' }}
+                      >
+                        {event?.organizer || 'FPT'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-4 pt-4 border-top">
-              <h5 className="fw-bold mb-3" style={{ fontSize: 18 }}>Chi tiết sự kiện</h5>
-              <p className="text-secondary" style={{ fontSize: 15, lineHeight: 1.8 }}>{event.description}</p>
-            </div>
+                <div className="mt-4 pt-4 border-top">
+                  <h5 className="fw-bold mb-3" style={{ fontSize: 18 }}>
+                    Chi tiết sự kiện
+                  </h5>
+                  <p
+                    className="text-secondary"
+                    style={{ fontSize: 15, lineHeight: 1.8 }}
+                  >
+                    {event?.description || 'Không có mô tả chi tiết.'}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -51,5 +117,3 @@ export default function EventDetailPage() {
     </>
   )
 }
-
-

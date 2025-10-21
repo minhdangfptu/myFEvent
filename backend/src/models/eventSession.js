@@ -10,7 +10,6 @@ const EventSessionSchema = new Schema({
   description: String,
   startAt: { type: Date, required: true },
   endAt:   { type: Date, required: true },
-  ownerUserId: { type: Types.ObjectId, ref: 'User' }, 
   location: String,
   sortOrder: Number
 }, { timestamps: true, versionKey: false });

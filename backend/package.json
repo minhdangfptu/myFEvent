@@ -15,8 +15,10 @@
     "build": "npm run clean && npm run build-babel",
     "start": "node ./src/index.js",
     "production": "npm run build && npm run start",
-    "dev": "nodemon ./src/server.js",
-    "send:test-mail": "node ./sendTestMail.js"
+    "dev": "nodemon ./src/index.js",
+    "send:test-mail": "node ./sendTestMail.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",
@@ -43,7 +45,10 @@
     "@babel/preset-env": "^7.22.10",
     "babel-plugin-module-resolver": "^5.0.0",
     "eslint": "^8.47.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.3",
+    "mongodb-memory-server": "^10.1.4"
   },
   "overrides": {
     "mongodb": "6.9.0"
