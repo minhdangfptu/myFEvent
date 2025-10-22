@@ -37,7 +37,7 @@ export default function UserLayout({
         <div 
           className="flex-grow-1 d-flex flex-column"
           style={{ 
-            marginLeft: sidebarOpen ? '250px' : '70px',
+            marginLeft: sidebarOpen ? '230px' : '70px',
             transition: 'margin-left 0.3s ease'
           }}
         >

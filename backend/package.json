@@ -13,12 +13,10 @@
     "clean": "rm -rf build && mkdir build",
     "build-babel": "babel ./src -d ./build/src",
     "build": "npm run clean && npm run build-babel",
-    "start": "node ./src/index.js",
+    "start": "node ./server.js",
     "production": "npm run build && npm run start",
-    "dev": "nodemon ./src/index.js",
-    "send:test-mail": "node ./sendTestMail.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "dev": "nodemon ./server.js",
+    "send:test-mail": "node ./sendTestMail.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",

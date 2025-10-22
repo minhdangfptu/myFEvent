@@ -129,10 +129,10 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials!' });
+    if (!user) return res.status(404).json({ message: 'Sai tài khoản hoặc mật khẩu' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Invalid credentials!' });
+    if (!ok) return res.status(400).json({ message: 'Sai tài khoản hoặc mật khẩu' });
 
     if (!user.verified || user.status !== 'active') {
       return res.status(403).json({ message: 'Tài khoản chưa được xác minh. Vui lòng kiểm tra email để xác minh tài khoản.' });

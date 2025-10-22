@@ -58,7 +58,7 @@ export default function Header() {
   }
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top" style={{ padding: '4px' }}>
+    <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top" style={{ padding: '0px' }}>
       <div className="container-xl px-2">
         <RouterLink to="/landingpage" className="navbar-brand d-flex align-items-center gap-2 text-dark">
           <img src="/logo-03.png" alt="myFEvent" style={{ height: 50, width: 'auto' }} />

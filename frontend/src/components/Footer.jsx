@@ -18,7 +18,7 @@ export default function Footer() {
           <div className="col-6 col-md-2">
             <div className="fw-semibold mb-2" style={{ fontSize: 14 }}>{t('footer.product')}</div>
             <div className="d-flex flex-column gap-1">
-              <RouterLink className="text-decoration-none text-muted" to="/events" style={{ fontSize: 14 }}>{t('footer.eventAtFPT')}</RouterLink>
+              <RouterLink className="text-decoration-none text-muted" to="/events" style={{ fontSize: 14 }}>MyFEvent</RouterLink>
               <RouterLink className="text-decoration-none text-muted" to="/login" style={{ fontSize: 14 }}>{t('footer.login')}</RouterLink>
               <RouterLink className="text-decoration-none text-muted" to="/signup" style={{ fontSize: 14 }}>{t('footer.signup')}</RouterLink>
             </div>
