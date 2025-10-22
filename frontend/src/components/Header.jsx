@@ -58,10 +58,10 @@ export default function Header() {
   }
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top">
+    <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top" style={{ padding: '4px' }}>
       <div className="container-xl px-2">
         <RouterLink to="/landingpage" className="navbar-brand d-flex align-items-center gap-2 text-dark">
-          <img src="/logo-03.png" alt="myFEvent" style={{ height: 60, width: 'auto' }} />
+          <img src="/logo-03.png" alt="myFEvent" style={{ height: 50, width: 'auto' }} />
         </RouterLink>
 
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,8 +83,8 @@ export default function Header() {
             ))}
           </ul>
           <div className="d-none d-sm-flex gap-2">
-            <RouterLink to="/login" className="btn btn-link text-secondary">Đăng nhập</RouterLink>
-            <RouterLink to="/signup" className="btn btn-danger">Đăng ký</RouterLink>
+            <RouterLink style={{fontSize: 15}} to="/login" className="btn btn-link text-secondary">Đăng nhập</RouterLink>
+            <RouterLink style={{fontSize: 15}} to="/signup" className="btn btn-danger">Đăng ký</RouterLink>
           </div>
         </div>
       </div>

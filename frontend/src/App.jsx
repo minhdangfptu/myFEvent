@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 
 // Public Pages
 import LandingPage from './pages/Public/LandingPage';
@@ -28,6 +29,7 @@ import Dashboard from './pages/User/Dashboard';
 import Menber from './pages/User/Menber';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
+import Notifications from './pages/User/Notifications';
 
 // Error Pages
 import ErrorPage404 from './pages/Errors/ErrorPage404'; 
@@ -39,6 +41,7 @@ import ErrorPageOffline from './pages/Errors/ErrorPageOffline';
 export default function App() {
   return (
     <BrowserRouter>
+      <NotificationsProvider>
       <Routes>
           {/* Default Route */}
           <Route path="/" element={<Navigate to="/landingpage" replace />} />
@@ -61,18 +64,14 @@ export default function App() {
           <Route path="/email-confirmation" element={<EmailConfirmation />} />
           
           {/* Protected User Routes */}
-          <Route 
-            path="/user-landing-page" 
-            element={
-                <UserLandingPage />
-            } 
-          />
+          <Route path="/user-landing-page" element={<UserLandingPage />} />
           <Route 
             path="/user-profile" 
             element={
                 <UserProfile />
             } 
           />
+          <Route path="/notifications" element={<Notifications />} />
           <Route 
             path="/event-detail" 
             element={
@@ -145,6 +144,7 @@ export default function App() {
           {/* 404 Route - Must be last */}
           <Route path="*" element={<ErrorPage404 />} /> 
       </Routes>
+      </NotificationsProvider>
     </BrowserRouter>
   );
 }
