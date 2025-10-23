@@ -1,6 +1,7 @@
 import { useAuth } from "../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { toast } from "react-toastify";
 
 export default function UserHeader({
   title,
@@ -17,8 +18,9 @@ export default function UserHeader({
   const handleLogout = async () => {
     try {
       await logout();
-    } finally {
-      window.location.href = "/landingpage";
+      window.location.href = "/landingpage?toast=logout-success";
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi đăng xuất");
     }
   };
 

@@ -1,8 +1,20 @@
 import { Link as RouterLink } from "react-router-dom"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
+
 
 export default function FPTEvent_Landing() {
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const toastType = searchParams.get('toast');
+    if (toastType === 'logout-success') {
+      toast.success('Đăng xuất thành công');
+    }
+  }, [searchParams]);
   return (
     <div className="min-vh-100 bg-white overflow-hidden">
       <Header />

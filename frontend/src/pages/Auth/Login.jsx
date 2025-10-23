@@ -27,7 +27,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      navigate('/user-landing-page', { replace: true });
+      navigate('/user-landing-page', { replace: true, state: { toast: { type: 'success', message: 'Đăng nhập thành công' } } });
     } catch (error) {
       console.error('Login error:', error);
       if (error?.response?.status === 403) {
@@ -44,7 +44,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
       await loginWithGoogle(credentialResponse.credential);
-      navigate('/user-landing-page', { replace: true });
+      navigate('/user-landing-page', { replace: true, state: { toast: { type: 'success', message: 'Đăng nhập thành công' } } });
     } catch (error) {
       console.error('Google login error:', error);
       setError(error.response?.data?.message || 'Đăng nhập Google thất bại.');
