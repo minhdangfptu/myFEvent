@@ -13,6 +13,14 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${id}`);
     return res.data;
   },
+  getEventById: async (id) => {
+    const res = await axiosClient.get(`/api/events/${id}`);
+    return res.data;
+  },
+  getAllPublicEvents: async () => {
+    const res = await axiosClient.get('/api/events/public');
+    return res.data;
+  },
   listMyEvents: async () => {
     const res = await axiosClient.get('/api/events/me/list');
     return res.data;
