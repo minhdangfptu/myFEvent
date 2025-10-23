@@ -210,7 +210,6 @@ export default function HoOCHomePage() {
                     <button className="ghost-btn" onClick={() => navigate('/event-detail')}>
                       {t('actions.viewDetails')}
                     </button>
-                    {/* ⛔ ĐÃ BỎ NÚT THAM GIA TRONG EVENT-BODY */}
                   </div>
                 </div>
               </div>

@@ -67,7 +67,7 @@ export const getPublicEventDetail = async (req, res) => {
 // POST /api/events/  (create by HoOC)
 export const createEvent = async (req, res) => {
   try {
-    const { name, description, eventDate, location, type = 'private' } = req.body;
+    const { name, description, eventDate, location, type = 'private', images } = req.body;
     if (!name) return res.status(400).json({ message: 'Name is required' });
     const date = eventDate ? new Date(eventDate) : new Date();
 
@@ -88,6 +88,7 @@ export const createEvent = async (req, res) => {
       type,
       organizerName: req.user.id,
       joinCode,
+      image: Array.isArray(images) ? images.filter(Boolean) : []
     });
 
     // Creator becomes HoOC
@@ -154,4 +155,79 @@ export const listMyEvents = async (req, res) => {
   }
 };
 
+const ensureEventRole = async (userId, eventId, allowedRoles = ['HoOC', 'HoD']) => {
+  const membership = await EventMember.findOne({ eventId, userId }).lean();
+  if (!membership) return false;
+  return allowedRoles.includes(membership.role);
+};
 
+export const replaceEventImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { images } = req.body;
+    if (!Array.isArray(images)) return res.status(400).json({ message: 'images must be an array of base64 strings' });
+
+    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+
+    const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
+    const event = await Event.findByIdAndUpdate(
+      id,
+      { $set: { image: sanitized } },
+      { new: true }
+    ).select('image');
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    return res.status(200).json({ message: 'Images updated', data: { image: event.image } });
+  } catch (error) {
+    console.error('replaceEventImages error:', error);
+    return res.status(500).json({ message: 'Failed to update images' });
+  }
+};
+
+export const addEventImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { images } = req.body;
+    if (!Array.isArray(images) || images.length === 0) return res.status(400).json({ message: 'images is required' });
+
+    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+
+    const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
+    const event = await Event.findByIdAndUpdate(
+      id,
+      { $push: { image: { $each: sanitized } } },
+      { new: true }
+    ).select('image');
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    return res.status(200).json({ message: 'Images added', data: { image: event.image } });
+  } catch (error) {
+    console.error('addEventImages error:', error);
+    return res.status(500).json({ message: 'Failed to add images' });
+  }
+};
+
+export const removeEventImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { indexes } = req.body;
+    if (!Array.isArray(indexes)) return res.status(400).json({ message: 'indexes must be an array of numbers' });
+
+    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+
+    const event = await Event.findById(id).select('image');
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    const keep = event.image.filter((_, idx) => !indexes.includes(idx));
+    event.image = keep;
+    await event.save();
+
+    return res.status(200).json({ message: 'Images removed', data: { image: event.image } });
+  } catch (error) {
+    console.error('removeEventImages error:', error);
+    return res.status(500).json({ message: 'Failed to remove images' });
+  }
+};

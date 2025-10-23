@@ -24,7 +24,7 @@ import EmailConfirmation from './pages/Auth/EmailConfirmation';
 import UserLandingPage from './pages/User/UserLandingPage';
 import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
 import UserProfile from './pages/User/UserProfile';
-import UserEventDetail from './pages/User/EventDetail';
+import UserEventDetail from './pages/User/UserEventDetail';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
 import Menber from './pages/User/Menber';
