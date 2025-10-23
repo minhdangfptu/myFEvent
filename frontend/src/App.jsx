@@ -23,6 +23,7 @@ import EmailConfirmation from './pages/Auth/EmailConfirmation';
 // User Dashboard Pages
 import UserLandingPage from './pages/User/UserLandingPage';
 import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
+import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
 import UserProfile from './pages/User/UserProfile';
 import UserEventDetail from './pages/User/UserEventDetail';
 import Settings from './pages/User/Settings';
@@ -78,6 +79,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="HoOC">
                 <HoOCLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-event-detail/:eventId" 
+            element={
+              <ProtectedRoute requiredRole="HoOC">
+                <HoOCEventDetail />
               </ProtectedRoute>
             } 
           />

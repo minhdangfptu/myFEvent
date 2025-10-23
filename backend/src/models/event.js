@@ -5,7 +5,7 @@ const EventSchema = new Schema({
     description: { type: String },
     eventDate: { type: Date, required: true },
     location: { type: String },
-    organizerName: { type: Types.ObjectId, ref: 'User', required: true },
+    organizerName: { type: String, required: true },
     image: [{ type: String }],
     status: { type: String, enum: ['cancelled', 'completed', 'ongoing', 'scheduled'], default: 'scheduled' },
     joinCode: { type: String, unique: true, index: true },

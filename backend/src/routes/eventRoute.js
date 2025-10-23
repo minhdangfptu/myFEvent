@@ -1,5 +1,5 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages } from '../controllers/eventController.js';
+import { listPublicEvents, getPublicEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
 import { authenticateToken, requireRole } from '../middlewares/authMiddleware.js';
 import {
   createMilestone,
@@ -33,6 +33,10 @@ router.get('/:id/summary', authenticateToken, getEventSummary);
 
 // Events joined by current user
 router.get('/me/list', authenticateToken, listMyEvents);
+
+// Event management
+router.patch('/:id', authenticateToken, updateEvent);
+router.delete('/:id', authenticateToken, deleteEvent);
 
 // Image management
 router.patch('/:id/images', authenticateToken, replaceEventImages);

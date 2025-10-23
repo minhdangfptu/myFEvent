@@ -10,7 +10,7 @@ export default function HoOCHomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', description: '' });
+  const [createForm, setCreateForm] = useState({ name: '', description: '', organizerName: '' });
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -71,8 +71,10 @@ export default function HoOCHomePage() {
     <UserLayout
       title={t('home.title')}
       activePage="home"
+      sidebarType="hooc"
       showSearch={true}
-      showEventAction={true}  // HoOC có action ở header
+      showEventAction={true}
+      eventActions={user?.role === 'HoOC' ? ['create'] : ['create','join']}
       onSearch={setSearchQuery}
       onEventAction={(action) => {
         if (action === 'join') setShowJoinModal(true);
@@ -121,9 +123,11 @@ export default function HoOCHomePage() {
 
           {/* NHÓM HÀNH ĐỘNG BÊN PHẢI: Join riêng cho mọi user */}
           <div className="d-flex align-items-center gap-2 flex-wrap">
-            <button className="btn btn-danger" onClick={() => setShowJoinModal(true)}>
-              {t('actions.join')}
-            </button>
+            {user?.role !== 'HoOC' && (
+              <button className="btn btn-danger" onClick={() => setShowJoinModal(true)}>
+                {t('actions.join')}
+              </button>
+            )}
 
             {/* Filters */}
             <div className="filters position-relative">
@@ -320,12 +324,15 @@ export default function HoOCHomePage() {
                   e.preventDefault();
                   setCreateError('');
                   if (!createForm.name.trim()) { setCreateError('Vui lòng nhập tên sự kiện'); return; }
+                  if (!createForm.organizerName.trim()) { setCreateError('Vui lòng nhập tên người tổ chức'); return; }
                   try {
                     setCreateSubmitting(true);
-                    const res = await eventApi.create({ name: createForm.name, description: createForm.description, type: 'private' });
+                    const res = await eventApi.create({ name: createForm.name, description: createForm.description, organizerName: createForm.organizerName, type: 'private' });
                     setShowCreateModal(false);
-                    setCreateForm({ name: '', description: '' });
+                    setCreateForm({ name: '', description: '', organizerName: '' });
                     alert(`Mã tham gia: ${res.data.joinCode}`);
+                    // Reload page to refresh sidebar
+                    window.location.reload();
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -338,6 +345,18 @@ export default function HoOCHomePage() {
                       placeholder="Tên sự kiện"
                       value={createForm.name}
                       onChange={(e) => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                      required
+                      disabled={createSubmitting}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Tên người tổ chức*</label>
+                    <input
+                      type="text"
+                      className="form-control soft-input"
+                      placeholder="Tên người tổ chức"
+                      value={createForm.organizerName}
+                      onChange={(e) => setCreateForm(f => ({ ...f, organizerName: e.target.value }))}
                       required
                       disabled={createSubmitting}
                     />

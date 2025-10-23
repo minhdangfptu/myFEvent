@@ -67,8 +67,9 @@ export const getPublicEventDetail = async (req, res) => {
 // POST /api/events/  (create by HoOC)
 export const createEvent = async (req, res) => {
   try {
-    const { name, description, eventDate, location, type = 'private', images } = req.body;
+    const { name, description, eventDate, location, type = 'private', images, organizerName } = req.body;
     if (!name) return res.status(400).json({ message: 'Name is required' });
+    if (!organizerName) return res.status(400).json({ message: 'Organizer name is required' });
     const date = eventDate ? new Date(eventDate) : new Date();
 
     // Generate unique join code (try a few times)
@@ -86,7 +87,7 @@ export const createEvent = async (req, res) => {
       eventDate: date,
       location: location || '',
       type,
-      organizerName: req.user.id,
+      organizerName,
       joinCode,
       image: Array.isArray(images) ? images.filter(Boolean) : []
     });
@@ -139,14 +140,18 @@ export const getEventSummary = async (req, res) => {
 // GET /api/events/me/list  (events joined by current user)
 export const listMyEvents = async (req, res) => {
   try {
+    console.log('listMyEvents - User ID:', req.user.id);
     const memberships = await EventMember.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
       .lean();
+    console.log('Found memberships:', memberships);
 
     const eventIds = memberships.map(m => m.eventId);
+    console.log('Event IDs:', eventIds);
     const events = await Event.find({ _id: { $in: eventIds } })
       .select('name status eventDate joinCode')
       .lean();
+    console.log('Found events:', events);
 
     return res.status(200).json({ data: events });
   } catch (error) {
@@ -159,6 +164,51 @@ const ensureEventRole = async (userId, eventId, allowedRoles = ['HoOC', 'HoD']) 
   const membership = await EventMember.findOne({ eventId, userId }).lean();
   if (!membership) return false;
   return allowedRoles.includes(membership.role);
+};
+
+// PATCH /api/events/:id (update event)
+export const updateEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, organizerName, eventDate, location, type } = req.body;
+    
+    const allowed = await ensureEventRole(req.user.id, id, ['HoOC']);
+    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (organizerName) updateData.organizerName = organizerName;
+    if (eventDate) updateData.eventDate = new Date(eventDate);
+    if (location !== undefined) updateData.location = location;
+    if (type) updateData.type = type;
+
+    const event = await Event.findByIdAndUpdate(id, updateData, { new: true });
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    return res.status(200).json({ message: 'Event updated', data: event });
+  } catch (error) {
+    console.error('updateEvent error:', error);
+    return res.status(500).json({ message: 'Failed to update event' });
+  }
+};
+
+// DELETE /api/events/:id (delete event)
+export const deleteEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const allowed = await ensureEventRole(req.user.id, id, ['HoOC']);
+    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+
+    await EventMember.deleteMany({ eventId: id });
+    await Event.findByIdAndDelete(id);
+
+    return res.status(200).json({ message: 'Event deleted' });
+  } catch (error) {
+    console.error('deleteEvent error:', error);
+    return res.status(500).json({ message: 'Failed to delete event' });
+  }
 };
 
 export const replaceEventImages = async (req, res) => {

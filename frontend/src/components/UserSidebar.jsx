@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { eventApi } from "../apis/eventApi";
 
 export default function UserSidebar({
   sidebarOpen,
@@ -17,25 +18,31 @@ export default function UserSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // Event đang chọn
-  const [selectedEvent, setSelectedEvent] = useState("Halloween 2025");
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [events, setEvents] = useState([]);
+  const hasEvents = events && events.length > 0;
 
-  // Dữ liệu
-  const events = [
-    { id: "halloween2025", name: "Halloween 2025", icon: "bi-calendar-event" },
-    { id: "halloween2024", name: "Halloween 2024", icon: "bi-calendar-event" },
-    { id: "tet2024", name: "Tết 2024", icon: "bi-calendar-event" },
-    {
-      id: "graduation2024",
-      name: "Lễ tốt nghiệp 2024",
-      icon: "bi-calendar-event",
-    },
-    {
-      id: "orientation2024",
-      name: "Tuần định hướng 2024",
-      icon: "bi-calendar-event",
-    },
-  ];
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        console.log('Fetching events for sidebar...');
+        const res = await eventApi.listMyEvents();
+        console.log('API response:', res);
+        const list = Array.isArray(res?.data) ? res.data : [];
+        console.log('Events list:', list);
+        const mapped = list.map(e => ({ id: e._id || e.id, name: e.name, icon: "bi-calendar-event" }));
+        console.log('Mapped events:', mapped);
+        if (mounted) {
+          setEvents(mapped);
+          if (mapped.length && !selectedEvent) setSelectedEvent(mapped[0].name);
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
 
   const mainMenuItems = useMemo(
     () => [
@@ -70,18 +77,12 @@ export default function UserSidebar({
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/work-board" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    {
-      id: "work-timeline",
-      label: "Timeline công việc",
-      path: "/work-timeline",
-    },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/work-stats" },
+    { id: "work-timeline", label: "Timeline công việc", path: "/work-timeline" },
   ];
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/budget" },
     { id: "expenses", label: "Chi tiêu", path: "/expenses" },
     { id: "income", label: "Thu nhập", path: "/income" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/finance-stats" },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
@@ -276,7 +277,7 @@ export default function UserSidebar({
                 }}
               >
                 <div className="d-flex align-items-center">
-                  <span>{selectedEvent}</span>
+                  <span>{selectedEvent || (hasEvents ? events[0]?.name : "Chưa tham gia sự kiện")}</span>
                 </div>
               </button>
               <ul className="dropdown-menu w-100" style={{ padding: 0 }}>
@@ -353,7 +354,7 @@ export default function UserSidebar({
               );
             })}
 
-            {/* Công việc */}
+            {hasEvents && (
             <div
               className="menu-item-hover"
               onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
@@ -429,8 +430,9 @@ export default function UserSidebar({
                 </div>
               )}
             </div>
+            )}
 
-            {/* Tài chính */}
+            {hasEvents && (
             <div
               className="menu-item-hover"
               onMouseEnter={(e) =>
@@ -506,8 +508,9 @@ export default function UserSidebar({
                 </div>
               )}
             </div>
+            )}
 
-            {/* Rủi ro */}
+            {hasEvents && (
             <div
               className="menu-item-hover"
               onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
@@ -581,6 +584,7 @@ export default function UserSidebar({
                 </div>
               )}
             </div>
+            )}
 
             {/* Feedback */}
             <button
