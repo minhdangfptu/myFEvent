@@ -28,6 +28,11 @@ body {
   min-height: 100vh;
 }
 
+.dropdown-item.d-flex.align-items-center {
+  text-align: left;
+  justify-content: flex-start;
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;

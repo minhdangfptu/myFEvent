@@ -21,15 +21,17 @@ import ResetPassword from "./pages/Auth/ResetPassword";
 import EmailConfirmation from "./pages/Auth/EmailConfirmation";
 
 // User Dashboard Pages
-import UserLandingPage from "./pages/User/UserLandingPage";
-import UserProfile from "./pages/User/UserProfile";
-import UserEventDetail from "./pages/User/EventDetail";
-import Settings from "./pages/User/Settings";
-import Dashboard from "./pages/User/Dashboard";
-import Menber from "./pages/User/Menber";
-import Risk from "./pages/User/Risk";
-import Task from "./pages/User/Task";
-import Notifications from "./pages/User/Notifications";
+import UserLandingPage from './pages/User/UserLandingPage';
+import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
+import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
+import UserProfile from './pages/User/UserProfile';
+import UserEventDetail from './pages/User/UserEventDetail';
+import Settings from './pages/User/Settings';
+import Dashboard from './pages/User/Dashboard';
+import Menber from './pages/User/Menber';
+import Risk from './pages/User/Risk';
+import Task from './pages/User/Task';
+import Notifications from './pages/User/Notifications';
 
 // Error Pages
 import ErrorPage404 from "./pages/Errors/ErrorPage404";
@@ -67,8 +69,36 @@ export default function App() {
           <Route path="/email-confirmation" element={<EmailConfirmation />} />
 
           {/* Protected User Routes */}
-          <Route path="/user-landing-page" element={<UserLandingPage />} />
-          <Route path="/user-profile" element={<UserProfile />} />
+          <Route 
+            path="/user-landing-page" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UserLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-landing-page" 
+            element={
+              <ProtectedRoute requiredRole="HoOC">
+                <HoOCLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-event-detail/:eventId" 
+            element={
+              <ProtectedRoute requiredRole="HoOC">
+                <HoOCEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/user-profile" 
+            element={
+                <UserProfile />
+            } 
+          />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/event-detail" element={<UserEventDetail />} />
 

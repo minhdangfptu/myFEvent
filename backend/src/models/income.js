@@ -10,4 +10,4 @@ const IncomeSchema = new Schema({
   status: { type: String, enum: ['pending','received','refunded'], default: 'pending' }
 }, { timestamps: true, versionKey: false });
 
-module.exports = mongoose.model('Income', IncomeSchema);
+export default mongoose.model('Income', IncomeSchema);

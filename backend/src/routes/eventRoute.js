@@ -1,6 +1,6 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail } from '../controllers/eventController.js';
-import { authenticateToken } from '../middlewares/authMiddleware.js';
+import { listPublicEvents, getPublicEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
+import { authenticateToken, requireRole } from '../middlewares/authMiddleware.js';
 import {
   createMilestone,
   listMilestones,
@@ -21,6 +21,27 @@ const router = express.Router();
 // Public events
 router.get('/public', listPublicEvents);
 router.get('/:id', getPublicEventDetail);
+
+// Create event (HoOC)
+router.post('/', authenticateToken, requireRole('HoOC'), createEvent);
+
+// Join by code
+router.post('/join', authenticateToken, joinEventByCode);
+
+// Event summary
+router.get('/:id/summary', authenticateToken, getEventSummary);
+
+// Events joined by current user
+router.get('/me/list', authenticateToken, listMyEvents);
+
+// Event management
+router.patch('/:id', authenticateToken, updateEvent);
+router.delete('/:id', authenticateToken, deleteEvent);
+
+// Image management
+router.patch('/:id/images', authenticateToken, replaceEventImages);
+router.post('/:id/images', authenticateToken, addEventImages);
+router.delete('/:id/images', authenticateToken, removeEventImages);
 
 router.post('/:eventId/milestones', authenticateToken, createMilestone);
 router.get('/:eventId/milestones', authenticateToken, listMilestones);

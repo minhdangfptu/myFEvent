@@ -6,7 +6,7 @@ import { GoogleLogin } from '@react-oauth/google';
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, user } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +45,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      navigate("/user-landing-page", { replace: true });
+      if (user?.role === 'HoOC') {
+        navigate('/hooc-landing-page', { replace: true });
+      } else {
+        navigate('/user-landing-page', { replace: true });
+      }
     } catch (err) {
       console.error("Google login error:", err.message);
       setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");

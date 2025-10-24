@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import UserSidebar from './UserSidebar';
+import HoOCSidebar from './HoOCSidebar';
 import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
 
@@ -10,7 +11,8 @@ export default function UserLayout({
   showSearch = false, 
   showEventAction = false,
   onSearch,
-  onEventAction 
+  onEventAction,
+  sidebarType = 'user' 
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -27,11 +29,19 @@ export default function UserLayout({
     <div className="d-flex flex-column" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <UserSidebar 
-          sidebarOpen={sidebarOpen} 
-          setSidebarOpen={setSidebarOpen}
-          activePage={activePage}
-        />
+        {sidebarType === 'hooc' ? (
+          <HoOCSidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
+          />
+        ) : (
+          <UserSidebar 
+            sidebarOpen={sidebarOpen} 
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
+          />
+        )}
 
         {/* Main Content */}
         <div 

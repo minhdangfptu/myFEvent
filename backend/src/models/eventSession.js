@@ -16,4 +16,4 @@ const EventSessionSchema = new Schema({
 
 EventSessionSchema.index({ eventId: 1, startAt: 1, endAt: 1 });
 
-module.exports = mongoose.model('EventSession', EventSessionSchema);
+export default mongoose.model('EventSession', EventSessionSchema);

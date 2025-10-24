@@ -53,4 +53,4 @@ EventBudgetMasterSchema.statics.fromApprovedPlans = async function (eventId, cur
   return this.create({ eventId, version, currency, sources, byCategory, grandTotal });
 };
 
-module.exports = mongoose.model('EventBudgetMaster', EventBudgetMasterSchema);
+export default mongoose.model('EventBudgetMaster', EventBudgetMasterSchema);

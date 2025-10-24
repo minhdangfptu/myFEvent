@@ -39,8 +39,7 @@ const UserSchema = new Schema({
   isFirstLogin: { type: Boolean, default: true },
   role: {
     type: String,
-    enum: ['user', 'admin', 'mentor', 'IC-PDP'],
-    required: true,
+    enum: ['user', 'admin', 'mentor', 'IC-PDP', 'HoOC'],
     default: 'user',
   },
 }, { timestamps: true });

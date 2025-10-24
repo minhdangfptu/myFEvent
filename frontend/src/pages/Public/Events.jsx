@@ -5,6 +5,7 @@ import Footer from "../../components/Footer"
 import { eventService } from '../../services/eventService';
 import { formatDate } from '../../utils/formatDate';
 import {deriveEventStatus} from '../../utils/getEventStatus';
+import Loading from '../../components/Loading';
 
 
 export default function EventsPage() {
@@ -63,6 +64,24 @@ export default function EventsPage() {
   return (
     <>
       <Header />
+
+      {/* Full-page loading overlay */}
+      {loading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(255,255,255,0.75)',
+            zIndex: 2000,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Loading size={80} />
+        </div>
+      )}
+
       <div className="container-xl py-4">
         <div className="mx-auto" style={{ maxWidth: 900 }}>
           {/* Thanh tìm + lọc status */}
@@ -101,57 +120,30 @@ export default function EventsPage() {
         <div className="border rounded-3 p-3 p-sm-4" style={{ borderColor: '#fca5a5' }}>
           <div className="text-danger fw-bold mb-3 mb-sm-4" style={{ fontSize: 20 }}>Tất cả sự kiện</div>
 
-          {loading && <div className="text-center py-4">Đang tải...</div>}
           {error && <div className="text-danger mb-3">{error}</div>}
 
           <div className="row row-cols-1 row-cols-md-3 g-3">
             {visible.map((event) => {
-              const status = deriveEventStatus(event)
-              const name = event.name || event.title
-              const defaultImage = "/default-events.jpg"
-              const img =  Array.isArray(event.image) ? (event.image[0] || defaultImage) : (event.image || defaultImage) 
-              const dateToShow = event.eventDate ?? event.date
-
+              const id = event._id || event.id;
+              const title = event.name || event.title || 'Untitled';
+              const img = Array.isArray(event.image) ? event.image[0] : event.image || '/placeholder.png';
+              const dateText = event.eventDate ? formatDate(event.eventDate) : (event.date || '');
               return (
-                <div className="col" key={event._id ?? event.id}>
-                  <RouterLink
-                    to={`/events/${event._id}`}
-                    className="text-decoration-none text-reset"
-                  >
+                <div className="col" key={id}>
+                  <RouterLink to={`/events/${id}`} state={{ event }} className="text-decoration-none text-reset">
                     <div className="card h-100 shadow-sm border-0">
-                      <div className="position-relative">
-                        <img
-                          src={img}
-                          alt={name}
-                          className="card-img-top"
-                          style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }}
-                        />
-                        <span
-                          className={`badge position-absolute ${status.className}`}
-                          style={{ top: 10, left: 10, fontSize: 12, padding: '6px 10px', borderRadius: 8 }}
-                        >
-                          {status.text}
-                        </span>
-                      </div>
-
+                      <img src={img} alt={title} className="card-img-top" style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }} />
                       <div className="card-body">
-                        <div className="fw-semibold mb-2" style={{ fontSize: 16, color: '#111827' }}>{name}</div>
-                        <div className="d-flex flex-wrap gap-2 mb-2">
-                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>
-                            {formatDate(dateToShow)}
-                          </span>
-                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>
-                            {event.location}
-                          </span>
-                        </div>
-                        <div className="text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                          {event.description}
+                        <div className="fw-semibold mb-2" style={{ fontSize: 16, color: '#111827' }}>{title}</div>
+                        <div className="d-flex gap-2 mb-2">
+                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{dateText}</span>
+                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.location || ''}</span>
                         </div>
                       </div>
                     </div>
                   </RouterLink>
                 </div>
-              )
+              );
             })}
           </div>
 
