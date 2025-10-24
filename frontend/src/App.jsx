@@ -105,12 +105,12 @@ export default function App() {
           />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/event-detail" element={<UserEventDetail />} />
+          <Route path="/event/:eventId/member" element={<Menber />} />
 
           <Route path="/setting" element={<Settings />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/risk" element={<Risk />} />
           <Route path="/task" element={<Task />} />
-          <Route path="/member" element={<Menber />} />
 
           {/* Admin Routes */}
           <Route

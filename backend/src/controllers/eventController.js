@@ -113,7 +113,7 @@ export const joinEventByCode = async (req, res) => {
 
     const exists = await EventMember.findOne({ eventId: event._id, userId: req.user.id }).lean();
     if (!exists) {
-      await EventMember.create({ eventId: event._id, userId: req.user.id, role: 'staff' });
+      await EventMember.create({ eventId: event._id, userId: req.user.id, role: 'member' });
     }
 
     return res.status(200).json({ message: 'Joined event', data: { eventId: event._id } });

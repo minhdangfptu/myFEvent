@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import UserLayout from '../../components/UserLayout'
+import { eventApi } from '../../apis/eventApi'
 
 function AddMemberModal({ open, onClose, onConfirm }) {
 	const [emails, setEmails] = useState(['', ''])
@@ -47,18 +48,57 @@ export default function ManageMemberPage() {
 	const [showModal, setShowModal] = useState(false)
 	const [query, setQuery] = useState('')
 	const [sort, setSort] = useState('Tên')
+	const [members, setMembers] = useState([])
+	const [loading, setLoading] = useState(true)
+	const [error, setError] = useState('')
+	const [selectedEvent, setSelectedEvent] = useState('')
+	const [events, setEvents] = useState([])
+	const [pagination, setPagination] = useState({
+		page: 1,
+		limit: 10,
+		total: 0,
+		totalPages: 0
+	})
 
-	const rows = useMemo(() => (
-		Array.from({ length: 14 }).map((_, i) => ({
-			id: i + 1,
-			name: ['Đặng Đình Minh','Arlene McCoy','Cody Fisher','Esther Howard','Ronald Richards','Albert Flores','Marvin McKinney','Floyd Miles','Courtney Henry','Guy Hawkins','Ralph Edwards','Devon Lane'][i%12],
-			dept: ['TBTC','Hậu cần','HR','Nội dung'][i%4],
-			role: ['Trưởng ban tổ chức','Phó ban tổ chức','Trưởng ban','Thành viên'][i%4],
-			avatar: `https://i.pravatar.cc/100?img=${i+1}`
-		}))
-	), [])
+	// Load events for filter
+	useEffect(() => {
+		const loadEvents = async () => {
+			try {
+				const response = await eventApi.listMyEvents()
+				setEvents(response.data || [])
+			} catch (err) {
+				console.error('Error loading events:', err)
+			}
+		}
+		loadEvents()
+	}, [])
 
-	const filtered = rows.filter(r => r.name.toLowerCase().includes(query.toLowerCase()))
+	// Load members
+	useEffect(() => {
+		const loadMembers = async () => {
+			setLoading(true)
+			setError('')
+			try {
+				const params = {
+					page: pagination.page,
+					limit: pagination.limit,
+					search: query,
+					...(selectedEvent && { eventId: selectedEvent })
+				}
+				const response = await eventApi.getAllMembers(params)
+				setMembers(response.data || [])
+				setPagination(response.pagination || pagination)
+			} catch (err) {
+				console.error('Error loading members:', err)
+				setError('Không thể tải danh sách thành viên')
+			} finally {
+				setLoading(false)
+			}
+		}
+		loadMembers()
+	}, [pagination.page, query, selectedEvent])
+
+	const filtered = members.filter(r => r.name.toLowerCase().includes(query.toLowerCase()))
 
 	return (
 		<UserLayout title="Tất cả thành viên (104)" activePage="members" showSearch={false}>

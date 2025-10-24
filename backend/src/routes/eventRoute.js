@@ -13,8 +13,9 @@ import {
   getDepartmentDetailByEvent,
   assignHod,
   addMemberToDepartment,
-  removeMemberFromDepartment
+  removeMemberFromDepartment,
 } from '../controllers/departmentController.js';
+import { getMembersByEvent } from '../controllers/eventMemberController.js';
 
 const router = express.Router();
 
@@ -56,6 +57,9 @@ router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartme
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:eventId/departments/:departmentId/members/:userId', authenticateToken, removeMemberFromDepartment);
+
+// Get members from a specific event
+router.get('/:eventId/members', authenticateToken, getMembersByEvent);
 
 export default router;
 

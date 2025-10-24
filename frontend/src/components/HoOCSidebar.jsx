@@ -68,12 +68,18 @@ export default function HoOCSidebar({ sidebarOpen, setSidebarOpen, activePage = 
 	const handlePopupMouseEnter = () => { if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); } };
 	const handlePopupMouseLeave = () => { setHoveredMenu(null); };
 
+	const getSelectedEventId = () => {
+		if (!hasEvents || events.length === 0) return null;
+		const selectedEventObj = events.find(e => e.name === selectedEvent);
+		return selectedEventObj ? selectedEventObj.id : events[0].id;
+	};
+
 	const mainMenuItems = useMemo(() => [
 		{ id: "overview", icon: "bi-house-door", label: "Tổng quan", path: "/user-landing-page" },
 		{ id: "event-board", icon: "bi-people", label: "Ban sự kiện", path: "/event-board" },
-		{ id: "members", icon: "bi-person", label: "Thành viên", path: "/member" },
+		{ id: "members", icon: "bi-person", label: "Thành viên", path: getSelectedEventId() ? `/event/${getSelectedEventId()}/member` : "/member" },
 		{ id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/calendar" },
-	], []);
+	], [hasEvents, events, selectedEvent]);
 
 	const workSubItems = [
 		{ id: "work-board", label: "Bảng công việc", path: "/work-board" },

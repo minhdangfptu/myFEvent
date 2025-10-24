@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { authApi } from '../../apis/authApi';
+import { toast } from "react-toastify";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -74,6 +75,7 @@ export default function LoginPage() {
       } else {
         navigate('/user-landing-page', { replace: true });
       }
+      toast.success('Đăng nhập thành công');
     } catch (err) {
       console.error("Google login error:", err);
       setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");

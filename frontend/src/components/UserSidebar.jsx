@@ -44,6 +44,12 @@ export default function UserSidebar({
     return () => { mounted = false };
   }, []);
 
+  const getSelectedEventId = () => {
+    if (!hasEvents || events.length === 0) return null;
+    const selectedEventObj = events.find(e => e.name === selectedEvent);
+    return selectedEventObj ? selectedEventObj.id : events[0].id;
+  };
+
   const mainMenuItems = useMemo(
     () => [
       {
@@ -62,7 +68,7 @@ export default function UserSidebar({
         id: "members",
         icon: "bi-person",
         label: "Thành viên",
-        path: "/member",
+        path: getSelectedEventId() ? `/event/${getSelectedEventId()}/member` : "/member",
       },
       {
         id: "calendar",
@@ -71,7 +77,7 @@ export default function UserSidebar({
         path: "/calendar",
       },
     ],
-    []
+    [hasEvents, events, selectedEvent]
   );
 
   const workSubItems = [
