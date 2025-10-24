@@ -26,12 +26,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      if (user?.role === 'HoOC') {
-        navigate('/hooc-landing-page', { replace: true });
-      } else {
-        navigate('/user-landing-page', { replace: true });
-      }
+      const result = await login(email, password);
+      // Luôn redirect đến user-landing-page sau khi đăng nhập thành công
+      navigate('/user-landing-page', { replace: true });
     } catch (error) {
       console.error('Login error:', error);
       if (error?.response?.status === 403) {
@@ -48,12 +45,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await loginWithGoogle();
-      if (user?.role === 'HoOC') {
-        navigate('/hooc-landing-page', { replace: true });
-      } else {
-        navigate('/user-landing-page', { replace: true });
-      }
+      const result = await loginWithGoogle();
+      // Luôn redirect đến user-landing-page sau khi đăng nhập Google thành công
+      navigate('/user-landing-page', { replace: true });
     } catch (err) {
       console.error("Google login error:", err.message);
       setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");

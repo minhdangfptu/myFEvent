@@ -24,6 +24,12 @@ import EmailConfirmation from './pages/Auth/EmailConfirmation';
 import UserLandingPage from './pages/User/UserLandingPage';
 import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
 import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
+import HoOCManageMilestone from './pages/HoOC/HoOCManageMilestone';
+import HoOCMilestoneDetail from './pages/HoOC/HoOCMilestoneDetail';
+import HoOCEditMilestone from './pages/HoOC/HoOCEditMilestone';
+import HoOCManageMilestoneEmpty from './pages/HoOC/HoOCManageMilestoneEmpty';
+import HoOCManageDepartment from './pages/HoOC/HoOCManageDepartment';
+import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
@@ -80,7 +86,7 @@ export default function App() {
           <Route 
             path="/hooc-landing-page" 
             element={
-              <ProtectedRoute requiredRole="HoOC">
+              <ProtectedRoute>
                 <HoOCLandingPage />
               </ProtectedRoute>
             } 
@@ -90,6 +96,54 @@ export default function App() {
             element={
               <ProtectedRoute >
                 <HoOCEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-manage-milestone" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageMilestone />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-manage-milestone-empty" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageMilestoneEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-milestone-detail/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCMilestoneDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-edit-milestone/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCEditMilestone />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-manage-department" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageDepartment />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-department-detail/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCDepartmentDetail />
               </ProtectedRoute>
             } 
           />

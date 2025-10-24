@@ -244,10 +244,10 @@ export default function UserSidebar({
           )}
         </div>
 
-        {/* Current Event - Chỉ hiển thị khi có sự kiện */}
-        {sidebarOpen && hasEvents && (
+        {/* Event Selection - Luôn hiển thị */}
+        {sidebarOpen && (
           <div className="mb-3" style={{ paddingBottom: 0 }}>
-            <div className="group-title">SỰ KIỆN HIỆN TẠI</div>
+            <div className="group-title">CHỌN SỰ KIỆN</div>
             <div className="dropdown">
               <button
                 className="btn btn-outline-secondary dropdown-toggle w-100 d-flex align-items-center justify-content-between"
@@ -257,33 +257,43 @@ export default function UserSidebar({
                 style={{ textAlign: "left", padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", background: "white", color: "#dc2626", fontWeight: "bold", height: 40 }}
               >
                 <div className="d-flex align-items-center">
-                  <span>{selectedEvent}</span>
+                  <span>{hasEvents ? selectedEvent : "Chọn sự kiện..."}</span>
                 </div>
               </button>
               <ul className="dropdown-menu w-100" style={{ padding: 0 }}>
-                {events.map((event) => (
-                  <li key={event.id}>
-                    <button
-                      className="dropdown-item d-flex align-items-center"
-                      style={{ textAlign: "left", paddingLeft: 16 }}
-                      onClick={() => {
-                        setSelectedEvent(event.name);
-                        setCurrentEventMembership(event.membership);
-                        
-                        // Redirect đến trang tương ứng với role
-                        if (event.membership === 'HoOC') {
-                          window.location.href = '/hooc-landing-page';
-                        } else if (event.membership === 'Member' || event.membership === 'HoD') {
-                          window.location.href = '/member-landing-page';
-                        }
-                      }}
-                    >
-                      <i className={`${event.icon} me-2`}></i>
-                      {event.name}
+                {hasEvents ? (
+                  <>
+                    {events.map((event) => (
+                      <li key={event.id}>
+                        <button
+                          className="dropdown-item d-flex align-items-center"
+                          style={{ textAlign: "left", paddingLeft: 16 }}
+                          onClick={() => {
+                            setSelectedEvent(event.name);
+                            setCurrentEventMembership(event.membership);
+                            
+                            // Redirect đến trang tương ứng với role
+                            if (event.membership === 'HoOC') {
+                              window.location.href = '/hooc-landing-page';
+                            } else if (event.membership === 'Member' || event.membership === 'HoD') {
+                              window.location.href = '/member-landing-page';
+                            }
+                          }}
+                        >
+                          <i className={`${event.icon} me-2`}></i>
+                          {event.name}
+                        </button>
+                      </li>
+                    ))}
+                    <li><hr className="dropdown-divider" /></li>
+                  </>
+                ) : (
+                  <li>
+                    <button className="dropdown-item d-flex align-items-center" style={{ textAlign: "left", paddingLeft: 16, color: "#6b7280" }}>
+                      <i className="bi bi-info-circle me-2"></i>Chưa có sự kiện nào
                     </button>
                   </li>
-                ))}
-                <li><hr className="dropdown-divider" /></li>
+                )}
                 <li>
                   <button className="dropdown-item d-flex align-items-center" style={{ textAlign: "left", paddingLeft: 16, color: "#6b7280" }}>
                     <i className="bi bi-eye me-2"></i>Xem sự kiện của bạn
@@ -325,7 +335,216 @@ export default function UserSidebar({
               );
             })}
 
-            {/* User thường không có các chức năng chính khác */}
+            {/* Hiển thị menu theo role khi đã chọn sự kiện */}
+            {hasEvents && currentEventMembership && (
+              <>
+                {/* Tổng quan */}
+                <div className="position-relative">
+                  <button
+                    className={`btn-nav ${overviewOpen ? "active" : ""}`}
+                    onClick={() => setOverviewOpen(!overviewOpen)}
+                    onMouseEnter={(e) => handleMouseEnter('overview', e)}
+                    onMouseLeave={handleMouseLeave}
+                    title="Tổng quan"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-grid-3x3-gap me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Tổng quan</span>}
+                    </div>
+                    {sidebarOpen && <i className={`bi bi-chevron-${overviewOpen ? "up" : "down"}`} />}
+                  </button>
+                  
+                  {/* Submenu Tổng quan */}
+                  {overviewOpen && sidebarOpen && (
+                    <div className="d-flex flex-column gap-1" style={{ marginLeft: 20 }}>
+                      {overviewSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu ${activePage === item.id ? "active" : ""}`}
+                          onClick={() => (window.location.href = item.path)}
+                          title={item.label}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Hover submenu khi sidebar đóng */}
+                  {hoveredMenu === 'overview' && !sidebarOpen && (
+                    <div className="hover-submenu" style={{ top: hoverPos.top, left: hoverPos.left }}>
+                      {overviewSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className="hover-submenu-item"
+                          onClick={() => (window.location.href = item.path)}
+                          onMouseEnter={handlePopupMouseEnter}
+                          onMouseLeave={handlePopupMouseLeave}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Công việc */}
+                {workSubItems.length > 0 && (
+                  <div className="position-relative">
+                    <button
+                      className={`btn-nav ${workOpen ? "active" : ""}`}
+                      onClick={() => setWorkOpen(!workOpen)}
+                      onMouseEnter={(e) => handleMouseEnter('work', e)}
+                      onMouseLeave={handleMouseLeave}
+                      title="Công việc"
+                    >
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-kanban me-3" style={{ width: 20 }} />
+                        {sidebarOpen && <span>Công việc</span>}
+                      </div>
+                      {sidebarOpen && <i className={`bi bi-chevron-${workOpen ? "up" : "down"}`} />}
+                    </button>
+                    
+                    {/* Submenu Công việc */}
+                    {workOpen && sidebarOpen && (
+                      <div className="d-flex flex-column gap-1" style={{ marginLeft: 20 }}>
+                        {workSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className={`btn-submenu ${activePage === item.id ? "active" : ""}`}
+                            onClick={() => (window.location.href = item.path)}
+                            title={item.label}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Hover submenu khi sidebar đóng */}
+                    {hoveredMenu === 'work' && !sidebarOpen && (
+                      <div className="hover-submenu" style={{ top: hoverPos.top, left: hoverPos.left }}>
+                        {workSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className="hover-submenu-item"
+                            onClick={() => (window.location.href = item.path)}
+                            onMouseEnter={handlePopupMouseEnter}
+                            onMouseLeave={handlePopupMouseLeave}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tài chính - chỉ HoOC và HoD */}
+                {financeSubItems.length > 0 && (
+                  <div className="position-relative">
+                    <button
+                      className={`btn-nav ${financeOpen ? "active" : ""}`}
+                      onClick={() => setFinanceOpen(!financeOpen)}
+                      onMouseEnter={(e) => handleMouseEnter('finance', e)}
+                      onMouseLeave={handleMouseLeave}
+                      title="Tài chính"
+                    >
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
+                        {sidebarOpen && <span>Tài chính</span>}
+                      </div>
+                      {sidebarOpen && <i className={`bi bi-chevron-${financeOpen ? "up" : "down"}`} />}
+                    </button>
+                    
+                    {/* Submenu Tài chính */}
+                    {financeOpen && sidebarOpen && (
+                      <div className="d-flex flex-column gap-1" style={{ marginLeft: 20 }}>
+                        {financeSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className={`btn-submenu ${activePage === item.id ? "active" : ""}`}
+                            onClick={() => (window.location.href = item.path)}
+                            title={item.label}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Hover submenu khi sidebar đóng */}
+                    {hoveredMenu === 'finance' && !sidebarOpen && (
+                      <div className="hover-submenu" style={{ top: hoverPos.top, left: hoverPos.left }}>
+                        {financeSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className="hover-submenu-item"
+                            onClick={() => (window.location.href = item.path)}
+                            onMouseEnter={handlePopupMouseEnter}
+                            onMouseLeave={handlePopupMouseLeave}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Rủi ro - chỉ HoOC và HoD */}
+                {risksSubItems.length > 0 && (
+                  <div className="position-relative">
+                    <button
+                      className={`btn-nav ${risksOpen ? "active" : ""}`}
+                      onClick={() => setRisksOpen(!risksOpen)}
+                      onMouseEnter={(e) => handleMouseEnter('risks', e)}
+                      onMouseLeave={handleMouseLeave}
+                      title="Rủi ro"
+                    >
+                      <div className="d-flex align-items-center">
+                        <i className="bi bi-exclamation-triangle me-3" style={{ width: 20 }} />
+                        {sidebarOpen && <span>Rủi ro</span>}
+                      </div>
+                      {sidebarOpen && <i className={`bi bi-chevron-${risksOpen ? "up" : "down"}`} />}
+                    </button>
+                    
+                    {/* Submenu Rủi ro */}
+                    {risksOpen && sidebarOpen && (
+                      <div className="d-flex flex-column gap-1" style={{ marginLeft: 20 }}>
+                        {risksSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className={`btn-submenu ${activePage === item.id ? "active" : ""}`}
+                            onClick={() => (window.location.href = item.path)}
+                            title={item.label}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Hover submenu khi sidebar đóng */}
+                    {hoveredMenu === 'risks' && !sidebarOpen && (
+                      <div className="hover-submenu" style={{ top: hoverPos.top, left: hoverPos.left }}>
+                        {risksSubItems.map((item) => (
+                          <button
+                            key={item.id}
+                            className="hover-submenu-item"
+                            onClick={() => (window.location.href = item.path)}
+                            onMouseEnter={handlePopupMouseEnter}
+                            onMouseLeave={handlePopupMouseLeave}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 

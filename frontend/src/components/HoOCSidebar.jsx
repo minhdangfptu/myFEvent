@@ -95,7 +95,8 @@ export default function HoOCSidebar({
     items.push(
       { id: "event-board", icon: "bi-people", label: "Ban sự kiện", path: "/task" },
       { id: "members", icon: "bi-person", label: "Thành viên", path: "/member" },
-      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" }
+      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" },
+      { id: "department-management", icon: "bi-building", label: "Quản lý ban", path: "/hooc-manage-department" }
     );
     
     return items;
@@ -110,7 +111,7 @@ export default function HoOCSidebar({
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [

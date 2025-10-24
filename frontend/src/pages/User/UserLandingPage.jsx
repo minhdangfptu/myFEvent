@@ -32,17 +32,7 @@ export default function UserHomePage() {
       const events = response.data || [];
       setMyEvents(events);
       
-      // Nếu user có sự kiện, redirect đến trang tương ứng với role
-      if (events.length > 0) {
-        const firstEvent = events[0];
-        const membership = firstEvent.membership;
-        
-        if (membership === 'HoOC') {
-          navigate('/hooc-landing-page');
-        } else if (membership === 'Member' || membership === 'HoD') {
-          navigate('/member-landing-page');
-        }
-      }
+      // Không redirect tự động, để user tự chọn sự kiện từ sidebar
     } catch (error) {
       console.error('Error fetching user events:', error);
     } finally {
