@@ -2,6 +2,7 @@ import * as React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -42,10 +43,13 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 
 export default function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  
   return (
-    <BrowserRouter>
-    <ToastContainer position="top-right" autoClose={3000} />
-      <NotificationsProvider>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <BrowserRouter>
+        <ToastContainer position="top-right" autoClose={3000} />
+        <NotificationsProvider>
         
         <Routes>
           {/* Default Route */}
@@ -144,7 +148,8 @@ export default function App() {
           {/* 404 Route - Must be last */}
           <Route path="*" element={<ErrorPage404 />} />
         </Routes>
-      </NotificationsProvider>
-    </BrowserRouter>
+        </NotificationsProvider>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
   );
 }

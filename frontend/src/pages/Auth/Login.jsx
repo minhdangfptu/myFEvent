@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+import { authApi } from '../../apis/authApi';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -40,22 +42,48 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     setError("");
     setLoading(true);
     try {
-      await loginWithGoogle();
-      if (user?.role === 'HoOC') {
+      // Decode the JWT token to get user info
+      const decoded = jwtDecode(credentialResponse.credential);
+      
+      // Send the credential to backend
+      const response = await authApi.googleLogin({
+        credential: credentialResponse.credential,
+        g_csrf_token: document.cookie.split("; ").find(r => r.startsWith("g_csrf_token="))?.split("=")[1] || undefined
+      });
+      
+      // Persist auth data
+      const accessToken = response.accessToken || response.tokens?.accessToken;
+      const refreshToken = response.refreshToken || response.tokens?.refreshToken;
+      const userData = response.user || null;
+
+      if (accessToken) localStorage.setItem('access_token', accessToken);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+      if (userData) localStorage.setItem('user', JSON.stringify(userData));
+
+      if (userData) {
+        window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } }));
+      }
+
+      // Navigate based on user role
+      if (userData?.role === 'HoOC') {
         navigate('/hooc-landing-page', { replace: true });
       } else {
         navigate('/user-landing-page', { replace: true });
       }
     } catch (err) {
-      console.error("Google login error:", err.message);
+      console.error("Google login error:", err);
       setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleError = () => {
+    setError("Đăng nhập Google thất bại. Vui lòng thử lại.");
   };
 
   return (
@@ -124,9 +152,17 @@ export default function LoginPage() {
               <div className="text-center text-secondary mb-3">Hoặc</div>
 
               <div className="d-flex justify-content-center mb-3">
-                <button type="button" className="btn btn-outline-dark" onClick={handleGoogleLogin} disabled={loading}>
-                  {loading ? 'Đang xử lý Google...' : 'Đăng nhập bằng Google'}
-                </button>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap={false}
+                  width="100%"
+                  text="signin_with"
+                  shape="rectangular"
+                  theme="outline"
+                  size="large"
+                  logo_alignment="left"
+                />
               </div>
 
               <div className="text-center">
