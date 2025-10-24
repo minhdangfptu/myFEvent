@@ -173,53 +173,100 @@ export const refreshToken = async (req, res) => {
 };
 
 export const loginWithGoogle = async (req, res) => {
-  try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ message: 'Google token is required!' });
-    }
-
-    const ticket = await oauth2Client.verifyIdToken({
-      idToken: token,
-      audience: config.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    const { email, name, picture, sub } = payload;
-
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = new User({
-        email,
-        fullName: name,
-        avatarUrl: picture,
-        passwordHash: crypto.randomBytes(32).toString('hex'),
-        phone: `google_${sub}`,
-        status: 'active',
-        isFirstLogin: true,
+    try {
+      const { credential, g_csrf_token } = req.body;           
+      if (!credential) return res.status(400).json({ message: 'Missing Google credential!' });
+  
+      const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+  
+      const csrfCookie = req.cookies?.g_csrf_token;
+      if (csrfCookie && g_csrf_token && csrfCookie !== g_csrf_token) {
+        return res.status(400).json({ message: 'CSRF check failed' });
+      }
+  
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: config.GOOGLE_CLIENT_ID,
       });
-      await user.save();
+  
+      const payload = ticket.getPayload(); // { sub, email, email_verified, name, picture, iss, ... }
+      if (!payload) return res.status(401).json({ message: 'Invalid Google token' });
+  
+      const { email, name, picture, sub, iss, email_verified } = payload;
+      if (!['accounts.google.com', 'https://accounts.google.com'].includes(iss) || !email_verified) {
+        return res.status(401).json({ message: 'Unverified Google account' });
+      }
+  
+      let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
+  
+      if (!user) {
+
+        user = await User.create({
+          email,
+          fullName: name,
+          avatarUrl: picture,
+          googleId: sub,
+          authProvider: 'google',
+          status: 'active',
+          isFirstLogin: true,
+        });
+      } else {
+
+        if (!user.googleId) {
+          user.googleId = sub;
+        }
+
+        if (!user.fullName && name) user.fullName = name;
+        if (!user.avatarUrl && picture) user.avatarUrl = picture;
+        await user.save();
+      }
+
+       const accessToken = jwt.sign(
+         { userId: user._id, email: user.email, role: user.role },
+         config.JWT_SECRET,
+         { expiresIn: config.JWT_EXPIRE }
+       );
+  
+      const refreshToken = jwt.sign(
+        { userId: user._id, typ: 'refresh' },
+        config.JWT_REFRESH_SECRET,
+        { expiresIn: config.JWT_REFRESH_EXPIRE }
+      );
+  
+      const authToken = new AuthToken({
+        userId: user._id,
+        token: refreshToken,
+        userAgent: req.get('User-Agent'),
+        ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim(),
+
+        expiresAt: (() => {
+          const { exp } = jwt.decode(refreshToken) || {};
+          return exp ? new Date(exp * 1000) : new Date(Date.now() + 7*24*60*60*1000);
+        })(),
+      });
+      await authToken.save();
+  
+      return res.status(200).json({
+        message: 'Google login successful!',
+        accessToken,
+        refreshToken,
+         user: {
+           id: user._id,
+           email: user.email,
+           fullName: user.fullName,
+           avatarUrl: user.avatarUrl,
+           role: user.role
+         }
+      });
+    } catch (error) {
+      console.log(error);
+      const isBadToken = /invalid|wrong number of segments|jwt/i.test(error?.message || '');
+      return res.status(isBadToken ? 401 : 500).json({
+        message: isBadToken ? 'Invalid Google token' : 'Fail to login with Google!'
+      });
     }
-
-    const { accessToken, refreshToken } = createTokens(user._id, user.email);
-    await saveRefreshToken(user._id, refreshToken, req);
-
-    return res.status(200).json({
-      message: 'Google login successful!',
-      user: {
-        id: user._id,
-        email: user.email,
-        fullName: user.fullName,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-      },
-      tokens: { accessToken, refreshToken },
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Fail to login with Google!' });
-  }
-};
+  };
+  
 
 export const logout = async (req, res) => {
   try {

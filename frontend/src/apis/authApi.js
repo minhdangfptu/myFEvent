@@ -14,16 +14,9 @@ export const authApi = {
     }
   },
 
-  // Login with Google
-  loginWithGoogle: async (googleToken) => {
-    try {
-      const response = await axiosClient.post('/api/auth/google-login', {
-        token: googleToken, // backend expects { token }
-      });
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  googleLogin: async ({ credential, g_csrf_token }) => {
+    return axiosClient.post("/api/auth/google", { credential, g_csrf_token })
+      .then(res => res.data);
   },
 
   // Signup

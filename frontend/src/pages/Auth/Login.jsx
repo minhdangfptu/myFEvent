@@ -7,6 +7,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, loginWithGoogle } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       await login(email, password);
       navigate('/user-landing-page', { replace: true, state: { toast: { type: 'success', message: 'Đăng nhập thành công' } } });
@@ -40,21 +40,18 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoading(true);
     try {
-      setLoading(true);
-      await loginWithGoogle(credentialResponse.credential);
-      navigate('/user-landing-page', { replace: true, state: { toast: { type: 'success', message: 'Đăng nhập thành công' } } });
-    } catch (error) {
-      console.error('Google login error:', error);
-      setError(error.response?.data?.message || 'Đăng nhập Google thất bại.');
+      await loginWithGoogle();
+      navigate("/user-landing-page", { replace: true });
+    } catch (err) {
+      console.error("Google login error:", err.message);
+      setError(err?.response?.data?.message || err?.message || "Đăng nhập Google thất bại.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogleError = () => {
-    setError('Đăng nhập Google thất bại. Vui lòng thử lại.');
   };
 
   return (
@@ -123,14 +120,9 @@ export default function LoginPage() {
               <div className="text-center text-secondary mb-3">Hoặc</div>
 
               <div className="d-flex justify-content-center mb-3">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
-                  theme="outline"
-                  size="large"
-                  text="signin_with"
-                  shape="rectangular"
-                />
+                <button type="button" className="btn btn-outline-dark" onClick={handleGoogleLogin} disabled={loading}>
+                  {loading ? 'Đang xử lý Google...' : 'Đăng nhập bằng Google'}
+                </button>
               </div>
 
               <div className="text-center">
@@ -144,4 +136,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

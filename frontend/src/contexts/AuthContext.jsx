@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../apis/authApi';
+import { signInWithGoogle } from '../services/googleAuth';
 
 const AuthContext = createContext();
 
@@ -72,8 +73,9 @@ export const AuthProvider = ({ children }) => {
     return persistAuth(response);
   };
 
-  const loginWithGoogle = async (googleToken) => {
-    const response = await authApi.loginWithGoogle(googleToken);
+  const loginWithGoogle = async () => {
+    const payload = await signInWithGoogle();
+    const response = await authApi.googleLogin(payload);
     return persistAuth(response);
   };
 
