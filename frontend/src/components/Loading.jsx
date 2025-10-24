@@ -8,7 +8,7 @@ const Loading = ({ size = 50 }) => {
         src={loadingGif} 
         alt="Loading..." 
         style={{ 
-          width: '100%',
+          width: '10%',
           height: 'auto'
         }} 
       />
