@@ -29,7 +29,7 @@ import UserProfile from './pages/User/UserProfile';
 import UserEventDetail from './pages/User/UserEventDetail';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import Menber from './pages/User/Menber';
+import Menber from './pages/User/Member';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';

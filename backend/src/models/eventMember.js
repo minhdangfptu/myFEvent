@@ -3,6 +3,6 @@ const EventMemberSchema = new Schema({
     eventId: { type: Types.ObjectId, ref: 'Event', required: true },
     userId: { type: Types.ObjectId, ref: 'User', required: true },
     departmentId: { type: Types.ObjectId, ref: 'Department' },
-    role: {type: String, enum: ['HoOC', 'HoD', 'staff'], default: 'staff' },
+    role: {type: String, enum: ['HoOC', 'HoD', 'member','mentor'], default: 'member' },
 }, { timestamps: true, versionKey: false });
 export default mongoose.model('EventMember', EventMemberSchema);
