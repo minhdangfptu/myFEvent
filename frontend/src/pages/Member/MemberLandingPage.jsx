@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
-import { useAuth } from '../../contexts/AuthContext';
 
-export default function UserHomePage() {
+export default function MemberLandingPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -17,51 +19,10 @@ export default function UserHomePage() {
   const [joinError, setJoinError] = useState('');
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-  const { t } = useTranslation();
 
-  // Kiểm tra sự kiện của user và redirect
   useEffect(() => {
-    checkUserEvents();
+    fetchMyEvents();
   }, []);
-
-  const checkUserEvents = async () => {
-    try {
-      setLoading(true);
-      const response = await eventApi.listMyEvents();
-      const events = response.data || [];
-      setMyEvents(events);
-      
-      // Nếu user có sự kiện, redirect đến trang tương ứng với role
-      if (events.length > 0) {
-        const firstEvent = events[0];
-        const membership = firstEvent.membership;
-        
-        if (membership === 'HoOC') {
-          navigate('/hooc-landing-page');
-        } else if (membership === 'Member' || membership === 'HoD') {
-          navigate('/member-landing-page');
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching user events:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====== DATA DEMO ======
-  const events = useMemo(() => ([
-    { id: 1, title: 'Halloween 2025', status: 'Sắp diễn ra', date: '12/12', description: 'Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint...', image: '/api/placeholder/600/360' },
-    { id: 2, title: 'International Day 2025', status: 'Đang diễn ra', date: '12/12 - 13/12', description: 'Velit officia consequat duis enim velit mollit. Exercitation veniam...', image: '/api/placeholder/600/360' },
-    { id: 3, title: 'Halloween 2024', status: 'Đã kết thúc', date: '12/12', description: 'Exercitation veniam consequat sunt nostrud amet...', image: '/api/placeholder/600/360' }
-  ]), []);
-
-  const blogs = useMemo(() => ([
-    { id: 1, title: 'Kinh nghiệm chuẩn bị hậu cần', topic: 'Hậu cần', user: 'Lan', date: '15 Sep 2021', image: '/api/placeholder/600/360' },
-    { id: 2, title: 'Checklist âm thanh ánh sáng', topic: 'Kỹ thuật', user: 'Minh', date: '08 Oct 2021', image: '/api/placeholder/600/360' },
-    { id: 3, title: 'Gợi ý truyền thông trước sự kiện', topic: 'Truyền thông', user: 'Hà', date: '20 Oct 2021', image: '/api/placeholder/600/360' },
-  ]), []);
 
   // ====== FILTERS / SORT ======
   const STATUS_OPTIONS = [t('home.statuses.all'), t('home.statuses.upcoming'), t('home.statuses.ongoing'), t('home.statuses.past')];
@@ -85,6 +46,45 @@ export default function UserHomePage() {
     return () => document.removeEventListener('click', onClickOutside);
   }, []);
 
+  const fetchMyEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await eventApi.listMyEvents();
+      const events = response.data || [];
+      setMyEvents(events);
+      
+      // Kiểm tra nếu user không có sự kiện nào, redirect về trang user
+      if (events.length === 0) {
+        navigate('/user-landing-page');
+        return;
+      }
+      
+      // Kiểm tra nếu user là HoOC, redirect đến trang HoOC
+      const hasHoOCEvent = events.some(event => event.membership === 'HoOC');
+      if (hasHoOCEvent) {
+        navigate('/hooc-landing-page');
+        return;
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ====== DATA DEMO ======
+  const events = useMemo(() => ([
+    { id: 1, title: 'Halloween 2025', status: 'Sắp diễn ra', date: '12/12', description: 'Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint...', image: '/api/placeholder/600/360' },
+    { id: 2, title: 'International Day 2025', status: 'Đang diễn ra', date: '12/12 - 13/12', description: 'Velit officia consequat duis enim velit mollit. Exercitation veniam...', image: '/api/placeholder/600/360' },
+    { id: 3, title: 'Halloween 2024', status: 'Đã kết thúc', date: '12/12', description: 'Exercitation veniam consequat sunt nostrud amet...', image: '/api/placeholder/600/360' }
+  ]), []);
+
+  const blogs = useMemo(() => ([
+    { id: 1, title: 'Kinh nghiệm chuẩn bị hậu cần', topic: 'Hậu cần', user: 'Lan', date: '15 Sep 2021', image: '/api/placeholder/600/360' },
+    { id: 2, title: 'Checklist âm thanh ánh sáng', topic: 'Kỹ thuật', user: 'Minh', date: '08 Oct 2021', image: '/api/placeholder/600/360' },
+    { id: 3, title: 'Gợi ý truyền thông trước sự kiện', topic: 'Truyền thông', user: 'Hà', date: '20 Oct 2021', image: '/api/placeholder/600/360' },
+  ]), []);
+
   // Filter + sort logic
   const filteredEvents = events
     .filter(ev =>
@@ -99,10 +99,14 @@ export default function UserHomePage() {
       return 0;
     });
 
+  const handleEventClick = (eventId) => {
+    navigate(`/member-event-detail/${eventId}`);
+  };
+
   // Hiển thị loading nếu đang kiểm tra sự kiện
   if (loading) {
     return (
-      <UserLayout title="Trang chủ User" sidebarType="user">
+      <UserLayout title="Trang chủ Member" sidebarType="member">
         <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -114,11 +118,11 @@ export default function UserHomePage() {
 
   return (
     <UserLayout
-      title="Trang chủ User"
+      title="Trang chủ Member"
       activePage="home"
-      sidebarType="user"
+      sidebarType="member"
       showSearch={true}
-      showEventAction={true}  // User có thể tạo và tham gia sự kiện
+      showEventAction={true}
       eventActions={['create', 'join']}
       onSearch={setSearchQuery}
       onEventAction={(action) => {
@@ -260,7 +264,6 @@ export default function UserHomePage() {
                     <button className="ghost-btn" onClick={() => navigate('/event-detail')}>
                       {t('actions.viewDetails')}
                     </button>
-                    {/* ⛔ ĐÃ BỎ NÚT THAM GIA TRONG EVENT-BODY */}
                   </div>
                 </div>
               </div>
@@ -430,7 +433,6 @@ export default function UserHomePage() {
           </div>
         </div>
       )}
-
     </UserLayout>
   );
 }

@@ -1,5 +1,5 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
+import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
 import { authenticateToken, requireRole } from '../middlewares/authMiddleware.js';
 import {
   createMilestone,
@@ -22,8 +22,11 @@ const router = express.Router();
 router.get('/public', listPublicEvents);
 router.get('/:id', getPublicEventDetail);
 
-// Create event (HoOC)
-router.post('/', authenticateToken, requireRole('HoOC'), createEvent);
+// Private event detail (authenticated users) - TẠM THỜI BỎ PHÂN QUYỀN
+router.get('/private/:id', authenticateToken, getPrivateEventDetail);
+
+// Create event (any authenticated user)
+router.post('/', authenticateToken, createEvent);
 
 // Join by code
 router.post('/join', authenticateToken, joinEventByCode);

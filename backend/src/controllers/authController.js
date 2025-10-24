@@ -263,7 +263,6 @@ export const loginWithGoogle = async (req, res) => {
          }
       });
     } catch (error) {
-      console.log(error);
       const isBadToken = /invalid|wrong number of segments|jwt/i.test(error?.message || '');
       return res.status(isBadToken ? 401 : 500).json({
         message: isBadToken ? 'Invalid Google token' : 'Fail to login with Google!'
