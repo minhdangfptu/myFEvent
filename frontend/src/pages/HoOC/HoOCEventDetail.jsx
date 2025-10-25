@@ -13,9 +13,19 @@ export default function HoOCEventDetail() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', description: '', organizerName: '' });
+  const [editForm, setEditForm] = useState({ 
+    name: '', 
+    description: '', 
+    organizerName: '', 
+    eventDate: '', 
+    location: '', 
+    status: '' 
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Check if user is HoOC
+  const isHoOC = user?.role === 'HoOC';
 
   useEffect(() => {
     fetchEventDetails();
@@ -34,7 +44,10 @@ export default function HoOCEventDetail() {
       setEditForm({
         name: eventRes.data.name || '',
         description: eventRes.data.description || '',
-        organizerName: eventRes.data.organizerName || ''
+        organizerName: eventRes.data.organizerName || '',
+        eventDate: eventRes.data.eventDate || '',
+        location: eventRes.data.location || '',
+        status: eventRes.data.status || ''
       });
     } catch (error) {
       console.error('Error fetching event details:', error);
@@ -52,7 +65,10 @@ export default function HoOCEventDetail() {
       await eventApi.updateEvent(eventId, {
         name: editForm.name,
         description: editForm.description,
-        organizerName: editForm.organizerName
+        organizerName: editForm.organizerName,
+        eventDate: editForm.eventDate,
+        location: editForm.location,
+        status: editForm.status
       });
       
       setEditing(false);
@@ -266,29 +282,69 @@ export default function HoOCEventDetail() {
                   disabled={!editing}
                 />
               </div>
-              <div className="d-flex gap-2">
-                {!editing ? (
-                  <button className="btn btn-outline-danger" onClick={() => setEditing(true)}>
-                    <i className="bi bi-pencil me-2"></i>Chỉnh sửa
-                  </button>
-                ) : (
-                  <>
-                    <button className="btn btn-danger" onClick={handleSave} disabled={submitting}>
-                      {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
-                    </button>
-                    <button className="btn btn-outline-secondary" onClick={() => {
-                      setEditing(false);
-                      setEditForm({
-                        name: event.name,
-                        description: event.description,
-                        organizerName: event.organizerName
-                      });
-                    }}>
-                      Hủy
-                    </button>
-                  </>
-                )}
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Ngày diễn ra</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={editing ? editForm.eventDate : event.eventDate}
+                  onChange={(e) => setEditForm({...editForm, eventDate: e.target.value})}
+                  disabled={!editing}
+                />
               </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Địa điểm</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editing ? editForm.location : event.location}
+                  onChange={(e) => setEditForm({...editForm, location: e.target.value})}
+                  disabled={!editing}
+                  placeholder="Nhập địa điểm tổ chức sự kiện"
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Trạng thái</label>
+                <select
+                  className="form-control"
+                  value={editing ? editForm.status : event.status}
+                  onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                  disabled={!editing}
+                >
+                  <option value="scheduled">Sắp diễn ra</option>
+                  <option value="ongoing">Đang diễn ra</option>
+                  <option value="completed">Đã kết thúc</option>
+                  <option value="cancelled">Đã hủy</option>
+                </select>
+              </div>
+              {isHoOC && (
+                <div className="d-flex gap-2">
+                  {!editing ? (
+                    <button className="btn btn-outline-danger" onClick={() => setEditing(true)}>
+                      <i className="bi bi-pencil me-2"></i>Chỉnh sửa
+                    </button>
+                  ) : (
+                    <>
+                      <button className="btn btn-danger" onClick={handleSave} disabled={submitting}>
+                        {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+                      </button>
+                      <button className="btn btn-outline-secondary" onClick={() => {
+                        setEditing(false);
+                        setEditForm({
+                          name: event.name,
+                          description: event.description,
+                          organizerName: event.organizerName,
+                          eventDate: event.eventDate,
+                          location: event.location,
+                          status: event.status
+                        });
+                      }}>
+                        Hủy
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Join Code */}

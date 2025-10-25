@@ -10,7 +10,7 @@ dotenv.config();
       subject: 'Test Email via App Password',
       html: '<h3>✅ Gmail SMTP Test Successful!</h3><p>myFEvent is ready to send mail.</p>',
     });
-    console.log('Email sent successfully!');
+    // Email sent successfully
   } catch (err) {
     console.error('❌ Failed to send:', err);
   }

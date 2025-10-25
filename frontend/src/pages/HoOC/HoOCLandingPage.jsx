@@ -15,8 +15,40 @@ export default function HoOCHomePage() {
   const [createError, setCreateError] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [myEvents, setMyEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  // Kiểm tra sự kiện của user và redirect
+  useEffect(() => {
+    checkUserEvents();
+  }, []);
+
+  const checkUserEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await eventApi.listMyEvents();
+      const events = response.data || [];
+      setMyEvents(events);
+      
+      // Nếu user không có sự kiện HoOC, redirect về trang user
+      const hasHoOCEvent = events.some(event => event.membership === 'HoOC');
+      if (!hasHoOCEvent) {
+        // Nếu có sự kiện Member, redirect đến trang Member
+        const hasMemberEvent = events.some(event => event.membership === 'Member' || event.membership === 'HoD');
+        if (hasMemberEvent) {
+          navigate('/member-landing-page');
+        } else {
+          navigate('/user-landing-page');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user events:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ====== DATA DEMO ======
   const events = useMemo(() => ([
@@ -67,14 +99,27 @@ export default function HoOCHomePage() {
       return 0;
     });
 
+  // Hiển thị loading nếu đang kiểm tra sự kiện
+  if (loading) {
+    return (
+      <UserLayout title="Trang chủ HoOC" sidebarType="hooc">
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </UserLayout>
+    );
+  }
+
   return (
     <UserLayout
-      title={t('home.title')}
+      title="Trang chủ HoOC"
       activePage="home"
       sidebarType="hooc"
       showSearch={true}
       showEventAction={true}
-      eventActions={user?.role === 'HoOC' ? ['create'] : ['create','join']}
+      eventActions={['create', 'join']}
       onSearch={setSearchQuery}
       onEventAction={(action) => {
         if (action === 'join') setShowJoinModal(true);
@@ -121,13 +166,14 @@ export default function HoOCHomePage() {
         <div className="section-head">
           <h4 className="section-title">{t('home.allEvents')}</h4>
 
-          {/* NHÓM HÀNH ĐỘNG BÊN PHẢI: Join riêng cho mọi user */}
+          {/* NHÓM HÀNH ĐỘNG BÊN PHẢI: Join và Create cho mọi user */}
           <div className="d-flex align-items-center gap-2 flex-wrap">
-            {user?.role !== 'HoOC' && (
-              <button className="btn btn-danger" onClick={() => setShowJoinModal(true)}>
-                {t('actions.join')}
-              </button>
-            )}
+            <button className="btn btn-outline-danger" onClick={() => setShowCreateModal(true)}>
+              <i className="bi bi-plus-circle me-2"></i>Tạo sự kiện
+            </button>
+            <button className="btn btn-danger" onClick={() => setShowJoinModal(true)}>
+              {t('actions.join')}
+            </button>
 
             {/* Filters */}
             <div className="filters position-relative">
@@ -284,7 +330,7 @@ export default function HoOCHomePage() {
                     const res = await eventApi.joinByCode(joinCode.trim());
                     setShowJoinModal(false);
                     setJoinCode('');
-                    navigate(`/event-detail?id=${res.data.eventId}`);
+                    navigate(`/hooc-event-detail/${res.data.eventId}`);
                   } catch (err) {
                     setJoinError(err.response?.data?.message || 'Tham gia thất bại');
                   }
@@ -331,8 +377,8 @@ export default function HoOCHomePage() {
                     setShowCreateModal(false);
                     setCreateForm({ name: '', description: '', organizerName: '' });
                     alert(`Mã tham gia: ${res.data.joinCode}`);
-                    // Reload page to refresh sidebar
-                    window.location.reload();
+                    // Redirect to event detail page
+                    navigate(`/hooc-event-detail/${res.data.id}`);
                   } finally {
                     setCreateSubmitting(false);
                   }

@@ -28,6 +28,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      const result = await login(email, password);
+      // Luôn redirect đến user-landing-page sau khi đăng nhập thành công
+      navigate('/user-landing-page', { replace: true });
       await login(email, password);
       navigate('/user-landing-page', { replace: true, state: { toast: { type: 'success', message: 'Đăng nhập thành công' } } });
     } catch (error) {

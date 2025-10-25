@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import UserSidebar from './UserSidebar';
 import HoOCSidebar from './HoOCSidebar';
+import MemberSidebar from './MemberSidebar';
 import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
 
@@ -31,6 +32,12 @@ export default function UserLayout({
         {/* Sidebar */}
         {sidebarType === 'hooc' ? (
           <HoOCSidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
+          />
+        ) : sidebarType === 'member' ? (
+          <MemberSidebar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}

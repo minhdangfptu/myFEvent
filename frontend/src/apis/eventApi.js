@@ -46,11 +46,19 @@ export const eventApi = {
     return res.data;
   },
   getById: async (id) => {
-    const res = await axiosClient.get(`/api/events/${id}`);
+    const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
   listMyEvents: async () => {
     const res = await axiosClient.get('/api/events/me/list');
+    return res.data;
+  },
+  getMyEvents: async () => {
+    const res = await axiosClient.get('/api/events/me/list');
+    return res.data;
+  },
+  debugAuth: async () => {
+    const res = await axiosClient.get('/api/auth/profile');
     return res.data;
   }
 }
