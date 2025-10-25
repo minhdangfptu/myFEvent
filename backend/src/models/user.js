@@ -27,6 +27,7 @@ const UserSchema = new Schema({
     type: String,
     required: function () { return this.authProvider === 'local'; },
     unique: true,
+    sparse: true,
     trim: true,
   },
   status: {
