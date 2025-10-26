@@ -47,6 +47,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      const result = await loginWithGoogle();
+      // Luôn redirect đến user-landing-page sau khi đăng nhập Google thành công
+      navigate('/user-landing-page', { replace: true });
       // Decode the JWT token to get user info
       const decoded = jwtDecode(credentialResponse.credential);
       

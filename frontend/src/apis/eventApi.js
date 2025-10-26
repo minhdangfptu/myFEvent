@@ -46,19 +46,24 @@ export const eventApi = {
     return res.data;
   },
   getById: async (id) => {
-    const res = await axiosClient.get(`/api/events/${id}`);
+    const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
   listMyEvents: async () => {
     const res = await axiosClient.get('/api/events/me/list');
     return res.data;
   },
-  getAllMembers: async (params = {}) => {
-    const res = await axiosClient.get('/api/events/members/all', { params });
-    return res.data;
-  },
+
   getMembersByEvent: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/members`);
+    return res.data;
+  },
+  getMyEvents: async () => {
+    const res = await axiosClient.get('/api/events/me/list');
+    return res.data;
+  },
+  debugAuth: async () => {
+    const res = await axiosClient.get('/api/auth/profile');
     return res.data;
   }
 }

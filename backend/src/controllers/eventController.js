@@ -64,6 +64,30 @@ export const getPublicEventDetail = async (req, res) => {
   }
 };
 
+// GET /api/events/private/:id (private events for authenticated users) - TẠM THỜI BỎ PHÂN QUYỀN
+export const getPrivateEventDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // TẠM THỜI BỎ PHÂN QUYỀN - Cho phép tất cả user đã login
+    // const membership = await EventMember.findOne({ eventId: id, userId: req.user.id }).lean();
+    // if (!membership) {
+    //   return res.status(403).json({ message: 'Access denied. You are not a member of this event.' });
+    // }
+
+    const event = await Event.findById(id)
+      .select('name type description eventDate location image status organizerName joinCode createdAt updatedAt')
+      .lean();
+    
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    return res.status(200).json({ data: event });
+  } catch (error) {
+    console.error('getPrivateEventDetail error:', error);
+    return res.status(500).json({ message: 'Failed to get event detail' });
+  }
+};
+
 // POST /api/events/  (create by HoOC)
 export const createEvent = async (req, res) => {
   try {
@@ -113,7 +137,7 @@ export const joinEventByCode = async (req, res) => {
 
     const exists = await EventMember.findOne({ eventId: event._id, userId: req.user.id }).lean();
     if (!exists) {
-      await EventMember.create({ eventId: event._id, userId: req.user.id, role: 'member' });
+      await EventMember.create({ eventId: event._id, userId: req.user.id, role: 'Member' });
     }
 
     return res.status(200).json({ message: 'Joined event', data: { eventId: event._id } });
@@ -140,20 +164,25 @@ export const getEventSummary = async (req, res) => {
 // GET /api/events/me/list  (events joined by current user)
 export const listMyEvents = async (req, res) => {
   try {
-    console.log('listMyEvents - User ID:', req.user.id);
     const memberships = await EventMember.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
       .lean();
-    console.log('Found memberships:', memberships);
 
     const eventIds = memberships.map(m => m.eventId);
-    console.log('Event IDs:', eventIds);
     const events = await Event.find({ _id: { $in: eventIds } })
       .select('name status eventDate joinCode')
       .lean();
-    console.log('Found events:', events);
 
-    return res.status(200).json({ data: events });
+    // Map events with membership info
+    const eventsWithMembership = events.map(event => {
+      const membership = memberships.find(m => m.eventId.toString() === event._id.toString());
+      return {
+        ...event,
+        membership: membership ? membership.role : 'Member'
+      };
+    });
+
+    return res.status(200).json({ data: eventsWithMembership });
   } catch (error) {
     console.error('listMyEvents error:', error);
     return res.status(500).json({ message: 'Failed to list events' });

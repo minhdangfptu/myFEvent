@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { eventApi } from "../apis/eventApi";
 
-export default function HoOCSidebar({
+export default function MemberSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
@@ -9,7 +9,7 @@ export default function HoOCSidebar({
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
-  const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [theme, setTheme] = useState("light");
 
   // Hover popup (khi sidebar đóng)
@@ -27,18 +27,18 @@ export default function HoOCSidebar({
     let mounted = true;
     (async () => {
       try {
-        console.log('HoOC: Fetching events...');
+        console.log('MemberSidebar: Fetching events...');
         const res = await eventApi.listMyEvents();
-        console.log('HoOC: API response:', res);
+        console.log('MemberSidebar: API response:', res);
         const list = Array.isArray(res?.data) ? res.data : [];
-        console.log('HoOC: Events list:', list);
+        console.log('MemberSidebar: Events list:', list);
         const mapped = list.map(e => ({ 
           id: e._id || e.id, 
           name: e.name, 
           icon: "bi-calendar-event",
-          membership: e.membership // Assume backend trả về membership
+          membership: e.membership
         }));
-        console.log('HoOC: Mapped events:', mapped);
+        console.log('MemberSidebar: Mapped events:', mapped);
         if (mounted) {
           setEvents(mapped);
           if (mapped.length && !selectedEvent) {
@@ -47,7 +47,7 @@ export default function HoOCSidebar({
           }
         }
       } catch (error) {
-        console.error('HoOC: Error fetching events:', error);
+        console.error('MemberSidebar: Error fetching events:', error);
       }
     })();
     return () => { mounted = false };
@@ -88,38 +88,42 @@ export default function HoOCSidebar({
   // Menu chính - LUÔN có "Trang chủ"
   const mainMenuItems = useMemo(() => {
     const items = [
-      { id: "home", icon: "bi-house-door", label: "Trang chủ", path: "/hooc-landing-page" }
+      { id: "home", icon: "bi-house-door", label: "Trang chủ", path: "/member-landing-page" }
     ];
     
-    // HoOC luôn có đầy đủ menu
+    // Member có đầy đủ menu như HoOC trừ thống kê
     items.push(
       { id: "event-board", icon: "bi-people", label: "Ban sự kiện", path: "/task" },
       { id: "members", icon: "bi-person", label: "Thành viên", path: "/member" },
-      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" },
-      { id: "department-management", icon: "bi-building", label: "Quản lý ban", path: "/hooc-manage-department" }
+      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" }
     );
     
     return items;
   }, []);
 
-  // Submenu Tổng quan - HoOC có đầy đủ quyền
+  // Submenu Tổng quan - Member có đầy đủ quyền trừ thống kê
   const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/hooc-event-detail/${events.find(e => e.name === selectedEvent)?.id || ''}` }
+    { id: "overview-dashboard", label: "Dashboard tổng", path: "/member-landing-page" },
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/member-event-detail/${events.find(e => e.name === selectedEvent)?.id || ''}` }
   ];
 
+  // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: "/task" },
+    // Không có work-stats (thống kê tiến độ)
   ];
+
+  // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/task" },
     { id: "expenses", label: "Chi tiêu", path: "/task" },
     { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    // Không có finance-stats (thống kê thu chi)
   ];
+
+  // Submenu Rủi ro - Member có đầy đủ quyền
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: "/risk" },
