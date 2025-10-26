@@ -310,3 +310,38 @@ export const removeEventImages = async (req, res) => {
     return res.status(500).json({ message: 'Failed to remove images' });
   }
 };
+
+// GET /api/events/detail/:id (get all type event detail - public or private with membership check)
+export const getAllEventDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get event details
+    const event = await Event.findById(id)
+      .select('name type description eventDate location image status organizerName joinCode createdAt updatedAt')
+      .populate({ path: 'organizerName', select: 'fullName email' })
+      .lean();
+    
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Check if event is public
+    if (event.type === 'public') {
+      return res.status(200).json({ data: { event } });
+    }
+
+    // If private, check if user is a member
+    const membership = await EventMember.findOne({ eventId: id, userId: req.user.id }).lean();
+    
+    if (!membership) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this event.' });
+    }
+
+    // User is a member, return event details
+    return res.status(200).json({ data: { event } });
+  } catch (error) {
+    console.error('getAllEventDetail error:', error);
+    return res.status(500).json({ message: 'Failed to get event detail' });
+  }
+};
+
+

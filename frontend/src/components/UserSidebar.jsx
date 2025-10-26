@@ -17,31 +17,7 @@ export default function UserSidebar({
   const [selectedEvent, setSelectedEvent] = useState("");
   const [events, setEvents] = useState([]);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await eventApi.listMyEvents();
-        const list = Array.isArray(res?.data) ? res.data : [];
-        const mapped = list.map(e => ({ 
-          id: e._id || e.id, 
-          name: e.name, 
-          icon: "bi-calendar-event",
-          membership: e.membership // Assume backend trả về membership
-        }));
-        if (mounted) {
-          setEvents(mapped);
-          if (mapped.length && !selectedEvent) {
-            setSelectedEvent(mapped[0].name);
-            setCurrentEventMembership(mapped[0].membership);
-          }
-        }
-      } catch (error) {
-        console.error('UserSidebar: Error fetching events:', error);
-      }
-    })();
-    return () => { mounted = false };
-  }, []);
+
 
   useEffect(() => {
     if (!sidebarOpen) {

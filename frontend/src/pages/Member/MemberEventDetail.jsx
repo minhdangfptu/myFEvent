@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,9 +8,21 @@ export default function MemberEventDetail() {
   const { eventId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Thêm eventId vào URL query để sidebar đồng bộ
+  useEffect(() => {
+    if (!eventId) return;
+    const params = new URLSearchParams(location.search);
+    const currentEventId = params.get('eventId');
+    if (!currentEventId || currentEventId !== eventId) {
+      params.set('eventId', eventId);
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    }
+  }, [eventId, location.search, location.pathname, navigate]);
 
   useEffect(() => {
     fetchEventDetail();
@@ -19,11 +31,24 @@ export default function MemberEventDetail() {
   const fetchEventDetail = async () => {
     try {
       setLoading(true);
-      const response = await eventApi.getEventDetail(eventId);
-      setEvent(response.data);
+      const response = await eventApi.getAllEventDetail(eventId);
+      console.log('Event detail response:', response);
+      
+      // API returns { event, members } but we just need event for now
+      if (response.data && response.data.event) {
+        setEvent(response.data.event);
+      } else {
+        setError('Không tìm thấy thông tin sự kiện');
+      }
     } catch (error) {
       console.error('Error fetching event detail:', error);
-      setError('Không thể tải thông tin sự kiện');
+      if (error.response?.status === 403) {
+        setError('Bạn không có quyền truy cập sự kiện này');
+      } else if (error.response?.status === 404) {
+        setError('Không tìm thấy sự kiện');
+      } else {
+        setError('Không thể tải thông tin sự kiện');
+      }
     } finally {
       setLoading(false);
     }
@@ -31,7 +56,7 @@ export default function MemberEventDetail() {
 
   if (loading) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="user">
+      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
         <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -43,7 +68,7 @@ export default function MemberEventDetail() {
 
   if (error || !event) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="user">
+      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy sự kiện'}
         </div>
@@ -114,7 +139,7 @@ export default function MemberEventDetail() {
               <div className="col-md-6">
                 <p><strong>Ngày tổ chức:</strong> {new Date(event.eventDate).toLocaleDateString('vi-VN')}</p>
                 <p><strong>Địa điểm:</strong> {event.location || 'Chưa cập nhật'}</p>
-                <p><strong>Người tổ chức:</strong> {event.organizerName}</p>
+                <p><strong>Đơn vị tổ chức:</strong> {event.organizerName?.fullName || event.organizerName || 'Chưa cập nhật'}</p>
               </div>
               <div className="col-md-6">
                 <p><strong>Loại sự kiện:</strong> {event.type === 'public' ? 'Công khai' : 'Riêng tư'}</p>
@@ -139,19 +164,19 @@ export default function MemberEventDetail() {
 
         <div className="col-md-4">
           <div className="info-card">
-            <h5 className="fw-bold mb-3">Thống kê</h5>
+            <h5 className="fw-bold mb-3">Thông tin</h5>
             <div className="d-flex justify-content-between mb-2">
               <span>Số thành viên:</span>
               <span className="fw-bold">{event.memberCount || 0}</span>
             </div>
-            <div className="d-flex justify-content-between mb-2">
+            {/* <div className="d-flex justify-content-between mb-2">
               <span>Ngân sách:</span>
               <span className="fw-bold">{event.budget ? `${event.budget.toLocaleString()} VNĐ` : 'Chưa cập nhật'}</span>
             </div>
             <div className="d-flex justify-content-between mb-2">
               <span>Chi tiêu:</span>
               <span className="fw-bold">{event.expenses ? `${event.expenses.toLocaleString()} VNĐ` : '0 VNĐ'}</span>
-            </div>
+            </div> */}
           </div>
 
           <div className="info-card">

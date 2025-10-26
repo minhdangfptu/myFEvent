@@ -7,7 +7,7 @@ import { eventApi } from "../../apis/eventApi";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
-import { userApi } from '../../apis/userApi';
+import { userApi } from "../../apis/userApi";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -94,17 +94,20 @@ export default function HomePage() {
     let isActive = true;
     const fetchRoles = async () => {
       const roleMap = {};
-      await Promise.all(events.map(async (event) => {
-        try {
-          const res = await userApi.getUserRoleByEvent(event.id || event._id);
-          if (res && res.role && res.user?.fullName) {
-            roleMap[event.id || event._id] = {
-              role: res.role,
-              name: res.user.fullName
-            };
-          }
-        } catch {}
-      }));
+      await Promise.all(
+        events.map(async (event) => {
+          try {
+            const res = await userApi.getUserRoleByEvent(event.id || event._id);
+            if (res && res.role && res.user?.fullName) {
+              console.log("Kết quả API:", res, "Event:", event.id || event._id);
+              roleMap[event.id || event._id] = {
+                role: res.role,
+                name: res.user.fullName,
+              };
+            }
+          } catch {}
+        })
+      );
       if (isActive) setEventRoles(roleMap);
     };
     fetchRoles();
@@ -174,8 +177,10 @@ export default function HomePage() {
     })
     .sort((a, b) => {
       if (sortBy === SORT.AZ) return a.name.localeCompare(b.name);
-      if (sortBy === SORT.NEWEST) return new Date(b.eventDate) - new Date(a.eventDate);
-      if (sortBy === SORT.OLDEST) return new Date(a.eventDate) - new Date(b.eventDate);
+      if (sortBy === SORT.NEWEST)
+        return new Date(b.eventDate) - new Date(a.eventDate);
+      if (sortBy === SORT.OLDEST)
+        return new Date(a.eventDate) - new Date(b.eventDate);
       return 0;
     });
 
@@ -452,11 +457,16 @@ export default function HomePage() {
                       </span>
                     )}
                     {/* Position - role của user trong event */}
-                    <span style= {{color: "white", backgroundColor: "red"}}className="event-chip chip-gray">
+                    <span
+                      style={{ color: "white", backgroundColor: "red" }}
+                      className="event-chip chip-gray"
+                    >
                       <i className="bi bi-person-badge me-1" />
-                      
-                      {eventRoles[event.id || event._id]?.name ? ` ${eventRoles[event.id || event._id].name} - ` : ''}
-                      {eventRoles[event.id || event._id]?.role || 'Không rõ'}
+
+                      {eventRoles[event.id || event._id]?.name
+                        ? ` ${eventRoles[event.id || event._id].name} - `
+                        : ""}
+                      {eventRoles[event.id || event._id]?.role || "Không rõ"}
                     </span>
                   </div>
                   <div className="event-title">{event.name}</div>
@@ -465,34 +475,37 @@ export default function HomePage() {
                     <button
                       className="ghost-btn"
                       onClick={() =>
-                        navigate(`/member-event-detail/${event.id || event._id || idx}`)
+                        navigate(
+                          `/member-event-detail/${event.id || event._id || idx}`
+                        )
                       }
                     >
                       Xem chi tiết
                     </button>
-                    <button
-                      className="ghost-btn"
-                      style={{ backgroundColor: "red", color: "white" }}
-                      onClick={() => {
-                        const role = eventRoles[event.id || event._id]?.role;
-                        if (role === 'Member') {
-                          navigate('/member-landing-page');
-                          return;
-                        }
-                        if (role === 'HoOC') {
-                          navigate('/hooc-landing-page');
-                          return;
-                        }
-                        if (role === 'HoD') {
-                          navigate('/hod-landing-page');
-                          return;
-                        }
-                        // fallback mặc định
-                        navigate(`${eventDetailPrefix}${event.id || event._id || idx}`);
-                      }}
-                    >
-                      Truy cập
-                    </button>
+                                         <button
+                       className="ghost-btn"
+                       style={{ backgroundColor: "red", color: "white" }}
+                       onClick={() => {
+                         const role = eventRoles[event.id || event._id]?.role;
+                         const eid = event.id || event._id || idx;
+                         if (role === "Member") {
+                           navigate(`/member-event-detail/${eid}?eventId=${eid}`);
+                           return;
+                         }
+                         if (role === "HoOC") {
+                           navigate(`/hooc-dashboard?eventId=${eid}`);
+                           return;
+                         }
+                         if (role === "HoD") {
+                           navigate(`/hod-landing-page?eventId=${eid}`);
+                           return;
+                         }
+                         // fallback mặc định
+                         navigate(`${eventDetailPrefix}${eid}`);
+                       }}
+                     >
+                       Truy cập
+                     </button>
                   </div>
                 </div>
               </div>

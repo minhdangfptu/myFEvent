@@ -51,6 +51,8 @@ import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
+import HoDLandingPage from "./pages/HoD/HoDLandingPage";
+import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 
 
 export default function App() {
@@ -101,10 +103,26 @@ export default function App() {
             } 
           />
           <Route 
+            path="/hod-landing-page" 
+            element={
+              <ProtectedRoute>
+                <HoDLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/hooc-event-detail/:eventId" 
             element={
               <ProtectedRoute >
                 <HoOCEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-dashboard" 
+            element={
+              <ProtectedRoute >
+                <HoOCDashBoard />
               </ProtectedRoute>
             } 
           />

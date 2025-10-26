@@ -1,6 +1,6 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
-import { authenticateToken, requireRole } from '../middlewares/authMiddleware.js';
+import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
+import { authenticateToken } from '../middlewares/authMiddleware.js';
 import {
   createMilestone,
   listMilestones,
@@ -24,6 +24,9 @@ router.get('/:id', getPublicEventDetail);
 
 // Private event detail (authenticated users) - TẠM THỜI BỎ PHÂN QUYỀN
 router.get('/private/:id', authenticateToken, getPrivateEventDetail);
+
+// Get all type event detail
+router.get('/detail/:id', authenticateToken, getAllEventDetail);
 
 // Create event (any authenticated user)
 router.post('/', authenticateToken, createEvent);

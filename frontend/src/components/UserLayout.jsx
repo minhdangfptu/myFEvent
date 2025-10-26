@@ -4,6 +4,7 @@ import HoOCSidebar from './HoOCSidebar';
 import MemberSidebar from './MemberSidebar';
 import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
+import HoDSideBar from './HoDSideBar';
 
 export default function UserLayout({ 
   title, 
@@ -38,6 +39,12 @@ export default function UserLayout({
           />
         ) : sidebarType === 'member' ? (
           <MemberSidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
+          />
+        ) :  sidebarType === 'hod' ? (
+          <HoDSideBar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
