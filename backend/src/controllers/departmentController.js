@@ -60,6 +60,88 @@ export const getDepartmentDetailByEvent = async (req, res) => {
   }
 };
 
+// ================= CREATE department =================
+// POST /api/events/:eventId/departments
+export const createDepartment = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { name, description, leaderId } = req.body || {};
+    // Kiểm tra event tồn tại
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event không tồn tại' });
+    }
+    // Kiểm tra quyền HooC
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+      return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
+    }
+    // Tạo department
+    const depart = await Department.create({
+      eventId,
+      name,
+      description,
+      leaderId
+    });
+    return res.status(201).json({ data: depart });
+  } catch (error) {
+    console.error('createDepartment error:', error);
+    return res.status(500).json({ message: 'Tạo department thất bại' });
+  }
+};
+
+// ================= EDIT department =================
+// PATCH /api/events/:eventId/departments/:departmentId
+export const editDepartment = async (req, res) => {
+  try {
+    const { eventId, departmentId } = req.params;
+    const { name, description, leaderId } = req.body || {};
+    // Kiểm tra event/department
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event không tồn tại' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
+    // Kiểm tra quyền HooC
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+      return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
+    }
+    // Cập nhật
+    if (typeof name === 'string') department.name = name;
+    if (typeof description === 'string') department.description = description;
+    if (leaderId) department.leaderId = leaderId;
+    await department.save();
+    return res.status(200).json({ data: department });
+  } catch (error) {
+    console.error('editDepartment error:', error);
+    return res.status(500).json({ message: 'Sửa department thất bại' });
+  }
+};
+
+// ================= DELETE department =================
+// DELETE /api/events/:eventId/departments/:departmentId
+export const deleteDepartment = async (req, res) => {
+  try {
+    const { eventId, departmentId } = req.params;
+    // Kiểm tra event/department
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event không tồn tại' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
+    // Kiểm tra quyền HooC
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+      return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
+    }
+    await department.deleteOne();
+    return res.status(200).json({ message: 'Xoá department thành công' });
+  } catch (error) {
+    console.error('deleteDepartment error:', error);
+    return res.status(500).json({ message: 'Xoá department thất bại' });
+  }
+};
+
 // Helpers
 const ensureEventExists = async (eventId) => {
 	const exists = await Event.exists({ _id: eventId });
