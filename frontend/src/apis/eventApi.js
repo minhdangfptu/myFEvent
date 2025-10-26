@@ -53,10 +53,6 @@ export const eventApi = {
     const res = await axiosClient.get('/api/events/me/list');
     return res.data;
   },
-  getMyEvents: async () => {
-    const res = await axiosClient.get('/api/events/me/list');
-    return res.data;
-  },
   debugAuth: async () => {
     const res = await axiosClient.get('/api/auth/profile');
     return res.data;

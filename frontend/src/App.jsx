@@ -21,7 +21,7 @@ import ForgotPassword from "./pages/Auth/ForgotPassword";
 import ResetPassword from "./pages/Auth/ResetPassword";
 import EmailConfirmation from "./pages/Auth/EmailConfirmation";
 
-// User Dashboard Pages
+// User Pages
 import UserLandingPage from './pages/User/UserLandingPage';
 import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
 import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
@@ -38,6 +38,7 @@ import Menber from './pages/User/Menber';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';
+import HomePage from "./pages/User/HomePage";
 
 // Member Pages
 import MemberLandingPage from './pages/Member/MemberLandingPage';
@@ -50,6 +51,7 @@ import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
+
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -232,6 +234,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <Menber />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/home-page" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                < HomePage />
               </ProtectedRoute>
             } 
           />

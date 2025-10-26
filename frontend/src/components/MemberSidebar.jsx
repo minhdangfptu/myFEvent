@@ -203,7 +203,17 @@ export default function MemberSidebar({
             </button>
           )}
         </div>
-
+        <div className="mb-4">
+          {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
+          <div className="d-flex flex-column gap-1">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+              <div className="d-flex align-items-center">
+                <i className="bi bi-list me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Trang chủ</span>}
+              </div>
+            </button>
+          </div>
+        </div>
         {/* Current Event - Chỉ hiển thị khi có sự kiện */}
         {sidebarOpen && hasEvents && (
           <div className="mb-3" style={{ paddingBottom: 0 }}>

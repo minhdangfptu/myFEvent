@@ -31,7 +31,7 @@ export default function MemberEventDetail() {
 
   if (loading) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
+      <UserLayout title="Chi tiết sự kiện" sidebarType="user">
         <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -43,7 +43,7 @@ export default function MemberEventDetail() {
 
   if (error || !event) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
+      <UserLayout title="Chi tiết sự kiện" sidebarType="user">
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy sự kiện'}
         </div>

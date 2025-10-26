@@ -60,6 +60,9 @@ router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:eventId/departments/:departmentId/members/:userId', authenticateToken, removeMemberFromDepartment);
 
+
+//Event role 
+
 export default router;
 
 

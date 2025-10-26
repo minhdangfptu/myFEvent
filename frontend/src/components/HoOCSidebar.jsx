@@ -85,23 +85,6 @@ export default function HoOCSidebar({
   const handlePopupMouseEnter = () => { if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); } };
   const handlePopupMouseLeave = () => { setHoveredMenu(null); };
 
-  // Menu chính - LUÔN có "Trang chủ"
-  const mainMenuItems = useMemo(() => {
-    const items = [
-      { id: "home", icon: "bi-house-door", label: "Trang chủ", path: "/hooc-landing-page" }
-    ];
-    
-    // HoOC luôn có đầy đủ menu
-    items.push(
-      { id: "event-board", icon: "bi-people", label: "Ban sự kiện", path: "/task" },
-      { id: "members", icon: "bi-person", label: "Thành viên", path: "/member" },
-      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" },
-      { id: "department-management", icon: "bi-building", label: "Quản lý ban", path: "/hooc-manage-department" }
-    );
-    
-    return items;
-  }, []);
-
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
@@ -178,7 +161,7 @@ export default function HoOCSidebar({
       `}</style>
 
       {/* Header */}
-      <div className="p-3" style={{ flexShrink: 0 }}>
+      <div className="p-3 pb-0" style={{ flexShrink: 0, paddingBottom: "0px" }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
@@ -255,32 +238,26 @@ export default function HoOCSidebar({
             </div>
           </div>
         )}
+        
       </div>
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
+      <div className="mb-4">
+          {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
+          <div className="d-flex flex-column gap-1">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+              <div className="d-flex align-items-center">
+                <i className="bi bi-list me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Trang chủ</span>}
+              </div>
+            </button>
+          </div>
+        </div>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CHỨC NĂNG CHÍNH</div>}
 
           <div className="d-flex flex-column gap-1">
-            {/* Mục chính - Trang chủ luôn hiển thị */}
-            {mainMenuItems.map((item) => {
-              const isActive = activePage === item.id;
-              return (
-                <button
-                  key={item.id}
-                  className={`btn-nav ${isActive ? "active" : ""}`}
-                  onClick={() => (window.location.href = item.path)}
-                  title={item.label}
-                >
-                  <div style={{display: "flex", alignItems: 'center', justifyContent:"center"}} className="d-flex align-items-center">
-                    <i className={`${item.icon} me-3`} style={{ width: 20 }} />
-                    {sidebarOpen && <span>{item.label}</span>}
-                  </div>
-                </button>
-              );
-            })}
-
             {/* Dropdown Tổng quan - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <div
