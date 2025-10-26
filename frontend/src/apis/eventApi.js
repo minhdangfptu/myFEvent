@@ -17,8 +17,8 @@ export const eventApi = {
       throw error;
     }
   },
-  create: async ({ name, description, eventDate, location, type, organizerName }) => {
-    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName });
+  create: async ({ name, description, eventDate, location, type, organizerName, images }) => {
+    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName, images });
     return res.data;
   },
   replaceImages: async (eventId, images) => {

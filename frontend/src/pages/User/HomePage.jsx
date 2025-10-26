@@ -47,12 +47,15 @@ export default function HomePage() {
     name: "",
     description: "",
     organizerName: "",
+    images: [], // Thêm field images
   });
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [imageInputType, setImageInputType] = useState("url"); // "url" hoặc "file"
+  const [imageUrl, setImageUrl] = useState("");
 
   const [blogs, setBlogs] = useState([]);
   const [events, setEvents] = useState([]);
@@ -115,6 +118,63 @@ export default function HomePage() {
       isActive = false;
     };
   }, [events]);
+
+  // ===== Image handling functions =====
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setCreateError('Vui lòng chọn file hình ảnh hợp lệ');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setCreateError('Kích thước file không được vượt quá 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target.result;
+      setCreateForm(prev => ({
+        ...prev,
+        images: [...prev.images, base64]
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUrlAdd = () => {
+    if (!imageUrl.trim()) {
+      setCreateError('Vui lòng nhập URL hình ảnh');
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(imageUrl);
+    } catch {
+      setCreateError('URL không hợp lệ');
+      return;
+    }
+
+    setCreateForm(prev => ({
+      ...prev,
+      images: [...prev.images, imageUrl.trim()]
+    }));
+    setImageUrl("");
+    setCreateError("");
+  };
+
+  const removeImage = (index) => {
+    setCreateForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
 
   // ===== Filter/Sort with stable tokens (không lệch i18n) =====
   const STATUS = {
@@ -297,7 +357,8 @@ export default function HomePage() {
         .event-desc { color:#6B7280; font-size:14px; }
         .blog-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition:transform .2s, box-shadow .2s; }
         .blog-card:hover { box-shadow:0 8px 24px rgba(255, 0, 0, 0.08) }
-        .blog-img { height:160px; background:#f3f4f6; }
+        .blog-img { height:160px; background:#f3f4f6; position:relative; }
+        .blog-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
         .blog-body { padding:16px; }
         .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; }
         .blog-meta { display:flex; flex-wrap:wrap; gap:6px; color:#6B7280; font-size:12px; }
@@ -422,20 +483,44 @@ export default function HomePage() {
 
         {/* ====== Event ====== */}
         <div className="row g-4">
-          {filteredEvents.map((event, idx) => (
+          {filteredEvents.map((event, idx) => {
+            console.log('Event data:', event);
+            console.log('Event images:', event.image);
+            return (
             <div
               key={event.id || event._id || idx}
               className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
             >
               <div className="event-card h-100">
-                <div
-                  className="event-img"
-                  style={{
-                    backgroundImage: `url(${event.image})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
+                <div className="position-relative">
+                  <img
+                    src={event.image && event.image.length > 0 ? event.image[0] : '/default-events.jpg'}
+                    alt={event.name}
+                    className="event-img"
+                    style={{
+                      width: '100%',
+                      height: '180px',
+                      objectFit: 'cover',
+                      background: '#f3f4f6'
+                    }}
+                    onError={(e) => {
+                      console.error('Event image load error:', event.image?.[0]);
+                      e.target.src = '/default-events.jpg';
+                    }}
+                    onLoad={() => {
+                      console.log('Event image loaded successfully:', event.image?.[0]);
+                    }}
+                  />
+                  {/* Image count indicator */}
+                  {event.image && event.image.length > 1 && (
+                    <div className="position-absolute top-0 end-0 m-2">
+                      <span className="badge bg-dark bg-opacity-75 text-white">
+                        <i className="bi bi-images me-1"></i>
+                        {event.image.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="event-body">
                   <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
                     {event.status && (
@@ -510,7 +595,8 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {filteredEvents.length === 0 && (
             <div className="col-12">
@@ -537,16 +623,35 @@ export default function HomePage() {
               style={{ cursor: "pointer" }}
             >
               <div className="blog-card h-100">
-                <div
-                  className="blog-img"
-                  style={{
-                    backgroundImage: `url(${
-                      blog.image || "/api/placeholder/600/360"
-                    })`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
+                <div className="position-relative">
+                  <img
+                    src={blog.image && blog.image.length > 0 ? blog.image[0] : '/default-events.jpg'}
+                    alt={blog.name}
+                    className="blog-img"
+                    style={{
+                      width: '100%',
+                      height: '160px',
+                      objectFit: 'cover',
+                      background: '#f3f4f6'
+                    }}
+                    onError={(e) => {
+                      console.error('Blog image load error:', blog.image?.[0]);
+                      e.target.src = '/default-events.jpg';
+                    }}
+                    onLoad={() => {
+                      console.log('Blog image loaded successfully:', blog.image?.[0]);
+                    }}
+                  />
+                  {/* Image count indicator */}
+                  {blog.image && blog.image.length > 1 && (
+                    <div className="position-absolute top-0 end-0 m-2">
+                      <span className="badge bg-dark bg-opacity-75 text-white">
+                        <i className="bi bi-images me-1"></i>
+                        {blog.image.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="blog-body">
                   <div className="blog-title">{blog.name}</div>
                   <div className="blog-meta">
@@ -598,7 +703,17 @@ export default function HomePage() {
                 <button
                   type="button"
                   className="btn-close"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateForm({
+                      name: "",
+                      description: "",
+                      organizerName: "",
+                      images: [],
+                    });
+                    setImageUrl("");
+                    setCreateError("");
+                  }}
                 />
               </div>
               <div className="modal-body">
@@ -624,20 +739,31 @@ export default function HomePage() {
 
                     try {
                       setCreateSubmitting(true);
+                      console.log('Creating event with data:', {
+                        name: createForm.name,
+                        description: createForm.description,
+                        organizerName: createForm.organizerName,
+                        type: "private",
+                        images: createForm.images,
+                      });
                       const res = await eventApi.create({
                         name: createForm.name,
                         description: createForm.description,
                         organizerName: createForm.organizerName,
                         type: "private",
+                        images: createForm.images,
                       });
+                      console.log('Event created successfully:', res);
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",
                         description: "",
                         organizerName: "",
+                        images: [],
                       });
+                      setImageUrl("");
                       alert(`Mã tham gia: ${res.data.joinCode}`);
-                      navigate(`${eventDetailPrefix}${res.data.id}`);
+                      navigate(`/hooc-event-detail/${res.data.id}`);
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -695,11 +821,119 @@ export default function HomePage() {
                       disabled={createSubmitting}
                     />
                   </div>
+
+                  {/* Image Upload Section */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Hình ảnh sự kiện</label>
+                    
+                    {/* Image Input Type Toggle */}
+                    <div className="d-flex gap-2 mb-3">
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${imageInputType === "url" ? "btn-primary" : "btn-outline-primary"}`}
+                        onClick={() => setImageInputType("url")}
+                        disabled={createSubmitting}
+                      >
+                        <i className="bi bi-link-45deg me-1"></i>
+                        URL
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${imageInputType === "file" ? "btn-primary" : "btn-outline-primary"}`}
+                        onClick={() => setImageInputType("file")}
+                        disabled={createSubmitting}
+                      >
+                        <i className="bi bi-upload me-1"></i>
+                        Upload File
+                      </button>
+                    </div>
+
+                    {/* URL Input */}
+                    {imageInputType === "url" && (
+                      <div className="d-flex gap-2 mb-3">
+                        <input
+                          type="url"
+                          className="form-control soft-input"
+                          placeholder="Nhập URL hình ảnh..."
+                          value={imageUrl}
+                          onChange={(e) => setImageUrl(e.target.value)}
+                          disabled={createSubmitting}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary"
+                          onClick={handleUrlAdd}
+                          disabled={createSubmitting || !imageUrl.trim()}
+                        >
+                          <i className="bi bi-plus"></i>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* File Upload */}
+                    {imageInputType === "file" && (
+                      <div className="mb-3">
+                        <input
+                          type="file"
+                          className="form-control soft-input"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          disabled={createSubmitting}
+                        />
+                        <small className="text-muted">
+                          Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
+                        </small>
+                      </div>
+                    )}
+
+                    {/* Image Preview */}
+                    {createForm.images.length > 0 && (
+                      <div className="mt-3">
+                        <label className="form-label fw-semibold">Hình ảnh đã chọn:</label>
+                        <div className="row g-2">
+                          {createForm.images.map((img, index) => (
+                            <div key={index} className="col-md-3">
+                              <div className="position-relative">
+                                <img
+                                  src={img}
+                                  alt={`Preview ${index + 1}`}
+                                  className="img-fluid rounded"
+                                  style={{ width: "100%", height: "100px", objectFit: "cover" }}
+                                  onError={(e) => {
+                                    e.target.src = "/default-events.jpg";
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                                  onClick={() => removeImage(index)}
+                                  disabled={createSubmitting}
+                                  style={{ width: "24px", height: "24px", padding: "0" }}
+                                >
+                                  <i className="bi bi-x" style={{ fontSize: "12px" }}></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <div className="d-flex gap-2 justify-content-end">
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
-                      onClick={() => setShowCreateModal(false)}
+                      onClick={() => {
+                        setShowCreateModal(false);
+                        setCreateForm({
+                          name: "",
+                          description: "",
+                          organizerName: "",
+                          images: [],
+                        });
+                        setImageUrl("");
+                        setCreateError("");
+                      }}
                     >
                       Hủy
                     </button>

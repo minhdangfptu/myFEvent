@@ -320,6 +320,48 @@ export default function HoOCSidebar({
               </div>
             )}
 
+            {/* Ban sự kiện */}
+            <button
+              className={`btn-nav ${
+                activePage === "event-board" ? "active" : ""
+              }`}
+              onClick={() => (window.location.href = "/task")}
+              title="Ban sự kiện"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-people me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Ban sự kiện</span>}
+              </div>
+            </button>
+
+            {/* Thành viên */}
+            <button
+              className={`btn-nav ${
+                activePage === "members" ? "active" : ""
+              }`}
+              onClick={() => (window.location.href = "/member")}
+              title="Thành viên"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-person me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Thành viên</span>}
+              </div>
+            </button>
+
+            {/* Lịch cá nhân */}
+            <button
+              className={`btn-nav ${
+                activePage === "calendar" ? "active" : ""
+              }`}
+              onClick={() => (window.location.href = "/task")}
+              title="Lịch cá nhân"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-calendar me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Lịch cá nhân</span>}
+              </div>
+            </button>
+
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <>
