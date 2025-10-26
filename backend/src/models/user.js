@@ -26,8 +26,7 @@ const UserSchema = new Schema({
   phone: {
     type: String,
     required: function () { return this.authProvider === 'local'; },
-    unique: true,
-    sparse: true,
+    set: v => (v && String(v).trim() ? String(v).trim() : undefined),
     trim: true,
   },
   status: {
@@ -44,5 +43,7 @@ const UserSchema = new Schema({
     default: 'user',
   },
 }, { timestamps: true });
+UserSchema.index({ phone: 1 },    { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
+UserSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: "string" } } });
 
 export default mongoose.model('User', UserSchema);
