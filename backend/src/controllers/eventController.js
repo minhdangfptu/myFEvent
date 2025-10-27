@@ -92,6 +92,7 @@ export const getPrivateEventDetail = async (req, res) => {
 export const createEvent = async (req, res) => {
   try {
     const { name, description, eventDate, location, type = 'private', images, organizerName } = req.body;
+    
     if (!name) return res.status(400).json({ message: 'Name is required' });
     if (!organizerName) return res.status(400).json({ message: 'Organizer name is required' });
     const date = eventDate ? new Date(eventDate) : new Date();
@@ -105,6 +106,30 @@ export const createEvent = async (req, res) => {
     }
     if (!joinCode) return res.status(500).json({ message: 'Failed to generate join code' });
 
+    // Process images - support both URLs and base64 uploads
+    let processedImages = [];
+    if (images && Array.isArray(images)) {
+      console.log('createEvent - Processing images:', images);
+      processedImages = images.filter(img => {
+        // Accept URLs or base64 data
+        if (typeof img === 'string') {
+          // Check if it's a URL
+          if (img.startsWith('http://') || img.startsWith('https://')) {
+            console.log('createEvent - Valid URL:', img);
+            return true;
+          }
+          // Check if it's base64 data
+          if (img.startsWith('data:image/')) {
+            console.log('createEvent - Valid base64 image');
+            return true;
+          }
+        }
+        console.log('createEvent - Invalid image format:', img);
+        return false;
+      });
+    }
+    console.log('createEvent - Processed images:', processedImages);
+
     const event = await Event.create({
       name,
       description: description || '',
@@ -113,8 +138,10 @@ export const createEvent = async (req, res) => {
       type,
       organizerName,
       joinCode,
-      image: Array.isArray(images) ? images.filter(Boolean) : []
+      image: processedImages
     });
+
+    console.log('createEvent - Created event:', event);
 
     // Creator becomes HoOC
     await EventMember.create({ eventId: event._id, userId: req.user.id, role: 'HoOC' });
@@ -170,17 +197,21 @@ export const listMyEvents = async (req, res) => {
 
     const eventIds = memberships.map(m => m.eventId);
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventDate joinCode')
+      .select('name status eventDate joinCode image type description location organizerName')
       .lean();
 
     // Map events with membership info
     const eventsWithMembership = events.map(event => {
       const membership = memberships.find(m => m.eventId.toString() === event._id.toString());
+      console.log('listMyEvents - Event data:', event);
+      console.log('listMyEvents - Event images:', event.image);
       return {
         ...event,
         membership: membership ? membership.role : 'Member'
       };
     });
+
+    console.log('listMyEvents - Final events with membership:', eventsWithMembership);
 
     return res.status(200).json({ data: eventsWithMembership });
   } catch (error) {
@@ -310,3 +341,38 @@ export const removeEventImages = async (req, res) => {
     return res.status(500).json({ message: 'Failed to remove images' });
   }
 };
+
+// GET /api/events/detail/:id (get all type event detail - public or private with membership check)
+export const getAllEventDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get event details
+    const event = await Event.findById(id)
+      .select('name type description eventDate location image status organizerName joinCode createdAt updatedAt')
+      .populate({ path: 'organizerName', select: 'fullName email' })
+      .lean();
+    
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Check if event is public
+    if (event.type === 'public') {
+      return res.status(200).json({ data: { event } });
+    }
+
+    // If private, check if user is a member
+    const membership = await EventMember.findOne({ eventId: id, userId: req.user.id }).lean();
+    
+    if (!membership) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this event.' });
+    }
+
+    // User is a member, return event details
+    return res.status(200).json({ data: { event } });
+  } catch (error) {
+    console.error('getAllEventDetail error:', error);
+    return res.status(500).json({ message: 'Failed to get event detail' });
+  }
+};
+
+

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { userApi } from "../apis/userApi";
 
-export default function HoOCSidebar({
+export default function HoDSideBar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
@@ -41,8 +41,11 @@ export default function HoOCSidebar({
     let mounted = true;
     (async () => {
       try {
+        console.log('HoOC: Fetching events...');
         const res = await eventApi.listMyEvents();
+        console.log('HoOC: API response:', res);
         const list = Array.isArray(res?.data) ? res.data : [];
+        console.log('HoOC: Events list:', list);
         let sortedList = list;
         if (eventIdFromUrl) {
           const idx = list.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
@@ -57,6 +60,7 @@ export default function HoOCSidebar({
           icon: "bi-calendar-event",
           membership: e.membership,
         }));
+        console.log('HoOC: Mapped events:', mapped);
         if (mounted) {
           setEvents(mapped);
           if (eventIdFromUrl) {
@@ -227,7 +231,7 @@ export default function HoOCSidebar({
                 overflow: "hidden"
               }}
             >
-              
+                
               <i className="bi bi-calendar-event me-2"></i>
               <span 
                 style={{ 

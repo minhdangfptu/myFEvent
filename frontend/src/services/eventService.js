@@ -16,4 +16,12 @@ export const eventService = {
             throw error;
         }
     },
+    listMyEvents: async () => {
+        try {
+            const response = await eventApi.listMyEvents();
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
 };

@@ -17,8 +17,8 @@ export const eventApi = {
       throw error;
     }
   },
-  create: async ({ name, description, eventDate, location, type, organizerName }) => {
-    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName });
+  create: async ({ name, description, eventDate, location, type, organizerName, images }) => {
+    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName, images });
     return res.data;
   },
   replaceImages: async (eventId, images) => {
@@ -45,7 +45,7 @@ export const eventApi = {
     const res = await axiosClient.post('/api/events/join', { code });
     return res.data;
   },
-  getById: async (id) => {
+  getById: async (id) => {``
     const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
@@ -53,13 +53,8 @@ export const eventApi = {
     const res = await axiosClient.get('/api/events/me/list');
     return res.data;
   },
-
-  getMembersByEvent: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/members`);
-    return res.data;
-  },
-  getMyEvents: async () => {
-    const res = await axiosClient.get('/api/events/me/list');
+  getAllEventDetail: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/detail/${eventId}`);
     return res.data;
   },
   debugAuth: async () => {

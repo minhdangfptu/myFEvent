@@ -143,6 +143,7 @@ export default function UserHomePage() {
         navigate(location.pathname, { replace: true, state: null });
       }
     }, [location, navigate]);
+
   // Hiển thị loading nếu đang kiểm tra sự kiện
   if (loading) {
     return (

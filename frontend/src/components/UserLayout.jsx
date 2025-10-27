@@ -4,6 +4,7 @@ import HoOCSidebar from './HoOCSidebar';
 import MemberSidebar from './MemberSidebar';
 import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
+import HoDSideBar from './HoDSideBar';
 
 export default function UserLayout({ 
   title, 
@@ -42,6 +43,12 @@ export default function UserLayout({
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
           />
+        ) :  sidebarType === 'hod' ? (
+          <HoDSideBar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
+          />
         ) : (
           <UserSidebar 
             sidebarOpen={sidebarOpen} 
@@ -68,7 +75,7 @@ export default function UserLayout({
           />
 
           {/* Main Content Area */}
-          <main className="flex-grow-1 p-4">
+          <main className="flex-grow-1 px-4 pb-4 pt-4">
             {children}
           </main>
         </div>
