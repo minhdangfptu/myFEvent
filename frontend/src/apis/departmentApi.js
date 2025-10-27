@@ -5,6 +5,14 @@ export const departmentApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/departments`);
     return res.data;
   },
+  getDepartmentDetail: async (eventId, departmentId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}`);
+    return res.data;
+  },
+  getMembersByDepartment: async (eventId, departmentId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/members`);
+    return res.data;
+  },
   createDepartment: async (eventId, data) => {
     const res = await axiosClient.post(`/api/events/${eventId}/departments`, data);
     return res.data;
@@ -32,18 +40,18 @@ export const departmentApi = {
   },
 
   // Thêm thành viên vào department
-  addMemberToDepartment: async (eventId, departmentId, userId) => {
+  addMemberToDepartment: async (eventId, departmentId, memberId) => {
     const res = await axiosClient.post(
       `/api/events/${eventId}/departments/${departmentId}/members`,
-      { userId }
+      { memberId }
     );
     return res.data;
   },
 
   // Xóa thành viên khỏi department
-  removeMemberFromDepartment: async (eventId, departmentId, userId) => {
+  removeMemberFromDepartment: async (eventId, departmentId, memberId) => {
     const res = await axiosClient.delete(
-      `/api/events/${eventId}/departments/${departmentId}/members/${userId}`
+      `/api/events/${eventId}/departments/${departmentId}/members/${memberId}`
     );
     return res.data;
   }

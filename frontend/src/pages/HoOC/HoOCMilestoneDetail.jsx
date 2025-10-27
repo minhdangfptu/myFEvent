@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import HoOCSidebar from '../../components/HoOCSidebar';
+import { milestoneService } from '../../services/milestoneService';
+import { formatDate } from '~/utils/formatDate';
+import { toast } from 'react-toastify';
 
 const HoOCMilestoneDetail = () => {
   const navigate = useNavigate();
@@ -10,51 +13,78 @@ const HoOCMilestoneDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
-  // Mock data cho milestone
-  const mockMilestone = {
-    id: 1,
-    name: "Kickoff sự kiện",
-    date: "5/9/2025",
-    status: "Sắp tới",
-    description: "Chào mừng tất cả mọi người, và đây là Halloween 2024! Để Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ibh, sit amet commodo nibh sapien sed nceptos himenaeos.",
-    relatedTasks: [
-      { id: 1, name: "Finalize product feature specifications", status: "Đã xong", color: "#10b981" },
-      { id: 2, name: "Complete user interface design mockups", status: "Đã xong", color: "#10b981" },
-      { id: 3, name: "Develop core application functionality", status: "Đang làm", color: "#f59e0b" },
-      { id: 4, name: "Conduct comprehensive quality assurance testing", status: "Chưa bắt đầu", color: "#6b7280" },
-      { id: 5, name: "Prepare marketing and launch materials", status: "Đang làm", color: "#f59e0b" },
-      { id: 6, name: "Set up production deployment infrastructure", status: "Chưa bắt đầu", color: "#6b7280" },
-      { id: 7, name: "Execute go-to-market strategy", status: "Chưa bắt đầu", color: "#6b7280" }
-    ]
-  };
-
   useEffect(() => {
-    setMilestone(mockMilestone);
-    setDeleteConfirmName(mockMilestone.name);
+    async function fetchMilestoneDetail() {
+      const response = await milestoneService.getMilestoneDetail(eventId, id);
+      setMilestone(response);
+    }
+    fetchMilestoneDetail();
   }, [id]);
 
-  const getStatusColor = (status) => {
+  const getTaskStatusLabel = (status) => {
     switch (status) {
-      case "Đã xong": return "#10b981";
-      case "Đang làm": return "#f59e0b";
-      case "Chưa bắt đầu": return "#6b7280";
+      case "todo": return "Chưa bắt đầu";
+      case "in_progress": return "Đang làm";
+      case "blocked": return "Bị chặn";
+      case "done": return "Đã hoàn thành";
+      case "cancelled": return "Đã hủy";
+      default: return "Chưa bắt đầu";
+    }
+  };
+  const getTaskStatusColor = (status) => {
+    switch (status) {
+      case "todo": return "#6b7280";
+      case "in_progress": return "#f59e0b";
+      case "blocked": return "#dc2626";
+      case "done": return "#10b981";
+      case "cancelled": return "#6b7280";
       default: return "#6b7280";
     }
   };
-
+  const getMilestoneStatusLabel = (status) => {
+    switch (status) {
+      case "planned": return "Sắp tới";
+      case "in_progress": return "Đang làm";
+      case "completed": return "Đã hoàn thành";
+      case "delayed": return "Trễ hạn";
+      case "cancelled": return "Đã hủy";
+      default: return "Sắp tới";
+    }
+  };
+  const getMilestoneStatusColor = (status) => {
+    switch (status) {
+      case "planned": return "#6b7280";
+      case "in_progress": return "#f59e0b";
+      case "completed": return "#10b981";
+      case "delayed": return "#dc2626";
+      case "cancelled": return "#6b7280";
+      default: return "#6b7280";
+    }
+  };
   const handleEditMilestone = () => {
-    navigate(`/events/${eventId}/hooc-edit-milestone/${id}`);
+    navigate(`/events/${eventId}/hooc-edit-milestone/${id}`, {
+      state: {
+        milestone: milestone,
+        relatedTasks: milestone.relatedTasks || []
+      }
+    });
   };
 
   const handleDeleteMilestone = () => {
     setShowDeleteModal(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteConfirmName === milestone.name) {
       // Xử lý xóa milestone
-      console.log('Deleting milestone:', milestone.id);
-      navigate(`/events/${eventId}/hooc-manage-milestone`);
+      try {
+        const response = await milestoneService.deleteMilestone(eventId, id);
+        toast.success('Xoá cột mốc thành công');
+        navigate(`/events/${eventId}/hooc-manage-milestone`);
+      } catch (error) {
+        toast.error('Xoá cột mốc thất bại');
+        console.error('Error deleting milestone:', error);
+      }
     }
   };
 
@@ -141,7 +171,7 @@ const HoOCMilestoneDetail = () => {
               <div className="col-md-6">
                 <div className="mb-3">
                   <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Ngày: </span>
-                  <span style={{ fontWeight: '500', fontSize: '1rem' }}>{milestone.date}</span>
+                  <span style={{ fontWeight: '500', fontSize: '1rem' }}>{formatDate(milestone.date)}</span>
                 </div>
                 
                 <div className="mb-3">
@@ -155,16 +185,7 @@ const HoOCMilestoneDetail = () => {
                       borderRadius: '20px'
                     }}
                   >
-                    <span 
-                      className="rounded-circle me-2"
-                      style={{ 
-                        width: '8px', 
-                        height: '8px', 
-                        backgroundColor: '#f59e0b',
-                        display: 'inline-block'
-                      }}
-                    ></span>
-                    {milestone.status}
+                    {getMilestoneStatusLabel(milestone.status)}
                   </span>
                 </div>
               </div>
@@ -197,13 +218,13 @@ const HoOCMilestoneDetail = () => {
                   <span 
                     className="badge px-3 py-2"
                     style={{ 
-                      backgroundColor: task.color,
+                      backgroundColor: getStatusColor(task.status),
                       color: 'white',
                       fontSize: '0.9rem',
                       borderRadius: '20px'
                     }}
                   >
-                    {task.status}
+                    getStatusLabel({task.status})
                   </span>
                 </div>
               ))}

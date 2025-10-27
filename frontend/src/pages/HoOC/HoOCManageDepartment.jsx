@@ -26,12 +26,9 @@ const HoOCManageDepartment = () => {
     try {
       setLoading(true);
       const response = await departmentService.getDepartments(eventId);
-      // Map response để hiển thị đúng format
       const mappedDepartments = (response || []).map(dept => ({
-        id: dept._id || dept.id,
-        name: dept.name,
-        leader: dept.leaderName || dept.leader?.fullName || 'Chưa có',
-        memberCount: dept.memberCount || dept.members?.length || 0,
+        ...dept,
+        leader: dept.leaderName || 'Chưa có',
         action: 'Xem chi tiết'
       }));
       setDepartments(mappedDepartments);
@@ -58,12 +55,9 @@ const HoOCManageDepartment = () => {
         description: createForm.description.trim()
       });
       
-      // Map response để đúng format
       const newDepartment = {
-        id: response._id || response.id,
-        name: response.name,
-        leader: response.leaderName || response.leader?.fullName || 'Chưa có',
-        memberCount: response.memberCount || response.members?.length || 0,
+        ...response,
+        leader: response.leaderName || 'Chưa có',
         action: 'Xem chi tiết'
       };
       

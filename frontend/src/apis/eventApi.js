@@ -64,6 +64,10 @@ export const eventApi = {
   getMembersByEvent: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/members`);
     return res.data;
+  },
+  getUnassignedMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/unassigned-members`);
+    return res.data;
   }
 }
 

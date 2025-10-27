@@ -10,6 +10,7 @@ const MilestoneSchema = new Schema({
         type: String, 
         enum: ['planned', 'in_progress', 'completed', 'delayed', 'cancelled'], 
         default: 'planned' 
-      }
+      },
+    isDeleted: { type: Boolean, default: false },
 }, { timestamps: true, versionKey: false });
 export default mongoose.model('Milestone', MilestoneSchema);

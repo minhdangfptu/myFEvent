@@ -1,6 +1,8 @@
 import Milestone from '../models/milestone.js';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
+import Task from '../models/task.js';
+import ensureEventRole from '../utils/ensureEventRole.js';
 
 // Helpers
 const ensureEventExists = async (eventId) => {
@@ -48,7 +50,7 @@ export const listMilestones = async (req, res) => {
     const sortBy = (req.query.sortBy || 'dueDate');
     const sortDir = (req.query.sortDir || 'asc') === 'desc' ? -1 : 1;
 
-    const filter = { eventId };
+    const filter = { eventId, isDeleted: false };
     if (status) filter.status = status;
 
     const [items, total] = await Promise.all([
@@ -79,9 +81,24 @@ export const listMilestones = async (req, res) => {
 export const getMilestoneDetail = async (req, res) => {
   try {
     const { eventId, milestoneId } = req.params;
+    const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'staff']);
+    if (!member) return res.status(403).json({ message: 'Can not view milestone detail!' });
     const milestone = await Milestone.findOne({ _id: milestoneId, eventId }).lean();
     if (!milestone) return res.status(404).json({ message: 'Milestone not found' });
-    return res.status(200).json({ data: milestone });
+    const tasks = await Task.findOne({milestoneId: milestoneId,eventId: eventId}).select('name status').lean();
+    const payload = {
+      id: String(milestone._id),
+      name: milestone.name,
+      date: milestone.targetDate,
+      status: milestone.status || 'upcoming',
+      description: milestone.description || '',
+      relatedTasks: (tasks || []).map(t => ({
+        id: String(t._id),
+        name: t.name,
+        status: t.status
+      }))
+    };
+    return res.status(200).json({ data: payload });
   } catch (error) {
     console.error('getMilestoneDetail error:', error);
     return res.status(500).json({ message: 'Failed to get milestone detail' });
@@ -94,8 +111,8 @@ export const updateMilestone = async (req, res) => {
     const { eventId, milestoneId } = req.params;
     // Only HooC can update milestone
     const membership = await EventMember.findOne({ eventId, userId: req.user?.id }).lean();
-    if (!membership || membership.role !== 'HooC') {
-      return res.status(403).json({ message: 'Only HooC can update milestone' });
+    if (!membership || membership.role !== 'HoOC') {
+      return res.status(403).json({ message: 'Only HoOC can update milestone' });
     }
     const { name, description, dueDate, status } = req.body;
     const updates = {};
@@ -123,11 +140,17 @@ export const deleteMilestone = async (req, res) => {
     const { eventId, milestoneId } = req.params;
     // Only HooC can delete milestone
     const membership = await EventMember.findOne({ eventId, userId: req.user?.id }).lean();
-    if (!membership || membership.role !== 'HooC') {
-      return res.status(403).json({ message: 'Only HooC can delete milestone' });
+    if (!membership || membership.role !== 'HoOC') {
+      return res.status(403).json({ message: 'Only HoOC can delete milestone' });
     }
-    const deleted = await Milestone.findOneAndDelete({ _id: milestoneId, eventId });
+    const deleted = await Milestone.findOne({ _id: milestoneId, eventId });
     if (!deleted) return res.status(404).json({ message: 'Milestone not found' });
+    const tasks = await Task.find({ milestoneId: milestoneId });
+    if (tasks.length > 0) {
+      return res.status(400).json({ message: 'Milestone has tasks' });
+    }
+    deleted.isDeleted = true;
+    await deleted.save();
     return res.status(200).json({ message: 'Milestone deleted' });
   } catch (error) {
     console.error('deleteMilestone error:', error);
