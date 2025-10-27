@@ -115,13 +115,13 @@ export default function HoOCSidebar({
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/hooc-event-detail/${selectedEvent || ''}` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hooc-event-detail` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
@@ -323,9 +323,9 @@ export default function HoOCSidebar({
             {/* Ban sự kiện */}
             <button
               className={`btn-nav ${
-                activePage === "event-board" ? "active" : ""
+                activePage === "department-management" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => (window.location.href = `/events/${selectedEvent || ''}/hooc-manage-department`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -339,7 +339,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/member")}
+              onClick={() => (window.location.href = `/events/${selectedEvent || ''}/members`)}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">

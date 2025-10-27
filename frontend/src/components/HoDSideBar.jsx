@@ -119,13 +119,13 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/hooc-event-detail/${selectedEvent || ''}` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hooc-event-detail` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [

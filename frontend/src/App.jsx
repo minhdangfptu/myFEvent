@@ -34,7 +34,7 @@ import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import Menber from './pages/User/Member';
+import MemberPage from './pages/User/Member';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';
@@ -53,6 +53,7 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
+import ManageMemberPage from "./pages/User/ManageMember";
 
 
 export default function App() {
@@ -111,7 +112,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-event-detail/:eventId" 
+            path="/events/:eventId/hooc-event-detail" 
             element={
               <ProtectedRoute >
                 <HoOCEventDetail />
@@ -127,7 +128,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-manage-milestone" 
+            path="/events/:eventId/hooc-manage-milestone" 
             element={
               <ProtectedRoute>
                 <HoOCManageMilestone />
@@ -135,7 +136,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-manage-milestone-empty" 
+            path="/events/:eventId/hooc-manage-milestone-empty" 
             element={
               <ProtectedRoute>
                 <HoOCManageMilestoneEmpty />
@@ -143,7 +144,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-milestone-detail/:id" 
+            path="/events/:eventId/hooc-milestone-detail/:id" 
             element={
               <ProtectedRoute>
                 <HoOCMilestoneDetail />
@@ -151,7 +152,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-edit-milestone/:id" 
+            path="/events/:eventId/hooc-edit-milestone/:id" 
             element={
               <ProtectedRoute>
                 <HoOCEditMilestone />
@@ -159,7 +160,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-manage-department" 
+            path="/events/:eventId/hooc-manage-department" 
             element={
               <ProtectedRoute>
                 <HoOCManageDepartment />
@@ -167,7 +168,7 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hooc-department-detail/:id" 
+            path="/events/:eventId/hooc-department-detail/:id" 
             element={
               <ProtectedRoute>
                 <HoOCDepartmentDetail />
@@ -248,10 +249,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/member" 
+            path="/events/:eventId/members" 
             element={
               <ProtectedRoute requiredRole="user">
-                <Menber />
+                <MemberPage />
               </ProtectedRoute>
             } 
           />

@@ -32,7 +32,7 @@ export default function HomePage() {
     HoOC: {
       title: "Trang chủ HoOC",
       sidebarType: "hooc",
-      eventDetailPrefix: "/hooc-event-detail/",
+      eventDetailPrefix: "/events/",
       allowCreate: true,
     },
   };
@@ -763,7 +763,7 @@ export default function HomePage() {
                       });
                       setImageUrl("");
                       alert(`Mã tham gia: ${res.data.joinCode}`);
-                      navigate(`/hooc-event-detail/${res.data.id}`);
+                      navigate(`/events/${res.data.id}/hooc-event-detail`);
                     } finally {
                       setCreateSubmitting(false);
                     }

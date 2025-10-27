@@ -4,7 +4,7 @@ import HoOCSidebar from '../../components/HoOCSidebar';
 
 const HoOCEditMilestone = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { eventId, id } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [milestone, setMilestone] = useState({
     name: '',
@@ -46,11 +46,11 @@ const HoOCEditMilestone = () => {
   const handleSaveChanges = () => {
     // Xử lý lưu thay đổi
     console.log('Saving milestone:', milestone);
-    navigate(`/hooc-milestone-detail/${id}`);
+    navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
   };
 
   const handleCancel = () => {
-    navigate(`/hooc-milestone-detail/${id}`);
+    navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
   };
 
   const getStatusColor = (status) => {

@@ -4,7 +4,7 @@ import HoOCSidebar from '../../components/HoOCSidebar';
 
 const HoOCMilestoneDetail = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { eventId, id } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [milestone, setMilestone] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -43,7 +43,7 @@ const HoOCMilestoneDetail = () => {
   };
 
   const handleEditMilestone = () => {
-    navigate(`/hooc-edit-milestone/${id}`);
+    navigate(`/events/${eventId}/hooc-edit-milestone/${id}`);
   };
 
   const handleDeleteMilestone = () => {
@@ -54,7 +54,7 @@ const HoOCMilestoneDetail = () => {
     if (deleteConfirmName === milestone.name) {
       // Xử lý xóa milestone
       console.log('Deleting milestone:', milestone.id);
-      navigate('/hooc-manage-milestone');
+      navigate(`/events/${eventId}/hooc-manage-milestone`);
     }
   };
 

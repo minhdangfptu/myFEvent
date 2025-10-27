@@ -359,7 +359,7 @@ export default function MemberLandingPage() {
                     setCreateForm({ name: '', description: '', organizerName: '' });
                     alert(`Mã tham gia: ${res.data.joinCode}`);
                     // Redirect to event detail page
-                    navigate(`/hooc-event-detail/${res.data.id}`);
+                    navigate(`/events/${res.data.id}/hooc-event-detail`);
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -432,7 +432,7 @@ export default function MemberLandingPage() {
                     const res = await eventApi.joinByCode(joinCode.trim());
                     setShowJoinModal(false);
                     setJoinCode('');
-                    navigate(`/hooc-event-detail/${res.data.eventId}`);
+                    navigate(`/events/${res.data.eventId}/hooc-event-detail`);
                   } catch (err) {
                     setJoinError(err.response?.data?.message || 'Tham gia thất bại');
                   }

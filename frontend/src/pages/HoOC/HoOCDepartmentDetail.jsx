@@ -4,7 +4,7 @@ import HoOCSidebar from '../../components/HoOCSidebar';
 import UserHeader from '../../components/UserHeader';
 
 const HoOCDepartmentDetail = () => {
-  const { id } = useParams();
+  const { eventId, id } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
@@ -111,7 +111,7 @@ const HoOCDepartmentDetail = () => {
     if (deleteConfirmName === department.name) {
       // Xử lý xóa department
       console.log('Deleting department:', department.id);
-      navigate('/hooc-manage-department');
+      navigate(`/events/${eventId}/hooc-manage-department`);
     }
   };
 

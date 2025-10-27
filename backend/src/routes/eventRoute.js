@@ -11,6 +11,7 @@ import {
 import {
   listDepartmentsByEvent,
   getDepartmentDetailByEvent,
+  createDepartment,
   assignHod,
   addMemberToDepartment,
   removeMemberFromDepartment,
@@ -60,11 +61,14 @@ router.get('/:eventId/departments', authenticateToken, listDepartmentsByEvent);
 router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetailByEvent);
 
 // Department management
+router.post('/:eventId/departments', authenticateToken, createDepartment);
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:eventId/departments/:departmentId/members/:userId', authenticateToken, removeMemberFromDepartment);
 
 
+//Event member management
+router.get('/:eventId/members', authenticateToken, getMembersByEvent);
 //Event role 
 
 export default router;

@@ -12,7 +12,7 @@ const ensureEventExists = async (eventId) => {
 export const createMilestone = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { name, description, dueDate, status } = req.body;
+    const { name, description, targetDate, status } = req.body;
 
     if (!(await ensureEventExists(eventId))) {
       return res.status(404).json({ message: 'Event not found' });
@@ -22,13 +22,13 @@ export const createMilestone = async (req, res) => {
       eventId,
       name,
       description,
-      dueDate,
+      targetDate,
       status
     });
 
     return res.status(201).json({ data: milestone });
   } catch (error) {
-    console.error('createMilestone error:', error);
+    console.error('createMilestone error:', error.message);
     return res.status(500).json({ message: 'Failed to create milestone' });
   }
 };

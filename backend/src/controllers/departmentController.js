@@ -72,7 +72,7 @@ export const createDepartment = async (req, res) => {
     }
     // Kiểm tra quyền HooC
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
     }
     // Tạo department
@@ -296,4 +296,3 @@ export const removeMemberFromDepartment = async (req, res) => {
 		return res.status(500).json({ message: 'Failed to remove member from department' });
 	}
 };
-

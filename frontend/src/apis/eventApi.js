@@ -60,6 +60,10 @@ export const eventApi = {
   debugAuth: async () => {
     const res = await axiosClient.get('/api/auth/profile');
     return res.data;
+  },
+  getMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members`);
+    return res.data;
   }
 }
 
