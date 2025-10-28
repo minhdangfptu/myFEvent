@@ -7,6 +7,7 @@ export default function HoDSideBar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
 }) {
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
@@ -119,13 +120,13 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/hooc-event-detail/${selectedEvent || ''}` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hooc-event-detail` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
@@ -255,7 +256,7 @@ export default function HoDSideBar({
       <div className="mb-4">
           {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
           <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
               <div className="d-flex align-items-center">
                 <i className="bi bi-list me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Trang chủ</span>}
@@ -300,7 +301,7 @@ export default function HoDSideBar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -314,7 +315,7 @@ export default function HoDSideBar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -329,7 +330,7 @@ export default function HoDSideBar({
               className={`btn-nav ${
                 activePage === "event-board" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -343,7 +344,7 @@ export default function HoDSideBar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/member")}
+              onClick={() => navigate("/member")}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
@@ -357,7 +358,7 @@ export default function HoDSideBar({
               className={`btn-nav ${
                 activePage === "calendar" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Lịch cá nhân"
             >
               <div className="d-flex align-items-center">
@@ -400,7 +401,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -414,7 +415,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -454,7 +455,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -468,7 +469,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -508,7 +509,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -522,7 +523,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -533,7 +534,7 @@ export default function HoDSideBar({
 
                 <button
                   className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => (window.location.href = "/task")}
+                  onClick={() => navigate("/task")}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
@@ -550,13 +551,13 @@ export default function HoDSideBar({
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
           <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
               <div className="d-flex align-items-center">
                 <i className="bi bi-bell me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
-            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
               <div className="d-flex align-items-center">
                 <i className="bi bi-gear me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Cài đặt</span>}

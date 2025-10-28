@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
@@ -7,6 +8,7 @@ export default function UserSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
 }) {
   const [theme, setTheme] = useState("light");
 
@@ -17,7 +19,14 @@ export default function UserSidebar({
   const sidebarRef = useRef(null);
 
   const { events, loading } = useEvents();
+  const navigate = useNavigate();
 
+
+  const getSelectedEventId = () => {
+    if (!hasEvents || events.length === 0) return null;
+    const selectedEventObj = events.find(e => e.name === selectedEvent);
+    return selectedEventObj ? selectedEventObj.id : events[0].id;
+  };
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -128,7 +137,7 @@ export default function UserSidebar({
             <div className="mb-4">
               {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-list me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
@@ -140,13 +149,13 @@ export default function UserSidebar({
             <div className="mb-4">
               {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-bell me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Thông báo</span>}
                   </div>
                 </button>
-                <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+                <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-gear me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Cài đặt</span>}

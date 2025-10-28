@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import HoOCSidebar from '../../components/HoOCSidebar';
 
 const HoOCManageMilestoneEmpty = () => {
   const navigate = useNavigate();
+  const { eventId } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleCreateMilestone = () => {

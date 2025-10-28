@@ -1,6 +1,6 @@
 import mongoose, {Types, Schema} from "mongoose";
 const RiskSchema = new Schema({
-    department: { type: Types.ObjectId, ref: 'Department', required: true },
+    departmentId: { type: Types.ObjectId, ref: 'Department', required: true },
     name: { type: String, required: true },
     description: { type: String, required: true },
     impact: { type: String, enum: ['low', 'medium', 'high'], required: true },

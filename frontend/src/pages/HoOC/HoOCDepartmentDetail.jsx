@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import HoOCSidebar from '../../components/HoOCSidebar';
 import UserHeader from '../../components/UserHeader';
+import { eventService } from '../../services/eventService';
+import { departmentService } from '../../services/departmentService';
+import { toast } from 'react-toastify';
+import { formatDate } from '~/utils/formatDate';
 
 const HoOCDepartmentDetail = () => {
-  const { id } = useParams();
+  const { eventId, id } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
@@ -19,71 +23,30 @@ const HoOCDepartmentDetail = () => {
     description: ''
   });
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [addMemberForm, setAddMemberForm] = useState({
-    name: '',
-    email: '',
-    role: 'Thành viên'
-  });
+  const [unassignedMembers, setUnassignedMembers] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null);
 
-  // Mock data cho department
-  const mockDepartment = {
-    id: 6,
-    name: "Ban Hậu cần",
-    description: "Nơi những công việc sau cánh gà toả sáng.",
-    memberCount: 16,
-    newMembersToday: 1,
-    createdDate: "21/11/2024",
-    lastModified: "21/11/2024",
-    leader: "Đặng Đình Minh"
-  };
-
-  const mockMembers = [
-    {
-      id: 1,
-      name: "Đặng Đình Minh",
-      role: "Trưởng ban",
-      email: "minhddhe180032@fpt.edu.vn",
-      selected: false
-    },
-    {
-      id: 2,
-      name: "Arlene McCoy",
-      role: "Phó ban",
-      email: "arlenemccoyy@gmail.com",
-      selected: false
-    },
-    {
-      id: 3,
-      name: "Cody Fisher",
-      role: "Thành viên",
-      email: "codyfisher21345@gmail.com",
-      selected: false
-    },
-    {
-      id: 4,
-      name: "Esther Howard",
-      role: "Thành viên",
-      email: "howardvn123@gmail.com",
-      selected: false
-    },
-    {
-      id: 5,
-      name: "Ronald Richards",
-      role: "Thành viên",
-      email: "ronaldrichards2@gmail.com",
-      selected: false
-    }
-  ];
 
   useEffect(() => {
-    setDepartment(mockDepartment);
-    setMembers(mockMembers);
-    setEditForm({
-      name: mockDepartment.name,
-      description: mockDepartment.description
-    });
-    setDeleteConfirmName(mockDepartment.name);
+    fetchMembersAndDepartment();
   }, [id]);
+
+  async function fetchMembersAndDepartment () {
+    try {
+      const department = await departmentService.getDepartmentDetail(eventId, id);
+      setDepartment(department || []);
+      const members = await departmentService.getMembersByDepartment(eventId, id);
+      setMembers(members || []);
+      console.log(members);
+    }catch (error) {
+      console.error('Error fetching members of department:', error);
+      toast.error('Lỗi khi tải danh sách thành viên của ban');
+    }
+  }
 
   const handleEdit = () => {
     setEditing(true);
@@ -111,7 +74,7 @@ const HoOCDepartmentDetail = () => {
     if (deleteConfirmName === department.name) {
       // Xử lý xóa department
       console.log('Deleting department:', department.id);
-      navigate('/hooc-manage-department');
+      navigate(`/events/${eventId}/hooc-manage-department`);
     }
   };
 
@@ -121,38 +84,104 @@ const HoOCDepartmentDetail = () => {
   };
 
   const handleMemberAction = (memberId, action) => {
-    console.log(`Action: ${action} for member: ${memberId}`);
+    if (action === 'remove') {
+      const member = members.find(m => m.id === memberId);
+      setMemberToRemove(member);
+      setShowRemoveMemberModal(true);
+    } else if (action === 'change_leader') {
+      // TODO: Implement change leader functionality
+      console.log('Change leader functionality not implemented yet');
+    }
   };
 
-  const handleAddMember = () => {
+  const handleConfirmRemoveMember = async () => {
+    if (!memberToRemove) return;
+
+    try {
+      await departmentService.removeMemberFromDepartment(eventId, id, memberToRemove._id);
+      toast.success('Đã xóa thành viên khỏi ban');
+      setShowRemoveMemberModal(false);
+      setMemberToRemove(null);
+      // Reload members list
+      await fetchMembersAndDepartment();
+      // You might want to reload the department data here
+
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast.error('Không thể xóa thành viên khỏi ban');
+    }
+  };
+
+  const handleCancelRemoveMember = () => {
+    setShowRemoveMemberModal(false);
+    setMemberToRemove(null);
+  };
+
+  const handleAddMember = async () => {
     setShowAddMemberModal(true);
+    await loadUnassignedMembers();
   };
 
-  const handleAddMemberSubmit = (e) => {
-    e.preventDefault();
-    if (addMemberForm.name.trim() && addMemberForm.email.trim()) {
-      // Xử lý thêm thành viên mới
-      const newMember = {
-        id: members.length + 1,
-        name: addMemberForm.name,
-        email: addMemberForm.email,
-        role: addMemberForm.role,
-        selected: false
-      };
-      setMembers([...members, newMember]);
+  const loadUnassignedMembers = async () => {
+    try {
+      setLoadingMembers(true);
+      const response = await eventService.getUnassignedMembersByEvent(eventId);
+      setUnassignedMembers(response.data || []);
+    } catch (error) {
+      console.error('Error loading unassigned members:', error);
+      toast.error('Không thể tải danh sách thành viên');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleMemberSelect = (memberId) => {
+    setSelectedMembers(prev => {
+      if (prev.includes(memberId)) {
+        return prev.filter(id => id !== memberId);
+      } else {
+        return [...prev, memberId];
+      }
+    });
+  };
+
+  const handleAddSelectedMembers = async () => {
+    if (selectedMembers.length === 0) {
+      toast.warning('Vui lòng chọn ít nhất một thành viên');
+      return;
+    }
+
+    try {
+      for (const memberId of selectedMembers) {
+        await departmentService.addMemberToDepartment(eventId, id, memberId);
+      }
+      toast.success(`Đã thêm ${selectedMembers.length} thành viên vào ban`);
       setShowAddMemberModal(false);
-      setAddMemberForm({ name: '', email: '', role: 'Thành viên' });
+      setSelectedMembers([]);
+      setMemberSearchQuery('');
+      // Reload members list
+      await fetchMembersAndDepartment();
+      // You might want to reload the department data here
+    } catch (error) {
+      console.error('Error adding members:', error);
+      toast.error('Không thể thêm thành viên vào ban');
     }
   };
 
   const handleCancelAddMember = () => {
     setShowAddMemberModal(false);
-    setAddMemberForm({ name: '', email: '', role: 'Thành viên' });
+    setSelectedMembers([]);
+    setMemberSearchQuery('');
   };
 
   const filteredMembers = members.filter(member =>
     member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     member.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUnassignedMembers = unassignedMembers.filter(member =>
+    member.userId?.fullName?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+    member.userId?.email?.toLowerCase().includes(memberSearchQuery.toLowerCase())
   );
 
   if (!department) {
@@ -207,13 +236,13 @@ const HoOCDepartmentDetail = () => {
             <div className="col-md-3">
               <div className="bg-light rounded-3 p-3 text-center">
                 <i className="bi bi-clock text-info me-2"></i>
-                <span style={{ fontWeight: '600' }}>Ngày tạo ban: {department.createdDate}</span>
+                <span style={{ fontWeight: '600' }}>Ngày tạo ban: {formatDate(department.createdAt)}</span>
               </div>
             </div>
             <div className="col-md-3">
               <div className="bg-light rounded-3 p-3 text-center">
                 <i className="bi bi-clock text-warning me-2"></i>
-                <span style={{ fontWeight: '600' }}>Thay đổi lần cuối: {department.lastModified}</span>
+                <span style={{ fontWeight: '600' }}>Thay đổi lần cuối: {formatDate(department.updatedAt)}</span>
               </div>
             </div>
           </div>
@@ -331,10 +360,10 @@ const HoOCDepartmentDetail = () => {
                                   className="dropdown-item"
                                   onClick={() => handleMemberAction(member.id, 'remove')}
                                 >
-                                  Xoá thành viên khỏi sự kiện
+                                  Xoá thành viên khỏi ban
                                 </button>
                               </li>
-                              {member.role !== 'Trưởng ban' && (
+                              {member.role !== 'HoD' && (
                                 <li>
                                   <button 
                                     className="dropdown-item"
@@ -536,14 +565,15 @@ const HoOCDepartmentDetail = () => {
            <div 
              className="bg-white rounded-3 p-4"
              style={{ 
-               minWidth: '500px',
-               maxWidth: '600px',
+               minWidth: '600px',
+               maxWidth: '800px',
+               maxHeight: '80vh',
                border: '1px solid #e5e7eb'
              }}
            >
              <div className="d-flex justify-content-between align-items-center mb-3">
                <h4 className="mb-0" style={{ color: '#1f2937', fontWeight: '600' }}>
-                 Thêm thành viên mới
+                 Thêm thành viên vào ban
                </h4>
                <button 
                  className="btn-close"
@@ -552,74 +582,171 @@ const HoOCDepartmentDetail = () => {
              </div>
              
              <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-               Thêm thành viên mới vào ban {department.name}
+               Chọn thành viên chưa có ban để thêm vào {department.name}
+             </p>
+
+             {/* Search */}
+             <div className="mb-3">
+               <input
+                 type="text"
+                 className="form-control"
+                 placeholder="Tìm kiếm thành viên..."
+                 value={memberSearchQuery}
+                 onChange={(e) => setMemberSearchQuery(e.target.value)}
+                 style={{ borderRadius: '8px' }}
+               />
+             </div>
+
+             {/* Members List */}
+             <div 
+               className="border rounded-3 p-3 mb-3"
+               style={{ 
+                 maxHeight: '400px', 
+                 overflowY: 'auto',
+                 border: '1px solid #e5e7eb'
+               }}
+             >
+               {loadingMembers ? (
+                 <div className="text-center py-4">
+                   <div className="spinner-border text-primary" role="status">
+                     <span className="visually-hidden">Loading...</span>
+                   </div>
+                   <p className="mt-2 text-muted">Đang tải danh sách thành viên...</p>
+                 </div>
+               ) : filteredUnassignedMembers.length === 0 ? (
+                 <div className="text-center py-4">
+                   <i className="bi bi-people text-muted" style={{ fontSize: '2rem' }}></i>
+                   <p className="mt-2 text-muted">
+                     {memberSearchQuery ? 'Không tìm thấy thành viên phù hợp' : 'Không có thành viên chưa có ban'}
+                   </p>
+                 </div>
+               ) : (
+                 <div className="d-flex flex-column gap-2">
+                   {filteredUnassignedMembers.map((member) => (
+                     <div 
+                       key={member._id}
+                       className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${
+                         selectedMembers.includes(member._id) ? 'bg-light border-primary' : 'border-light'
+                       }`}
+                       onClick={() => handleMemberSelect(member._id)}
+                       style={{ 
+                         cursor: 'pointer',
+                         transition: 'all 0.2s ease'
+                       }}
+                     >
+                       <input 
+                         type="checkbox" 
+                         className="form-check-input me-3"
+                         checked={selectedMembers.includes(member._id)}
+                         onChange={() => handleMemberSelect(member._id)}
+                       />
+                       <div className="flex-grow-1">
+                         <div className="d-flex align-items-center">
+                           <div 
+                             className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style={{ 
+                               width: '40px', 
+                               height: '40px', 
+                               backgroundColor: '#f3f4f6',
+                               fontSize: '1.2rem',
+                               fontWeight: '600',
+                               color: '#6b7280'
+                             }}
+                           >
+                             {member.name?.charAt(0) || '?'}
+                           </div>
+                           <div>
+                             <h6 className="mb-1" style={{ color: '#1f2937', fontWeight: '500' }}>
+                               {member.name || 'Unknown'}
+                             </h6>
+                             <p className="mb-0" style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                               {member.email || ''}
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+
+             {/* Selected Count */}
+             {selectedMembers.length > 0 && (
+               <div className="mb-3">
+                 <p className="text-primary mb-0" style={{ fontWeight: '500' }}>
+                   Đã chọn {selectedMembers.length} thành viên
+                 </p>
+               </div>
+             )}
+               
+             <div className="d-flex justify-content-end gap-2">
+               <button 
+                 type="button"
+                 className="btn btn-outline-secondary"
+                 onClick={handleCancelAddMember}
+                 style={{ borderRadius: '8px' }}
+               >
+                 Huỷ
+               </button>
+               <button 
+                 type="button"
+                 className="btn btn-danger"
+                 onClick={handleAddSelectedMembers}
+                 disabled={selectedMembers.length === 0}
+                 style={{ borderRadius: '8px' }}
+               >
+                 Thêm {selectedMembers.length > 0 ? `(${selectedMembers.length})` : ''} thành viên
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Remove Member Confirmation Modal */}
+       {showRemoveMemberModal && memberToRemove && (
+         <div 
+           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+           style={{ 
+             backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+             zIndex: 1050 
+           }}
+         >
+           <div 
+             className="bg-white rounded-3 p-4"
+             style={{ 
+               minWidth: '400px',
+               maxWidth: '500px',
+               border: '1px solid #e5e7eb'
+             }}
+           >
+             <div className="d-flex align-items-center mb-3">
+               <i className="bi bi-exclamation-triangle-fill text-warning me-2" style={{ fontSize: '1.2rem' }}></i>
+               <h5 className="mb-0" style={{ color: '#1f2937', fontWeight: '600' }}>
+                 Xoá thành viên khỏi ban
+               </h5>
+             </div>
+             
+             <p style={{ color: '#6b7280', marginBottom: '20px' }}>
+               Bạn có chắc chắn muốn xoá <strong>{memberToRemove.name}</strong> khỏi ban {department.name}?
              </p>
              
-             <form onSubmit={handleAddMemberSubmit}>
-               <div className="mb-3">
-                 <label className="form-label fw-semibold">
-                   Họ và tên <span className="text-danger">*</span>
-                 </label>
-                 <input 
-                   type="text" 
-                   className="form-control"
-                   placeholder="Nhập họ và tên thành viên"
-                   value={addMemberForm.name}
-                   onChange={(e) => setAddMemberForm({...addMemberForm, name: e.target.value})}
-                   style={{ borderRadius: '8px' }}
-                   required
-                 />
-               </div>
-               
-               <div className="mb-3">
-                 <label className="form-label fw-semibold">
-                   Email <span className="text-danger">*</span>
-                 </label>
-                 <input 
-                   type="email" 
-                   className="form-control"
-                   placeholder="Nhập email thành viên"
-                   value={addMemberForm.email}
-                   onChange={(e) => setAddMemberForm({...addMemberForm, email: e.target.value})}
-                   style={{ borderRadius: '8px' }}
-                   required
-                 />
-               </div>
-
-               <div className="mb-4">
-                 <label className="form-label fw-semibold">
-                   Vai trò
-                 </label>
-                 <select 
-                   className="form-select"
-                   value={addMemberForm.role}
-                   onChange={(e) => setAddMemberForm({...addMemberForm, role: e.target.value})}
-                   style={{ borderRadius: '8px' }}
-                 >
-                   <option value="Thành viên">Thành viên</option>
-                   <option value="Phó ban">Phó ban</option>
-                   <option value="Trưởng ban">Trưởng ban</option>
-                 </select>
-               </div>
-               
-               <div className="d-flex justify-content-end gap-2">
-                 <button 
-                   type="button"
-                   className="btn btn-outline-secondary"
-                   onClick={handleCancelAddMember}
-                   style={{ borderRadius: '8px' }}
-                 >
-                   Huỷ
-                 </button>
-                 <button 
-                   type="submit"
-                   className="btn btn-danger"
-                   style={{ borderRadius: '8px' }}
-                 >
-                   Thêm thành viên
-                 </button>
-               </div>
-             </form>
+             <div className="d-flex justify-content-end gap-2">
+               <button 
+                 className="btn btn-outline-secondary"
+                 onClick={handleCancelRemoveMember}
+                 style={{ borderRadius: '8px' }}
+               >
+                 Huỷ
+               </button>
+               <button 
+                 className="btn btn-danger"
+                 onClick={handleConfirmRemoveMember}
+                 style={{ borderRadius: '8px' }}
+               >
+                 Xoá thành viên
+               </button>
+             </div>
            </div>
          </div>
        )}

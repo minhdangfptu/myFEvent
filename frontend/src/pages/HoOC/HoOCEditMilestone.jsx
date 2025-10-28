@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import HoOCSidebar from '../../components/HoOCSidebar';
+import { milestoneService } from '../../services/milestoneService';
+import { formatDateForInput } from '~/utils/formatDate';
+import { toast } from 'react-toastify';
 
 const HoOCEditMilestone = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const location = useLocation();
+  const { eventId, id } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [milestone, setMilestone] = useState({
     name: '',
@@ -13,28 +17,44 @@ const HoOCEditMilestone = () => {
     description: ''
   });
   const [relatedTasks, setRelatedTasks] = useState([]);
-
-  // Mock data cho milestone
-  const mockMilestone = {
-    id: 1,
-    name: "Kickoff sự kiện",
-    date: "2024-06-30",
-    status: "Sắp tới",
-    description: "Chào mừng tất cả mọi người, và đây là Halloween 2024! Để Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ibh, sit amet commodo nibh sapien sed nceptos himenaeos."
-  };
-
-  const mockRelatedTasks = [
-    { id: 1, name: "Design new user dashboard", status: "Đã xong", color: "#10b981" },
-    { id: 2, name: "Implement analytics tracking", status: "Đã xong", color: "#10b981" },
-    { id: 3, name: "Mobile app optimization", status: "Đang làm", color: "#f59e0b" },
-    { id: 4, name: "User testing and feedback", status: "Đang làm", color: "#f59e0b" },
-    { id: 5, name: "Final deployment and launch", status: "Đang làm", color: "#f59e0b" }
-  ];
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setMilestone(mockMilestone);
-    setRelatedTasks(mockRelatedTasks);
-  }, [id]);
+    // Kiểm tra xem có data từ navigation state không
+    const stateData = location.state;
+    
+    if (stateData && stateData.milestone) {
+      // Sử dụng data từ milestone detail
+      setMilestone({
+        name: stateData.milestone.name || '',
+        date: stateData.milestone.date || '',
+        status: stateData.milestone.status || '',
+        description: stateData.milestone.description || ''
+      });
+      setRelatedTasks(stateData.relatedTasks || []);
+      setLoading(false);
+    } else {
+      // Fallback: gọi API nếu không có data từ state
+      async function fetchMilestoneDetail() {
+        try {
+          setLoading(true);
+          const response = await milestoneService.getMilestoneDetail(eventId, id);
+          setMilestone({
+            name: response.name || '',
+            date: response.date || '',
+            status: response.status || '',
+            description: response.description || ''
+          });
+          setRelatedTasks(response.relatedTasks || []);
+        } catch (error) {
+          console.error('Error fetching milestone detail:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+      fetchMilestoneDetail();
+    }
+  }, [eventId, id, location.state]);
 
   const handleInputChange = (field, value) => {
     setMilestone(prev => ({
@@ -43,24 +63,69 @@ const HoOCEditMilestone = () => {
     }));
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     // Xử lý lưu thay đổi
-    console.log('Saving milestone:', milestone);
-    navigate(`/hooc-milestone-detail/${id}`);
+    try {
+      const response = await milestoneService.updateMilestone(eventId, id, milestone);
+      toast.success('Cập nhật cột mốc thành công');
+      navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
+    } catch (error) {
+      console.error('Error updating milestone:', error);
+      toast.error('Cập nhật cột mốc thất bại');
+    }
   };
 
   const handleCancel = () => {
-    navigate(`/hooc-milestone-detail/${id}`);
+    navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
   };
 
-  const getStatusColor = (status) => {
+  const getTaskStatusLabel = (status) => {
     switch (status) {
-      case "Đã xong": return "#10b981";
-      case "Đang làm": return "#f59e0b";
-      case "Chưa bắt đầu": return "#6b7280";
+      case "todo": return "Chưa bắt đầu";
+      case "in_progress": return "Đang làm";
+      case "blocked": return "Bị chặn";
+      case "done": return "Đã hoàn thành";
+      case "cancelled": return "Đã hủy";
+      default: return "Chưa bắt đầu";
+    }
+  };
+
+  const getTaskStatusColor = (status) => {
+    switch (status) {
+      case "todo": return "#6b7280";
+      case "in_progress": return "#f59e0b";
+      case "blocked": return "#dc2626";
+      case "done": return "#10b981";
+      case "cancelled": return "#6b7280";
       default: return "#6b7280";
     }
   };
+
+  const getMilestoneStatusLabel = (status) => {
+    switch (status) {
+      case "planned": return "Sắp tới";
+      case "in_progress": return "Đang làm";
+      case "completed": return "Đã hoàn thành";
+      case "delayed": return "Trễ hạn";
+      case "cancelled": return "Đã hủy";
+      default: return "Sắp tới";
+    }
+  };
+
+  const getMilestoneStatusColor = (status) => {
+    switch (status) {
+      case "planned": return "#6b7280";
+      case "in_progress": return "#f59e0b";
+      case "completed": return "#10b981";
+      case "delayed": return "#dc2626";
+      case "cancelled": return "#6b7280";
+      default: return "#6b7280";
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
@@ -152,7 +217,7 @@ const HoOCEditMilestone = () => {
                   <input 
                     type="date" 
                     className="form-control"
-                    value={milestone.date}
+                    value={formatDateForInput(milestone.date)}
                     onChange={(e) => handleInputChange('date', e.target.value)}
                     style={{ borderRadius: '8px' }}
                   />
@@ -177,10 +242,11 @@ const HoOCEditMilestone = () => {
                   onChange={(e) => handleInputChange('status', e.target.value)}
                   style={{ borderRadius: '8px' }}
                 >
-                  <option value="Sắp tới">Sắp tới</option>
-                  <option value="Đang diễn ra">Đang diễn ra</option>
-                  <option value="Đã hoàn thành">Đã hoàn thành</option>
-                  <option value="Chưa bắt đầu">Chưa bắt đầu</option>
+                  <option value="planned">Sắp tới</option>
+                  <option value="in_progress">Đang làm</option>
+                  <option value="completed">Đã hoàn thành</option>
+                  <option value="delayed">Trễ hạn</option>
+                  <option value="cancelled">Đã hủy</option>
                 </select>
               </div>
 
@@ -217,13 +283,13 @@ const HoOCEditMilestone = () => {
                     <span 
                       className="badge px-3 py-2"
                       style={{ 
-                        backgroundColor: task.color,
+                        backgroundColor: getTaskStatusColor(task.status),
                         color: 'white',
                         fontSize: '0.9rem',
                         borderRadius: '20px'
                       }}
                     >
-                      {task.status}
+                      {getTaskStatusLabel(task.status)}
                     </span>
                   </div>
                 ))}

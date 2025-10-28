@@ -10,11 +10,13 @@ import {
 } from '../controllers/milestoneController.js';
 import {
   listDepartmentsByEvent,
-  getDepartmentDetailByEvent,
+  getDepartmentDetail,
+  createDepartment,
   assignHod,
   addMemberToDepartment,
-  removeMemberFromDepartment
+  removeMemberFromDepartment,
 } from '../controllers/departmentController.js';
+import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment } from '../controllers/eventMemberController.js';
 
 const router = express.Router();
 
@@ -56,14 +58,19 @@ router.patch('/:eventId/milestones/:milestoneId', authenticateToken, updateMiles
 router.delete('/:eventId/milestones/:milestoneId', authenticateToken, deleteMilestone);
 
 router.get('/:eventId/departments', authenticateToken, listDepartmentsByEvent);
-router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetailByEvent);
+router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetail);
 
 // Department management
+router.post('/:eventId/departments', authenticateToken, createDepartment);
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
-router.delete('/:eventId/departments/:departmentId/members/:userId', authenticateToken, removeMemberFromDepartment);
+router.delete('/:eventId/departments/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
 
 
+//Event member management
+router.get('/:eventId/members', authenticateToken, getMembersByEvent);
+router.get('/:eventId/unassigned-members', authenticateToken, getUnassignedMembersByEvent);
+router.get('/:eventId/departments/:departmentId/members', authenticateToken, getMembersByDepartment);
 //Event role 
 
 export default router;

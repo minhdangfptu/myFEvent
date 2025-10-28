@@ -1,14 +1,6 @@
 import Task from '../models/task.js';
 import EventMember from '../models/eventMember.js';
-
-
-// ======= Helper kiểm tra quyền =======
-const ensureEventRole = async (userId, eventId, allowedRoles = ['HoOC', 'HoD', 'staff']) => {
-    const m = await EventMember.findOne({ eventId, userId }).lean();
-    if (!m) return null;
-    if (!allowedRoles.includes(m.role)) return null;
-    return m;
-};
+import ensureEventRole from '../utils/ensureEventRole.js';
 
 
 // GET /api/events/:eventId/tasks?departmentId=...: (HoOC/HoD/Mem)

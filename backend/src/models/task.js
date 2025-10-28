@@ -15,7 +15,7 @@ const TaskSchema = new Schema({
   updatedAt: { type: Date, default: () => new Date() },
   dueDate: Date,
 
-  assigneeId:   { type: Types.ObjectId, ref: 'User' },
+  assigneeId:   { type: Types.ObjectId, ref: 'EventMember' },
   eventId:      { type: Types.ObjectId, ref: 'Event' },       // (O) như ERD
   departmentId: { type: Types.ObjectId, ref: 'Department' },  // (O)
   milestoneId:  { type: Types.ObjectId, ref: 'Milestone' },

@@ -20,25 +20,25 @@ export default function HomePage() {
   // ===== Role config & derive once =====
   const CONFIG_BY_ROLE = {
     User: {
-      title: "Trang chủ User",
+      title: "Trang chủ",
       sidebarType: "user",
       eventDetailPrefix: "/event-detail/",
       allowCreate: true,
     },
     Member: {
-      title: "Trang chủ Member",
+      title: "Trang chủ",
       sidebarType: "member",
       eventDetailPrefix: "/member-event-detail/",
       allowCreate: true,
     },
     HoOC: {
-      title: "Trang chủ HoOC",
+      title: "Trang chủ",
       sidebarType: "hooc",
       eventDetailPrefix: "/hooc-event-detail/",
       allowCreate: true,
     },
   };
-  const { title, sidebarType, eventDetailPrefix, allowCreate } =
+  const { title, sidebarType, allowCreate } =
     CONFIG_BY_ROLE[user?.role] || CONFIG_BY_ROLE.User;
 
   // ===== UI states =====
@@ -500,7 +500,7 @@ export default function HomePage() {
                       )}
                       {/* Position - role của user trong event */}
                       <span
-                        style={{ color: "white", backgroundColor: "red" }}
+                        style={{ color: "white", backgroundColor: "#dc2626" }}
                         className="event-chip chip-gray"
                       >
                         <i className="bi bi-person-badge me-1" />
@@ -527,12 +527,14 @@ export default function HomePage() {
                       </button>
                       <button
                         className="ghost-btn"
-                        style={{ backgroundColor: "red", color: "white" }}
+                        style={{ backgroundColor: "#dc2626", color: "white" }}
                         onClick={() => {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
-                            navigate(`/member-event-detail/${eid}?eventId=${eid}`);
+                            navigate(
+                              `/member-event-detail/${eid}?eventId=${eid}`
+                            );
                             return;
                           }
                           if (role === "HoOC") {
@@ -704,13 +706,6 @@ export default function HomePage() {
 
                     try {
                       setCreateSubmitting(true);
-                      console.log("Creating event with data:", {
-                        name: createForm.name,
-                        description: createForm.description,
-                        organizerName: createForm.organizerName,
-                        type: "private",
-                        images: createForm.images,
-                      });
                       const res = await eventApi.create({
                         name: createForm.name,
                         description: createForm.description,
@@ -718,7 +713,6 @@ export default function HomePage() {
                         type: "private",
                         images: createForm.images,
                       });
-                      console.log("Event created successfully:", res);
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",
@@ -786,7 +780,6 @@ export default function HomePage() {
                       disabled={createSubmitting}
                     />
                   </div>
-
                   {/* Image Upload Section */}
                   <div className="mb-3">
                     <label className="form-label fw-semibold">
@@ -973,7 +966,7 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `${eventDetailPrefix}${res.data.eventId || res.data.id}`
+                        `/member-event-detail?eventId=${res.data.eventId || res.data.id}`
                       );
                     } catch (err) {
                       setJoinError(

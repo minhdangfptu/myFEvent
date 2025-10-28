@@ -7,6 +7,7 @@ export default function MemberSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
 }) {
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
@@ -20,21 +21,10 @@ export default function MemberSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // XÓA các state/setEvents cho events, selectedEvent, setEvents, setSelectedEvent, currentEventMembership - KHÔNG CẦN NỮA
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  // Lấy eventId từ query hoặc từ path (ví dụ: /member-event-detail/abc123)
-  let eventId = params.get("eventId");
-  if (!eventId && location.pathname.includes('/member-event-detail/')) {
-    const pathParts = location.pathname.split('/');
-    const index = pathParts.findIndex(part => part === 'member-event-detail');
-    if (index !== -1 && pathParts[index + 1]) {
-      eventId = pathParts[index + 1];
-    }
-  }
-  const { events } = useEvents();
+  // Sử dụng eventId từ props thay vì lấy từ URL
+  const { events, loading } = useEvents();
   const event = events.find(e => (e._id || e.id) === eventId);
-  const hasEvents = events && events.length > 0;
+  const hasEvents = !!event;
   const navigate = useNavigate();
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
@@ -308,7 +298,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "notifications" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/home-page")}
+              onClick={() => navigate("/home-page")}
               title="Trang chủ"
             >
               <div className="d-flex align-items-center">
@@ -376,7 +366,7 @@ export default function MemberSidebar({
                         className={`hover-submenu-item${
                           activePage === item.id ? " active" : ""
                         }`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -392,7 +382,7 @@ export default function MemberSidebar({
                         className={`btn-submenu${
                           activePage === item.id ? " active" : ""
                         }`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -407,7 +397,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "event-board" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -421,7 +411,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/member")}
+              onClick={() => navigate("/member")}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
@@ -435,7 +425,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "calendar" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Lịch cá nhân"
             >
               <div className="d-flex align-items-center">
@@ -501,7 +491,7 @@ export default function MemberSidebar({
                           className={`hover-submenu-item${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -517,7 +507,7 @@ export default function MemberSidebar({
                           className={`btn-submenu${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -579,7 +569,7 @@ export default function MemberSidebar({
                           className={`hover-submenu-item${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -595,7 +585,7 @@ export default function MemberSidebar({
                           className={`btn-submenu${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -655,7 +645,7 @@ export default function MemberSidebar({
                           className={`hover-submenu-item${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -671,7 +661,7 @@ export default function MemberSidebar({
                           className={`btn-submenu${
                             activePage === item.id ? " active" : ""
                           }`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -684,7 +674,7 @@ export default function MemberSidebar({
                   className={`btn-nav ${
                     activePage === "feedback" ? "active" : ""
                   }`}
-                  onClick={() => (window.location.href = "/task")}
+                  onClick={() => navigate("/task")}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
@@ -705,7 +695,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "notifications" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/notifications")}
+              onClick={() => navigate("/notifications")}
               title="Thông báo"
             >
               <div className="d-flex align-items-center">
@@ -715,7 +705,7 @@ export default function MemberSidebar({
             </button>
             <button
               className={`btn-nav ${activePage === "settings" ? "active" : ""}`}
-              onClick={() => (window.location.href = "/setting")}
+              onClick={() => navigate("/setting")}
               title="Cài đặt"
             >
               <div className="d-flex align-items-center">

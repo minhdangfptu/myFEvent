@@ -24,4 +24,12 @@ export const eventService = {
             throw error;
         }
     },
+    getUnassignedMembersByEvent: async (eventId) => {
+        try {
+            const response = await eventApi.getUnassignedMembersByEvent(eventId);
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
 };

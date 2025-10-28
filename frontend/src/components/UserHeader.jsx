@@ -71,17 +71,7 @@ export default function UserHeader({
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
-          {/* <button
-            className="btn btn-ghost me-3"
-            onClick={() => {
-              const event = new CustomEvent('toggleSidebar');
-              window.dispatchEvent(event);
-            }}
-            aria-label="Mở/đóng thanh bên"
-          >
-            <i className="bi bi-list"></i>
-          </button> */}
-          <h5 className="mb-0 text-muted">Trang chủ</h5>
+          <h5 className="mb-0 text-muted">{title}</h5>
         </div>
 
         <div className="d-flex align-items-center gap-3">

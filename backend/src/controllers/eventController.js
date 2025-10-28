@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
+import ensureEventRole from '../utils/ensureEventRole.js';
 
 // GET /api/events/public
 export const listPublicEvents = async (req, res) => {
@@ -227,20 +228,14 @@ export const listMyEvents = async (req, res) => {
   }
 };
 
-const ensureEventRole = async (userId, eventId, allowedRoles = ['HoOC', 'HoD']) => {
-  const membership = await EventMember.findOne({ eventId, userId }).lean();
-  if (!membership) return false;
-  return allowedRoles.includes(membership.role);
-};
-
 // PATCH /api/events/:id (update event)
 export const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, organizerName, eventDate, location, type } = req.body;
     
-    const allowed = await ensureEventRole(req.user.id, id, ['HoOC']);
-    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+    const membership = await ensureEventRole(req.user.id, id, ['HoOC']);
+    if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
 
     const updateData = {};
     if (name) updateData.name = name;
@@ -265,8 +260,8 @@ export const deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const allowed = await ensureEventRole(req.user.id, id, ['HoOC']);
-    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+    const membership = await ensureEventRole(req.user.id, id, ['HoOC']);
+    if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
 
     await EventMember.deleteMany({ eventId: id });
     await Event.findByIdAndDelete(id);
@@ -284,8 +279,8 @@ export const replaceEventImages = async (req, res) => {
     const { images } = req.body;
     if (!Array.isArray(images)) return res.status(400).json({ message: 'images must be an array of base64 strings' });
 
-    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
-    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+    const membership = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
 
     const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
     const event = await Event.findByIdAndUpdate(
@@ -308,8 +303,8 @@ export const addEventImages = async (req, res) => {
     const { images } = req.body;
     if (!Array.isArray(images) || images.length === 0) return res.status(400).json({ message: 'images is required' });
 
-    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
-    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+    const membership = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
 
     const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
     const event = await Event.findByIdAndUpdate(
@@ -332,8 +327,8 @@ export const removeEventImages = async (req, res) => {
     const { indexes } = req.body;
     if (!Array.isArray(indexes)) return res.status(400).json({ message: 'indexes must be an array of numbers' });
 
-    const allowed = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
-    if (!allowed) return res.status(403).json({ message: 'Insufficient permissions' });
+    const membership = await ensureEventRole(req.user.id, id, ['HoOC', 'HoD']);
+    if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
 
     const event = await Event.findById(id).select('image');
     if (!event) return res.status(404).json({ message: 'Event not found' });

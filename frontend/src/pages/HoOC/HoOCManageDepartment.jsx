@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import HoOCSidebar from '../../components/HoOCSidebar';
 import UserHeader from '../../components/UserHeader';
+import { departmentService } from '../../services/departmentService';
 
 const HoOCManageDepartment = () => {
   const navigate = useNavigate();
+  const { eventId } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,73 +15,70 @@ const HoOCManageDepartment = () => {
     name: '',
     description: ''
   });
-
-  // Mock data cho departments
-  const mockDepartments = [
-    {
-      id: 1,
-      name: "Ban Nội dung",
-      leader: "Đặng Đình Minh",
-      memberCount: 5,
-      action: "Xem chi tiết"
-    },
-    {
-      id: 2,
-      name: "Ban Văn thể",
-      leader: "Arlene McCoy",
-      memberCount: 6,
-      action: "Xem chi tiết"
-    },
-    {
-      id: 3,
-      name: "Ban Truyền thông",
-      leader: "Cody Fisher",
-      memberCount: 11,
-      action: "Xem chi tiết"
-    },
-    {
-      id: 4,
-      name: "Ban Tài chính",
-      leader: "Esther Howard",
-      memberCount: 4,
-      action: "Xem chi tiết"
-    },
-    {
-      id: 5,
-      name: "Game",
-      leader: "Ronald Richards",
-      memberCount: 8,
-      action: "Xem chi tiết"
-    },
-    {
-      id: 6,
-      name: "Ban Hậu cần",
-      leader: "18",
-      memberCount: 18,
-      action: "Xem chi tiết"
-    }
-  ];
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setDepartments(mockDepartments);
-  }, []);
+    fetchDepartments();
+  }, [eventId]);
+
+  const fetchDepartments = async () => {
+    try {
+      setLoading(true);
+      const response = await departmentService.getDepartments(eventId);
+      const mappedDepartments = (response || []).map(dept => ({
+        ...dept,
+        leader: dept.leaderName || 'Chưa có',
+        action: 'Xem chi tiết'
+      }));
+      setDepartments(mappedDepartments);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+      setError('Không thể tải danh sách ban');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateDepartment = () => {
     setShowCreateModal(true);
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (createForm.name.trim() && createForm.description.trim()) {
-      // Xử lý tạo ban mới
-      console.log('Creating department:', createForm);
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await departmentService.createDepartment(eventId, {
+        name: createForm.name.trim(),
+        description: createForm.description.trim()
+      });
+      
+      const newDepartment = {
+        ...response,
+        leader: response.leaderName || 'Chưa có',
+        action: 'Xem chi tiết'
+      };
+      
+      // Thêm ban mới vào danh sách
+      setDepartments([...departments, newDepartment]);
+      
+      // Đóng modal và reset form
       setShowCreateModal(false);
       setCreateForm({ name: '', description: '' });
+      
+      alert('Tạo ban thành công!');
+    } catch (err) {
+      console.error('Error creating department:', err);
+      setError(err.response?.data?.message || 'Tạo ban thất bại');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleViewDetails = (departmentId) => {
-    navigate(`/hooc-department-detail/${departmentId}`);
+    navigate(`/events/${eventId}/hooc-department-detail/${departmentId}`);
   };
 
   const filteredDepartments = departments.filter(dept =>
@@ -247,6 +246,12 @@ const HoOCManageDepartment = () => {
               Thêm ban, thêm những cánh tay phải mạnh mẽ cho mình!
             </p>
             
+            {error && (
+              <div className="alert alert-danger mb-3">
+                {error}
+              </div>
+            )}
+            
             <form onSubmit={handleCreateSubmit}>
               <div className="mb-3">
                 <label className="form-label fw-semibold">
@@ -291,8 +296,9 @@ const HoOCManageDepartment = () => {
                   type="submit"
                   className="btn btn-danger"
                   style={{ borderRadius: '8px' }}
+                  disabled={loading}
                 >
-                  Xác nhận
+                  {loading ? 'Đang tạo...' : 'Xác nhận'}
                 </button>
               </div>
             </form>

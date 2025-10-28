@@ -2,13 +2,11 @@ import mongoose, { Schema, Types } from 'mongoose';
 
 const PlanItemSchema = new Schema({
   itemId:   { type: Types.ObjectId, default: () => new Types.ObjectId() },
-  category: { type: String, required: true },     // Venue / Catering / Media...
+  category: { type: String, required: true },     
   name:     { type: String, required: true },
   qty:      { type: Schema.Types.Decimal128, default: 1, min: 0 },
   unitCost: { type: Schema.Types.Decimal128, default: 0, min: 0 },
-  taxRate:  { type: Schema.Types.Decimal128, default: 0, min: 0 },  // 0.1 = 10%
-  discount: { type: Schema.Types.Decimal128, default: 0, min: 0 },
-  total:    { type: Schema.Types.Decimal128, default: 0, min: 0 }   // auto-calc nếu =0
+  total:    { type: Schema.Types.Decimal128, default: 0, min: 0 }   
 }, { _id: false });
 
 /** Kế hoạch ngân sách do 1 department nộp cho 1 event */
@@ -35,11 +33,10 @@ const EventBudgetPlanSchema = new Schema({
   }]
 }, { timestamps: true, versionKey: false });
 
-/** 1 department chỉ được nộp 1 plan cho 1 event */
 EventBudgetPlanSchema.index({ eventId: 1, departmentId: 1 }, { unique: true });
 EventBudgetPlanSchema.index({ eventId: 1, status: 1 });
 
-/** Tự tính total nếu chưa điền */
+
 EventBudgetPlanSchema.pre('save', function () {
   for (const it of this.items || []) {
     const qty  = Number(it.qty || 0);

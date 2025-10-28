@@ -45,8 +45,12 @@ export const eventApi = {
     const res = await axiosClient.post('/api/events/join', { code });
     return res.data;
   },
-  getById: async (id) => {``
+  getById: async (id) => {
     const res = await axiosClient.get(`/api/events/private/${id}`);
+    return res.data;
+  },
+  replaceEventImages: async (eventId, images) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/images/replace`, { images });
     return res.data;
   },
   listMyEvents: async () => {
@@ -59,6 +63,14 @@ export const eventApi = {
   },
   debugAuth: async () => {
     const res = await axiosClient.get('/api/auth/profile');
+    return res.data;
+  },
+  getMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members`);
+    return res.data;
+  },
+  getUnassignedMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/unassigned-members`);
     return res.data;
   }
 }

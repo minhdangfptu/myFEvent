@@ -22,22 +22,21 @@ import ResetPassword from "./pages/Auth/ResetPassword";
 import EmailConfirmation from "./pages/Auth/EmailConfirmation";
 
 // User Pages
-import UserLandingPage from "./pages/User/UserLandingPage";
-import HoOCLandingPage from "./pages/HoOC/HoOCLandingPage";
-import HoOCEventDetail from "./pages/HoOC/HoOCEventDetail";
-import HoOCManageMilestone from "./pages/HoOC/HoOCManageMilestone";
-import HoOCMilestoneDetail from "./pages/HoOC/HoOCMilestoneDetail";
-import HoOCEditMilestone from "./pages/HoOC/HoOCEditMilestone";
-import HoOCManageMilestoneEmpty from "./pages/HoOC/HoOCManageMilestoneEmpty";
-import HoOCManageDepartment from "./pages/HoOC/HoOCManageDepartment";
-import HoOCDepartmentDetail from "./pages/HoOC/HoOCDepartmentDetail";
-import UserProfile from "./pages/User/UserProfile";
-import Settings from "./pages/User/Settings";
-import Dashboard from "./pages/User/Dashboard";
-import Menber from "./pages/User/Menber";
-import Risk from "./pages/User/Risk";
-import Task from "./pages/User/Task";
-import Notifications from "./pages/User/Notifications";
+import UserLandingPage from './pages/User/UserLandingPage';
+import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
+import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
+import HoOCManageMilestone from './pages/HoOC/HoOCManageMilestone';
+import HoOCMilestoneDetail from './pages/HoOC/HoOCMilestoneDetail';
+import HoOCEditMilestone from './pages/HoOC/HoOCEditMilestone';
+import HoOCManageMilestoneEmpty from './pages/HoOC/HoOCManageMilestoneEmpty';
+import HoOCManageDepartment from './pages/HoOC/HoOCManageDepartment';
+import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
+import UserProfile from './pages/User/UserProfile';
+import Settings from './pages/User/Settings';
+import Dashboard from './pages/User/Dashboard';
+import Risk from './pages/User/Risk';
+import Task from './pages/User/Task';
+import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
 // Member Pages
@@ -53,7 +52,9 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
+
 import { EventProvider } from "./contexts/EventContext";
+import MemberPage from "./pages/Member/MemberEvent";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -91,194 +92,194 @@ export default function App() {
                 element={<EmailConfirmation />}
               />
 
-              {/* Protected User Routes */}
-              <Route
-                path="/user-landing-page"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <UserLandingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-landing-page"
-                element={
-                  <ProtectedRoute>
-                    <HoOCLandingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hod-landing-page"
-                element={
-                  <ProtectedRoute>
-                    <HoDLandingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-event-detail/:eventId"
-                element={
-                  <ProtectedRoute>
-                    <HoOCEventDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <HoOCDashBoard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-manage-milestone"
-                element={
-                  <ProtectedRoute>
-                    <HoOCManageMilestone />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-manage-milestone-empty"
-                element={
-                  <ProtectedRoute>
-                    <HoOCManageMilestoneEmpty />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-milestone-detail/:id"
-                element={
-                  <ProtectedRoute>
-                    <HoOCMilestoneDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-edit-milestone/:id"
-                element={
-                  <ProtectedRoute>
-                    <HoOCEditMilestone />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-manage-department"
-                element={
-                  <ProtectedRoute>
-                    <HoOCManageDepartment />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hooc-department-detail/:id"
-                element={
-                  <ProtectedRoute>
-                    <HoOCDepartmentDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/member-landing-page"
-                element={
-                  <ProtectedRoute>
-                    <MemberLandingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/member-event-detail/:eventId"
-                element={
-                  <ProtectedRoute>
-                    <MemberEventDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/user-profile"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <UserProfile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/notifications"
-                element={
-                  <ProtectedRoute>
-                    <Notifications />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/event-detail"
-                element={
-                  <ProtectedRoute>
-                    <HoOCEventDetail />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/setting"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <Settings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/risk"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <Risk />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/task"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <Task />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/member"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <Menber />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/home-page"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <HomePage />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Admin Routes */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <div>Admin Page (Replace with your component)</div>
-                  </ProtectedRoute>
-                }
-              />
+          {/* Protected User Routes */}
+          <Route 
+            path="/user-landing-page" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UserLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-landing-page" 
+            element={
+              <ProtectedRoute>
+                <HoOCLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hod-landing-page" 
+            element={
+              <ProtectedRoute>
+                <HoDLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-event-detail" 
+            element={
+              <ProtectedRoute >
+                <HoOCEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hooc-dashboard" 
+            element={
+              <ProtectedRoute >
+                <HoOCDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-manage-milestone" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageMilestone />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-manage-milestone-empty" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageMilestoneEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-milestone-detail/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCMilestoneDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-edit-milestone/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCEditMilestone />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-manage-department" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageDepartment />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hooc-department-detail/:id" 
+            element={
+              <ProtectedRoute>
+                <HoOCDepartmentDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/member-landing-page" 
+            element={
+              <ProtectedRoute>
+                <MemberLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/member-event-detail/:eventId" 
+            element={
+              <ProtectedRoute>
+                <MemberEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/user-profile" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UserProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <Notifications />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/event-detail" 
+            element={
+              <ProtectedRoute>
+                <HoOCEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/setting" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Settings />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/risk" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Risk />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/task" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Task />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/members" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <MemberPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/home-page" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                < HomePage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Admin Routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <div>Admin Page (Replace with your component)</div>
+              </ProtectedRoute>
+            }
+          />
 
               {/* Error Routes */}
               <Route path="/403" element={<ErrorPage403 />} />

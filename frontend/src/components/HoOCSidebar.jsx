@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 
@@ -7,6 +7,8 @@ export default function HoOCSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
+  
 }) {
   // UI state cho menu
   const [workOpen, setWorkOpen] = useState(false);
@@ -19,30 +21,22 @@ export default function HoOCSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // Lấy eventId từ URL/query hoặc path
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  let eventId = params.get("eventId");
-  if (!eventId && location.pathname.includes('/hooc-event-detail/')) {
-    const pathParts = location.pathname.split('/');
-    const index = pathParts.findIndex(part => part === 'hooc-event-detail');
-    if (index !== -1 && pathParts[index + 1]) {
-      eventId = pathParts[index + 1];
-    }
-  }
+  // Sử dụng eventId từ props
   const { events, loading } = useEvents();
   const event = events.find(e => (e._id || e.id) === eventId);
   const hasEvent = !!event;
+  const navigate = useNavigate();
 
-  // Menu cấu hình như cũ
+  // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/hooc-event-detail/${eventId || ''}` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` }
   ];
+
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/hooc-manage-milestone" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
@@ -175,21 +169,21 @@ export default function HoOCSidebar({
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(255,255,255,0.75)",
+              background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
             }}
           >
-            <Loading size={40} />
+            <Loading size={100} />
           </div>
         ) : (
           <>
             <div className="mb-4">
               {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-list me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
@@ -234,7 +228,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -248,7 +242,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -263,7 +257,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "event-board" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate(`/events/${eventId || ''}/hooc-manage-department`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -277,7 +271,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/member")}
+              onClick={() => navigate(`/events/${eventId || ''}/members`)}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
@@ -291,7 +285,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "calendar" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Lịch cá nhân"
             >
               <div className="d-flex align-items-center">
@@ -334,7 +328,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -348,7 +342,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -388,7 +382,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -402,7 +396,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -442,7 +436,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -456,7 +450,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -467,7 +461,7 @@ export default function HoOCSidebar({
 
                 <button
                   className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => (window.location.href = "/task")}
+                  onClick={() => navigate("/task")}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
@@ -484,13 +478,13 @@ export default function HoOCSidebar({
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
           <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
               <div className="d-flex align-items-center">
                 <i className="bi bi-bell me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
-            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
               <div className="d-flex align-items-center">
                 <i className="bi bi-gear me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Cài đặt</span>}
