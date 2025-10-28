@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
-import UserHeader from '../../components/UserHeader';
+import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
 
 const HoOCManageDepartment = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -86,26 +84,13 @@ const HoOCManageDepartment = () => {
   );
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="department-management"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <UserHeader title="Manage Department Page" />
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout
+      title="Manage Department Page"
+      sidebarType="hooc"
+      activePage="department-management"
+    >
+      {/* Main Content */}
+      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
               Danh sách các ban
@@ -212,7 +197,6 @@ const HoOCManageDepartment = () => {
               </ul>
             </nav>
           </div>
-        </div>
       </div>
 
       {/* Create Department Modal */}
@@ -305,7 +289,7 @@ const HoOCManageDepartment = () => {
           </div>
         </div>
       )}
-    </div>
+    </UserLayout>
   );
 };
 

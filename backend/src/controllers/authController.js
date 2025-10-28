@@ -62,7 +62,7 @@ const saveRefreshToken = async (userId, token, req) => {
 };
 
 // Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
-const sendVerificationEmail = async (email, fullName, req) => {
+export const sendVerificationEmail = async (email, fullName, req) => {
   const { code } = setEmailVerificationCode(email);
 
   const html = `

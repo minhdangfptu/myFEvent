@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
-import UserHeader from '../../components/UserHeader';
+import UserLayout from '../../components/UserLayout';
 import { eventService } from '../../services/eventService';
 import { departmentService } from '../../services/departmentService';
 import { toast } from 'react-toastify';
@@ -10,7 +9,7 @@ import { formatDate } from '~/utils/formatDate';
 const HoOCDepartmentDetail = () => {
   const { eventId, id } = useParams();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
   const [activeTab, setActiveTab] = useState('info');
   const [department, setDepartment] = useState(null);
   const [members, setMembers] = useState([]);
@@ -189,26 +188,9 @@ const HoOCDepartmentDetail = () => {
   }
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="department-management"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <UserHeader title="Department Detail Page" />
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout title="Department Detail Page" sidebarType="hooc" activePage="department-management">
+      {/* Main Content */}
+      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           {/* Department Header */}
           <div className="mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', marginBottom: '8px' }}>
@@ -487,7 +469,6 @@ const HoOCDepartmentDetail = () => {
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -750,7 +731,7 @@ const HoOCDepartmentDetail = () => {
            </div>
          </div>
        )}
-     </div>
+     </UserLayout>
    );
  };
  

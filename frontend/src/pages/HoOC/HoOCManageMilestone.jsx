@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
+import UserLayout from '../../components/UserLayout';
 import { milestoneApi } from '../../apis/milestoneApi';
 
 const HoOCManageMilestone = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
   const [milestones, setMilestones] = useState([]);
   const [hoveredMilestone, setHoveredMilestone] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -72,26 +72,51 @@ const HoOCManageMilestone = () => {
     fetchMilestones();
   }, [eventId]);
 
+  const parseAnyDate = (value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) return d;
+    try {
+      const parts = String(value).split('/').map(p => p.trim());
+      if (parts.length >= 2) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parts[2] ? parseInt(parts[2], 10) : new Date().getFullYear();
+        const guess = new Date(year, month, day);
+        if (!isNaN(guess.getTime())) return guess;
+      }
+    } catch {}
+    return null;
+  };
+
   const fetchMilestones = async () => {
     try {
       setLoading(true);
       const response = await milestoneApi.listMilestonesByEvent(eventId);
-      // Map data từ backend
-      const mappedMilestones = (response.data || []).map((ms, index) => ({
+      const sorted = [...(response.data || [])].sort((a, b) => {
+        const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000);
+        const db = parseAnyDate(b?.targetDate) || new Date(8640000000000000);
+        return da.getTime() - db.getTime();
+      });
+      const mappedMilestones = sorted.map((ms, index) => ({
         id: ms._id || ms.id,
         name: ms.name,
         date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString('vi-VN') : '',
         status: getStatusLabel(ms.status),
         description: ms.description || '',
         relatedTasks: ms.tasksCount || 0,
-        position: calculatePosition(index, response.data.length)
+        position: calculatePosition(index, sorted.length)
       }));
       setMilestones(mappedMilestones);
     } catch (err) {
       console.error('Error fetching milestones:', err);
       setError('Không thể tải danh sách cột mốc');
-      // Nếu không có data, sử dụng mock data
-      setMilestones(mockMilestones);
+      const sortedMock = [...mockMilestones].sort((a, b) => {
+        const da = parseAnyDate(a?.date) || new Date(8640000000000000);
+        const db = parseAnyDate(b?.date) || new Date(8640000000000000);
+        return da.getTime() - db.getTime();
+      }).map((ms, index, arr) => ({ ...ms, position: calculatePosition(index, arr.length) }));
+      setMilestones(sortedMock);
     } finally {
       setLoading(false);
     }
@@ -185,48 +210,9 @@ const HoOCManageMilestone = () => {
   };
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="work-timeline"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h2 className="mb-1" style={{ color: '#1f2937', fontWeight: '600' }}>
-              Manage Milestone Page
-            </h2>
-            <div className="d-flex align-items-center">
-              <i className="bi bi-list me-2" style={{ color: '#6b7280' }}></i>
-              <img 
-                src="/website-icon-fix@3x.png" 
-                alt="myFEvent" 
-                style={{ width: 24, height: 24, marginRight: '8px' }}
-              />
-              <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                myFEvent
-              </span>
-            </div>
-          </div>
-          
-          <div className="d-flex align-items-center">
-            <i className="bi bi-bell me-3" style={{ fontSize: '1.2rem', color: '#6b7280' }}></i>
-            <i className="bi bi-person-circle" style={{ fontSize: '1.5rem', color: '#6b7280' }}></i>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout title="Manage Milestone Page" sidebarType="hooc" activePage="work-timeline">
+      {/* Main Content */}
+      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
               Cột mốc sự kiện
@@ -378,7 +364,6 @@ const HoOCManageMilestone = () => {
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Create Milestone Modal */}
@@ -504,7 +489,7 @@ const HoOCManageMilestone = () => {
           </div>
         </div>
       )}
-    </div>
+    </UserLayout>
   );
 };
 
