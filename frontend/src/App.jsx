@@ -2,7 +2,7 @@ import * as React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -22,27 +22,27 @@ import ResetPassword from "./pages/Auth/ResetPassword";
 import EmailConfirmation from "./pages/Auth/EmailConfirmation";
 
 // User Pages
-import UserLandingPage from './pages/User/UserLandingPage';
-import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
-import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
-import HoOCManageMilestone from './pages/HoOC/HoOCManageMilestone';
-import HoOCMilestoneDetail from './pages/HoOC/HoOCMilestoneDetail';
-import HoOCEditMilestone from './pages/HoOC/HoOCEditMilestone';
-import HoOCManageMilestoneEmpty from './pages/HoOC/HoOCManageMilestoneEmpty';
-import HoOCManageDepartment from './pages/HoOC/HoOCManageDepartment';
-import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
-import UserProfile from './pages/User/UserProfile';
-import Settings from './pages/User/Settings';
-import Dashboard from './pages/User/Dashboard';
-import Menber from './pages/User/Menber';
-import Risk from './pages/User/Risk';
-import Task from './pages/User/Task';
-import Notifications from './pages/User/Notifications';
+import UserLandingPage from "./pages/User/UserLandingPage";
+import HoOCLandingPage from "./pages/HoOC/HoOCLandingPage";
+import HoOCEventDetail from "./pages/HoOC/HoOCEventDetail";
+import HoOCManageMilestone from "./pages/HoOC/HoOCManageMilestone";
+import HoOCMilestoneDetail from "./pages/HoOC/HoOCMilestoneDetail";
+import HoOCEditMilestone from "./pages/HoOC/HoOCEditMilestone";
+import HoOCManageMilestoneEmpty from "./pages/HoOC/HoOCManageMilestoneEmpty";
+import HoOCManageDepartment from "./pages/HoOC/HoOCManageDepartment";
+import HoOCDepartmentDetail from "./pages/HoOC/HoOCDepartmentDetail";
+import UserProfile from "./pages/User/UserProfile";
+import Settings from "./pages/User/Settings";
+import Dashboard from "./pages/User/Dashboard";
+import Menber from "./pages/User/Menber";
+import Risk from "./pages/User/Risk";
+import Task from "./pages/User/Task";
+import Notifications from "./pages/User/Notifications";
 import HomePage from "./pages/User/HomePage";
 
 // Member Pages
-import MemberLandingPage from './pages/Member/MemberLandingPage';
-import MemberEventDetail from './pages/Member/MemberEventDetail';
+import MemberLandingPage from "./pages/Member/MemberLandingPage";
+import MemberEventDetail from "./pages/Member/MemberEventDetail";
 
 // Error Pages
 import ErrorPage404 from "./pages/Errors/ErrorPage404";
@@ -53,253 +53,260 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
-
+import { EventProvider } from "./contexts/EventContext";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  
+
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
         <ToastContainer position="top-right" autoClose={3000} />
         <NotificationsProvider>
-        
-        <Routes>
-          {/* Default Route */}
-          <Route path="/" element={<Navigate to="/landingpage" replace />} />
+          <EventProvider>
+            <Routes>
+              {/* Default Route */}
+              <Route
+                path="/"
+                element={<Navigate to="/landingpage" replace />}
+              />
 
-          {/* Public Routes */}
-          <Route path="/landingpage" element={<LandingPage />} />
-          <Route path="/about" element={<AboutUs />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<PublicEventDetail />} />
-          <Route path="/clubs" element={<Clubs />} />
-          <Route path="/policy" element={<Policy />} />
-          <Route path="/contact" element={<Contact />} />
+              {/* Public Routes */}
+              <Route path="/landingpage" element={<LandingPage />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/events/:id" element={<PublicEventDetail />} />
+              <Route path="/clubs" element={<Clubs />} />
+              <Route path="/policy" element={<Policy />} />
+              <Route path="/contact" element={<Contact />} />
 
-          {/* Authentication Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/register-complete" element={<RegisterComplete />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/email-confirmation" element={<EmailConfirmation />} />
+              {/* Authentication Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/register-complete" element={<RegisterComplete />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/email-confirmation"
+                element={<EmailConfirmation />}
+              />
 
-          {/* Protected User Routes */}
-          <Route 
-            path="/user-landing-page" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <UserLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-landing-page" 
-            element={
-              <ProtectedRoute>
-                <HoOCLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hod-landing-page" 
-            element={
-              <ProtectedRoute>
-                <HoDLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-event-detail/:eventId" 
-            element={
-              <ProtectedRoute >
-                <HoOCEventDetail />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-dashboard" 
-            element={
-              <ProtectedRoute >
-                <HoOCDashBoard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-manage-milestone" 
-            element={
-              <ProtectedRoute>
-                <HoOCManageMilestone />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-manage-milestone-empty" 
-            element={
-              <ProtectedRoute>
-                <HoOCManageMilestoneEmpty />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-milestone-detail/:id" 
-            element={
-              <ProtectedRoute>
-                <HoOCMilestoneDetail />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-edit-milestone/:id" 
-            element={
-              <ProtectedRoute>
-                <HoOCEditMilestone />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-manage-department" 
-            element={
-              <ProtectedRoute>
-                <HoOCManageDepartment />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/hooc-department-detail/:id" 
-            element={
-              <ProtectedRoute>
-                <HoOCDepartmentDetail />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/member-landing-page" 
-            element={
-              <ProtectedRoute>
-                <MemberLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/member-event-detail/:eventId" 
-            element={
-              <ProtectedRoute>
-                <MemberEventDetail />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/user-profile" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <UserProfile />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/notifications" 
-            element={
-              <ProtectedRoute>
-                <Notifications />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/event-detail" 
-            element={
-              <ProtectedRoute>
-                <HoOCEventDetail />
-              </ProtectedRoute>
-            } 
-          />
-          
-          <Route 
-            path="/setting" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <Settings />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/risk" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <Risk />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/task" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <Task />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/member" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                <Menber />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/home-page" 
-            element={
-              <ProtectedRoute requiredRole="user">
-                < HomePage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <div>Admin Page (Replace with your component)</div>
-              </ProtectedRoute>
-            }
-          />
+              {/* Protected User Routes */}
+              <Route
+                path="/user-landing-page"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <UserLandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-landing-page"
+                element={
+                  <ProtectedRoute>
+                    <HoOCLandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hod-landing-page"
+                element={
+                  <ProtectedRoute>
+                    <HoDLandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-event-detail/:eventId"
+                element={
+                  <ProtectedRoute>
+                    <HoOCEventDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <HoOCDashBoard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-manage-milestone"
+                element={
+                  <ProtectedRoute>
+                    <HoOCManageMilestone />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-manage-milestone-empty"
+                element={
+                  <ProtectedRoute>
+                    <HoOCManageMilestoneEmpty />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-milestone-detail/:id"
+                element={
+                  <ProtectedRoute>
+                    <HoOCMilestoneDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-edit-milestone/:id"
+                element={
+                  <ProtectedRoute>
+                    <HoOCEditMilestone />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-manage-department"
+                element={
+                  <ProtectedRoute>
+                    <HoOCManageDepartment />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hooc-department-detail/:id"
+                element={
+                  <ProtectedRoute>
+                    <HoOCDepartmentDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/member-landing-page"
+                element={
+                  <ProtectedRoute>
+                    <MemberLandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/member-event-detail/:eventId"
+                element={
+                  <ProtectedRoute>
+                    <MemberEventDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/user-profile"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <UserProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute>
+                    <Notifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/event-detail"
+                element={
+                  <ProtectedRoute>
+                    <HoOCEventDetail />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Error Routes */}
-          <Route path="/403" element={<ErrorPage403 />} />
-          <Route path="/401" element={<ErrorPage401 />} />
-          <Route path="/502" element={<ErrorPage502 />} />
-          <Route path="/off" element={<ErrorPageOffline />} />
-          <Route
-            path="/unauthorized"
-            element={
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  height: "100vh",
-                  flexDirection: "column",
-                }}
-              >
-                <h1>403 - Unauthorized</h1>
-                <p>You don't have permission to access this page.</p>
-              </div>
-            }
-          />
+              <Route
+                path="/setting"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/risk"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <Risk />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/task"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <Task />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/member"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <Menber />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/home-page"
+                element={
+                  <ProtectedRoute requiredRole="user">
+                    <HomePage />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* 404 Route - Must be last */}
-          <Route path="*" element={<ErrorPage404 />} />
-        </Routes>
+              {/* Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <div>Admin Page (Replace with your component)</div>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Error Routes */}
+              <Route path="/403" element={<ErrorPage403 />} />
+              <Route path="/401" element={<ErrorPage401 />} />
+              <Route path="/502" element={<ErrorPage502 />} />
+              <Route path="/off" element={<ErrorPageOffline />} />
+              <Route
+                path="/unauthorized"
+                element={
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "100vh",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <h1>403 - Unauthorized</h1>
+                    <p>You don't have permission to access this page.</p>
+                  </div>
+                }
+              />
+
+              {/* 404 Route - Must be last */}
+              <Route path="*" element={<ErrorPage404 />} />
+            </Routes>
+          </EventProvider>
         </NotificationsProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>

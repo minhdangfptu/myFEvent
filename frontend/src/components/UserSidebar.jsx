@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { eventApi } from "../apis/eventApi";
+import { useEvents } from "../contexts/EventContext";
+import Loading from "./Loading";
 
 export default function UserSidebar({
   sidebarOpen,
@@ -14,9 +16,7 @@ export default function UserSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
-
+  const { events, loading } = useEvents();
 
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function UserSidebar({
           transform: rotate(720deg);
         }
         .hover-submenu-item.active{ background:#f0f3ff;color:#2563eb;font-weight:700; }
-        .sidebar-content{ flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;scrollbar-width:thin;scrollbar-color:#c1c1c1 #f1f1f1;}
+        .sidebar-content{ flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;scrollbar-width:thin;scrollbar-color:#c1c1c1 #f1f1f1;position:relative;}
         .sidebar-content::-webkit-scrollbar{ width:6px; }
         .sidebar-content::-webkit-scrollbar-track{ background:#f1f1f1;border-radius:3px; }
         .sidebar-content::-webkit-scrollbar-thumb{ background:#c1c1c1;border-radius:3px; }
@@ -108,36 +108,54 @@ export default function UserSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {/* Chỉ hiển thị nhóm CÀI ĐẶT */}
-        <div className="mb-4">
-          {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
-          <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-list me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Trang chủ</span>}
-              </div>
-            </button>
+        {loading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,0.75)",
+              zIndex: 2000,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Loading size={40} />
           </div>
-        </div>
-        {/* Chỉ hiển thị nhóm CÀI ĐẶT */}
-        <div className="mb-4">
-          {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
-          <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-bell me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Thông báo</span>}
+        ) : (
+          <>
+            {/* Chỉ hiển thị nhóm CÀI ĐẶT */}
+            <div className="mb-4">
+              {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
+              <div className="d-flex flex-column gap-1">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Trang chủ</span>}
+                  </div>
+                </button>
               </div>
-            </button>
-            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-gear me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Cài đặt</span>}
+            </div>
+            {/* Chỉ hiển thị nhóm CÀI ĐẶT */}
+            <div className="mb-4">
+              {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
+              <div className="d-flex flex-column gap-1">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Thông báo</span>}
+                  </div>
+                </button>
+                <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Cài đặt</span>}
+                  </div>
+                </button>
               </div>
-            </button>
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Theme toggle hoặc Expand button */}

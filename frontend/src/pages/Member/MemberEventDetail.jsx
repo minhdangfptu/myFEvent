@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
+import Loading from '../../components/Loading';
 
 export default function MemberEventDetail() {
   const { eventId } = useParams();
@@ -57,10 +58,18 @@ export default function MemberEventDetail() {
   if (loading) {
     return (
       <UserLayout title="Chi tiết sự kiện" sidebarType="member">
-        <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(255,255,255,0.75)",
+            zIndex: 2000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Loading size={80} />
         </div>
       </UserLayout>
     );

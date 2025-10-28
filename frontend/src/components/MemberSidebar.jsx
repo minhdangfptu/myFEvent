@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
+import { useEvents } from "../contexts/EventContext";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -19,73 +20,24 @@ export default function MemberSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
-  const [currentEventMembership, setCurrentEventMembership] = useState(null);
-  const hasEvents = events && events.length > 0;
+  // XÓA các state/setEvents cho events, selectedEvent, setEvents, setSelectedEvent, currentEventMembership - KHÔNG CẦN NỮA
   const location = useLocation();
-  const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   // Lấy eventId từ query hoặc từ path (ví dụ: /member-event-detail/abc123)
-  let eventIdFromUrl = params.get("eventId");
-  if (!eventIdFromUrl && location.pathname.includes('/member-event-detail/')) {
+  let eventId = params.get("eventId");
+  if (!eventId && location.pathname.includes('/member-event-detail/')) {
     const pathParts = location.pathname.split('/');
     const index = pathParts.findIndex(part => part === 'member-event-detail');
     if (index !== -1 && pathParts[index + 1]) {
-      eventIdFromUrl = pathParts[index + 1];
+      eventId = pathParts[index + 1];
     }
   }
+  const { events } = useEvents();
+  const event = events.find(e => (e._id || e.id) === eventId);
+  const hasEvents = events && events.length > 0;
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        console.log("MemberSidebar: Fetching events...");
-        const res = await eventApi.listMyEvents();
-        console.log("MemberSidebar: API response:", res);
-        const list = Array.isArray(res?.data) ? res.data : [];
-        console.log("MemberSidebar: Events list:", list);
-        // Nếu có eventId truyền vào → ƯU TIÊN đẩy lên đầu
-        let sortedList = list;
-        if (eventIdFromUrl) {
-          const idx = list.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
-          if (idx !== -1) {
-            const [currentEvent] = list.splice(idx, 1);
-            sortedList = [currentEvent, ...list];
-          }
-        }
-        const mapped = sortedList.map((e) => ({
-          id: e._id || e.id,
-          name: e.name,
-          icon: "bi-calendar-event",
-          membership: e.membership,
-        }));
-        console.log("MemberSidebar: Mapped events:", mapped);
-        if (mounted) {
-          setEvents(mapped);
-          // Nếu có eventId, chọn sự kiện đó làm selected
-          if (eventIdFromUrl) {
-            const evt = mapped.find((ev) => ev.id === eventIdFromUrl);
-            if (evt) {
-              setSelectedEvent(evt.id);
-              setCurrentEventMembership(evt.membership);
-            } else if (mapped.length) {
-              setSelectedEvent(mapped[0].id);
-              setCurrentEventMembership(mapped[0].membership);
-            }
-          } else if (mapped.length && !selectedEvent) {
-            setSelectedEvent(mapped[0].id);
-            setCurrentEventMembership(mapped[0].membership);
-          }
-        }
-      } catch (error) {
-        console.error("MemberSidebar: Error fetching events:", error);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [eventIdFromUrl]);
+  // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -180,7 +132,7 @@ export default function MemberSidebar({
     {
       id: "overview-detail",
       label: "Chi tiết sự kiện",
-      path: `/member-event-detail/${selectedEvent || ""}`,
+      path: `/member-event-detail/${eventId || ""}`,
     },
   ];
 
@@ -338,9 +290,9 @@ export default function MemberSidebar({
                   whiteSpace: "normal",
                   lineHeight: "1.2"
                 }}
-                title={events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                title={event?.name || "(Chưa chọn sự kiện)"}
               >
-                {events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                {event?.name || "(Chưa chọn sự kiện)"}
               </span>
             </div>
           </div>
