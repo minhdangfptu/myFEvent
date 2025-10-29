@@ -29,7 +29,7 @@ export default function HoOCSidebar({
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
+    { id: "overview-dashboard", label: "Dashboard tổng", path: `/hooc-dashboard?eventId=${eventId}` },
     { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` }
   ];
 

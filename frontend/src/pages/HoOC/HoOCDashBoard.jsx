@@ -102,7 +102,7 @@ export default function HoOCDashBoard() {
   )
 
   return (
-    <UserLayout title="Dashboard tổng" sidebarType="hooc">
+    <UserLayout title="Dashboard tổng" sidebarType="hooc" activePage="overview-dashboard">
       <div className="bg-light min-vh-100 py-4">
         <div className="container-lg">
           {/* Header */}

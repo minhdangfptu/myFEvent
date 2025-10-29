@@ -52,11 +52,9 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
-
+import HoOCManageMember from "./pages/HoOC/HoOCManageMember";
 import { EventProvider } from "./contexts/EventContext";
 import MemberPage from "./pages/ManageDept&Member/MemberEvent";
-import ManageMemberPage from "./pages/User/ManageMember";
-import MemberProfile from "./pages/ManageDept&Member/MemberProfile";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -176,6 +174,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/hooc-manage-member" 
+            element={
+              <ProtectedRoute>
+                <HoOCManageMember />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/events/:eventId/hooc-department-detail/:id" 
             element={
               <ProtectedRoute>
@@ -188,22 +194,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MemberLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/manage-member" 
-            element={
-              <ProtectedRoute>
-                <ManageMemberPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/member-profile" 
-            element={
-              <ProtectedRoute>
-                <MemberProfile />
               </ProtectedRoute>
             } 
           />

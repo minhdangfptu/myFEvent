@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
@@ -168,9 +168,13 @@ export default function MemberPage() {
             </span>
           </div>
           <div className="ms-auto d-flex align-items-center gap-2">
-            <a className="btn btn-danger" href="/manage-member">
+            <Link
+              className="btn btn-danger"
+              to={`/events/${eventId}/hooc-manage-member`}
+              state={{ event, membersByDepartment: allMembersByDepartment }}
+            >
               Quản lý thành viên
-            </a>
+            </Link>
           </div>
         </div>
 

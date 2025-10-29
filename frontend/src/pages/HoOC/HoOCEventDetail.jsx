@@ -460,7 +460,7 @@ export default function HoOCEventDetail() {
     <UserLayout
       title="Chi tiết sự kiện"
       sidebarType="hooc"
-      activePage="overview"
+      activePage="overview-detail"
     >
       <style>{`
         .event-header { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem; }
