@@ -163,11 +163,14 @@ const HoOCManageMilestone = () => {
   };
 
   const handleEditMilestone = (milestoneId) => {
-    navigate(`/events/${eventId}/hooc-edit-milestone/${milestoneId}`);
+    // Hiển thị loading overlay trước khi chuyển trang
+    setLoading(true)
+    navigate(`/events/${eventId}/hooc-edit-milestone/${milestoneId}`)
   };
 
   const handleViewDetails = (milestoneId) => {
-    navigate(`/events/${eventId}/hooc-milestone-detail/${milestoneId}`);
+    setLoading(true)
+    navigate(`/events/${eventId}/hooc-milestone-detail/${milestoneId}`)
   };
 
   const handleCreateMilestone = () => {
@@ -487,7 +490,7 @@ const HoOCManageMilestone = () => {
                   style={{ borderRadius: '8px' }}
                   disabled={loading}
                 >
-                  {loading ? 'Đang tạo...' : 'Xác nhận'}
+                  {loading ? (<Loading size={18} />) : 'Xác nhận'}
                 </button>
               </div>
             </form>
