@@ -817,14 +817,14 @@ const HoOCDepartmentDetail = () => {
                               color: "#6b7280",
                             }}
                           >
-                            {member.name?.charAt(0) || "?"}
+                            {member.fullName?.charAt(0) || "?"}
                           </div>
                           <div>
                             <h6
                               className="mb-1"
                               style={{ color: "#1f2937", fontWeight: "500" }}
                             >
-                              {member.name || "Unknown"}
+                              {member.fullName || "Unknown"}
                             </h6>
                             <p
                               className="mb-0"

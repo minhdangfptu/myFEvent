@@ -554,8 +554,6 @@ export default function HomePage() {
                               navigate(`/hod-landing-page?eventId=${eid}`);
                               return;
                             }
-                            // fallback mặc định
-                            // navigate(`${eventDetailPrefix}${eid}`);
                           }}
                         >
                           Truy cập
@@ -971,8 +969,9 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `/member-event-detail?eventId=${res.data.eventId || res.data.id}`
+                        `/member-event-detail/${res.data.eventId || res.data.id}?eventId=${res.data.eventId || res.data.id}`
                       );
+                      toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {
                       setJoinError(
                         err.response?.data?.message || "Tham gia thất bại"
