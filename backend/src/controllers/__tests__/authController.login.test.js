@@ -62,14 +62,34 @@ describe('authController - login', () => {
   test('TC02 - Wrong password -> 400', async () => {
     User.findOne.mockResolvedValue({
       _id: 'u1',
-      email: 'a@p.com',
+      email: 'b@p.com',
       passwordHash: 'p',
-      verified: true,
       status: 'active'
     })
     bcrypt.compare.mockResolvedValue(false)
 
-    const req = { body: { email: 'a@p.com', password: 'wrong' } }
+    const req = { body: { email: 'b@p.com', password: 'wrong' } }
+    const res = mockRes()
+
+    await authControllerModule.login(req, res)
+
+    expect(bcrypt.compare).toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Email or password is incorrect'
+    }))
+  })
+  // TC03 - Empty password
+  test('TC03 - Empty password -> 400', async () => {
+    User.findOne.mockResolvedValue({
+      _id: 'u1',
+      email: 'b@p.com',
+      passwordHash: 'p',
+      status: 'active'
+    })
+    bcrypt.compare.mockResolvedValue(false)
+
+    const req = { body: { email: 'b@p.com', password: '' } }
     const res = mockRes()
 
     await authControllerModule.login(req, res)
@@ -81,17 +101,17 @@ describe('authController - login', () => {
     }))
   })
 
-  // TC03 - Unverified or inactive user
-  test('TC03 - User not verified or inactive -> 403', async () => {
+  // TC04 - Inactive user
+  test('TC04 - User not verified or inactive -> 403', async () => {
     User.findOne.mockResolvedValue({
       _id: 'u2',
-      email: 'b@x.com',
+      email: 'b@p.com',
       passwordHash: 'p',
       status: 'pending'
     })
     bcrypt.compare.mockResolvedValue(true)
 
-    const req = { body: { email: 'b@x.com', password: 'p' } }
+    const req = { body: { email: 'b@p.com', password: 'p' } }
     const res = mockRes()
 
     await authControllerModule.login(req, res)
@@ -101,14 +121,33 @@ describe('authController - login', () => {
       message: 'Account is not active'
     }))
   })
+  //TC05 - Banned user
+  test('TC05 - Banned user -> 403', async () => {
+    User.findOne.mockResolvedValue({
+      _id: 'u2',
+      email: 'b@p.com',
+      passwordHash: 'p',
+      status: 'banned'
+    })
+    bcrypt.compare.mockResolvedValue(true)
 
-  // TC04 - Successful login
-  test('TC04 - Success -> 200', async () => {
+    const req = { body: { email: 'b@p.com', password: 'p' } }
+    const res = mockRes()
+
+    await authControllerModule.login(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(403)
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Account is banned'
+    }))
+  })
+  // TC06 - Successful login
+  test('TC06 - Success -> 200', async () => {
     User.findOne.mockResolvedValue({
       _id: 'u3',
-      email: 'c@x.com',
+      email: 'b@p.com',
       passwordHash: 'hashed',
-      fullName: 'User C',
+      fullName: 'User B',
       role: 'user',
       status: 'active'
     })
@@ -119,19 +158,19 @@ describe('authController - login', () => {
     })
     saveRefreshToken.mockResolvedValue()
 
-    const req = { body: { email: 'c@x.com', password: 'p' } }
+    const req = { body: { email: 'b@p.com', password: 'p' } }
     const res = mockRes()
 
     await authControllerModule.login(req, res)
 
-    expect(User.findOne).toHaveBeenCalledWith({ email: 'c@x.com' })
-    expect(createTokens).toHaveBeenCalledWith('u3', 'c@x.com')
+    expect(User.findOne).toHaveBeenCalledWith({ email: 'd@p.com' })
+    expect(createTokens).toHaveBeenCalledWith('u3', 'd@p.com')
     expect(saveRefreshToken).toHaveBeenCalled()
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       message: 'Login successful!',
       user: expect.objectContaining({
-        email: 'c@x.com',
-        fullName: 'User C',
+        email: 'd@p.com',
+        fullName: 'User D',
         role: 'user',
       }),
       tokens: {

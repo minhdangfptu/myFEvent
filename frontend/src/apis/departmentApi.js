@@ -39,6 +39,15 @@ export const departmentApi = {
     return res.data;
   },
 
+  // Thay đổi trưởng ban (Change Head of Department)
+  changeHoD: async (eventId, departmentId, newHoDId) => {
+    const res = await axiosClient.patch(
+      `/api/events/${eventId}/departments/${departmentId}/change-hod`,
+      { newHoDId }
+    );
+    return res.data;
+  },
+
   // Thêm thành viên vào department
   addMemberToDepartment: async (eventId, departmentId, memberId) => {
     const res = await axiosClient.post(

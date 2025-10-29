@@ -30,6 +30,9 @@ const HoOCDepartmentDetail = () => {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState(null);
+  const [showChangeLeaderModal, setShowChangeLeaderModal] = useState(false);
+  const [selectedNewLeader, setSelectedNewLeader] = useState(null);
+  const [changingLeader, setChangingLeader] = useState(false);
 
   useEffect(() => {
     fetchMembersAndDepartment();
@@ -118,9 +121,7 @@ const HoOCDepartmentDetail = () => {
       setMemberToRemove(member);
       setShowRemoveMemberModal(true);
     } else if (action === "change_leader") {
-      // TODO: Implement change leader functionality
-      console.log("Change leader functionality not implemented yet");
-      toast.info("Chức năng thay đổi trưởng ban đang được phát triển");
+      setShowChangeLeaderModal(true);
     }
   };
 
@@ -207,6 +208,45 @@ const HoOCDepartmentDetail = () => {
     setShowAddMemberModal(false);
     setSelectedMembers([]);
     setMemberSearchQuery("");
+  };
+
+  const handleChangeLeader = async () => {
+    if (!selectedNewLeader) {
+      toast.warning("Vui lòng chọn trưởng ban mới");
+      return;
+    }
+
+    // Check if there are any available members to choose from
+    const availableMembers = members.filter(member => 
+      member.role !== 'HoOC' && member.role !== 'HoD'
+    );
+    
+    if (availableMembers.length === 0) {
+      toast.warning("Không có thành viên nào khác để chọn làm trưởng ban");
+      return;
+    }
+
+    try {
+      setChangingLeader(true);
+      // Backend expects a userId, not membership id
+      const newHoDUserId = selectedNewLeader.userId || selectedNewLeader.id;
+      await departmentService.changeHoD(eventId, id, newHoDUserId);
+      toast.success("Thay đổi trưởng ban thành công!");
+      setShowChangeLeaderModal(false);
+      setSelectedNewLeader(null);
+      // Reload department and members data
+      await fetchMembersAndDepartment();
+    } catch (error) {
+      console.error("Error changing leader:", error);
+      toast.error("Không thể thay đổi trưởng ban");
+    } finally {
+      setChangingLeader(false);
+    }
+  };
+
+  const handleCancelChangeLeader = () => {
+    setShowChangeLeaderModal(false);
+    setSelectedNewLeader(null);
   };
 
   const filteredMembers = members.filter(
@@ -595,6 +635,7 @@ const HoOCDepartmentDetail = () => {
                   <button
                     className="btn btn-primary d-flex align-items-center"
                     style={{ borderRadius: "8px", fontWeight: "400" }}
+                    onClick={() => setShowChangeLeaderModal(true)}
                   >
                     <i className="bi bi-arrow-repeat me-2"></i>
                     Đổi trưởng ban
@@ -929,6 +970,124 @@ const HoOCDepartmentDetail = () => {
                 style={{ borderRadius: "8px" }}
               >
                 Xoá thành viên
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Leader Modal */}
+      {showChangeLeaderModal && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 1050,
+          }}
+        >
+          <div
+            className="bg-white rounded-3 p-4"
+            style={{
+              minWidth: "500px",
+              maxWidth: "600px",
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <div className="d-flex align-items-center mb-3">
+              <i
+                className="bi bi-arrow-repeat text-primary me-2"
+                style={{ fontSize: "1.2rem" }}
+              ></i>
+              <h5
+                className="mb-0"
+                style={{ color: "#1f2937", fontWeight: "600" }}
+              >
+                Thay đổi trưởng ban
+              </h5>
+            </div>
+
+            <p style={{ color: "#6b7280", marginBottom: "20px" }}>
+              Chọn thành viên mới làm trưởng ban cho <strong>{department.name}</strong>.
+              Chỉ có thể chọn từ các thành viên hiện tại trong ban.
+            </p>
+
+            <div className="mb-3">
+              <label className="form-label fw-semibold">
+                Chọn trưởng ban mới <span className="text-danger">*</span>
+              </label>
+              <div className="border rounded-3" style={{ maxHeight: "200px", overflowY: "auto" }}>
+                {(() => {
+                  const availableMembers = members.filter(member => 
+                    member.role !== 'HoOC' && // Exclude HoOC
+                    member.role !== 'HoD'    // Exclude current HoD
+                  );
+                  
+                  if (availableMembers.length === 0) {
+                    return (
+                      <div className="p-4 text-center text-muted">
+                        <i className="bi bi-people me-2"></i>
+                        Không có thành viên nào khác để chọn làm trưởng ban
+                      </div>
+                    );
+                  }
+                  
+                  return availableMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className={`p-3 border-bottom d-flex align-items-center ${
+                        selectedNewLeader?.id === member.id ? 'bg-primary text-white' : ''
+                      }`}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: selectedNewLeader?.id === member.id ? '#0d6efd' : 'transparent'
+                      }}
+                      onClick={() => setSelectedNewLeader(member)}
+                    >
+                      <img
+                        src={member.avatar || `https://i.pravatar.cc/100?u=${member.email}`}
+                        className="rounded-circle me-3"
+                        style={{ width: "40px", height: "40px" }}
+                        alt={member.name}
+                      />
+                      <div className="flex-grow-1">
+                        <div className="fw-semibold">{member.name}</div>
+                        <div className="small text-muted">{member.email}</div>
+                        <div className="small">
+                          <span className="badge bg-secondary">{member.role}</span>
+                        </div>
+                      </div>
+                      {selectedNewLeader?.id === member.id && (
+                        <i className="bi bi-check-circle-fill text-white"></i>
+                      )}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            <div className="d-flex justify-content-end gap-2">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={handleCancelChangeLeader}
+                style={{ borderRadius: "8px" }}
+                disabled={changingLeader}
+              >
+                Huỷ
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleChangeLeader}
+                style={{ borderRadius: "8px" }}
+                disabled={changingLeader || !selectedNewLeader || members.filter(member => member.role !== 'HoOC' && member.role !== 'HoD').length === 0}
+              >
+                {changingLeader ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang thay đổi...
+                  </>
+                ) : (
+                  'Xác nhận thay đổi'
+                )}
               </button>
             </div>
           </div>
