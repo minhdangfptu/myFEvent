@@ -212,7 +212,7 @@ const HoOCMilestoneDetail = () => {
                       borderRadius: '20px'
                     }}
                   >
-                    getStatusLabel({task.status})
+                    {getTaskStatusLabel(task.status)}
                   </span>
                 </div>
               ))}
