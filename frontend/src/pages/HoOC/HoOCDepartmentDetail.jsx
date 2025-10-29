@@ -53,6 +53,7 @@ const HoOCDepartmentDetail = () => {
       toast.error("Lỗi khi tải danh sách thành viên của ban");
     }
   }
+  
 
   const handleEdit = () => {
     if (department) {
@@ -150,6 +151,8 @@ const HoOCDepartmentDetail = () => {
   };
 
   const handleAddMember = async () => {
+    const response = await eventService.getUnassignedMembersByEvent(eventId);
+    setUnassignedMembers(response.data || []);
     setShowAddMemberModal(true);
     await loadUnassignedMembers();
   };
@@ -817,14 +820,14 @@ const HoOCDepartmentDetail = () => {
                               color: "#6b7280",
                             }}
                           >
-                            {member.name?.charAt(0) || "?"}
+                            {member.userId?.fullName?.charAt(0) || "?"}
                           </div>
                           <div>
                             <h6
                               className="mb-1"
                               style={{ color: "#1f2937", fontWeight: "500" }}
                             >
-                              {member.name || "Unknown"}
+                              {member.userId?.fullName || "Unknown"}
                             </h6>
                             <p
                               className="mb-0"
