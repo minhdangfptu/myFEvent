@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
+import UserLayout from '../../components/UserLayout';
 import { milestoneService } from '../../services/milestoneService';
 import { formatDate } from '~/utils/formatDate';
 import { toast } from 'react-toastify';
@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 const HoOCMilestoneDetail = () => {
   const navigate = useNavigate();
   const { eventId, id } = useParams();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
   const [milestone, setMilestone] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
@@ -98,48 +98,9 @@ const HoOCMilestoneDetail = () => {
   }
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="work-timeline"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h2 className="mb-1" style={{ color: '#1f2937', fontWeight: '600' }}>
-              Milestone Detail Page
-            </h2>
-            <div className="d-flex align-items-center">
-              <i className="bi bi-list me-2" style={{ color: '#6b7280' }}></i>
-              <img 
-                src="/website-icon-fix@3x.png" 
-                alt="myFEvent" 
-                style={{ width: 24, height: 24, marginRight: '8px' }}
-              />
-              <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                myFEvent
-              </span>
-            </div>
-          </div>
-          
-          <div className="d-flex align-items-center">
-            <i className="bi bi-bell me-3" style={{ fontSize: '1.2rem', color: '#6b7280' }}></i>
-            <i className="bi bi-person-circle" style={{ fontSize: '1.5rem', color: '#6b7280' }}></i>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout title="Milestone Detail Page" sidebarType="hooc" activePage="work-timeline">
+      {/* Main Content */}
+      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           {/* Milestone Header */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#1f2937', fontWeight: '600', margin: 0 }}>
@@ -230,7 +191,6 @@ const HoOCMilestoneDetail = () => {
               ))}
             </div>
           </div>
-        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -295,7 +255,7 @@ const HoOCMilestoneDetail = () => {
           </div>
         </div>
       )}
-    </div>
+    </UserLayout>
   );
 };
 

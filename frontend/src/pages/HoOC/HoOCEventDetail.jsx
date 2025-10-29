@@ -5,6 +5,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
+import ConfirmModal from "../../components/ConfirmModal";
+import { userApi } from "../../apis/userApi";
 
 export default function HoOCEventDetail() {
   const { eventId } = useParams();
@@ -29,6 +31,35 @@ export default function HoOCEventDetail() {
   const [imageUrl, setImageUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    action: null,
+    message: "",
+  });
+  const [secondConfirm, setSecondConfirm] = useState(false);
+  const [passwordModal, setPasswordModal] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [otpModal, setOtpModal] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otpMsg, setOtpMsg] = useState("");
+  console.log(user);
+  const isGoogleUser = user?.authProvider === "google";
+  const [showGoogleDeleteWarning, setShowGoogleDeleteWarning] = useState(false);
+
+  // Bộ xử lý xác nhận (chung)
+  const handleOpenConfirm = (action, message) => {
+    setConfirmModal({ show: true, action, message });
+  };
+  const handleCloseConfirm = () =>
+    setConfirmModal({ show: false, action: null, message: "" });
+  const handleConfirm = async () => {
+    if (confirmModal.action) await confirmModal.action();
+    setConfirmModal({ show: false, action: null, message: "" });
+  };
 
   // Check if user is HoOC
   // const isHoOC = user?.role === "HoOC";
@@ -47,7 +78,6 @@ export default function HoOCEventDetail() {
 
       setEvent(eventRes.data);
       setMembers(membersRes.data.members || []);
-      // console.log("user>>>>>>>>>>>>>>",membersRes.data.members);
       setEditForm({
         name: eventRes.data.name || "",
         description: eventRes.data.description || "",
@@ -99,20 +129,81 @@ export default function HoOCEventDetail() {
     }
   };
 
-  const handleDelete = async () => {
-    if (
-      !window.confirm(
-        "Bạn có chắc chắn muốn xóa sự kiện này? Hành động này không thể hoàn tác."
-      )
-    ) {
-      return;
-    }
+  //Change event type
+  const handleChangeType = async () => {
+    handleOpenConfirm(async () => {
+      try {
+        await eventApi.updateEvent(eventId, { type: "public" });
+        toast.success("Thay đổi trạng thái thành công!");
+        await fetchEventDetails();
+      } catch (error) {
+        console.error("Change type error:", error);
+        toast.error(
+          error.response?.data?.message || "Thay đổi trạng thái thất bại"
+        );
+      }
+    }, `Bạn có chắc chắn muốn thay đổi trạng thái công khai sự kiện này? \n Khi bạn thay đổi trạng thái sự kiện, thông tin sự kiện sẽ được công khai cho tất cả mọi người. \nHành động này không thể hoàn tác.`);
+  };
 
+  // Delete event (xoá 2 bước)
+  const handleDelete = async () => {
+    handleOpenConfirm(async () => {
+      setSecondConfirm(true); // Sau xác nhận đầu, mở modal xác nhận thứ 2
+    }, "Bạn có chắc chắn muốn xóa sự kiện này? Khi bạn xóa sự kiện, mọi dữ liệu về Ban tổ chức và thành viên sẽ bị xóa vĩnh viễn và không thể khôi phục. Hành động này không thể hoàn tác.");
+  };
+
+  // Hàm gọi api xóa thật sự
+  const doDeleteEvent = async () => {
     try {
       await eventApi.deleteEvent(eventId);
-      navigate("/home-page");
+      navigate(
+        "/home-page",
+        {
+          replace: true,
+          state: {
+            toast: { type: "success", message: "Xoá sự kiện thành công!" },
+          },
+        },
+        window.location.reload()
+      );
     } catch (error) {
       setError("Xóa sự kiện thất bại");
+    } finally {
+      setSecondConfirm(false);
+    }
+  };
+
+  // sau khi xác nhận lần hai, mở modal nhập mật khẩu
+  const onSecondDeleteConfirm = () => {
+    setSecondConfirm(false);
+    setPassword("");
+    setPasswordError("");
+    if (isGoogleUser) {
+      setOtpModal(true);
+      setOtpMsg("");
+      setOtp(["", "", "", "", "", ""]);
+      setOtpError("");
+      setOtpSent(false);
+    } else {
+      setPasswordModal(true);
+    }
+  };
+
+  // xác thực mật khẩu rồi gọi api xoá nếu ok
+  const handleCheckPasswordAndDelete = async () => {
+    setPasswordError("");
+    if (!password.trim()) {
+      setPasswordError("Vui lòng nhập mật khẩu!");
+      return;
+    }
+    try {
+      await userApi.checkPassword(password);
+      setPasswordModal(false);
+      await doDeleteEvent();
+    } catch (err) {
+      setPasswordError(
+        err.response?.data?.message || "Mật khẩu không đúng, vui lòng thử lại!"
+      );
     }
   };
 
@@ -124,7 +215,7 @@ export default function HoOCEventDetail() {
   const getImageSrc = (image) => {
     if (!image) return "/default-events.jpg";
 
-    // Nếu image là array, lấy ảnh đầu tiên
+    //take first image
     if (Array.isArray(image) && image.length > 0) {
       const firstImage = image[0];
       if (typeof firstImage === "string" && firstImage.startsWith("data:")) {
@@ -133,7 +224,7 @@ export default function HoOCEventDetail() {
       return `data:image/jpeg;base64,${firstImage}`;
     }
 
-    // Nếu image là string
+    //image is string
     if (typeof image === "string") {
       if (image.startsWith("data:")) {
         return image;
@@ -196,25 +287,23 @@ export default function HoOCEventDetail() {
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
+  //delete image
   const removeExistingImage = async (index) => {
-    if (!event.image || !Array.isArray(event.image)) return;
-
-    try {
-      setSubmitting(true);
-      setError("");
-
-      // Tạo array mới không có ảnh tại index
-      const updatedImages = event.image.filter((_, i) => i !== index);
-
-      await eventApi.replaceEventImages(eventId, updatedImages);
-      await fetchEventDetails();
-      toast.success("Xóa ảnh thành công!");
-    } catch (error) {
-      console.error("Remove image error:", error);
-      setError("Xóa ảnh thất bại");
-    } finally {
-      setSubmitting(false);
-    }
+    handleOpenConfirm(async () => {
+      try {
+        setSubmitting(true);
+        setError("");
+        const updatedImages = event.image.filter((_, i) => i !== index);
+        await eventApi.replaceEventImages(eventId, updatedImages);
+        await fetchEventDetails();
+        toast.success("Xóa ảnh thành công!");
+      } catch (error) {
+        console.error("Remove image error:", error);
+        setError("Xóa ảnh thất bại");
+      } finally {
+        setSubmitting(false);
+      }
+    }, "Bạn có chắc chắn muốn xóa ảnh này?");
   };
 
   const convertToBase64 = (file) => {
@@ -244,7 +333,7 @@ export default function HoOCEventDetail() {
       const urlImages = imagePreviews.filter((_, i) => i >= imageFiles.length);
       const allImages = [...base64Images, ...urlImages];
 
-      // Sử dụng replaceEventImages API để thay thế toàn bộ ảnh
+      // replace all images
       await eventApi.replaceEventImages(eventId, allImages);
 
       setImageFiles([]);
@@ -256,6 +345,64 @@ export default function HoOCEventDetail() {
       toast.error("Cập nhật hình ảnh thất bại");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const sendOtp = async () => {
+    setOtpLoading(true);
+    setOtpError("");
+    setOtpMsg("");
+    try {
+      await userApi.sendDeleteOtp(user.email);
+      setOtpSent(true);
+      setOtpMsg("Đã gửi mã xác nhận, vui lòng kiểm tra email và nhập mã OTP.");
+    } catch (err) {
+      setOtpError(
+        err.response?.data?.message || "Không thể gửi mã xác nhận. Hãy thử lại!"
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const verifyOtpAndDelete = async () => {
+    setOtpError("");
+    setOtpMsg("");
+    const code = otp.join("");
+    if (code.length !== 6) {
+      setOtpError("Vui lòng nhập đủ 6 số.");
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      await userApi.verifyDeleteOtp(user.email, code);
+      setOtpModal(false);
+      await doDeleteEvent();
+    } catch (err) {
+      setOtpError(
+        err.response?.data?.message || "Sai mã xác nhận, vui lòng thử lại!"
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index, value) => {
+    if (value.length <= 1 && /^\d*$/.test(value)) {
+      const newOtp = [...otp];
+      newOtp[index] = value;
+      setOtp(newOtp);
+      // Auto-focus
+      if (value && index < 5) {
+        const nextInput = document.getElementById(`otp-${index + 1}`);
+        nextInput?.focus();
+      }
+    }
+  };
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
     }
   };
 
@@ -708,20 +855,30 @@ export default function HoOCEventDetail() {
             <div className="info-card">
               <h5>Hành động sự kiện</h5>
               <div className="d-flex gap-2 flex-wrap">
-                <button
-                  className="btn btn-outline-secondary"
-                  onClick={() => setActiveTab("info")}
-                >
-                  <i className="bi bi-image me-2"></i>Xem hình ảnh
-                </button>
+                {event.type === "public" ? (
+                  <button
+                    disabled
+                    className="btn btn-warning"
+                    onClick={handleChangeType}
+                  >
+                    <i className="bi bi-eye me-2"></i>Công khai sự kiện
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-warning"
+                    onClick={handleChangeType}
+                  >
+                    <i className="bi bi-eye me-2"></i>Công khai sự kiện
+                  </button>
+                )}
                 <button className="btn btn-danger" onClick={handleDelete}>
                   <i className="bi bi-trash me-2"></i>Xóa sự kiện
                 </button>
               </div>
               <p className="text-muted small mt-3 mb-0">
                 <i className="bi bi-exclamation-triangle me-1"></i>
-                Xóa sự kiện sẽ ảnh hưởng tới toàn bộ thành viên và không thể
-                hoàn tác.
+                LƯU Ý: Các hành động này sẽ ảnh hưởng tới sự kiện cũng như toàn
+                bộ thành viên và không thể hoàn tác.
               </p>
             </div>
           </div>
@@ -982,6 +1139,253 @@ export default function HoOCEventDetail() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* thể hiện modal xác nhận chung */}
+      <ConfirmModal
+        show={confirmModal.show}
+        onClose={handleCloseConfirm}
+        onConfirm={handleConfirm}
+        message={confirmModal.message}
+      />
+      {/* Modal xác nhận bước 2 */}
+      <ConfirmModal
+        show={secondConfirm}
+        onClose={() => setSecondConfirm(false)}
+        onConfirm={onSecondDeleteConfirm}
+        message={
+          <span style={{ color: "red" }}>
+            <b>XÁC NHẬN QUAN TRỌNG:</b>
+            <br /> Thao tác này sẽ xóa vĩnh viễn toàn bộ dữ liệu, KHÔNG THỂ KHÔI
+            PHỤC.
+            <br />
+            Bạn chắc chắn muốn thực hiện?
+          </span>
+        }
+      />
+      {/* Modal cảnh báo user google không xoá được, chuyển tới cài đặt */}
+      {showGoogleDeleteWarning && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 3200,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 10,
+              width: 420,
+              padding: 24,
+            }}
+          >
+            <div className="mb-3 text-danger">
+              <b>Bạn đang đăng nhập bằng Google.</b>
+              <br /> Để xoá sự kiện vui lòng thiết lập mật khẩu cho tài khoản
+              trong phần <b>Cài đặt</b>.<br />
+              <span className="text-muted">
+                (Vào "Hồ sơ" hoặc "Cài đặt tài khoản", đổi hoặc đặt mật khẩu
+                mới. Sau khi đặt mật khẩu xong, hãy thực hiện lại thao tác xoá
+                sự kiện này.)
+              </span>
+            </div>
+            <div className="d-flex justify-content-end gap-2 mt-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowGoogleDeleteWarning(false)}
+              >
+                Đóng
+              </button>
+              <a href="/setting" className="btn btn-primary">
+                Đi tới cài đặt
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal nhập mật khẩu xác nhận xoá như cũ */}
+      {passwordModal && !isGoogleUser && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 3100,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 10,
+              width: 420,
+              padding: 24,
+            }}
+          >
+            <div className="mb-3">
+              Nhập mật khẩu tài khoản để xác nhận xoá.<br></br>
+              <span style={{ color: "red" }}>
+                <b>Lưu ý, hành động xóa KHÔNG THỂ KHÔI PHỤC</b>
+              </span>
+              :
+            </div>
+            <input
+              type="password"
+              className="form-control mb-2"
+              value={password}
+              placeholder="Mật khẩu"
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              disabled={false}
+            />
+            {passwordError && (
+              <div className="text-danger small mb-2">{passwordError}</div>
+            )}
+            <div className="d-flex justify-content-end gap-2 mt-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setPasswordModal(false)}
+              >
+                Huỷ
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleCheckPasswordAndDelete}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal OTP xác nhận xóa cho user Google */}
+      {otpModal && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 3200,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 10,
+              width: 420,
+              padding: 24,
+            }}
+          >
+            <div className="mb-3 text-danger">
+              <b>Xác nhận xoá sự kiện bằng mã OTP</b>
+            </div>
+            <div className="mb-2">
+              {otpSent ? (
+                <>
+                  Chúng tôi đã gửi mã xác nhận tới email Google{" "}
+                  <b>{user.email}</b>. Nhập mã gồm 6 số:
+                </>
+              ) : (
+                <>
+                  Nhấn "Gửi mã" để nhận mã xác nhận qua email Google{" "}
+                  <b>{user.email}</b> trước khi xoá sự kiện này.
+                </>
+              )}
+            </div>
+            {otpMsg && (
+              <div className="alert alert-success p-2 mb-2">{otpMsg}</div>
+            )}
+            {otpError && (
+              <div className="alert alert-danger p-2 mb-2">{otpError}</div>
+            )}
+            {otpSent ? (
+              <>
+                <div className="d-flex gap-2 justify-content-between mb-2">
+                  {otp.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`otp-${idx}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                      className="form-control text-center fw-semibold"
+                      style={{ width: 48, height: 48, fontSize: "1.2rem" }}
+                      disabled={otpLoading}
+                    />
+                  ))}
+                </div>
+                <div className="d-flex gap-2 justify-content-between mb-2">
+                  <button
+                    className="btn btn-light flex-fill"
+                    disabled={otpLoading}
+                    onClick={() => {
+                      setOtpModal(false);
+                      setOtpError("");
+                    }}
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    className="btn btn-danger flex-fill"
+                    disabled={otpLoading}
+                    onClick={verifyOtpAndDelete}
+                  >
+                    {otpLoading ? "Đang xác nhận..." : "Xác nhận xoá"}
+                  </button>
+                </div>
+                <div className="text-secondary small mt-2">
+                  Không nhận được mã? &nbsp;
+                  <button
+                    className="btn btn-link p-0 align-baseline"
+                    style={{ color: "#ef4444" }}
+                    disabled={otpLoading}
+                    onClick={sendOtp}
+                  >
+                    Gửi lại mã xác nhận
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="d-flex gap-2 justify-content-end mt-3">
+                <button
+                  className="btn btn-light"
+                  onClick={() => setOtpModal(false)}
+                  disabled={otpLoading}
+                >
+                  Huỷ
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={sendOtp}
+                  disabled={otpLoading}
+                >
+                  {otpLoading ? "Đang gửi mã..." : "Gửi mã"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

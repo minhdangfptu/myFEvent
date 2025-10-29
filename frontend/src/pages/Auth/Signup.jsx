@@ -83,13 +83,7 @@ export default function SignupPage() {
       if (userData) {
         window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } }));
       }
-
-      // Navigate based on user role
-      if (userData?.role === 'HoOC') {
-        navigate('/hooc-landing-page', { replace: true });
-      } else {
-        navigate('/user-landing-page', { replace: true });
-      }
+        navigate('/home-page', { replace: true });  
     } catch (error) {
       console.error('Google signup error:', error);
       setError(error.response?.data?.message || error?.message || 'Đăng ký Google thất bại.');

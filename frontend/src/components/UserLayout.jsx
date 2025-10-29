@@ -86,7 +86,7 @@ export default function UserLayout({
           />
 
           {/* Main Content Area */}
-          <main className="flex-grow-1 px-4 pb-4 pt-4">
+          <main style = {{minHeight: '85vh'}} className="flex-grow-1 px-4 pb-4 pt-4">
             {children}
           </main>
         </div>

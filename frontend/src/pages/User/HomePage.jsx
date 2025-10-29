@@ -10,6 +10,8 @@ import { eventService } from "../../services/eventService";
 import { userApi } from "../../apis/userApi";
 import { useEvents } from "../../contexts/EventContext";
 import Loading from "../../components/Loading";
+import ConfirmModal from '../../components/ConfirmModal';
+import NoDataImg from '~/assets/no-data.png';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -58,6 +60,8 @@ export default function HomePage() {
   const [imageInputType, setImageInputType] = useState("url"); // "url" hoặc "file"
   const [imageUrl, setImageUrl] = useState("");
   const [blogs, setBlogs] = useState([]);
+  const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
+  const [joinCodeForModal, setJoinCodeForModal] = useState("");
 
   const { events, loading } = useEvents();
 
@@ -221,7 +225,7 @@ export default function HomePage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(255,255,255,0.75)",
+            background: "rgba(255,255,255,1)",
             zIndex: 2000,
             display: "flex",
             justifyContent: "center",
@@ -443,129 +447,127 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ====== Event ====== */}
-        <div className="row g-4">
-          {filteredEvents.map((event, idx) => {
-            return (
-              <div
-                key={event.id || event._id || idx}
-                className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
-              >
-                <div className="event-card h-100">
-                  <div className="position-relative">
-                    <img
-                      src={
-                        event.image && event.image.length > 0
-                          ? event.image[0]
-                          : "/default-events.jpg"
-                      }
-                      alt={event.name}
-                      className="event-img"
-                      style={{
-                        width: "100%",
-                        height: "180px",
-                        objectFit: "cover",
-                        background: "#f3f4f6",
-                      }}
-                    />
-                    {/* Image count indicator */}
-                    {event.image && event.image.length > 1 && (
-                      <div className="position-absolute top-0 end-0 m-2">
-                        <span className="badge bg-dark bg-opacity-75 text-white">
-                          <i className="bi bi-images me-1"></i>
-                          {event.image.length}
+        {filteredEvents.length === 0 ? (
+          <div className="d-flex flex-column justify-content-center align-items-center py-5">
+            <img src={NoDataImg} alt="Không có sự kiện" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
+            <div className="text-muted mt-3" style={{ fontSize: 18 }}>Bạn chưa tham gia sự kiện nào!</div>
+          </div>
+        ) : (
+          <div className="row g-4">
+            {filteredEvents.map((event, idx) => {
+              return (
+                <div
+                  key={event.id || event._id || idx}
+                  className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
+                >
+                  <div className="event-card h-100">
+                    <div className="position-relative">
+                      <img
+                        src={
+                          event.image && event.image.length > 0
+                            ? event.image[0]
+                            : "/default-events.jpg"
+                        }
+                        alt={event.name}
+                        className="event-img"
+                        style={{
+                          width: "100%",
+                          height: "180px",
+                          objectFit: "cover",
+                          background: "#f3f4f6",
+                        }}
+                      />
+                      {/* Image count indicator */}
+                      {event.image && event.image.length > 1 && (
+                        <div className="position-absolute top-0 end-0 m-2">
+                          <span className="badge bg-dark bg-opacity-75 text-white">
+                            <i className="bi bi-images me-1"></i>
+                            {event.image.length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="event-body">
+                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        {event.status && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-lightning-charge-fill me-1" />
+                            {event.status}
+                          </span>
+                        )}
+                        {event.eventDate && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-calendar-event me-1" />
+                            {formatDate(event.eventDate)}
+                          </span>
+                        )}
+                        {event.location && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-geo-alt me-1" />
+                            {event.location}
+                          </span>
+                        )}
+                        {/* Position - role của user trong event */}
+                        <span
+                          style={{ color: "white", backgroundColor: "#dc2626" }}
+                          className="event-chip chip-gray"
+                        >
+                          <i className="bi bi-person-badge me-1" />
+
+                          {event.eventMember?.userId?.fullName || user.fullName}
+                          {" - "}
+                          {event.eventMember?.role || "Không rõ"}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="event-body">
-                    <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                      {event.status && (
-                        <span className="event-chip chip-gray">
-                          <i className="bi bi-lightning-charge-fill me-1" />
-                          {event.status}
-                        </span>
-                      )}
-                      {event.eventDate && (
-                        <span className="event-chip chip-gray">
-                          <i className="bi bi-calendar-event me-1" />
-                          {formatDate(event.eventDate)}
-                        </span>
-                      )}
-                      {event.location && (
-                        <span className="event-chip chip-gray">
-                          <i className="bi bi-geo-alt me-1" />
-                          {event.location}
-                        </span>
-                      )}
-                      {/* Position - role của user trong event */}
-                      <span
-                        style={{ color: "white", backgroundColor: "#dc2626" }}
-                        className="event-chip chip-gray"
-                      >
-                        <i className="bi bi-person-badge me-1" />
-
-                        {event.eventMember?.userId?.fullName || user.fullName}
-                        {" - "}
-                        {event.eventMember?.role || "Không rõ"}
-                      </span>
-                    </div>
-                    <div className="event-title">{event.name}</div>
-                    <p className="event-desc mb-3">{event.description}</p>
-                    <div className="d-flex justify-content-between">
-                      <button
-                        className="ghost-btn"
-                        onClick={() =>
-                          navigate(
-                            `/member-event-detail/${
-                              event.id || event._id || idx
-                            }`
-                          )
-                        }
-                      >
-                        Xem chi tiết
-                      </button>
-                      <button
-                        className="ghost-btn"
-                        style={{ backgroundColor: "#dc2626", color: "white" }}
-                        onClick={() => {
-                          const role = event.eventMember?.role;
-                          const eid = event.id || event._id || idx;
-                          if (role === "Member") {
+                      <div className="event-title">{event.name}</div>
+                      <p className="event-desc mb-3">{event.description}</p>
+                      <div className="d-flex justify-content-between">
+                        <button
+                          className="ghost-btn"
+                          onClick={() =>
                             navigate(
-                              `/member-event-detail/${eid}?eventId=${eid}`
-                            );
-                            return;
+                              `/member-event-detail/${
+                                event.id || event._id || idx
+                              }`
+                            )
                           }
-                          if (role === "HoOC") {
-                            navigate(`/hooc-dashboard?eventId=${eid}`);
-                            return;
-                          }
-                          if (role === "HoD") {
-                            navigate(`/hod-landing-page?eventId=${eid}`);
-                            return;
-                          }
-                          // fallback mặc định
-                          // navigate(`${eventDetailPrefix}${eid}`);
-                        }}
-                      >
-                        Truy cập
-                      </button>
+                        >
+                          Xem chi tiết
+                        </button>
+                        <button
+                          className="ghost-btn"
+                          style={{ backgroundColor: "#dc2626", color: "white" }}
+                          onClick={() => {
+                            const role = event.eventMember?.role;
+                            const eid = event.id || event._id || idx;
+                            if (role === "Member") {
+                              navigate(
+                                `/member-event-detail/${eid}?eventId=${eid}`
+                              );
+                              return;
+                            }
+                            if (role === "HoOC") {
+                              navigate(`/hooc-dashboard?eventId=${eid}`);
+                              return;
+                            }
+                            if (role === "HoD") {
+                              navigate(`/hod-landing-page?eventId=${eid}`);
+                              return;
+                            }
+                            // fallback mặc định
+                            // navigate(`${eventDetailPrefix}${eid}`);
+                          }}
+                        >
+                          Truy cập
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-
-          {filteredEvents.length === 0 && (
-            <div className="col-12">
-              <div className="soft-card p-4 text-center text-muted">
-                {t("home.noEvents")}
-              </div>
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ====== Blog ====== */}
@@ -721,8 +723,11 @@ export default function HomePage() {
                         images: [],
                       });
                       setImageUrl("");
-                      alert(`Mã tham gia: ${res.data.joinCode}`);
-                      navigate(`/hooc-event-detail/${res.data.id}`);
+                      setJoinCodeForModal(res.data.joinCode);
+                      setShowJoinCodeModal(true);
+                      // Không alert
+                      // alert(`Mã tham gia: ${res.data.joinCode}`);
+                      // navigate(`/event/${res.data.id}/hooc-event-detail`); // chuyển hướng sau khi đóng modal
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -1011,6 +1016,24 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showJoinCodeModal && (
+        <ConfirmModal
+          show={showJoinCodeModal}
+          onClose={() => setShowJoinCodeModal(false)}
+          onConfirm={() => {
+            setShowJoinCodeModal(false);
+            window.location.reload();
+          }}
+          message={
+            <div>
+              <div className="mb-2"><strong>Mã tham gia sự kiện của bạn:</strong></div>
+              <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 4, color: '#ef4444', marginBottom: 12 }}>{joinCodeForModal}</div>
+              <div className="mb-0">Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự kiện.</div>
+            </div>
+          }
+        />
       )}
     </UserLayout>
   );

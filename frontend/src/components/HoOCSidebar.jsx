@@ -183,7 +183,7 @@ export default function HoOCSidebar({
             <div className="mb-4">
               {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
+                <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-list me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
@@ -195,7 +195,6 @@ export default function HoOCSidebar({
           {sidebarOpen && <div className="group-title">CHỨC NĂNG CHÍNH</div>}
 
           <div className="d-flex flex-column gap-1">
-            {/* Dropdown Tổng quan - Chỉ hiển thị khi có sự kiện */}
             {hasEvent && (
               <div
                 className="menu-item-hover"
@@ -255,7 +254,7 @@ export default function HoOCSidebar({
             {/* Ban sự kiện */}
             <button
               className={`btn-nav ${
-                activePage === "event-board" ? "active" : ""
+                activePage === "department-management" ? "active" : ""
               }`}
               onClick={() => navigate(`/events/${eventId || ''}/hooc-manage-department`)}
               title="Ban sự kiện"

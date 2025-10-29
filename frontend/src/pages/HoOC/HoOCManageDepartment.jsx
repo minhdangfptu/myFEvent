@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
-import UserHeader from '../../components/UserHeader';
+import { toast } from 'react-toastify';
+import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
+import NoDataImg from '~/assets/no-data.png';
+import Loading from '~/components/Loading';
 
 const HoOCManageDepartment = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -68,7 +69,7 @@ const HoOCManageDepartment = () => {
       setShowCreateModal(false);
       setCreateForm({ name: '', description: '' });
       
-      alert('Tạo ban thành công!');
+      toast.success('Tạo ban thành công!');
     } catch (err) {
       console.error('Error creating department:', err);
       setError(err.response?.data?.message || 'Tạo ban thất bại');
@@ -86,26 +87,13 @@ const HoOCManageDepartment = () => {
   );
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="department-management"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <UserHeader title="Manage Department Page" />
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout
+      title="Quản lý phân ban sự kiện"
+      sidebarType="hooc"
+      activePage="department-management"
+    >
+      {/* Main Content */}
+      <div  className="bg-white rounded-3 shadow-sm" style={{height: "80vh", padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
               Danh sách các ban
@@ -137,64 +125,71 @@ const HoOCManageDepartment = () => {
           </div>
 
           {/* Departments Table */}
-          <div className="table-responsive">
-            <table className="table table-hover">
-              <thead>
-                <tr>
-                  <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                    <i className="bi bi-arrow-up text-success me-1"></i>
-                    Tên Ban
-                  </th>
-                  <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                    <i className="bi bi-arrow-up text-success me-1"></i>
-                    Trưởng Ban
-                  </th>
-                  <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                    <i className="bi bi-arrow-up text-success me-1"></i>
-                    Số thành viên
-                  </th>
-                  <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                    <i className="bi bi-arrow-up text-success me-1"></i>
-                    Hành động
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDepartments.map((dept, index) => (
-                  <tr 
-                    key={dept.id}
-                    style={{ 
-                      backgroundColor: index === 0 ? '#f8fafc' : 'transparent',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => handleViewDetails(dept.id)}
-                  >
-                    <td style={{ padding: '15px', fontWeight: '500', color: '#374151' }}>
-                      {dept.name}
-                    </td>
-                    <td style={{ padding: '15px', color: '#6b7280' }}>
-                      {dept.leader}
-                    </td>
-                    <td style={{ padding: '15px', color: '#6b7280' }}>
-                      {dept.memberCount}
-                    </td>
-                    <td style={{ padding: '15px' }}>
-                      <span 
-                        className="text-primary"
-                        style={{ cursor: 'pointer', fontWeight: '500' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewDetails(dept.id);
-                        }}
-                      >
-                        {dept.action}
-                      </span>
-                    </td>
+          {filteredDepartments.length === 0 ? (
+            <div className="d-flex flex-column justify-content-center align-items-center py-4">
+              <img src={NoDataImg} alt="Không có dữ liệu" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
+              <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có ban nào được tạo!</div>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover">
+                <thead>
+                  <tr>
+                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
+                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      Tên Ban
+                    </th>
+                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
+                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      Trưởng Ban
+                    </th>
+                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
+                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      Số thành viên
+                    </th>
+                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
+                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      Hành động
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredDepartments.map((dept, index) => (
+                    <tr 
+                      key={dept.id}
+                      style={{ 
+                        backgroundColor: index === 0 ? '#f8fafc' : 'transparent',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleViewDetails(dept.id)}
+                    >
+                      <td style={{ padding: '15px', fontWeight: '500', color: '#374151' }}>
+                        {dept.name}
+                      </td>
+                      <td style={{ padding: '15px', color: '#6b7280' }}>
+                        {dept.leader}
+                      </td>
+                      <td style={{ padding: '15px', color: '#6b7280' }}>
+                        {dept.memberCount}
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        <span 
+                          className="text-primary"
+                          style={{ cursor: 'pointer', fontWeight: '500' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(dept.id);
+                          }}
+                        >
+                          {dept.action}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Pagination */}
           <div className="d-flex justify-content-center mt-4">
@@ -212,7 +207,6 @@ const HoOCManageDepartment = () => {
               </ul>
             </nav>
           </div>
-        </div>
       </div>
 
       {/* Create Department Modal */}
@@ -305,7 +299,7 @@ const HoOCManageDepartment = () => {
           </div>
         </div>
       )}
-    </div>
+    </UserLayout>
   );
 };
 

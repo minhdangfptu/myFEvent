@@ -15,6 +15,7 @@ import {
   assignHod,
   addMemberToDepartment,
   removeMemberFromDepartment,
+  editDepartment,
 } from '../controllers/departmentController.js';
 import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment } from '../controllers/eventMemberController.js';
 
@@ -62,15 +63,17 @@ router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartme
 
 // Department management
 router.post('/:eventId/departments', authenticateToken, createDepartment);
+
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:eventId/departments/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
-
+router.patch('/:eventId/departments/:departmentId', authenticateToken, editDepartment)
 
 //Event member management
 router.get('/:eventId/members', authenticateToken, getMembersByEvent);
 router.get('/:eventId/unassigned-members', authenticateToken, getUnassignedMembersByEvent);
 router.get('/:eventId/departments/:departmentId/members', authenticateToken, getMembersByDepartment);
+
 //Event role 
 
 export default router;

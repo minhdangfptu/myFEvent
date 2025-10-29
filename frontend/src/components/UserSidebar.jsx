@@ -137,7 +137,7 @@ export default function UserSidebar({
             <div className="mb-4">
               {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
+                <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
                     <i className="bi bi-list me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}

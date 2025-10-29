@@ -54,7 +54,7 @@ import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 
 import { EventProvider } from "./contexts/EventContext";
-import MemberPage from "./pages/Member/MemberEvent";
+import MemberPage from "./pages/ManageDept&Member/MemberEvent";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;

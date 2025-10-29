@@ -167,7 +167,8 @@ export const editDepartment = async (req, res) => {
     if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
     // Kiểm tra quyền HooC
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+    // console.log(">>>>>>>>>>>>>>>>>>.",requesterMembership);
+    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
     }
     // Cập nhật
