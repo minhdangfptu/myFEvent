@@ -98,6 +98,10 @@ export const signup = async (req, res) => {
       }
     }
 
+    if (!email || !password || !fullName || !phone) {
+      return res.status(400).json({ message: 'Missing required fields!' });
+    }
+
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -129,13 +133,13 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Sai tài khoản hoặc mật khẩu' });
+    if (!user) return res.status(404).json({ message: 'Email or password is incorrect' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Sai tài khoản hoặc mật khẩu' });
+    if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
 
-    if (!user.verified || user.status !== 'active') {
-      return res.status(403).json({ message: 'Tài khoản chưa được xác minh. Vui lòng kiểm tra email để xác minh tài khoản.' });
+    if ( user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active' });
     }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
@@ -156,7 +160,6 @@ export const login = async (req, res) => {
   }
 };
 
-// Uses authenticateRefreshToken middleware (req.user, req.authToken)
 export const refreshToken = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);

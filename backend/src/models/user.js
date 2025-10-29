@@ -21,8 +21,6 @@ const UserSchema = new Schema({
   bio: { type: String, default: '' },
   highlight: { type: String, default: '' },
   tags: { type: [String], default: [] },
-  totalEvents: { type: Number, default: 0 },
-  verified: { type: Boolean, default: false },
   phone: {
     type: String,
     required: function () { return this.authProvider === 'local'; },
@@ -36,7 +34,6 @@ const UserSchema = new Schema({
   },
   googleId: { type: String, unique: true, sparse: true },
   authProvider: { type: String, enum: ['local', 'google'], default: 'google' },
-  isFirstLogin: { type: Boolean, default: true },
   role: {
     type: String,
     enum: ['user', 'admin'],
