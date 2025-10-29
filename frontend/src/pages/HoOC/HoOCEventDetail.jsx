@@ -7,6 +7,13 @@ import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { userApi } from "../../apis/userApi";
+import { formatDate, formatDateForInput } from '../../utils/formatDate';
+
+function toDMY(value) {
+  const d = new Date(value);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('vi-VN').replace(/\//g, '-');
+}
 
 export default function HoOCEventDetail() {
   const { eventId } = useParams();
@@ -504,7 +511,7 @@ export default function HoOCEventDetail() {
           <div className="stat-item">
             <i className="bi bi-clock"></i>
             <span>
-              D-Day: {new Date(event.eventDate).toLocaleDateString("vi-VN")}
+              D-Day: {formatDate(event?.eventDate) || "Chưa có thông tin"}
             </span>
           </div>
         </div>
@@ -644,7 +651,7 @@ export default function HoOCEventDetail() {
               </div>
               <div className="mb-3">
                 <strong>Ngày diễn ra:</strong>{" "}
-                {new Date(event.eventDate).toLocaleDateString("vi-VN")}
+                {formatDate(event?.eventDate) || "Chưa có thông tin"}
               </div>
               <div className="mb-3">
                 <strong>Địa điểm:</strong> {event.location || "Chưa cập nhật"}
@@ -776,12 +783,17 @@ export default function HoOCEventDetail() {
                 <input
                   type="date"
                   className="form-control"
-                  value={editing ? editForm.eventDate : event.eventDate}
+                  value={editing ? formatDateForInput(editForm.eventDate) : formatDateForInput(event.eventDate)}
                   onChange={(e) =>
                     setEditForm({ ...editForm, eventDate: e.target.value })
                   }
                   disabled={!editing}
                 />
+                {/* Hiển thị dạng dd-MM-yyyy */}
+                <div className="form-text mt-1">
+                  
+                  Hiển thị dạng dd-MM-yyyy: {toDMY(editing ? editForm.eventDate : event.eventDate) || "Chưa có thông tin"}
+                </div>
               </div>
               <div className="mb-3">
                 <label className="form-label fw-semibold">Địa điểm</label>

@@ -55,6 +55,8 @@ import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 
 import { EventProvider } from "./contexts/EventContext";
 import MemberPage from "./pages/ManageDept&Member/MemberEvent";
+import ManageMemberPage from "./pages/User/ManageMember";
+import MemberProfile from "./pages/ManageDept&Member/MemberProfile";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -186,6 +188,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MemberLandingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/manage-member" 
+            element={
+              <ProtectedRoute>
+                <ManageMemberPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/member-profile" 
+            element={
+              <ProtectedRoute>
+                <MemberProfile />
               </ProtectedRoute>
             } 
           />

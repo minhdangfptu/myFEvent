@@ -40,7 +40,7 @@ export default function HoOCHomePage() {
         if (hasMemberEvent) {
           navigate('/member-landing-page');
         } else {
-          navigate('/user-landing-page');
+          navigate('/hooc-landing-page');
         }
       }
     } catch (error) {
