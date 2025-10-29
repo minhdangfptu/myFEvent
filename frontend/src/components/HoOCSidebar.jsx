@@ -1,101 +1,59 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { eventApi } from "../apis/eventApi";
-import { userApi } from "../apis/userApi";
+import { useEvents } from "../contexts/EventContext";
+import Loading from "./Loading";
 
 export default function HoOCSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
+  
 }) {
+  // UI state cho menu
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
-  const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [theme, setTheme] = useState("light");
-
-  // Hover popup (khi sidebar đóng)
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
-  const [currentEventMembership, setCurrentEventMembership] = useState(null);
-  const hasEvents = events && events.length > 0;
-  const location = useLocation();
+  // Sử dụng eventId từ props
+  const { events, loading } = useEvents();
+  const event = events.find(e => (e._id || e.id) === eventId);
+  const hasEvent = !!event;
   const navigate = useNavigate();
-  const params = new URLSearchParams(location.search);
-  // Lấy eventId từ query hoặc từ path (ví dụ: /hooc-event-detail/abc123)
-  let eventIdFromUrl = params.get("eventId");
-  if (!eventIdFromUrl && location.pathname.includes('/hooc-event-detail/')) {
-    const pathParts = location.pathname.split('/');
-    const index = pathParts.findIndex(part => part === 'hooc-event-detail');
-    if (index !== -1 && pathParts[index + 1]) {
-      eventIdFromUrl = pathParts[index + 1];
-    }
-  }
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await eventApi.listMyEvents();
-        const list = Array.isArray(res?.data) ? res.data : [];
-        let sortedList = list;
-        if (eventIdFromUrl) {
-          const idx = list.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
-          if (idx !== -1) {
-            const [currentEvent] = list.splice(idx, 1);
-            sortedList = [currentEvent, ...list];
-          }
-        }
-        const mapped = sortedList.map(e => ({ 
-          id: e._id || e.id, 
-          name: e.name, 
-          icon: "bi-calendar-event",
-          membership: e.membership,
-        }));
-        if (mounted) {
-          setEvents(mapped);
-          if (eventIdFromUrl) {
-            const evt = mapped.find((ev) => ev.id === eventIdFromUrl);
-            if (evt) {
-              setSelectedEvent(evt.id);
-              setCurrentEventMembership(evt.membership);
-            } else if (mapped.length) {
-              setSelectedEvent(mapped[0].id);
-              setCurrentEventMembership(mapped[0].membership);
-            }
-          } else if (mapped.length && !selectedEvent) {
-            setSelectedEvent(mapped[0].id);
-            setCurrentEventMembership(mapped[0].membership);
-          }
-        }
-      } catch (error) {
-        console.error('HoOC: Error fetching events:', error);
-      }
-    })();
-    return () => { mounted = false };
-  }, [eventIdFromUrl]);
+  // Submenu Tổng quan - HoOC có đầy đủ quyền
+  const overviewSubItems = [
+    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` }
+  ];
 
-  useEffect(() => {
-    if (!sidebarOpen) {
-      setWorkOpen(false);
-      setFinanceOpen(false);
-      setRisksOpen(false);
-      setOverviewOpen(false);
-    }
-  }, [sidebarOpen]);
+  const workSubItems = [
+    { id: "work-board", label: "Bảng công việc", path: "/task" },
+    { id: "work-list", label: "List công việc", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/hooc-manage-milestone` },
+    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
+  ];
+  const financeSubItems = [
+    { id: "budget", label: "Ngân sách", path: "/task" },
+    { id: "expenses", label: "Chi tiêu", path: "/task" },
+    { id: "income", label: "Thu nhập", path: "/task" },
+    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+  ];
+  const risksSubItems = [
+    { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
+    { id: "risk-analysis", label: "Phân tích rủi ro", path: "/risk" },
+    { id: "risk-mitigation", label: "Giảm thiểu rủi ro", path: "/risk" },
+  ];
 
-  useEffect(() => () => { if (hoverTimeout) clearTimeout(hoverTimeout); }, [hoverTimeout]);
-
+  // Hover handlers giữ nguyên
   const handleMouseEnter = (menuType, e) => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-      setHoverTimeout(null);
-    }
+    if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); }
     if (sidebarRef.current && e?.currentTarget) {
       const rect = e.currentTarget.getBoundingClientRect();
       const sidebarRect = sidebarRef.current.getBoundingClientRect();
@@ -111,30 +69,6 @@ export default function HoOCSidebar({
   };
   const handlePopupMouseEnter = () => { if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); } };
   const handlePopupMouseLeave = () => { setHoveredMenu(null); };
-
-  // Submenu Tổng quan - HoOC có đầy đủ quyền
-  const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hooc-event-detail` }
-  ];
-
-  const workSubItems = [
-    { id: "work-board", label: "Bảng công việc", path: "/task" },
-    { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
-  ];
-  const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
-  ];
-  const risksSubItems = [
-    { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
-    { id: "risk-analysis", label: "Phân tích rủi ro", path: "/risk" },
-    { id: "risk-mitigation", label: "Giảm thiểu rủi ro", path: "/risk" },
-  ];
 
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
@@ -180,7 +114,7 @@ export default function HoOCSidebar({
           transform: rotate(720deg);
         }
         .hover-submenu-item.active{ background:#f0f3ff;color:#2563eb;font-weight:700; }
-        .sidebar-content{ flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;scrollbar-width:thin;scrollbar-color:#c1c1c1 #f1f1f1;}
+        .sidebar-content{ flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;scrollbar-width:thin;scrollbar-color:#c1c1c1 #f1f1f1;position:relative;}
         .sidebar-content::-webkit-scrollbar{ width:6px; }
         .sidebar-content::-webkit-scrollbar-track{ background:#f1f1f1;border-radius:3px; }
         .sidebar-content::-webkit-scrollbar-thumb{ background:#c1c1c1;border-radius:3px; }
@@ -211,34 +145,16 @@ export default function HoOCSidebar({
         </div>
 
         {/* Current Event - Chỉ hiển thị khi có sự kiện */}
-        {sidebarOpen && hasEvents && (
+        {sidebarOpen && (
           <div className="mb-3" style={{ paddingBottom: 0 }}>
             <div className="group-title">SỰ KIỆN HIỆN TẠI</div>
-            <div 
-              className="d-flex align-items-center"
-              style={{
-                padding: "8px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "6px",
-                background: "white",
-                color: "#dc2626",
-                fontWeight: "bold",
-                minHeight: 40,
-                overflow: "hidden"
-              }}
-            >
-              
+            <div className="d-flex align-items-center" style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", background: "white", color: "#dc2626", fontWeight: "bold", minHeight: 40, overflow: "hidden" }}>
               <i className="bi bi-calendar-event me-2"></i>
-              <span 
-                style={{ 
-                  overflow: "hidden", 
-                  wordWrap: "break-word", 
-                  whiteSpace: "normal",
-                  lineHeight: "1.2"
-                }}
-                title={events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+              <span
+                style={{ overflow: "hidden", wordWrap: "break-word", whiteSpace: "normal", lineHeight: "1.2" }}
+                title={event?.name || "(Chưa có sự kiện)"}
               >
-                {events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                {event?.name || "(Chưa có sự kiện)"}
               </span>
             </div>
           </div>
@@ -248,23 +164,38 @@ export default function HoOCSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-      <div className="mb-4">
-          {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
-          <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/home-page")} title="Trang chủ">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-list me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Trang chủ</span>}
-              </div>
-            </button>
+        {loading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Loading size={100} />
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
+              <div className="d-flex flex-column gap-1">
+                <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Trang chủ</span>}
+                  </div>
+                </button>
+              </div>
+            </div>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CHỨC NĂNG CHÍNH</div>}
 
           <div className="d-flex flex-column gap-1">
-            {/* Dropdown Tổng quan - Chỉ hiển thị khi có sự kiện */}
-            {hasEvents && (
+            {hasEvent && (
               <div
                 className="menu-item-hover"
                 onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("overview", e)}
@@ -296,7 +227,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -310,7 +241,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -325,7 +256,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "department-management" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = `/events/${selectedEvent || ''}/hooc-manage-department`)}
+              onClick={() => navigate(`/events/${eventId || ''}/hooc-manage-department`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -339,7 +270,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = `/events/${selectedEvent || ''}/members`)}
+              onClick={() => navigate(`/events/${eventId || ''}/members`)}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
@@ -353,7 +284,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "calendar" ? "active" : ""
               }`}
-              onClick={() => (window.location.href = "/task")}
+              onClick={() => navigate("/task")}
               title="Lịch cá nhân"
             >
               <div className="d-flex align-items-center">
@@ -363,7 +294,7 @@ export default function HoOCSidebar({
             </button>
 
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
-            {hasEvents && (
+            {hasEvent && (
               <>
                 <div
                   className="menu-item-hover"
@@ -396,7 +327,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -410,7 +341,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -450,7 +381,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -464,7 +395,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -504,7 +435,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -518,7 +449,7 @@ export default function HoOCSidebar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -529,7 +460,7 @@ export default function HoOCSidebar({
 
                 <button
                   className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => (window.location.href = "/task")}
+                  onClick={() => navigate("/task")}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
@@ -546,13 +477,13 @@ export default function HoOCSidebar({
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
           <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
               <div className="d-flex align-items-center">
                 <i className="bi bi-bell me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
-            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
               <div className="d-flex align-items-center">
                 <i className="bi bi-gear me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Cài đặt</span>}
@@ -560,6 +491,8 @@ export default function HoOCSidebar({
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Theme toggle hoặc Expand button */}

@@ -48,7 +48,7 @@ export default function EventDetailPage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(255,255,255,0.75)",
+            background: "rgba(255,255,255,1)",
             zIndex: 2000,
             display: "flex",
             justifyContent: "center",

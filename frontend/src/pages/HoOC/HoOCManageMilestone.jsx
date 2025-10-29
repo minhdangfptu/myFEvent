@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
 import { milestoneApi } from '../../apis/milestoneApi';
-import Loading from '../../components/Loading';
+import { useEvents } from '../../contexts/EventContext';
 
 const HoOCManageMilestone = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  
+  const { events } = useEvents();
+    
   const [milestones, setMilestones] = useState([]);
   const [hoveredMilestone, setHoveredMilestone] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -19,6 +20,58 @@ const HoOCManageMilestone = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Lấy thông tin sự kiện từ EventContext
+  const currentEvent = events.find(event => event._id === eventId);
+
+  // Mock data cho milestones
+  const mockMilestones = [
+    {
+      id: 1,
+      name: "Kickoff sự kiện",
+      date: "5/9/2025",
+      status: "Sắp tới",
+      description: "Chào mừng tất cả mọi người, và đây là Halloween 2024! Để Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
+      relatedTasks: 7,
+      position: 20
+    },
+    {
+      id: 2,
+      name: "Khởi công",
+      date: "14/9",
+      status: "Đã hoàn thành",
+      description: "Bắt đầu các hoạt động chuẩn bị cho sự kiện",
+      relatedTasks: 5,
+      position: 40
+    },
+    {
+      id: 3,
+      name: "D-DAY",
+      date: "1/11",
+      status: "Đang diễn ra",
+      description: "Ngày chính thức của sự kiện Halloween",
+      relatedTasks: 12,
+      position: 70
+    },
+    {
+      id: 4,
+      name: "Trả quyền lợi nhà tài trợ",
+      date: "2/11",
+      status: "Chưa bắt đầu",
+      description: "Thực hiện các cam kết với nhà tài trợ",
+      relatedTasks: 3,
+      position: 80
+    },
+    {
+      id: 5,
+      name: "Tổng kết",
+      date: "4/11",
+      status: "Chưa bắt đầu",
+      description: "Tổng kết và đánh giá sự kiện",
+      relatedTasks: 4,
+      position: 90
+    }
+  ];
 
   useEffect(() => {
     fetchMilestones();
@@ -165,22 +218,7 @@ const HoOCManageMilestone = () => {
   };
 
   return (
-    <UserLayout title="Manage Milestone Page" sidebarType="hooc" activePage="work-timeline">
-      {loading && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(255,255,255,0.75)',
-            zIndex: 2000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Loading />
-        </div>
-      )}
+    <UserLayout title="Quản lý cột mốc sự kiện" sidebarType="hooc" activePage="work-timeline">
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
@@ -206,7 +244,7 @@ const HoOCManageMilestone = () => {
           {/* Event Timeline */}
           <div className="bg-white border rounded-3 p-4" style={{ border: '1px solid #e5e7eb' }}>
             <h4 className="text-danger mb-4" style={{ fontWeight: '600' }}>
-              HALLOWEEN 2024
+              {currentEvent?.name || 'Sự kiện'}
             </h4>
             
             {/* Timeline */}

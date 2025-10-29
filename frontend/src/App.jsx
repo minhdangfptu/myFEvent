@@ -2,7 +2,7 @@ import * as React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -34,15 +34,14 @@ import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import MemberPage from './pages/User/Member';
 import Risk from './pages/User/Risk';
 import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
 // Member Pages
-import MemberLandingPage from './pages/Member/MemberLandingPage';
-import MemberEventDetail from './pages/Member/MemberEventDetail';
+import MemberLandingPage from "./pages/Member/MemberLandingPage";
+import MemberEventDetail from "./pages/Member/MemberEventDetail";
 
 // Error Pages
 import ErrorPage404 from "./pages/Errors/ErrorPage404";
@@ -53,38 +52,45 @@ import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDLandingPage from "./pages/HoD/HoDLandingPage";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
-import ManageMemberPage from "./pages/User/ManageMember";
 
+import { EventProvider } from "./contexts/EventContext";
+import MemberPage from "./pages/ManageDept&Member/MemberEvent";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  
+
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
         <ToastContainer position="top-right" autoClose={3000} />
         <NotificationsProvider>
-        
-        <Routes>
-          {/* Default Route */}
-          <Route path="/" element={<Navigate to="/landingpage" replace />} />
+          <EventProvider>
+            <Routes>
+              {/* Default Route */}
+              <Route
+                path="/"
+                element={<Navigate to="/landingpage" replace />}
+              />
 
-          {/* Public Routes */}
-          <Route path="/landingpage" element={<LandingPage />} />
-          <Route path="/about" element={<AboutUs />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<PublicEventDetail />} />
-          <Route path="/clubs" element={<Clubs />} />
-          <Route path="/policy" element={<Policy />} />
-          <Route path="/contact" element={<Contact />} />
+              {/* Public Routes */}
+              <Route path="/landingpage" element={<LandingPage />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/events/:id" element={<PublicEventDetail />} />
+              <Route path="/clubs" element={<Clubs />} />
+              <Route path="/policy" element={<Policy />} />
+              <Route path="/contact" element={<Contact />} />
 
-          {/* Authentication Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/register-complete" element={<RegisterComplete />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/email-confirmation" element={<EmailConfirmation />} />
+              {/* Authentication Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/register-complete" element={<RegisterComplete />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/email-confirmation"
+                element={<EmailConfirmation />}
+              />
 
           {/* Protected User Routes */}
           <Route 
@@ -275,32 +281,33 @@ export default function App() {
             }
           />
 
-          {/* Error Routes */}
-          <Route path="/403" element={<ErrorPage403 />} />
-          <Route path="/401" element={<ErrorPage401 />} />
-          <Route path="/502" element={<ErrorPage502 />} />
-          <Route path="/off" element={<ErrorPageOffline />} />
-          <Route
-            path="/unauthorized"
-            element={
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  height: "100vh",
-                  flexDirection: "column",
-                }}
-              >
-                <h1>403 - Unauthorized</h1>
-                <p>You don't have permission to access this page.</p>
-              </div>
-            }
-          />
+              {/* Error Routes */}
+              <Route path="/403" element={<ErrorPage403 />} />
+              <Route path="/401" element={<ErrorPage401 />} />
+              <Route path="/502" element={<ErrorPage502 />} />
+              <Route path="/off" element={<ErrorPageOffline />} />
+              <Route
+                path="/unauthorized"
+                element={
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "100vh",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <h1>403 - Unauthorized</h1>
+                    <p>You don't have permission to access this page.</p>
+                  </div>
+                }
+              />
 
-          {/* 404 Route - Must be last */}
-          <Route path="*" element={<ErrorPage404 />} />
-        </Routes>
+              {/* 404 Route - Must be last */}
+              <Route path="*" element={<ErrorPage404 />} />
+            </Routes>
+          </EventProvider>
         </NotificationsProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>

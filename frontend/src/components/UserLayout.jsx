@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
 import HoOCSidebar from './HoOCSidebar';
 import MemberSidebar from './MemberSidebar';
 import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
 import HoDSideBar from './HoDSideBar';
+import { getEventIdFromUrl } from '../utils/getEventIdFromUrl';
 
 export default function UserLayout({ 
   title, 
@@ -14,9 +16,14 @@ export default function UserLayout({
   showEventAction = false,
   onSearch,
   onEventAction,
-  sidebarType = 'user' 
+  sidebarType = 'user',
+  eventId // Cho phép truyền eventId từ bên ngoài
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+  
+  // Lấy eventId từ URL nếu không được truyền từ props
+  const currentEventId = eventId || getEventIdFromUrl(location.pathname, location.search);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -36,24 +43,28 @@ export default function UserLayout({
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
+            eventId={currentEventId}
           />
         ) : sidebarType === 'member' ? (
           <MemberSidebar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
+            eventId={currentEventId}
           />
         ) :  sidebarType === 'hod' ? (
           <HoDSideBar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
+            eventId={currentEventId}
           />
         ) : (
           <UserSidebar 
             sidebarOpen={sidebarOpen} 
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
+            eventId={currentEventId}
           />
         )}
 
@@ -75,7 +86,7 @@ export default function UserLayout({
           />
 
           {/* Main Content Area */}
-          <main className="flex-grow-1 px-4 pb-4 pt-4">
+          <main style = {{minHeight: '85vh'}} className="flex-grow-1 px-4 pb-4 pt-4">
             {children}
           </main>
         </div>

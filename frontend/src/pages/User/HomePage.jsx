@@ -8,6 +8,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
 import { userApi } from "../../apis/userApi";
+import { useEvents } from "../../contexts/EventContext";
+import Loading from "../../components/Loading";
+import ConfirmModal from '../../components/ConfirmModal';
+import NoDataImg from '~/assets/no-data.png';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -18,25 +22,25 @@ export default function HomePage() {
   // ===== Role config & derive once =====
   const CONFIG_BY_ROLE = {
     User: {
-      title: "Trang chủ User",
+      title: "Trang chủ",
       sidebarType: "user",
       eventDetailPrefix: "/event-detail/",
       allowCreate: true,
     },
     Member: {
-      title: "Trang chủ Member",
+      title: "Trang chủ",
       sidebarType: "member",
       eventDetailPrefix: "/member-event-detail/",
       allowCreate: true,
     },
     HoOC: {
-      title: "Trang chủ HoOC",
+      title: "Trang chủ",
       sidebarType: "hooc",
-      eventDetailPrefix: "/events/",
+      eventDetailPrefix: "/hooc-event-detail/",
       allowCreate: true,
     },
   };
-  const { title, sidebarType, eventDetailPrefix, allowCreate } =
+  const { title, sidebarType, allowCreate } =
     CONFIG_BY_ROLE[user?.role] || CONFIG_BY_ROLE.User;
 
   // ===== UI states =====
@@ -53,13 +57,13 @@ export default function HomePage() {
   const [createError, setCreateError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [imageInputType, setImageInputType] = useState("url"); // "url" hoặc "file"
   const [imageUrl, setImageUrl] = useState("");
-
   const [blogs, setBlogs] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [eventRoles, setEventRoles] = useState({});
+  const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
+  const [joinCodeForModal, setJoinCodeForModal] = useState("");
+
+  const { events, loading } = useEvents();
 
   // ===== Fetch blogs and stop loading =====
   useEffect(() => {
@@ -70,54 +74,11 @@ export default function HomePage() {
       } catch {
         setBlogs([]);
       } finally {
-        setLoading(false);
+        // setLoading(false);
       }
     };
     fetchBlogs();
   }, []);
-
-  // Fetch my events
-  useEffect(() => {
-    const fetchMyEvents = async () => {
-      try {
-        const res = await eventService.listMyEvents();
-        setEvents(Array.isArray(res?.data) ? res.data : []);
-      } catch {
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMyEvents();
-  }, []);
-
-  // Fetch role cho từng event đã join
-  useEffect(() => {
-    if (!events.length) return;
-    let isActive = true;
-    const fetchRoles = async () => {
-      const roleMap = {};
-      await Promise.all(
-        events.map(async (event) => {
-          try {
-            const res = await userApi.getUserRoleByEvent(event.id || event._id);
-            if (res && res.role && res.user?.fullName) {
-              console.log("Kết quả API:", res, "Event:", event.id || event._id);
-              roleMap[event.id || event._id] = {
-                role: res.role,
-                name: res.user.fullName,
-              };
-            }
-          } catch {}
-        })
-      );
-      if (isActive) setEventRoles(roleMap);
-    };
-    fetchRoles();
-    return () => {
-      isActive = false;
-    };
-  }, [events]);
 
   // ===== Image handling functions =====
   const handleFileUpload = (event) => {
@@ -125,23 +86,23 @@ export default function HomePage() {
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setCreateError('Vui lòng chọn file hình ảnh hợp lệ');
+    if (!file.type.startsWith("image/")) {
+      setCreateError("Vui lòng chọn file hình ảnh hợp lệ");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setCreateError('Kích thước file không được vượt quá 5MB');
+      setCreateError("Kích thước file không được vượt quá 5MB");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target.result;
-      setCreateForm(prev => ({
+      setCreateForm((prev) => ({
         ...prev,
-        images: [...prev.images, base64]
+        images: [...prev.images, base64],
       }));
     };
     reader.readAsDataURL(file);
@@ -149,7 +110,7 @@ export default function HomePage() {
 
   const handleUrlAdd = () => {
     if (!imageUrl.trim()) {
-      setCreateError('Vui lòng nhập URL hình ảnh');
+      setCreateError("Vui lòng nhập URL hình ảnh");
       return;
     }
 
@@ -157,22 +118,22 @@ export default function HomePage() {
     try {
       new URL(imageUrl);
     } catch {
-      setCreateError('URL không hợp lệ');
+      setCreateError("URL không hợp lệ");
       return;
     }
 
-    setCreateForm(prev => ({
+    setCreateForm((prev) => ({
       ...prev,
-      images: [...prev.images, imageUrl.trim()]
+      images: [...prev.images, imageUrl.trim()],
     }));
     setImageUrl("");
     setCreateError("");
   };
 
   const removeImage = (index) => {
-    setCreateForm(prev => ({
+    setCreateForm((prev) => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      images: prev.images.filter((_, i) => i !== index),
     }));
   };
 
@@ -261,12 +222,17 @@ export default function HomePage() {
     return (
       <UserLayout title={title} sidebarType={sidebarType}>
         <div
-          className="d-flex justify-content-center align-items-center"
-          style={{ height: 400 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(255,255,255,1)",
+            zIndex: 2000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
         >
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+          <Loading size={80} />
         </div>
       </UserLayout>
     );
@@ -481,131 +447,127 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ====== Event ====== */}
-        <div className="row g-4">
-          {filteredEvents.map((event, idx) => {
-            console.log('Event data:', event);
-            console.log('Event images:', event.image);
-            return (
-            <div
-              key={event.id || event._id || idx}
-              className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
-            >
-              <div className="event-card h-100">
-                <div className="position-relative">
-                  <img
-                    src={event.image && event.image.length > 0 ? event.image[0] : '/default-events.jpg'}
-                    alt={event.name}
-                    className="event-img"
-                    style={{
-                      width: '100%',
-                      height: '180px',
-                      objectFit: 'cover',
-                      background: '#f3f4f6'
-                    }}
-                    onError={(e) => {
-                      console.error('Event image load error:', event.image?.[0]);
-                      e.target.src = '/default-events.jpg';
-                    }}
-                    onLoad={() => {
-                      console.log('Event image loaded successfully:', event.image?.[0]);
-                    }}
-                  />
-                  {/* Image count indicator */}
-                  {event.image && event.image.length > 1 && (
-                    <div className="position-absolute top-0 end-0 m-2">
-                      <span className="badge bg-dark bg-opacity-75 text-white">
-                        <i className="bi bi-images me-1"></i>
-                        {event.image.length}
-                      </span>
+        {filteredEvents.length === 0 ? (
+          <div className="d-flex flex-column justify-content-center align-items-center py-5">
+            <img src={NoDataImg} alt="Không có sự kiện" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
+            <div className="text-muted mt-3" style={{ fontSize: 18 }}>Bạn chưa tham gia sự kiện nào!</div>
+          </div>
+        ) : (
+          <div className="row g-4">
+            {filteredEvents.map((event, idx) => {
+              return (
+                <div
+                  key={event.id || event._id || idx}
+                  className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
+                >
+                  <div className="event-card h-100">
+                    <div className="position-relative">
+                      <img
+                        src={
+                          event.image && event.image.length > 0
+                            ? event.image[0]
+                            : "/default-events.jpg"
+                        }
+                        alt={event.name}
+                        className="event-img"
+                        style={{
+                          width: "100%",
+                          height: "180px",
+                          objectFit: "cover",
+                          background: "#f3f4f6",
+                        }}
+                      />
+                      {/* Image count indicator */}
+                      {event.image && event.image.length > 1 && (
+                        <div className="position-absolute top-0 end-0 m-2">
+                          <span className="badge bg-dark bg-opacity-75 text-white">
+                            <i className="bi bi-images me-1"></i>
+                            {event.image.length}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="event-body">
-                  <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                    {event.status && (
-                      <span className="event-chip chip-gray">
-                        <i className="bi bi-lightning-charge-fill me-1" />
-                        {event.status}
-                      </span>
-                    )}
-                    {event.eventDate && (
-                      <span className="event-chip chip-gray">
-                        <i className="bi bi-calendar-event me-1" />
-                        {formatDate(event.eventDate)}
-                      </span>
-                    )}
-                    {event.location && (
-                      <span className="event-chip chip-gray">
-                        <i className="bi bi-geo-alt me-1" />
-                        {event.location}
-                      </span>
-                    )}
-                    {/* Position - role của user trong event */}
-                    <span
-                      style={{ color: "white", backgroundColor: "red" }}
-                      className="event-chip chip-gray"
-                    >
-                      <i className="bi bi-person-badge me-1" />
+                    <div className="event-body">
+                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        {event.status && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-lightning-charge-fill me-1" />
+                            {event.status}
+                          </span>
+                        )}
+                        {event.eventDate && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-calendar-event me-1" />
+                            {formatDate(event.eventDate)}
+                          </span>
+                        )}
+                        {event.location && (
+                          <span className="event-chip chip-gray">
+                            <i className="bi bi-geo-alt me-1" />
+                            {event.location}
+                          </span>
+                        )}
+                        {/* Position - role của user trong event */}
+                        <span
+                          style={{ color: "white", backgroundColor: "#dc2626" }}
+                          className="event-chip chip-gray"
+                        >
+                          <i className="bi bi-person-badge me-1" />
 
-                      {eventRoles[event.id || event._id]?.name
-                        ? ` ${eventRoles[event.id || event._id].name} - `
-                        : ""}
-                      {eventRoles[event.id || event._id]?.role || "Không rõ"}
-                    </span>
-                  </div>
-                  <div className="event-title">{event.name}</div>
-                  <p className="event-desc mb-3">{event.description}</p>
-                  <div className="d-flex justify-content-between">
-                    <button
-                      className="ghost-btn"
-                      onClick={() =>
-                        navigate(
-                          `/member-event-detail/${event.id || event._id || idx}`
-                        )
-                      }
-                    >
-                      Xem chi tiết
-                    </button>
-                                         <button
-                       className="ghost-btn"
-                       style={{ backgroundColor: "red", color: "white" }}
-                       onClick={() => {
-                         const role = eventRoles[event.id || event._id]?.role;
-                         const eid = event.id || event._id || idx;
-                         if (role === "Member") {
-                           navigate(`/member-event-detail/${eid}?eventId=${eid}`);
-                           return;
-                         }
-                         if (role === "HoOC") {
-                           navigate(`/hooc-dashboard?eventId=${eid}`);
-                           return;
-                         }
-                         if (role === "HoD") {
-                           navigate(`/hod-landing-page?eventId=${eid}`);
-                           return;
-                         }
-                         // fallback mặc định
-                         navigate(`${eventDetailPrefix}${eid}`);
-                       }}
-                     >
-                       Truy cập
-                     </button>
+                          {event.eventMember?.userId?.fullName || user.fullName}
+                          {" - "}
+                          {event.eventMember?.role || "Không rõ"}
+                        </span>
+                      </div>
+                      <div className="event-title">{event.name}</div>
+                      <p className="event-desc mb-3">{event.description}</p>
+                      <div className="d-flex justify-content-between">
+                        <button
+                          className="ghost-btn"
+                          onClick={() =>
+                            navigate(
+                              `/member-event-detail/${
+                                event.id || event._id || idx
+                              }`
+                            )
+                          }
+                        >
+                          Xem chi tiết
+                        </button>
+                        <button
+                          className="ghost-btn"
+                          style={{ backgroundColor: "#dc2626", color: "white" }}
+                          onClick={() => {
+                            const role = event.eventMember?.role;
+                            const eid = event.id || event._id || idx;
+                            if (role === "Member") {
+                              navigate(
+                                `/member-event-detail/${eid}?eventId=${eid}`
+                              );
+                              return;
+                            }
+                            if (role === "HoOC") {
+                              navigate(`/hooc-dashboard?eventId=${eid}`);
+                              return;
+                            }
+                            if (role === "HoD") {
+                              navigate(`/hod-landing-page?eventId=${eid}`);
+                              return;
+                            }
+                            // fallback mặc định
+                            // navigate(`${eventDetailPrefix}${eid}`);
+                          }}
+                        >
+                          Truy cập
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-            );
-          })}
-
-          {filteredEvents.length === 0 && (
-            <div className="col-12">
-              <div className="soft-card p-4 text-center text-muted">
-                {t("home.noEvents")}
-              </div>
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ====== Blog ====== */}
@@ -625,21 +587,28 @@ export default function HomePage() {
               <div className="blog-card h-100">
                 <div className="position-relative">
                   <img
-                    src={blog.image && blog.image.length > 0 ? blog.image[0] : '/default-events.jpg'}
+                    src={
+                      blog.image && blog.image.length > 0
+                        ? blog.image[0]
+                        : "/default-events.jpg"
+                    }
                     alt={blog.name}
                     className="blog-img"
                     style={{
-                      width: '100%',
-                      height: '160px',
-                      objectFit: 'cover',
-                      background: '#f3f4f6'
+                      width: "100%",
+                      height: "160px",
+                      objectFit: "cover",
+                      background: "#f3f4f6",
                     }}
                     onError={(e) => {
-                      console.error('Blog image load error:', blog.image?.[0]);
-                      e.target.src = '/default-events.jpg';
+                      console.error("Blog image load error:", blog.image?.[0]);
+                      e.target.src = "/default-events.jpg";
                     }}
                     onLoad={() => {
-                      console.log('Blog image loaded successfully:', blog.image?.[0]);
+                      console.log(
+                        "Blog image loaded successfully:",
+                        blog.image?.[0]
+                      );
                     }}
                   />
                   {/* Image count indicator */}
@@ -739,13 +708,6 @@ export default function HomePage() {
 
                     try {
                       setCreateSubmitting(true);
-                      console.log('Creating event with data:', {
-                        name: createForm.name,
-                        description: createForm.description,
-                        organizerName: createForm.organizerName,
-                        type: "private",
-                        images: createForm.images,
-                      });
                       const res = await eventApi.create({
                         name: createForm.name,
                         description: createForm.description,
@@ -753,7 +715,6 @@ export default function HomePage() {
                         type: "private",
                         images: createForm.images,
                       });
-                      console.log('Event created successfully:', res);
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",
@@ -762,8 +723,11 @@ export default function HomePage() {
                         images: [],
                       });
                       setImageUrl("");
-                      alert(`Mã tham gia: ${res.data.joinCode}`);
-                      navigate(`/events/${res.data.id}/hooc-event-detail`);
+                      setJoinCodeForModal(res.data.joinCode);
+                      setShowJoinCodeModal(true);
+                      // Không alert
+                      // alert(`Mã tham gia: ${res.data.joinCode}`);
+                      // navigate(`/event/${res.data.id}/hooc-event-detail`); // chuyển hướng sau khi đóng modal
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -821,16 +785,21 @@ export default function HomePage() {
                       disabled={createSubmitting}
                     />
                   </div>
-
                   {/* Image Upload Section */}
                   <div className="mb-3">
-                    <label className="form-label fw-semibold">Hình ảnh sự kiện</label>
-                    
+                    <label className="form-label fw-semibold">
+                      Hình ảnh sự kiện
+                    </label>
+
                     {/* Image Input Type Toggle */}
                     <div className="d-flex gap-2 mb-3">
                       <button
                         type="button"
-                        className={`btn btn-sm ${imageInputType === "url" ? "btn-primary" : "btn-outline-primary"}`}
+                        className={`btn btn-sm ${
+                          imageInputType === "url"
+                            ? "btn-primary"
+                            : "btn-outline-primary"
+                        }`}
                         onClick={() => setImageInputType("url")}
                         disabled={createSubmitting}
                       >
@@ -839,7 +808,11 @@ export default function HomePage() {
                       </button>
                       <button
                         type="button"
-                        className={`btn btn-sm ${imageInputType === "file" ? "btn-primary" : "btn-outline-primary"}`}
+                        className={`btn btn-sm ${
+                          imageInputType === "file"
+                            ? "btn-primary"
+                            : "btn-outline-primary"
+                        }`}
                         onClick={() => setImageInputType("file")}
                         disabled={createSubmitting}
                       >
@@ -889,7 +862,9 @@ export default function HomePage() {
                     {/* Image Preview */}
                     {createForm.images.length > 0 && (
                       <div className="mt-3">
-                        <label className="form-label fw-semibold">Hình ảnh đã chọn:</label>
+                        <label className="form-label fw-semibold">
+                          Hình ảnh đã chọn:
+                        </label>
                         <div className="row g-2">
                           {createForm.images.map((img, index) => (
                             <div key={index} className="col-md-3">
@@ -898,7 +873,11 @@ export default function HomePage() {
                                   src={img}
                                   alt={`Preview ${index + 1}`}
                                   className="img-fluid rounded"
-                                  style={{ width: "100%", height: "100px", objectFit: "cover" }}
+                                  style={{
+                                    width: "100%",
+                                    height: "100px",
+                                    objectFit: "cover",
+                                  }}
                                   onError={(e) => {
                                     e.target.src = "/default-events.jpg";
                                   }}
@@ -908,9 +887,16 @@ export default function HomePage() {
                                   className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
                                   onClick={() => removeImage(index)}
                                   disabled={createSubmitting}
-                                  style={{ width: "24px", height: "24px", padding: "0" }}
+                                  style={{
+                                    width: "24px",
+                                    height: "24px",
+                                    padding: "0",
+                                  }}
                                 >
-                                  <i className="bi bi-x" style={{ fontSize: "12px" }}></i>
+                                  <i
+                                    className="bi bi-x"
+                                    style={{ fontSize: "12px" }}
+                                  ></i>
                                 </button>
                               </div>
                             </div>
@@ -985,7 +971,7 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `${eventDetailPrefix}${res.data.eventId || res.data.id}`
+                        `/member-event-detail?eventId=${res.data.eventId || res.data.id}`
                       );
                     } catch (err) {
                       setJoinError(
@@ -1030,6 +1016,24 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showJoinCodeModal && (
+        <ConfirmModal
+          show={showJoinCodeModal}
+          onClose={() => setShowJoinCodeModal(false)}
+          onConfirm={() => {
+            setShowJoinCodeModal(false);
+            window.location.reload();
+          }}
+          message={
+            <div>
+              <div className="mb-2"><strong>Mã tham gia sự kiện của bạn:</strong></div>
+              <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 4, color: '#ef4444', marginBottom: 12 }}>{joinCodeForModal}</div>
+              <div className="mb-0">Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự kiện.</div>
+            </div>
+          }
+        />
       )}
     </UserLayout>
   );

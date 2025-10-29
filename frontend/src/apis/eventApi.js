@@ -45,8 +45,12 @@ export const eventApi = {
     const res = await axiosClient.post('/api/events/join', { code });
     return res.data;
   },
-  getById: async (id) => {``
+  getById: async (id) => {
     const res = await axiosClient.get(`/api/events/private/${id}`);
+    return res.data;
+  },
+  replaceEventImages: async (eventId, images) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
     return res.data;
   },
   listMyEvents: async () => {

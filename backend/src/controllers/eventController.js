@@ -110,26 +110,26 @@ export const createEvent = async (req, res) => {
     // Process images - support both URLs and base64 uploads
     let processedImages = [];
     if (images && Array.isArray(images)) {
-      console.log('createEvent - Processing images:', images);
+      // console.log('createEvent - Processing images:', images);
       processedImages = images.filter(img => {
         // Accept URLs or base64 data
         if (typeof img === 'string') {
           // Check if it's a URL
           if (img.startsWith('http://') || img.startsWith('https://')) {
-            console.log('createEvent - Valid URL:', img);
+            // console.log('createEvent - Valid URL:', img);
             return true;
           }
           // Check if it's base64 data
           if (img.startsWith('data:image/')) {
-            console.log('createEvent - Valid base64 image');
+            // console.log('createEvent - Valid base64 image');
             return true;
           }
         }
-        console.log('createEvent - Invalid image format:', img);
+        // console.log('createEvent - Invalid image format:', img);
         return false;
       });
     }
-    console.log('createEvent - Processed images:', processedImages);
+    // console.log('createEvent - Processed images:', processedImages);
 
     const event = await Event.create({
       name,
@@ -193,6 +193,7 @@ export const getEventSummary = async (req, res) => {
 export const listMyEvents = async (req, res) => {
   try {
     const memberships = await EventMember.find({ userId: req.user.id })
+    .populate('userId', 'fullName')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -204,15 +205,21 @@ export const listMyEvents = async (req, res) => {
     // Map events with membership info
     const eventsWithMembership = events.map(event => {
       const membership = memberships.find(m => m.eventId.toString() === event._id.toString());
-      console.log('listMyEvents - Event data:', event);
-      console.log('listMyEvents - Event images:', event.image);
+      // console.log('listMyEvents - Event data:', event);
+      // console.log('listMyEvents - Event images:', event.image);
       return {
         ...event,
-        membership: membership ? membership.role : 'Member'
+        eventMember: membership 
+      ? {
+          role: membership.role,
+          userId: membership.userId,
+          _id: membership._id,
+        }
+      : null,
       };
     });
 
-    console.log('listMyEvents - Final events with membership:', eventsWithMembership);
+    // console.log('listMyEvents - Final events with membership:', eventsWithMembership);
 
     return res.status(200).json({ data: eventsWithMembership });
   } catch (error) {
