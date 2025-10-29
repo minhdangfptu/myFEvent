@@ -7,7 +7,8 @@ import { useEvents } from '../../contexts/EventContext';
 const HoOCManageMilestone = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  const { events } = useEvents();
+  const { events, fetchEventRole, getEventRole } = useEvents();
+  const [eventRole, setEventRole] = useState('');
     
   const [milestones, setMilestones] = useState([]);
   const [hoveredMilestone, setHoveredMilestone] = useState(null);
@@ -24,58 +25,26 @@ const HoOCManageMilestone = () => {
   // Lấy thông tin sự kiện từ EventContext
   const currentEvent = events.find(event => event._id === eventId);
 
-  // Mock data cho milestones
-  const mockMilestones = [
-    {
-      id: 1,
-      name: "Kickoff sự kiện",
-      date: "5/9/2025",
-      status: "Sắp tới",
-      description: "Chào mừng tất cả mọi người, và đây là Halloween 2024! Để Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
-      relatedTasks: 7,
-      position: 20
-    },
-    {
-      id: 2,
-      name: "Khởi công",
-      date: "14/9",
-      status: "Đã hoàn thành",
-      description: "Bắt đầu các hoạt động chuẩn bị cho sự kiện",
-      relatedTasks: 5,
-      position: 40
-    },
-    {
-      id: 3,
-      name: "D-DAY",
-      date: "1/11",
-      status: "Đang diễn ra",
-      description: "Ngày chính thức của sự kiện Halloween",
-      relatedTasks: 12,
-      position: 70
-    },
-    {
-      id: 4,
-      name: "Trả quyền lợi nhà tài trợ",
-      date: "2/11",
-      status: "Chưa bắt đầu",
-      description: "Thực hiện các cam kết với nhà tài trợ",
-      relatedTasks: 3,
-      position: 80
-    },
-    {
-      id: 5,
-      name: "Tổng kết",
-      date: "4/11",
-      status: "Chưa bắt đầu",
-      description: "Tổng kết và đánh giá sự kiện",
-      relatedTasks: 4,
-      position: 90
-    }
-  ];
+  
 
+  // Fetch role for this event to decide sidebar and permissions
   useEffect(() => {
-    fetchMilestones();
-  }, [eventId]);
+    let mounted = true;
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole('');
+        return;
+      }
+      try {
+        const role = await fetchEventRole(eventId);
+        if (mounted) setEventRole(role);
+      } catch (_) {
+        if (mounted) setEventRole('');
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [eventId, fetchEventRole]);
 
   const parseAnyDate = (value) => {
     if (!value) return null;
@@ -217,28 +186,34 @@ const HoOCManageMilestone = () => {
     }
   };
 
+  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
+
+  const isMember = eventRole === 'Member';
+
   return (
-    <UserLayout title="Quản lý cột mốc sự kiện" sidebarType="hooc" activePage="work-timeline">
+    <UserLayout title="Quản lý cột mốc sự kiện" sidebarType={sidebarType} activePage="work-timeline" eventId={eventId}>
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
               Cột mốc sự kiện
             </h3>
-            <button 
-              className="btn btn-danger d-flex align-items-center"
-              onClick={handleCreateMilestone}
-              style={{ 
-                backgroundColor: '#dc2626', 
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontWeight: '500'
-              }}
-            >
-              <i className="bi bi-plus-lg me-2"></i>
-              TẠO CỘT MỐC MỚI
-            </button>
+            {!isMember && (
+              <button 
+                className="btn btn-danger d-flex align-items-center"
+                onClick={handleCreateMilestone}
+                style={{ 
+                  backgroundColor: '#dc2626', 
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontWeight: '500'
+                }}
+              >
+                <i className="bi bi-plus-lg me-2"></i>
+                TẠO CỘT MỐC MỚI
+              </button>
+            )}
           </div>
 
           {/* Event Timeline */}
@@ -355,13 +330,15 @@ const HoOCManageMilestone = () => {
               </div>
               
               <div className="d-flex gap-2">
-                <button 
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={() => handleEditMilestone(hoveredMilestone.id)}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Chỉnh sửa
-                </button>
+                {!isMember && (
+                  <button 
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => handleEditMilestone(hoveredMilestone.id)}
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    Chỉnh sửa
+                  </button>
+                )}
                 <button 
                   className="btn btn-primary btn-sm"
                   onClick={() => handleViewDetails(hoveredMilestone.id)}
@@ -375,7 +352,7 @@ const HoOCManageMilestone = () => {
       </div>
 
       {/* Create Milestone Modal */}
-      {showCreateModal && (
+      {!isMember && showCreateModal && (
         <div 
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
           style={{ 

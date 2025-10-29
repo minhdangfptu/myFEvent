@@ -6,7 +6,7 @@ import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
-import { userApi } from "../../apis/userApi";
+import { useEvents } from "../../contexts/EventContext";
 import { formatDate, formatDateForInput } from '../../utils/formatDate';
 
 function toDMY(value) {
@@ -19,11 +19,13 @@ export default function HoOCEventDetail() {
   const { eventId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { fetchEventRole, getEventRole } = useEvents();
   const [activeTab, setActiveTab] = useState("info");
   const [event, setEvent] = useState(null);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [eventRole, setEventRole] = useState("");
   const [editForm, setEditForm] = useState({
     name: "",
     description: "",
@@ -74,6 +76,25 @@ export default function HoOCEventDetail() {
   useEffect(() => {
     fetchEventDetails();
   }, [eventId]);
+
+  // Load role for this event to decide sidebar and permissions
+  useEffect(() => {
+    let mounted = true;
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("");
+        return;
+      }
+      try {
+        const role = await fetchEventRole(eventId);
+        if (mounted) setEventRole(role);
+      } catch (_) {
+        if (mounted) setEventRole("");
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [eventId, fetchEventRole]);
 
   const fetchEventDetails = async () => {
     try {
@@ -413,12 +434,16 @@ export default function HoOCEventDetail() {
     }
   };
 
+  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
+  const isMember = eventRole === 'Member';
+
   if (loading) {
     return (
       <UserLayout
         title="Chi tiết sự kiện"
-        sidebarType="hooc"
+        sidebarType={sidebarType}
         activePage="overview-detail"
+        eventId={eventId}
       >
         <div
           className="d-flex justify-content-center align-items-center"
@@ -448,8 +473,9 @@ export default function HoOCEventDetail() {
     return (
       <UserLayout
         title="Chi tiết sự kiện"
-        sidebarType="hooc"
+        sidebarType={sidebarType}
         activePage="overview-detail"
+        eventId={eventId}
       >
         <div className="alert alert-danger">Không tìm thấy sự kiện</div>
       </UserLayout>
@@ -459,8 +485,9 @@ export default function HoOCEventDetail() {
   return (
     <UserLayout
       title="Chi tiết sự kiện"
-      sidebarType="hooc"
+      sidebarType={sidebarType}
       activePage="overview-detail"
+      eventId={eventId}
     >
       <style>{`
         .event-header { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem; }
@@ -525,12 +552,14 @@ export default function HoOCEventDetail() {
         >
           Thông tin
         </button>
-        <button
-          className={`tab-btn ${activeTab === "settings" ? "active" : ""}`}
-          onClick={() => setActiveTab("settings")}
-        >
-          Cài đặt
-        </button>
+        {!isMember && (
+          <button
+            className={`tab-btn ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >
+            Cài đặt
+          </button>
+        )}
       </div>
 
       {error && (
@@ -733,7 +762,7 @@ export default function HoOCEventDetail() {
             <div className="info-card">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5>Chi tiết sự kiện</h5>
-                {!editing && (
+                {!editing && !isMember && (
                   <button
                     className="btn btn-outline-primary btn-sm"
                     onClick={() => setEditing(true)}
@@ -864,6 +893,7 @@ export default function HoOCEventDetail() {
             </div>
 
             {/* Event Actions */}
+            {!isMember && (
             <div className="info-card">
               <h5>Hành động sự kiện</h5>
               <div className="d-flex gap-2 flex-wrap">
@@ -893,6 +923,7 @@ export default function HoOCEventDetail() {
                 bộ thành viên và không thể hoàn tác.
               </p>
             </div>
+            )}
           </div>
           <div className="col-lg-4">
             {/* Join Code */}

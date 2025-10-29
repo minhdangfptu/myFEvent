@@ -76,41 +76,6 @@ export default function MemberSidebar({
     setHoveredMenu(null);
   };
 
-  // Menu chính - LUÔN có "Trang chủ"
-  const mainMenuItems = useMemo(() => {
-    const items = [
-      {
-        id: "home",
-        icon: "bi-house-door",
-        label: "Trang chủ",
-        path: "/member-landing-page",
-      },
-    ];
-
-    // Member có đầy đủ menu như HoOC trừ thống kê
-    items.push(
-      {
-        id: "event-board",
-        icon: "bi-people",
-        label: "Ban sự kiện",
-        path: "/task",
-      },
-      {
-        id: "members",
-        icon: "bi-person",
-        label: "Thành viên",
-        path: "/member",
-      },
-      {
-        id: "calendar",
-        icon: "bi-calendar",
-        label: "Lịch cá nhân",
-        path: "/task",
-      }
-    );
-
-    return items;
-  }, []);
 
   // Submenu Tổng quan - Member có đầy đủ quyền trừ thống kê
   const overviewSubItems = [
@@ -130,7 +95,7 @@ export default function MemberSidebar({
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/timelines` },
     // Không có work-stats (thống kê tiến độ)
   ];
 
@@ -411,7 +376,7 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "members" ? "active" : ""
               }`}
-              onClick={() => navigate("/member")}
+              onClick={() => navigate(`/events/${eventId || ''}/members`)}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">

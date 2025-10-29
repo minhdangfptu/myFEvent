@@ -113,9 +113,10 @@ export default function ManageMemberPage() {
     total: 0,
     totalPages: 0,
   });
+  const [eventRole, setEventRole] = useState("");
 
   const location = useLocation();
-  const { events: myEvents } = useEvents();
+  const { events: myEvents, fetchEventRole, getEventRole } = useEvents();
 
   // Prefetched from MemberEvent
   const prefetchedEvent = location.state?.event || null;
@@ -141,6 +142,26 @@ export default function ManageMemberPage() {
     const id = (currentEvent?._id || currentEvent?.id) || "";
     if (id && selectedEvent !== id) setSelectedEvent(id);
   }, [currentEvent, selectedEvent]);
+
+  // Load event role for permissions and sidebar
+  useEffect(() => {
+    let mounted = true;
+    const id = (currentEvent?._id || currentEvent?.id) || currentEventId;
+    if (!id) {
+      if (mounted) setEventRole("");
+      return () => {};
+    }
+    const loadRole = async () => {
+      try {
+        const role = await fetchEventRole(id);
+        if (mounted) setEventRole(role);
+      } catch (_) {
+        if (mounted) setEventRole("");
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [currentEvent, currentEventId, fetchEventRole]);
 
   // Nếu có dữ liệu prefetched, flatten ngay và không gọi API
   useEffect(() => {
@@ -223,12 +244,16 @@ export default function ManageMemberPage() {
     r.name.toLowerCase().includes(query.toLowerCase())
   );
 
+  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
+  const isMember = eventRole === 'Member';
+
   return (
     <UserLayout
       title="Quản lý thành viên sự kiện"
-      sidebarType="hooc"
+      sidebarType={sidebarType}
       activePage="members"
       showSearch={false}
+      eventId={currentEventId}
     >
       <style>{`
 				.cell-action{cursor:pointer}
@@ -243,13 +268,15 @@ export default function ManageMemberPage() {
             </div>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <button
-              className="btn btn-danger d-inline-flex align-items-center gap-2"
-              onClick={() => setShowModal(true)}
-            >
-              <i className="bi bi-plus" />
-              Thêm thành viên
-            </button>
+            {!isMember && (
+              <button
+                className="btn btn-danger d-inline-flex align-items-center gap-2"
+                onClick={() => setShowModal(true)}
+              >
+                <i className="bi bi-plus" />
+                Thêm thành viên
+              </button>
+            )}
           </div>
         </div>
 
@@ -368,11 +395,13 @@ export default function ManageMemberPage() {
           </div>
         </div>
 
-        <AddMemberModal
-          open={showModal}
-          onClose={() => setShowModal(false)}
-          onConfirm={() => setShowModal(false)}
-        />
+        {!isMember && (
+          <AddMemberModal
+            open={showModal}
+            onClose={() => setShowModal(false)}
+            onConfirm={() => setShowModal(false)}
+          />
+        )}
       </div>
     </UserLayout>
   );
