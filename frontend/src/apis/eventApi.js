@@ -50,7 +50,7 @@ export const eventApi = {
     return res.data;
   },
   replaceEventImages: async (eventId, images) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/images/replace`, { images });
+    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
     return res.data;
   },
   listMyEvents: async () => {

@@ -152,9 +152,9 @@ export default function HoOCSidebar({
               <i className="bi bi-calendar-event me-2"></i>
               <span
                 style={{ overflow: "hidden", wordWrap: "break-word", whiteSpace: "normal", lineHeight: "1.2" }}
-                title={event?.name || "(Chưa chọn sự kiện)"}
+                title={event?.name || "(Chưa có sự kiện)"}
               >
-                {event?.name || "(Chưa chọn sự kiện)"}
+                {event?.name || "(Chưa có sự kiện)"}
               </span>
             </div>
           </div>
