@@ -1,505 +1,749 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import UserLayout from '../../components/UserLayout';
-import { milestoneApi } from '../../apis/milestoneApi';
-import { useEvents } from '../../contexts/EventContext';
+"use client"
+
+import { useState, useEffect } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import UserLayout from "../../components/UserLayout"
+import { milestoneApi } from "../../apis/milestoneApi"
+import { useEvents } from "../../contexts/EventContext"
+
+const styles = {
+  container: {
+    padding: "2rem",
+    background: "#f8f9fa",
+    minHeight: "100vh",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "2rem",
+  },
+  headerTitle: {
+    fontSize: "1.75rem",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    margin: 0,
+  },
+  btnCreate: {
+    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    color: "white",
+    border: "none",
+    padding: "0.75rem 1.5rem",
+    borderRadius: "0.5rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+  },
+  errorMessage: {
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: "1rem",
+    borderRadius: "0.5rem",
+    marginBottom: "1rem",
+  },
+  content: {
+    display: "grid",
+    gridTemplateColumns: "1fr 2fr",
+    gap: "2rem",
+    background: "white",
+    borderRadius: "1rem",
+    padding: "2rem",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+  },
+  timelineSection: {
+    position: "relative",
+    paddingLeft: "2rem",
+  },
+  timelineLine: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "3px",
+    background: "linear-gradient(180deg, #ef4444 0%, #f87171 50%, #fca5a5 100%)",
+    borderRadius: "2px",
+  },
+  milestonesList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.5rem",
+  },
+  milestoneItem: {
+    display: "flex",
+    gap: "1rem",
+    cursor: "pointer",
+    padding: "1rem",
+    borderRadius: "0.75rem",
+    transition: "all 0.3s ease",
+    position: "relative",
+    left: "-1rem",
+    paddingLeft: "2rem",
+  },
+  milestoneItemActive: {
+    background: "#fef2f2",
+  },
+  milestoneDot: {
+    position: "absolute",
+    left: "-1.5rem",
+    top: "1.25rem",
+    width: "2rem",
+    height: "2rem",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.2)",
+    animation: "pulse 2s infinite",
+  },
+  dotInner: {
+    width: "0.75rem",
+    height: "0.75rem",
+    background: "white",
+    borderRadius: "50%",
+  },
+  milestoneInfo: {
+    flex: 1,
+  },
+  milestoneDate: {
+    fontSize: "0.875rem",
+    color: "#ef4444",
+    fontWeight: 600,
+  },
+  milestoneName: {
+    fontSize: "1rem",
+    fontWeight: 500,
+    color: "#1a1a1a",
+    marginTop: "0.25rem",
+  },
+  detailsSection: {
+    borderLeft: "1px solid #e5e7eb",
+    paddingLeft: "2rem",
+  },
+  milestoneDetails: {
+    animation: "fadeIn 0.3s ease",
+  },
+  detailsHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "1.5rem",
+    paddingBottom: "1rem",
+    borderBottom: "2px solid #f3f4f6",
+  },
+  detailsHeaderTitle: {
+    fontSize: "1.5rem",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    margin: 0,
+  },
+  statusBadge: {
+    color: "white",
+    padding: "0.5rem 1rem",
+    borderRadius: "2rem",
+    fontSize: "0.875rem",
+    fontWeight: 600,
+  },
+  detailsBody: {
+    marginBottom: "2rem",
+  },
+  detailItem: {
+    marginBottom: "1.5rem",
+  },
+  detailLabel: {
+    display: "block",
+    fontSize: "0.875rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    marginBottom: "0.5rem",
+  },
+  detailText: {
+    fontSize: "1rem",
+    color: "#1a1a1a",
+    margin: 0,
+    lineHeight: 1.5,
+  },
+  detailsActions: {
+    display: "flex",
+    gap: "1rem",
+  },
+  btnPrimary: {
+    flex: 1,
+    padding: "0.75rem 1.5rem",
+    border: "none",
+    borderRadius: "0.5rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    fontSize: "0.95rem",
+    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    color: "white",
+    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+  },
+  btnSecondary: {
+    flex: 1,
+    padding: "0.75rem 1.5rem",
+    border: "1px solid #e5e7eb",
+    borderRadius: "0.5rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    fontSize: "0.95rem",
+    background: "#f3f4f6",
+    color: "#1a1a1a",
+  },
+  noSelection: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "300px",
+    color: "#9ca3af",
+    fontSize: "1rem",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    background: "white",
+    borderRadius: "1rem",
+    padding: "2rem",
+    maxWidth: "500px",
+    width: "90%",
+    boxShadow: "0 20px 25px rgba(0, 0, 0, 0.15)",
+    animation: "slideUp 0.3s ease",
+  },
+  modalTitle: {
+    fontSize: "1.5rem",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    margin: "0 0 1.5rem 0",
+  },
+  formGroup: {
+    marginBottom: "1.5rem",
+  },
+  formLabel: {
+    display: "block",
+    fontSize: "0.95rem",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    marginBottom: "0.5rem",
+  },
+  formInput: {
+    width: "100%",
+    padding: "0.75rem",
+    border: "1px solid #e5e7eb",
+    borderRadius: "0.5rem",
+    fontSize: "0.95rem",
+    fontFamily: "inherit",
+    transition: "all 0.3s ease",
+    boxSizing: "border-box",
+  },
+  formTextarea: {
+    width: "100%",
+    padding: "0.75rem",
+    border: "1px solid #e5e7eb",
+    borderRadius: "0.5rem",
+    fontSize: "0.95rem",
+    fontFamily: "inherit",
+    transition: "all 0.3s ease",
+    resize: "vertical",
+    minHeight: "100px",
+    boxSizing: "border-box",
+  },
+  modalActions: {
+    display: "flex",
+    gap: "1rem",
+    marginTop: "2rem",
+  },
+}
+
+const animationStyles = `
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+    50% {
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .milestone-content-responsive {
+      grid-template-columns: 1fr !important;
+    }
+    .details-section-responsive {
+      border-left: none !important;
+      border-top: 1px solid #e5e7eb !important;
+      padding-left: 0 !important;
+      padding-top: 2rem !important;
+    }
+  }
+`
 
 const HoOCManageMilestone = () => {
-  const navigate = useNavigate();
-  const { eventId } = useParams();
-  const { events } = useEvents();
-    
-  const [milestones, setMilestones] = useState([]);
-  const [hoveredMilestone, setHoveredMilestone] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const navigate = useNavigate()
+  const { eventId } = useParams()
+  const { events, fetchEventRole, getEventRole } = useEvents()
+  const [eventRole, setEventRole] = useState("")
+
+  const [milestones, setMilestones] = useState([])
+  const [selectedMilestone, setSelectedMilestone] = useState(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({
-    name: '',
-    description: '',
-    targetDate: '',
-    status: 'Đã lên kế hoạch'
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+    name: "",
+    description: "",
+    targetDate: "",
+    status: "Đã lên kế hoạch",
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  // Lấy thông tin sự kiện từ EventContext
-  const currentEvent = events.find(event => event._id === eventId);
-
-  // Mock data cho milestones
-  const mockMilestones = [
-    {
-      id: 1,
-      name: "Kickoff sự kiện",
-      date: "5/9/2025",
-      status: "Sắp tới",
-      description: "Chào mừng tất cả mọi người, và đây là Halloween 2024! Để Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
-      relatedTasks: 7,
-      position: 20
-    },
-    {
-      id: 2,
-      name: "Khởi công",
-      date: "14/9",
-      status: "Đã hoàn thành",
-      description: "Bắt đầu các hoạt động chuẩn bị cho sự kiện",
-      relatedTasks: 5,
-      position: 40
-    },
-    {
-      id: 3,
-      name: "D-DAY",
-      date: "1/11",
-      status: "Đang diễn ra",
-      description: "Ngày chính thức của sự kiện Halloween",
-      relatedTasks: 12,
-      position: 70
-    },
-    {
-      id: 4,
-      name: "Trả quyền lợi nhà tài trợ",
-      date: "2/11",
-      status: "Chưa bắt đầu",
-      description: "Thực hiện các cam kết với nhà tài trợ",
-      relatedTasks: 3,
-      position: 80
-    },
-    {
-      id: 5,
-      name: "Tổng kết",
-      date: "4/11",
-      status: "Chưa bắt đầu",
-      description: "Tổng kết và đánh giá sự kiện",
-      relatedTasks: 4,
-      position: 90
-    }
-  ];
+  const currentEvent = events.find((event) => event._id === eventId)
 
   useEffect(() => {
-    fetchMilestones();
-  }, [eventId]);
+    let mounted = true
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("")
+        return
+      }
+      try {
+        const role = await fetchEventRole(eventId)
+        if (mounted) setEventRole(role)
+      } catch (_) {
+        if (mounted) setEventRole("")
+      }
+    }
+    loadRole()
+    fetchMilestones()
+    return () => {
+      mounted = false
+    }
+  }, [eventId, fetchEventRole])
 
   const parseAnyDate = (value) => {
-    if (!value) return null;
-    const d = new Date(value);
-    if (!isNaN(d.getTime())) return d;
+    if (!value) return null
+    const d = new Date(value)
+    if (!isNaN(d.getTime())) return d
     try {
-      const parts = String(value).split('/').map(p => p.trim());
+      const parts = String(value)
+        .split("/")
+        .map((p) => p.trim())
       if (parts.length >= 2) {
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = parts[2] ? parseInt(parts[2], 10) : new Date().getFullYear();
-        const guess = new Date(year, month, day);
-        if (!isNaN(guess.getTime())) return guess;
+        const day = Number.parseInt(parts[0], 10)
+        const month = Number.parseInt(parts[1], 10) - 1
+        const year = parts[2] ? Number.parseInt(parts[2], 10) : new Date().getFullYear()
+        const guess = new Date(year, month, day)
+        if (!isNaN(guess.getTime())) return guess
       }
     } catch {}
-    return null;
-  };
+    return null
+  }
 
   const fetchMilestones = async () => {
     try {
-      setLoading(true);
-      const response = await milestoneApi.listMilestonesByEvent(eventId);
+      setLoading(true)
+      const response = await milestoneApi.listMilestonesByEvent(eventId)
       const sorted = [...(response.data || [])].sort((a, b) => {
-        const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000);
-        const db = parseAnyDate(b?.targetDate) || new Date(8640000000000000);
-        return da.getTime() - db.getTime();
-      });
+        const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000)
+        const db = parseAnyDate(b?.targetDate) || new Date(8640000000000000)
+        return da.getTime() - db.getTime()
+      })
       const mappedMilestones = sorted.map((ms, index) => ({
         id: ms._id || ms.id,
         name: ms.name,
-        date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString('vi-VN') : '',
+        date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
         status: getStatusLabel(ms.status),
-        description: ms.description || '',
+        description: ms.description || "",
         relatedTasks: ms.tasksCount || 0,
-        position: calculatePosition(index, sorted.length)
-      }));
-      setMilestones(mappedMilestones);
+      }))
+      setMilestones(mappedMilestones)
+      if (mappedMilestones.length > 0 && !selectedMilestone) {
+        setSelectedMilestone(mappedMilestones[0])
+      }
     } catch (err) {
-      console.error('Error fetching milestones:', err);
-      setError('Không thể tải danh sách cột mốc');
-      const sortedMock = [...mockMilestones].sort((a, b) => {
-        const da = parseAnyDate(a?.date) || new Date(8640000000000000);
-        const db = parseAnyDate(b?.date) || new Date(8640000000000000);
-        return da.getTime() - db.getTime();
-      }).map((ms, index, arr) => ({ ...ms, position: calculatePosition(index, arr.length) }));
-      setMilestones(sortedMock);
+      console.error("Error fetching milestones:", err)
+      setError("Không thể tải danh sách cột mốc")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  const calculatePosition = (index, total) => {
-    if (total <= 1) return 50;
-    return ((index + 1) / total) * 80 + 10;
-  };
+  }
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'planned': return 'Đã lên kế hoạch';
-      case 'in_progress': return 'Đang thực hiện';
-      case 'completed': return 'Đã hoàn thành';
-      case 'delayed': return 'Trễ hạn';
-      case 'cancelled': return 'Đã hủy';
-      default: return 'Đã lên kế hoạch';
+      case "planned":
+        return "Đã lên kế hoạch"
+      case "in_progress":
+        return "Đang thực hiện"
+      case "completed":
+        return "Đã hoàn thành"
+      case "delayed":
+        return "Trễ hạn"
+      case "cancelled":
+        return "Đã hủy"
+      default:
+        return "Đã lên kế hoạch"
     }
-  };
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Đã lên kế hoạch": return "#3b82f6";
-      case "Đang thực hiện": return "#f59e0b";
-      case "Đã hoàn thành": return "#10b981";
-      case "Trễ hạn": return "#dc2626";
-      case "Đã hủy": return "#6b7280";
-      default: return "#6b7280";
+      case "Đã lên kế hoạch":
+        return "#3b82f6"
+      case "Đang thực hiện":
+        return "#f59e0b"
+      case "Đã hoàn thành":
+        return "#10b981"
+      case "Trễ hạn":
+        return "#dc2626"
+      case "Đã hủy":
+        return "#6b7280"
+      default:
+        return "#6b7280"
     }
-  };
+  }
 
-  const handleMilestoneHover = (milestone) => {
-    setHoveredMilestone(milestone);
-  };
-
-  const handleMilestoneLeave = () => {
-    setHoveredMilestone(null);
-  };
+  const handleMilestoneClick = (milestone) => {
+    setSelectedMilestone(milestone)
+  }
 
   const handleEditMilestone = (milestoneId) => {
-    // Hiển thị loading overlay trước khi chuyển trang
     setLoading(true)
     navigate(`/events/${eventId}/hooc-edit-milestone/${milestoneId}`)
-  };
+  }
 
   const handleViewDetails = (milestoneId) => {
     setLoading(true)
     navigate(`/events/${eventId}/hooc-milestone-detail/${milestoneId}`)
-  };
+  }
 
   const handleCreateMilestone = () => {
-    setShowCreateModal(true);
-  };
+    setShowCreateModal(true)
+  }
 
   const handleCreateSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
-      setLoading(true);
-      setError('');
-      
+      setLoading(true)
+      setError("")
+
       const response = await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
         targetDate: createForm.targetDate,
-        status: getStatusValue(createForm.status)
-      });
-      
-      // Fetch lại danh sách milestones
-      await fetchMilestones();
-      
-      // Đóng modal và reset form
-      setShowCreateModal(false);
-      setCreateForm({ name: '', description: '', targetDate: '', status: 'Đã lên kế hoạch' });
-      
-      alert('Tạo cột mốc thành công!');
-    } catch (err) {
-      console.error('Error creating milestone:', err);
-      setError(err.response?.data?.message || 'Tạo cột mốc thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
+        status: getStatusValue(createForm.status),
+      })
 
-  const getStatusValue = (statusLabel) => {
-    switch (statusLabel) {
-      case 'Đã lên kế hoạch': return 'planned';
-      case 'Đang thực hiện': return 'in_progress';
-      case 'Đã hoàn thành': return 'completed';
-      case 'Trễ hạn': return 'delayed';
-      case 'Đã hủy': return 'cancelled';
-      default: return 'planned';
+      await fetchMilestones()
+      setShowCreateModal(false)
+      setCreateForm({ name: "", description: "", targetDate: "", status: "Đã lên kế hoạch" })
+      alert("Tạo cột mốc thành công!")
+    } catch (err) {
+      console.error("Error creating milestone:", err)
+      setError(err.response?.data?.message || "Tạo cột mốc thất bại")
+    } finally {
+      setLoading(false)
     }
-  };
+  }
+
+  const getStatusValue = (label) => {
+    const map = {
+      "Đã lên kế hoạch": "planned",
+      "Đang thực hiện": "in_progress",
+      "Đã hoàn thành": "completed",
+      "Trễ hạn": "delayed",
+      "Đã hủy": "cancelled",
+    }
+    return map[label] || "planned"
+  }
 
   return (
-    <UserLayout title="Quản lý cột mốc sự kiện" sidebarType="hooc" activePage="work-timeline">
-      {/* Main Content */}
-      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
-              Cột mốc sự kiện
-            </h3>
-            <button 
-              className="btn btn-danger d-flex align-items-center"
-              onClick={handleCreateMilestone}
-              style={{ 
-                backgroundColor: '#dc2626', 
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontWeight: '500'
-              }}
-            >
-              <i className="bi bi-plus-lg me-2"></i>
-              TẠO CỘT MỐC MỚI
-            </button>
-          </div>
+    <UserLayout eventRole={eventRole}>
+      <style>{animationStyles}</style>
 
-          {/* Event Timeline */}
-          <div className="bg-white border rounded-3 p-4" style={{ border: '1px solid #e5e7eb' }}>
-            <h4 className="text-danger mb-4" style={{ fontWeight: '600' }}>
-              {currentEvent?.name || 'Sự kiện'}
-            </h4>
-            
-            {/* Timeline */}
-            <div className="position-relative" style={{ height: '80px' }}>
-              {/* Timeline line */}
-              <div 
-                className="position-absolute"
-                style={{
-                  top: '50%',
-                  left: '0',
-                  right: '0',
-                  height: '3px',
-                  backgroundColor: '#dc2626',
-                  transform: 'translateY(-50%)'
-                }}
-              ></div>
-              
-              {/* Milestone markers */}
-              {milestones.map((milestone) => (
-                <div key={milestone.id}>
-                  {/* Milestone marker */}
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h1 style={styles.headerTitle}>Quản lý Cột Mốc</h1>
+          <button
+            style={styles.btnCreate}
+            onClick={handleCreateMilestone}
+            onMouseEnter={(e) => {
+              e.target.style.transform = "translateY(-2px)"
+              e.target.style.boxShadow = "0 6px 16px rgba(239, 68, 68, 0.4)"
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = "translateY(0)"
+              e.target.style.boxShadow = "0 4px 12px rgba(239, 68, 68, 0.3)"
+            }}
+          >
+            + TẠO CỘT MỐC MỚI
+          </button>
+        </div>
+
+        {error && <div style={styles.errorMessage}>{error}</div>}
+
+        <div style={styles.content} className="milestone-content-responsive">
+          <div style={styles.timelineSection}>
+            <div style={styles.timelineLine}></div>
+            <div style={styles.milestonesList}>
+              {milestones.map((milestone, index) => (
+                <div
+                  key={milestone.id}
+                  style={{
+                    ...styles.milestoneItem,
+                    ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
+                  }}
+                  onClick={() => handleMilestoneClick(milestone)}
+                  onMouseEnter={(e) => {
+                    if (selectedMilestone?.id !== milestone.id) {
+                      e.currentTarget.style.background = "#f3f4f6"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedMilestone?.id !== milestone.id) {
+                      e.currentTarget.style.background = "transparent"
+                    }
+                  }}
+                >
                   <div
-                    className="position-absolute"
                     style={{
-                      left: `${milestone.position}%`,
-                      top: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: '#dc2626',
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      zIndex: 2
-                    }}
-                    onMouseEnter={() => handleMilestoneHover(milestone)}
-                    onMouseLeave={handleMilestoneLeave}
-                  ></div>
-                  
-                  {/* Milestone label */}
-                  <div
-                    className="position-absolute text-center"
-                    style={{
-                      left: `${milestone.position}%`,
-                      top: '70px',
-                      transform: 'translateX(-50%)',
-                      fontSize: '0.8rem',
-                      fontWeight: '500',
-                      color: '#374151',
-                      minWidth: '80px'
+                      ...styles.milestoneDot,
+                      background: `linear-gradient(135deg, ${getStatusColor(milestone.status)} 0%, rgba(239, 68, 68, 0.3) 100%)`,
                     }}
                   >
-                    <div>{milestone.name}</div>
-                    <div style={{ color: '#6b7280', fontSize: '0.7rem' }}>
-                      {milestone.date}
-                    </div>
+                    <div style={styles.dotInner}></div>
+                  </div>
+                  <div style={styles.milestoneInfo}>
+                    <div style={styles.milestoneDate}>{milestone.date}</div>
+                    <div style={styles.milestoneName}>{milestone.name}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Hover Popup */}
-          {hoveredMilestone && (
-            <div
-              className="position-absolute bg-white border rounded-3 shadow-lg p-3"
-              style={{
-                left: `${hoveredMilestone.position}%`,
-                top: '200px',
-                transform: 'translateX(-50%)',
-                minWidth: '280px',
-                zIndex: 1000,
-                border: '1px solid #e5e7eb'
-              }}
-              onMouseEnter={() => handleMilestoneHover(hoveredMilestone)}
-              onMouseLeave={handleMilestoneLeave}
-            >
-              <h5 className="mb-2" style={{ color: '#1f2937', fontWeight: '600' }}>
-                {hoveredMilestone.name}
-              </h5>
-              
-              <div className="mb-2">
-                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Ngày: </span>
-                <span style={{ fontWeight: '500' }}>{hoveredMilestone.targetDate}</span>
-              </div>
-              
-              <div className="mb-2">
-                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Trạng thái: </span>
-                <span 
-                  className="badge"
-                  style={{ 
-                    backgroundColor: getStatusColor(hoveredMilestone.status),
-                    color: 'white',
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  {hoveredMilestone.status}
-                </span>
-              </div>
-              
-              <p className="mb-2" style={{ fontSize: '0.9rem', color: '#4b5563' }}>
-                {hoveredMilestone.description}
-              </p>
-              
-              <div className="mb-3">
-                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                  Các công việc liên quan: {hoveredMilestone.relatedTasks} công việc
-                </span>
-              </div>
-              
-              <div className="d-flex gap-2">
-                <button 
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={() => handleEditMilestone(hoveredMilestone.id)}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Chỉnh sửa
-                </button>
-                <button 
-                  className="btn btn-primary btn-sm"
-                  onClick={() => handleViewDetails(hoveredMilestone.id)}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Xem chi tiết
-                </button>
-              </div>
-            </div>
-          )}
-      </div>
+          <div style={styles.detailsSection} className="details-section-responsive">
+            {selectedMilestone ? (
+              <div style={styles.milestoneDetails}>
+                <div style={styles.detailsHeader}>
+                  <h2 style={styles.detailsHeaderTitle}>{selectedMilestone.name}</h2>
+                  <span
+                    style={{
+                      ...styles.statusBadge,
+                      backgroundColor: getStatusColor(selectedMilestone.status),
+                    }}
+                  >
+                    {selectedMilestone.status}
+                  </span>
+                </div>
 
-      {/* Create Milestone Modal */}
-      {showCreateModal && (
-        <div 
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ 
-            backgroundColor: 'rgba(0, 0, 0, 0.5)', 
-            zIndex: 1050 
-          }}
-        >
-          <div 
-            className="bg-white rounded-3 p-4"
-            style={{ 
-              minWidth: '500px',
-              maxWidth: '600px',
-              border: '1px solid #e5e7eb'
-            }}
-          >
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4 className="mb-0" style={{ color: '#1f2937', fontWeight: '600' }}>
-                Tạo cột mốc mới
-              </h4>
-              <button 
-                className="btn-close"
-                onClick={() => setShowCreateModal(false)}
-              ></button>
-            </div>
-            
-            <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-              Tạo cột mốc mới để theo dõi tiến độ sự kiện!
-            </p>
-            
-            {error && (
-              <div className="alert alert-danger mb-3">
-                {error}
+                <div style={styles.detailsBody}>
+                  <div style={styles.detailItem}>
+                    <label style={styles.detailLabel}>Ngày:</label>
+                    <p style={styles.detailText}>{selectedMilestone.date}</p>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <label style={styles.detailLabel}>Mô tả:</label>
+                    <p style={styles.detailText}>{selectedMilestone.description || "Không có mô tả"}</p>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <label style={styles.detailLabel}>Số công việc liên quan:</label>
+                    <p style={styles.detailText}>{selectedMilestone.relatedTasks}</p>
+                  </div>
+                </div>
+
+                <div style={styles.detailsActions}>
+                  <button
+                    style={styles.btnSecondary}
+                    onClick={() => handleEditMilestone(selectedMilestone.id)}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "#e5e7eb"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "#f3f4f6"
+                    }}
+                  >
+                    Chỉnh sửa
+                  </button>
+                  <button
+                    style={styles.btnPrimary}
+                    onClick={() => handleViewDetails(selectedMilestone.id)}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = "translateY(-2px)"
+                      e.target.style.boxShadow = "0 6px 16px rgba(239, 68, 68, 0.4)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = "translateY(0)"
+                      e.target.style.boxShadow = "0 4px 12px rgba(239, 68, 68, 0.3)"
+                    }}
+                  >
+                    Xem chi tiết
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={styles.noSelection}>
+                <p>Chọn một cột mốc để xem chi tiết</p>
               </div>
             )}
-            
-            <form onSubmit={handleCreateSubmit}>
-              <div className="mb-3">
-                <label className="form-label fw-semibold">
-                  Tên cột mốc <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  className="form-control"
-                  placeholder="Tên cột mốc"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
-                  style={{ borderRadius: '8px' }}
-                  required
-                />
-              </div>
-              
-              <div className="mb-3">
-                <label className="form-label fw-semibold">
-                  Ngày dự kiến <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="date" 
-                  className="form-control"
-                  value={createForm.targetDate}
-                  onChange={(e) => setCreateForm({...createForm, targetDate: e.target.value})}
-                  style={{ borderRadius: '8px' }}
-                  required
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label fw-semibold">
-                  Trạng thái <span className="text-danger">*</span>
-                </label>
-                <select 
-                  className="form-select"
-                  value={createForm.status}
-                  onChange={(e) => setCreateForm({...createForm, status: e.target.value})}
-                  style={{ borderRadius: '8px' }}
-                  required
-                >
-                  <option value="Đã lên kế hoạch">Đã lên kế hoạch</option>
-                  <option value="Đang thực hiện">Đang thực hiện</option>
-                  <option value="Đã hoàn thành">Đã hoàn thành</option>
-                  <option value="Trễ hạn">Trễ hạn</option>
-                  <option value="Đã hủy">Đã hủy</option>
-                </select>
-              </div>
-              
-              <div className="mb-4">
-                <label className="form-label fw-semibold">
-                  Mô tả <span className="text-danger">*</span>
-                </label>
-                <textarea 
-                  className="form-control"
-                  rows="4"
-                  placeholder="Mô tả cột mốc"
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm({...createForm, description: e.target.value})}
-                  style={{ borderRadius: '8px' }}
-                  required
-                ></textarea>
-              </div>
-              
-              <div className="d-flex justify-content-end gap-2">
-                <button 
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => setShowCreateModal(false)}
-                  style={{ borderRadius: '8px' }}
-                >
-                  Huỷ
-                </button>
-                <button 
-                  type="submit"
-                  className="btn btn-danger"
-                  style={{ borderRadius: '8px' }}
-                  disabled={loading}
-                >
-                  {loading ? (<Loading size={18} />) : 'Xác nhận'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
-      )}
+
+        {showCreateModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <h2 style={styles.modalTitle}>Tạo Cột Mốc Mới</h2>
+              <form onSubmit={handleCreateSubmit}>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Tên cột mốc:</label>
+                  <input
+                    type="text"
+                    style={styles.formInput}
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#ef4444"
+                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb"
+                      e.target.style.boxShadow = "none"
+                    }}
+                    required
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Mô tả:</label>
+                  <textarea
+                    style={styles.formTextarea}
+                    value={createForm.description}
+                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#ef4444"
+                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb"
+                      e.target.style.boxShadow = "none"
+                    }}
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Ngày dự kiến:</label>
+                  <input
+                    type="date"
+                    style={styles.formInput}
+                    value={createForm.targetDate}
+                    onChange={(e) => setCreateForm({ ...createForm, targetDate: e.target.value })}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#ef4444"
+                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb"
+                      e.target.style.boxShadow = "none"
+                    }}
+                    required
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Trạng thái:</label>
+                  <select
+                    style={styles.formInput}
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value })}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#ef4444"
+                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb"
+                      e.target.style.boxShadow = "none"
+                    }}
+                  >
+                    <option>Đã lên kế hoạch</option>
+                    <option>Đang thực hiện</option>
+                    <option>Đã hoàn thành</option>
+                    <option>Trễ hạn</option>
+                    <option>Đã hủy</option>
+                  </select>
+                </div>
+                <div style={styles.modalActions}>
+                  <button
+                    type="button"
+                    style={styles.btnSecondary}
+                    onClick={() => setShowCreateModal(false)}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "#e5e7eb"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "#f3f4f6"
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    style={styles.btnPrimary}
+                    disabled={loading}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.target.style.transform = "translateY(-2px)"
+                        e.target.style.boxShadow = "0 6px 16px rgba(239, 68, 68, 0.4)"
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.target.style.transform = "translateY(0)"
+                        e.target.style.boxShadow = "0 4px 12px rgba(239, 68, 68, 0.3)"
+                      }
+                    }}
+                  >
+                    {loading ? "Đang tạo..." : "Tạo"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </UserLayout>
-  );
-};
+  )
+}
 
-export default HoOCManageMilestone;
-
+export default HoOCManageMilestone

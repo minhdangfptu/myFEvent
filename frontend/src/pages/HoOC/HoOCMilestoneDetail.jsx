@@ -4,14 +4,17 @@ import UserLayout from '../../components/UserLayout';
 import { milestoneService } from '../../services/milestoneService';
 import { formatDate } from '~/utils/formatDate';
 import { toast } from 'react-toastify';
+import { useEvents } from '../../contexts/EventContext';
 
 const HoOCMilestoneDetail = () => {
   const navigate = useNavigate();
   const { eventId, id } = useParams();
+  const { fetchEventRole, getEventRole } = useEvents();
   
   const [milestone, setMilestone] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [eventRole, setEventRole] = useState('');
 
   useEffect(() => {
     async function fetchMilestoneDetail() {
@@ -20,6 +23,25 @@ const HoOCMilestoneDetail = () => {
     }
     fetchMilestoneDetail();
   }, [id]);
+
+  // Load event role to decide sidebar and actions visibility
+  useEffect(() => {
+    let mounted = true;
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole('');
+        return;
+      }
+      try {
+        const role = await fetchEventRole(eventId);
+        if (mounted) setEventRole(role);
+      } catch (_) {
+        if (mounted) setEventRole('');
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [eventId, fetchEventRole]);
 
   const getTaskStatusLabel = (status) => {
     switch (status) {
@@ -97,8 +119,11 @@ const HoOCMilestoneDetail = () => {
     return <div>Loading...</div>;
   }
 
+  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
+  const isMember = eventRole === 'Member';
+
   return (
-    <UserLayout title="Milestone Detail Page" sidebarType="hooc" activePage="work-timeline">
+    <UserLayout title="Milestone Detail Page" sidebarType={sidebarType} activePage="work-timeline" eventId={eventId}>
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           {/* Milestone Header */}
@@ -106,24 +131,26 @@ const HoOCMilestoneDetail = () => {
             <h3 style={{ color: '#1f2937', fontWeight: '600', margin: 0 }}>
               {milestone.name}
             </h3>
-            <div className="d-flex gap-2">
-              <button 
-                className="btn btn-outline-primary d-flex align-items-center"
-                onClick={handleEditMilestone}
-                style={{ borderRadius: '8px' }}
-              >
-                <i className="bi bi-pencil me-2"></i>
-                Sửa cột mốc
-              </button>
-              <button 
-                className="btn btn-outline-danger d-flex align-items-center"
-                onClick={handleDeleteMilestone}
-                style={{ borderRadius: '8px' }}
-              >
-                <i className="bi bi-trash me-2"></i>
-                Xoá cột mốc
-              </button>
-            </div>
+            {!isMember && (
+              <div className="d-flex gap-2">
+                <button 
+                  className="btn btn-outline-primary d-flex align-items-center"
+                  onClick={handleEditMilestone}
+                  style={{ borderRadius: '8px' }}
+                >
+                  <i className="bi bi-pencil me-2"></i>
+                  Sửa cột mốc
+                </button>
+                <button 
+                  className="btn btn-outline-danger d-flex align-items-center"
+                  onClick={handleDeleteMilestone}
+                  style={{ borderRadius: '8px' }}
+                >
+                  <i className="bi bi-trash me-2"></i>
+                  Xoá cột mốc
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Milestone Info Card */}
@@ -185,7 +212,7 @@ const HoOCMilestoneDetail = () => {
                       borderRadius: '20px'
                     }}
                   >
-                    getStatusLabel({task.status})
+                    {getTaskStatusLabel(task.status)}
                   </span>
                 </div>
               ))}

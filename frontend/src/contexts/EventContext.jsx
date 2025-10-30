@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { eventService } from "../services/eventService";
 import { useAuth } from "./AuthContext";
+import { userApi } from "../apis/userApi";
 
 const EventContext = createContext();
 
@@ -13,6 +14,7 @@ export function EventProvider({ children }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [eventRoles, setEventRoles] = useState({}); // { [eventId]: "HoOC" | "HoD" | "Member" | "" }
 
   const fetchEvents = useCallback(async () => {
     if (!user) {
@@ -37,8 +39,28 @@ export function EventProvider({ children }) {
     fetchEvents();
   }, [fetchEvents]);
 
+  // Fetch role for a specific eventId with simple caching
+  const fetchEventRole = useCallback(async (eventId) => {
+    if (!eventId) return "";
+    // Return cached role if available
+    if (eventRoles[eventId]) return eventRoles[eventId];
+    try {
+      const res = await userApi.getUserRoleByEvent(eventId);
+      const role = res?.role || "";
+      setEventRoles((prev) => ({ ...prev, [eventId]: role }));
+      return role;
+    } catch (e) {
+      return "";
+    }
+  }, [eventRoles]);
+
+  // Utility to get role synchronously from cache (may be empty string if not fetched yet)
+  const getEventRole = useCallback((eventId) => {
+    return eventRoles[eventId] || "";
+  }, [eventRoles]);
+
   return (
-    <EventContext.Provider value={{ events, loading, error, refetchEvents: fetchEvents }}>
+    <EventContext.Provider value={{ events, loading, error, refetchEvents: fetchEvents, eventRoles, fetchEventRole, getEventRole }}>
       {children}
     </EventContext.Provider>
   );

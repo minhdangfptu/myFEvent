@@ -13,6 +13,7 @@ import {
   getDepartmentDetail,
   createDepartment,
   assignHod,
+  changeHoD,
   addMemberToDepartment,
   removeMemberFromDepartment,
   editDepartment,
@@ -65,6 +66,7 @@ router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartme
 router.post('/:eventId/departments', authenticateToken, createDepartment);
 
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
+router.patch('/:eventId/departments/:departmentId/change-hod', authenticateToken, changeHoD);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:eventId/departments/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
 router.patch('/:eventId/departments/:departmentId', authenticateToken, editDepartment)

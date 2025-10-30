@@ -276,6 +276,104 @@ export const assignHod = async (req, res) => {
 	}
 };
 
+export const changeHoD = async (req, res) => {
+  try {
+    const { eventId, departmentId } = req.params;
+    const { newHoDId } = req.body || {};
+    
+    if (!newHoDId) {
+      return res.status(400).json({ message: 'newHoDId is required' });
+    }
+
+    // Check if event exists
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Check if department exists in this event
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+
+    // Check if requester is HoOC (only HoOC can change HoD)
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
+      return res.status(403).json({ message: 'Only HoOC can change department head' });
+    }
+
+    // Check if new HoD exists
+    const newHoD = await User.findById(newHoDId).lean();
+    if (!newHoD) {
+      return res.status(404).json({ message: 'New HoD user not found'  });
+    }
+
+    // Check if new HoD is a member of this department
+    const newHoDMembership = await EventMember.findOne({ 
+      eventId, 
+      userId: newHoDId, 
+      departmentId: department._id 
+    }).lean();
+    
+    if (!newHoDMembership) {
+      return res.status(400).json({ 
+        message: 'New HoD must be a member of this department' 
+      });
+    }
+
+    // Get current HoD
+    const currentHoDId = department.leaderId?.toString();
+    
+    // Update department leader
+    department.leaderId = newHoDId;
+    await department.save();
+
+    // Update new HoD's role to HoD
+    await EventMember.findOneAndUpdate(
+      { eventId, userId: newHoDId, departmentId: department._id },
+      { $set: { role: 'HoD' } }
+    );
+
+    // Demote previous HoD to staff if different
+    if (currentHoDId && currentHoDId !== newHoDId) {
+      await EventMember.findOneAndUpdate(
+        { eventId, userId: currentHoDId, departmentId: department._id },
+        { $set: { role: 'Member' } }
+      );
+    }
+
+    // Get updated department with populated leader
+    const updatedDepartment = await Department.findById(department._id)
+      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+      .lean();
+
+    // Format response
+    const formattedDepartment = {
+      _id: updatedDepartment._id,
+      id: updatedDepartment._id,
+      name: updatedDepartment.name,
+      description: updatedDepartment.description,
+      leaderId: updatedDepartment.leaderId,
+      leader: updatedDepartment.leaderId,
+      leaderName: updatedDepartment.leaderId?.fullName || 'Chưa có',
+      memberCount: await EventMember.countDocuments({ 
+        departmentId: updatedDepartment._id,
+        role: { $ne: 'HoOC' }
+      }),
+      createdAt: updatedDepartment.createdAt,
+      updatedAt: updatedDepartment.updatedAt
+    };
+
+    return res.status(200).json({ 
+      message: 'Department head changed successfully',
+      data: formattedDepartment 
+    });
+  } catch (error) {
+    console.error('changeHoD error:', error.message);
+    return res.status(500).json({ message: 'Failed to change department head' + error.message });
+  }
+};
+
 // POST /api/events/:eventId/departments/:departmentId/members
 export const addMemberToDepartment = async (req, res) => {
 	try {

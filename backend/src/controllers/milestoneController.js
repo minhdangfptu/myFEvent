@@ -16,6 +16,10 @@ export const createMilestone = async (req, res) => {
     const { eventId } = req.params;
     const { name, description, targetDate, status } = req.body;
 
+    if (!name || !targetDate || !status) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
     if (!(await ensureEventExists(eventId))) {
       return res.status(404).json({ message: 'Event not found' });
     }

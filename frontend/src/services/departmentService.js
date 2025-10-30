@@ -29,6 +29,10 @@ export const departmentService = {
         const response = await departmentApi.assignHoD(eventId, departmentId, userId);
         return response.data;
     },
+    changeHoD: async (eventId, departmentId, newHoDId) => {
+        const response = await departmentApi.changeHoD(eventId, departmentId, newHoDId);
+        return response.data;
+    },
     addMemberToDepartment: async (eventId, departmentId, memberId) => {
         const response = await departmentApi.addMemberToDepartment(eventId, departmentId, memberId);
         return response.data;

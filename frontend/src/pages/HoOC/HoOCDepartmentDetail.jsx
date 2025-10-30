@@ -30,6 +30,26 @@ const HoOCDepartmentDetail = () => {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState(null);
+  const [showChangeLeaderModal, setShowChangeLeaderModal] = useState(false);
+  const [selectedNewLeader, setSelectedNewLeader] = useState(null);
+  const [changingLeader, setChangingLeader] = useState(false);
+  const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
+  const [selectedAssignLeader, setSelectedAssignLeader] = useState(null);
+  const [assigningLeader, setAssigningLeader] = useState(false);
+
+  // Helper: tránh render object (members có thể chứa userId object)
+  const getMemberDisplayName = (member) =>
+    (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
+  const getMemberEmail = (member) =>
+    (member?.userId?.email) || member?.email || ""
+  const getMemberAvatar = (member) =>
+    member?.userId?.avatarUrl || member?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(getMemberEmail(member) || String(member?._id || member?.id || ""))}`
+
+  const getLeaderDisplayName = (leader) => {
+    if (!leader) return 'Chưa có'
+    if (typeof leader === 'string') return leader
+    return leader.fullName || leader.userId?.fullName || leader.email || leader.userId?.email || 'Chưa có'
+  }
 
   useEffect(() => {
     fetchMembersAndDepartment();
@@ -53,7 +73,7 @@ const HoOCDepartmentDetail = () => {
       toast.error("Lỗi khi tải danh sách thành viên của ban");
     }
   }
-  
+
 
   const handleEdit = () => {
     if (department) {
@@ -72,7 +92,7 @@ const HoOCDepartmentDetail = () => {
     };
     if (!payload.name) return toast.warning("Tên ban không được để trống");
     try {
-      await departmentApi.updateDepartment(eventId, id, payload); 
+      await departmentApi.updateDepartment(eventId, id, payload);
       setDepartment((prev) => ({ ...(prev || {}), ...payload }));
       toast.success("Cập nhật ban thành công!");
       setEditing(false);
@@ -84,9 +104,9 @@ const HoOCDepartmentDetail = () => {
   const handleCancel = () => {
     setEditing(false);
     setEditForm({
-       name: department?.name || "",
-       description: department?.description || "",
-     });
+      name: department?.name || "",
+      description: department?.description || "",
+    });
   };
 
   const handleDeleteDepartment = () => {
@@ -118,9 +138,7 @@ const HoOCDepartmentDetail = () => {
       setMemberToRemove(member);
       setShowRemoveMemberModal(true);
     } else if (action === "change_leader") {
-      // TODO: Implement change leader functionality
-      console.log("Change leader functionality not implemented yet");
-      toast.info("Chức năng thay đổi trưởng ban đang được phát triển");
+      setShowChangeLeaderModal(true);
     }
   };
 
@@ -209,11 +227,84 @@ const HoOCDepartmentDetail = () => {
     setMemberSearchQuery("");
   };
 
-  const filteredMembers = members.filter(
-    (member) =>
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleChangeLeader = async () => {
+    if (!selectedNewLeader) {
+      toast.warning("Vui lòng chọn trưởng ban mới");
+      return;
+    }
+
+    // Check if there are any available members to choose from
+    const availableMembers = members.filter(member =>
+      member.role !== 'HoOC' && member.role !== 'HoD'
+    );
+
+    if (availableMembers.length === 0) {
+      toast.warning("Không có thành viên nào khác để chọn làm trưởng ban");
+      return;
+    }
+
+    try {
+      setChangingLeader(true);
+      // Backend expects a userId, not membership id
+      const newHoDUserId = selectedNewLeader.userId || selectedNewLeader.id;
+      await departmentService.changeHoD(eventId, id, newHoDUserId);
+      toast.success("Thay đổi trưởng ban thành công!");
+      setShowChangeLeaderModal(false);
+      setSelectedNewLeader(null);
+      // Reload department and members data
+      await fetchMembersAndDepartment();
+    } catch (error) {
+      console.error("Error changing leader:", error);
+      toast.error("Không thể thay đổi trưởng ban");
+    } finally {
+      setChangingLeader(false);
+    }
+  };
+
+  const handleCancelChangeLeader = () => {
+    setShowChangeLeaderModal(false);
+    setSelectedNewLeader(null);
+  };
+
+  const openAssignLeaderModal = () => {
+  setSelectedAssignLeader(null);
+  setShowAssignLeaderModal(true);
+};
+
+const handleCancelAssignLeader = () => {
+  setShowAssignLeaderModal(false);
+  setSelectedAssignLeader(null);
+};
+
+const handleConfirmAssignLeader = async () => {
+  if (!selectedAssignLeader) {
+    toast.warning("Vui lòng chọn 1 thành viên để gán làm trưởng ban");
+    return;
+  }
+
+  try {
+    setAssigningLeader(true);
+    // Backend cần userId (fallback sang id nếu dữ liệu khác)
+    const newHoDUserId = selectedAssignLeader.userId || selectedAssignLeader.id;
+    await departmentService.changeHoD(eventId, id, newHoDUserId);
+    toast.success("Đã gán trưởng ban thành công!");
+    setShowAssignLeaderModal(false);
+    setSelectedAssignLeader(null);
+    await fetchMembersAndDepartment(); // refresh lại dữ liệu
+  } catch (error) {
+    console.error("Assign HoD error:", error);
+    toast.error("Không thể gán trưởng ban");
+  } finally {
+    setAssigningLeader(false);
+  }
+};
+
+  const filteredMembers = members.filter((member) => {
+    const name = String(getMemberDisplayName(member)).toLowerCase()
+    const email = String(getMemberEmail(member)).toLowerCase()
+    const q = searchQuery.toLowerCase()
+    return name.includes(q) || email.includes(q)
+  })
 
   const filteredUnassignedMembers = unassignedMembers.filter(
     (member) =>
@@ -317,9 +408,8 @@ const HoOCDepartmentDetail = () => {
                 Thông tin
               </button>
               <button
-                className={`nav-link ${
-                  activeTab === "settings" ? "active" : ""
-                }`}
+                className={`nav-link ${activeTab === "settings" ? "active" : ""
+                  }`}
                 onClick={() => setActiveTab("settings")}
                 style={{
                   border: "none",
@@ -423,7 +513,7 @@ const HoOCDepartmentDetail = () => {
                 </thead>
                 <tbody>
                   {filteredMembers.map((member) => (
-                    <tr key={member.id}>
+                    <tr key={member._id || member.id}>
                       <td style={{ padding: "15px" }}>
                         <input type="checkbox" className="form-check-input" />
                       </td>
@@ -434,15 +524,15 @@ const HoOCDepartmentDetail = () => {
                           color: "#374151",
                         }}
                       >
-                        {member.name}
+                        {getMemberDisplayName(member)}
                       </td>
                       <td style={{ padding: "15px", color: "#6b7280" }}>
                         {member.role}
                       </td>
                       <td style={{ padding: "15px", color: "#6b7280" }}>
-                        {member.email}
+                        {getMemberEmail(member)}
                       </td>
-                      <td style={{ padding: "15px" }}>
+                       <td style={{ padding: "15px" }}>
                         <div className="dropdown">
                           <button
                             className="btn btn-link text-decoration-none"
@@ -590,15 +680,27 @@ const HoOCDepartmentDetail = () => {
                   <p style={{ color: "#6b7280", marginBottom: "15px" }}>
                     Mỗi ban cần phải có một trưởng ban. Trưởng ban{" "}
                     {department.name} hiện tại:{" "}
-                    <strong>{department.leader}</strong>
+                    <strong>{getLeaderDisplayName(department.leader)}</strong>
                   </p>
-                  <button
-                    className="btn btn-primary d-flex align-items-center"
-                    style={{ borderRadius: "8px", fontWeight: "400" }}
-                  >
-                    <i className="bi bi-arrow-repeat me-2"></i>
-                    Đổi trưởng ban
-                  </button>
+                  {department.leader ? (
+                    <button
+                      className="btn btn-primary d-flex align-items-center"
+                      style={{ borderRadius: "8px", fontWeight: "400" }}
+                      onClick={() => setShowChangeLeaderModal(true)}
+                    >
+                      <i className="bi bi-arrow-repeat me-2"></i>
+                      Đổi trưởng ban
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-success d-flex align-items-center"
+                      style={{ borderRadius: "8px", fontWeight: "400" }}
+                      onClick={openAssignLeaderModal}
+                    >
+                      <i className="bi bi-person-plus me-2"></i>
+                      Gán trưởng ban
+                    </button>
+                  )}
                 </div>
 
                 {/* Delete Department */}
@@ -790,11 +892,10 @@ const HoOCDepartmentDetail = () => {
                   {filteredUnassignedMembers.map((member) => (
                     <div
                       key={member._id}
-                      className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${
-                        selectedMembers.includes(member._id)
+                      className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(member._id)
                           ? "bg-light border-primary"
                           : "border-light"
-                      }`}
+                        }`}
                       onClick={() => handleMemberSelect(member._id)}
                       style={{
                         cursor: "pointer",
@@ -929,6 +1030,211 @@ const HoOCDepartmentDetail = () => {
                 style={{ borderRadius: "8px" }}
               >
                 Xoá thành viên
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Leader Modal */}
+      {showChangeLeaderModal && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 1050,
+          }}
+        >
+          <div
+            className="bg-white rounded-3 p-4"
+            style={{
+              minWidth: "500px",
+              maxWidth: "600px",
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <div className="d-flex align-items-center mb-3">
+              <i
+                className="bi bi-arrow-repeat text-primary me-2"
+                style={{ fontSize: "1.2rem" }}
+              ></i>
+              <h5
+                className="mb-0"
+                style={{ color: "#1f2937", fontWeight: "600" }}
+              >
+                Thay đổi trưởng ban
+              </h5>
+            </div>
+
+            <p style={{ color: "#6b7280", marginBottom: "20px" }}>
+              Chọn thành viên mới làm trưởng ban cho <strong>{department.name}</strong>.
+              Chỉ có thể chọn từ các thành viên hiện tại trong ban.
+            </p>
+
+            <div className="mb-3">
+              <label className="form-label fw-semibold">
+                Chọn trưởng ban mới <span className="text-danger">*</span>
+              </label>
+              <div className="border rounded-3" style={{ maxHeight: "200px", overflowY: "auto" }}>
+                {(() => {
+                  const availableMembers = members.filter(member =>
+                    member.role !== 'HoOC' && // Exclude HoOC
+                    member.role !== 'HoD'    // Exclude current HoD
+                  );
+
+                  if (availableMembers.length === 0) {
+                    return (
+                      <div className="p-4 text-center text-muted">
+                        <i className="bi bi-people me-2"></i>
+                        Không có thành viên nào khác để chọn làm trưởng ban
+                      </div>
+                    );
+                  }
+
+                  return availableMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className={`p-3 border-bottom d-flex align-items-center ${selectedNewLeader?.id === member.id ? 'bg-primary text-white' : ''
+                        }`}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: selectedNewLeader?.id === member.id ? '#0d6efd' : 'transparent'
+                      }}
+                      onClick={() => setSelectedNewLeader(member)}
+                    >
+                      <img
+                        src={member.avatar || `https://i.pravatar.cc/100?u=${member.email}`}
+                        className="rounded-circle me-3"
+                        style={{ width: "40px", height: "40px" }}
+                        alt={member.name}
+                      />
+                      <div className="flex-grow-1">
+                        <div className="fw-semibold">{member.name}</div>
+                        <div className="small text-muted">{member.email}</div>
+                        <div className="small">
+                          <span className="badge bg-secondary">{member.role}</span>
+                        </div>
+                      </div>
+                      {selectedNewLeader?.id === member.id && (
+                        <i className="bi bi-check-circle-fill text-white"></i>
+                      )}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            <div className="d-flex justify-content-end gap-2">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={handleCancelChangeLeader}
+                style={{ borderRadius: "8px" }}
+                disabled={changingLeader}
+              >
+                Huỷ
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleChangeLeader}
+                style={{ borderRadius: "8px" }}
+                disabled={changingLeader || !selectedNewLeader || members.filter(member => member.role !== 'HoOC' && member.role !== 'HoD').length === 0}
+              >
+                {changingLeader ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang thay đổi...
+                  </>
+                ) : (
+                  'Xác nhận thay đổi'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Leader Modal (khi ban chưa có trưởng ban) */}
+      {showAssignLeaderModal && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}
+        >
+          <div
+            className="bg-white rounded-3 p-4"
+            style={{ minWidth: "500px", maxWidth: "700px", border: "1px solid #e5e7eb" }}
+          >
+            <div className="d-flex align-items-center mb-3">
+              <i className="bi bi-person-plus text-success me-2" style={{ fontSize: "1.2rem" }}></i>
+              <h5 className="mb-0" style={{ color: "#1f2937", fontWeight: "600" }}>
+                Gán trưởng ban cho {department.name}
+              </h5>
+            </div>
+
+            <p style={{ color: "#6b7280", marginBottom: "12px" }}>
+              Chọn một thành viên hiện có trong ban để gán làm trưởng ban.
+            </p>
+
+            <div className="border rounded-3 mb-3" style={{ maxHeight: 320, overflowY: "auto" }}>
+              {(() => {
+                const candidates = members.filter(m => m.role !== 'HoOC' && m.role !== 'HoD');
+                if (!candidates || candidates.length === 0) {
+                  return (
+                    <div className="p-4 text-center text-muted">
+                      <i className="bi bi-people me-2"></i>
+                      Không có thành viên phù hợp để gán
+                    </div>
+                  );
+                }
+                return candidates.map(member => (
+                  <div
+                    key={member.id || member._id}
+                    className={`p-3 d-flex align-items-center justify-content-between ${selectedAssignLeader?.id === member.id ? 'bg-primary text-white' : ''}`}
+                    style={{ cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                    onClick={() => setSelectedAssignLeader(member)}
+                  >
+                    <div className="d-flex align-items-center">
+                      <img
+                        src={member.avatar || `https://i.pravatar.cc/100?u=${member.email}`}
+                        alt={member.name}
+                        className="rounded-circle me-3"
+                        style={{ width: 40, height: 40 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{member.name}</div>
+                        <div className="small text-muted">{member.email}</div>
+                      </div>
+                    </div>
+                    <div>
+                      {selectedAssignLeader?.id === member.id && <i className="bi bi-check-circle-fill" style={{ fontSize: 20 }}></i>}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <div className="d-flex justify-content-end gap-2">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={handleCancelAssignLeader}
+                style={{ borderRadius: 8 }}
+                disabled={assigningLeader}
+              >
+                Huỷ
+              </button>
+              <button
+                className="btn btn-success"
+                onClick={handleConfirmAssignLeader}
+                disabled={assigningLeader || !selectedAssignLeader}
+                style={{ borderRadius: 8 }}
+              >
+                {assigningLeader ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang gán...
+                  </>
+                ) : (
+                  'Gán trưởng ban'
+                )}
               </button>
             </div>
           </div>

@@ -138,8 +138,11 @@ export const login = async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
 
-    if ( user.status !== 'active') {
+    if ( user.status == 'pending') {
       return res.status(403).json({ message: 'Account is not active' });
+    }
+    if ( user.status == 'banned') {
+      return res.status(403).json({ message: 'Account is banned' });
     }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
