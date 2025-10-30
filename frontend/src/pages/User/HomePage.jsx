@@ -603,10 +603,6 @@ export default function HomePage() {
                       e.target.src = "/default-events.jpg";
                     }}
                     onLoad={() => {
-                      console.log(
-                        "Blog image loaded successfully:",
-                        blog.image?.[0]
-                      );
                     }}
                   />
                   {/* Image count indicator */}

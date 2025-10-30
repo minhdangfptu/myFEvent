@@ -313,7 +313,7 @@ const animationStyles = `
   }
 `
 
-const HoOCManageMilestone = () => {
+const Milestone = () => {
   const navigate = useNavigate()
   const { eventId } = useParams()
   const { events, fetchEventRole, getEventRole } = useEvents()
@@ -491,13 +491,13 @@ const HoOCManageMilestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole}>
+    <UserLayout sidebarType={eventRole}>
       <style>{animationStyles}</style>
 
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Quản lý Cột Mốc</h1>
-          <button
+          {eventRole === "HoOC" && (<button
             style={styles.btnCreate}
             onClick={handleCreateMilestone}
             onMouseEnter={(e) => {
@@ -511,6 +511,7 @@ const HoOCManageMilestone = () => {
           >
             + TẠO CỘT MỐC MỚI
           </button>
+          )}
         </div>
 
         {error && <div style={styles.errorMessage}>{error}</div>}
@@ -746,4 +747,4 @@ const HoOCManageMilestone = () => {
   )
 }
 
-export default HoOCManageMilestone
+export default Milestone

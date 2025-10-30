@@ -5,8 +5,9 @@ import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
 import NoDataImg from '~/assets/no-data.png';
 import Loading from '~/components/Loading';
+import { useEvents } from '~/contexts/EventContext';
 
-const HoOCManageDepartment = () => {
+const Department = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const [departments, setDepartments] = useState([]);
@@ -18,6 +19,22 @@ const HoOCManageDepartment = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [evenntRole, setEventRole] = useState('');
+
+  const { fetchEventRole } = useEvents();
+
+  useEffect(() => {
+    fetchEventRole(eventId).then(role => {
+      setEventRole(role);
+    });
+  }, [eventId]);
+
+  const getSidebarType = () => {
+    if (evenntRole === 'HoOC') return 'HoOC';
+    if (evenntRole === 'HoD') return 'HoD';
+    if (evenntRole === 'Member') return 'Member';
+    return 'user';
+  }
 
   useEffect(() => {
     fetchDepartments();
@@ -79,7 +96,7 @@ const HoOCManageDepartment = () => {
   };
 
   const handleViewDetails = (departmentId) => {
-    navigate(`/events/${eventId}/hooc-department-detail/${departmentId}`);
+    navigate(`/events/${eventId}/department-detail/${departmentId}`);
   };
 
   const filteredDepartments = departments.filter(dept =>
@@ -89,7 +106,7 @@ const HoOCManageDepartment = () => {
   return (
     <UserLayout
       title="Quản lý phân ban sự kiện"
-      sidebarType="hooc"
+      sidebarType= {getSidebarType()}
       activePage="department-management"
     >
       {/* Main Content */}
@@ -107,7 +124,7 @@ const HoOCManageDepartment = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: '250px', borderRadius: '8px' }}
               />
-              <button 
+              {evenntRole === 'HoOC' && (<button 
                 className="btn btn-danger d-flex align-items-center"
                 onClick={handleCreateDepartment}
                 style={{ 
@@ -121,6 +138,7 @@ const HoOCManageDepartment = () => {
                 <i className="bi bi-plus-lg me-2"></i>
                  Tạo ban
               </button>
+              )}
             </div>
           </div>
 
@@ -303,4 +321,4 @@ const HoOCManageDepartment = () => {
   );
 };
 
-export default HoOCManageDepartment;
+export default Department;

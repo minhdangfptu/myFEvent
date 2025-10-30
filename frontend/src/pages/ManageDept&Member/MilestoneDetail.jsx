@@ -6,7 +6,7 @@ import { formatDate } from '~/utils/formatDate';
 import { toast } from 'react-toastify';
 import { useEvents } from '../../contexts/EventContext';
 
-const HoOCMilestoneDetail = () => {
+const MilestoneDetail = () => {
   const navigate = useNavigate();
   const { eventId, id } = useParams();
   const { fetchEventRole, getEventRole } = useEvents();
@@ -286,5 +286,5 @@ const HoOCMilestoneDetail = () => {
   );
 };
 
-export default HoOCMilestoneDetail;
+export default MilestoneDetail;
 

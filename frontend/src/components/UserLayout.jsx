@@ -8,22 +8,25 @@ import UserFooter from './UserFooter';
 import HoDSideBar from './HoDSideBar';
 import { getEventIdFromUrl } from '../utils/getEventIdFromUrl';
 
-export default function UserLayout({ 
-  title, 
-  children, 
+export default function UserLayout({
+  title,
+  children,
   activePage = 'home',
-  showSearch = false, 
+  showSearch = false,
   showEventAction = false,
   onSearch,
   onEventAction,
   sidebarType = 'user',
-  eventId // Cho phép truyền eventId từ bên ngoài
+  eventId
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
-  
+
   // Lấy eventId từ URL nếu không được truyền từ props
   const currentEventId = eventId || getEventIdFromUrl(location.pathname, location.search);
+
+  // Normalize sidebarType to lowercase for comparison
+  const normalizedSidebarType = String(sidebarType || 'user').toLowerCase();
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -37,22 +40,21 @@ export default function UserLayout({
   return (
     <div className="d-flex flex-column" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
       <div className="d-flex flex-grow-1">
-        {/* Sidebar */}
-        {sidebarType === 'hooc' ? (
+        {normalizedSidebarType === 'hooc' ? (
           <HoOCSidebar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
             eventId={currentEventId}
           />
-        ) : sidebarType === 'member' ? (
+        ) : normalizedSidebarType === 'member' ? (
           <MemberSidebar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
             eventId={currentEventId}
           />
-        ) :  sidebarType === 'hod' ? (
+        ) : normalizedSidebarType === 'hod' ? (
           <HoDSideBar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
@@ -60,8 +62,8 @@ export default function UserLayout({
             eventId={currentEventId}
           />
         ) : (
-          <UserSidebar 
-            sidebarOpen={sidebarOpen} 
+          <UserSidebar
+            sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
             eventId={currentEventId}
@@ -69,15 +71,15 @@ export default function UserLayout({
         )}
 
         {/* Main Content */}
-        <div 
+        <div
           className="flex-grow-1 d-flex flex-column"
-          style={{ 
+          style={{
             marginLeft: sidebarOpen ? '230px' : '70px',
             transition: 'margin-left 0.3s ease'
           }}
         >
           {/* Header */}
-          <UserHeader 
+          <UserHeader
             title={title}
             showSearch={showSearch}
             showEventAction={showEventAction}
@@ -86,7 +88,7 @@ export default function UserLayout({
           />
 
           {/* Main Content Area */}
-          <main style = {{minHeight: '85vh'}} className="flex-grow-1 px-4 pb-4 pt-4">
+          <main style={{ minHeight: '85vh' }} className="flex-grow-1 px-4 pb-4 pt-4">
             {children}
           </main>
         </div>

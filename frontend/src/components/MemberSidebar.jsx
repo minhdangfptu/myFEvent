@@ -95,7 +95,7 @@ export default function MemberSidebar({
   const workSubItems = [
     { id: "work-board", label: "Bảng công việc", path: "/task" },
     { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/timelines` },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}milestones` },
     // Không có work-stats (thống kê tiến độ)
   ];
 
@@ -362,8 +362,8 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "event-board" ? "active" : ""
               }`}
-              onClick={() => navigate("/task")}
-              title="Ban sự kiện"
+              onClick={() => navigate(`/events/${eventId || ''}/departments`)}
+              title="Ban của bạn"
             >
               <div className="d-flex align-items-center">
                 <i className="bi bi-people me-3" style={{ width: 20 }} />
