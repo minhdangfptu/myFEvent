@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
+import { useEvents } from "~/contexts/EventContext";
 
 function MemberCard({
   name = "Thành viên",
@@ -63,6 +64,8 @@ export default function MemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [eventRole, setEventRole] = useState('');
+  const { fetchEventRole } = useEvents();
 
   // Load members once when component mounts
   useEffect(() => {
@@ -112,9 +115,23 @@ export default function MemberPage() {
     setFilteredMembersByDepartment(filtered);
   }, [search, allMembersByDepartment]);
 
+  useEffect(() => {
+      fetchEventRole(eventId).then(role => {
+        setEventRole(role);
+      });
+    }, [eventId]);
+  const getSidebarType = () => {
+    if (eventRole === 'HoOC') return 'HoOC';
+    if (eventRole === 'HoD') return 'HoD';
+    if (eventRole === 'Member') return 'Member';
+    return 'user';
+  };
+
+
+
   if (loading) {
     return (
-      <UserLayout title="Thành viên" activePage="members" sidebarType="hooc">
+      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()}>
         <div
           className="d-flex justify-content-center align-items-center"
           style={{ minHeight: "400px" }}
@@ -139,7 +156,7 @@ export default function MemberPage() {
 
   if (error) {
     return (
-      <UserLayout title="Thành viên" activePage="members" sidebarType="hooc">
+      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType}>
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
@@ -151,7 +168,7 @@ export default function MemberPage() {
     <UserLayout
       title={`Thành viên - Sự kiện ${event?.name}`}
       activePage="members"
-      sidebarType="hooc"
+      sidebarType={getSidebarType()}
     >
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
@@ -167,7 +184,7 @@ export default function MemberPage() {
               🔍
             </span>
           </div>
-          <div className="ms-auto d-flex align-items-center gap-2">
+          {eventRole === 'HoOC' && (<div className="ms-auto d-flex align-items-center gap-2">
             <Link
               className="btn btn-danger"
               to={`/events/${eventId}/hooc-manage-member`}
@@ -176,7 +193,9 @@ export default function MemberPage() {
               Quản lý thành viên
             </Link>
           </div>
+          )}
         </div>
+
 
         {Object.keys(filteredMembersByDepartment).length === 0 ? (
           <div className="text-center py-5">

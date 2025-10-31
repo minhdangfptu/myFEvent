@@ -25,12 +25,12 @@ import EmailConfirmation from "./pages/Auth/EmailConfirmation";
 import UserLandingPage from './pages/User/UserLandingPage';
 import HoOCLandingPage from './pages/HoOC/HoOCLandingPage';
 import HoOCEventDetail from './pages/HoOC/HoOCEventDetail';
-import HoOCManageMilestone from './pages/HoOC/HoOCManageMilestone';
-import HoOCMilestoneDetail from './pages/HoOC/HoOCMilestoneDetail';
+import Milestone from './pages/ManageDept&Member/Milestone';
+import MilestoneDetail from './pages/ManageDept&Member/MilestoneDetail';
 import HoOCEditMilestone from './pages/HoOC/HoOCEditMilestone';
 import HoOCManageMilestoneEmpty from './pages/HoOC/HoOCManageMilestoneEmpty';
-import HoOCManageDepartment from './pages/HoOC/HoOCManageDepartment';
-import HoOCDepartmentDetail from './pages/HoOC/HoOCDepartmentDetail';
+import Department from './pages/ManageDept&Member/Department';
+import DepartmentDetail from './pages/ManageDept&Member/DepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
@@ -135,10 +135,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/events/:eventId/hooc-manage-milestone" 
+            path="/events/:eventId/milestones" 
             element={
               <ProtectedRoute>
-                <HoOCManageMilestone />
+                <Milestone />
               </ProtectedRoute>
             } 
           />
@@ -151,10 +151,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/events/:eventId/hooc-milestone-detail/:id" 
+            path="/events/:eventId/milestone-detail/:id" 
             element={
               <ProtectedRoute>
-                <HoOCMilestoneDetail />
+                <MilestoneDetail />
               </ProtectedRoute>
             } 
           />
@@ -167,10 +167,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/events/:eventId/hooc-manage-department" 
+            path="/events/:eventId/departments" 
             element={
               <ProtectedRoute>
-                <HoOCManageDepartment />
+                <Department />
               </ProtectedRoute>
             } 
           />
@@ -183,10 +183,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/events/:eventId/hooc-department-detail/:id" 
+            path="/events/:eventId/department-detail/:id" 
             element={
               <ProtectedRoute>
-                <HoOCDepartmentDetail />
+                <DepartmentDetail />
               </ProtectedRoute>
             } 
           />

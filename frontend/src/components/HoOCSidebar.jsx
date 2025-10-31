@@ -256,7 +256,7 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "department-management" ? "active" : ""
               }`}
-              onClick={() => navigate(`/events/${eventId || ''}/hooc-manage-department`)}
+              onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">

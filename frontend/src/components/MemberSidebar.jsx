@@ -362,8 +362,8 @@ export default function MemberSidebar({
               className={`btn-nav ${
                 activePage === "event-board" ? "active" : ""
               }`}
-              onClick={() => navigate("/task")}
-              title="Ban sự kiện"
+              onClick={() => navigate(`/events/${eventId || ''}/departments`)}
+              title="Ban của bạn"
             >
               <div className="d-flex align-items-center">
                 <i className="bi bi-people me-3" style={{ width: 20 }} />

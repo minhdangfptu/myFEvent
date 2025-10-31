@@ -7,11 +7,13 @@ import { toast } from "react-toastify";
 import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
+import { useEvents } from "../../contexts/EventContext";
 
-const HoOCDepartmentDetail = () => {
+const DepartmentDetail = () => {
   const { eventId, id } = useParams();
   const navigate = useNavigate();
-
+  const [eventRole, setEventRole] = useState('');
+  const [userDepartmentId, setUserDepartmentId] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [department, setDepartment] = useState(null);
   const [members, setMembers] = useState([]);
@@ -36,6 +38,8 @@ const HoOCDepartmentDetail = () => {
   const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
   const [selectedAssignLeader, setSelectedAssignLeader] = useState(null);
   const [assigningLeader, setAssigningLeader] = useState(false);
+  const { fetchEventRole } = useEvents();
+  const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
 
   // Helper: tránh render object (members có thể chứa userId object)
   const getMemberDisplayName = (member) =>
@@ -51,29 +55,87 @@ const HoOCDepartmentDetail = () => {
     return leader.fullName || leader.userId?.fullName || leader.email || leader.userId?.email || 'Chưa có'
   }
 
+  const canManage = eventRole === 'HoOC' || (eventRole === 'HoD' && user._id === department.leaderId);
+
+  // Normalize sidebar type for UserLayout
+  const getSidebarType = () => {
+    if (eventRole === 'HoOC') return 'HoOC';
+    if (eventRole === 'HoD') return 'HoD';
+    if (eventRole === 'Member') return 'Member';
+    return 'user';
+  };
+
   useEffect(() => {
     fetchMembersAndDepartment();
   }, [id]);
 
-  async function fetchMembersAndDepartment() {
+  useEffect(() => {
+    let mounted = true;
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) {
+          setEventRole('');
+          setUserDepartmentId(null);
+        }
+        return;
+      }
+      try {
+        const r = await fetchEventRole(eventId);
+        // normalize returned value to string role name
+        let normalized = '';
+        let deptId = null;
+        
+        if (!r) {
+          normalized = '';
+        } else if (typeof r === 'string') {
+          normalized = r;
+        } else if (typeof r === 'object') {
+          normalized = String(r.role || '');
+          deptId = r.departmentId || null;
+        } else {
+          normalized = String(r);
+        }
+        
+        if (mounted) {
+          setEventRole(normalized);
+          setUserDepartmentId(deptId);
+        }
+      } catch (err) {
+        console.error('Error fetching role:', err);
+        if (mounted) {
+          setEventRole('');
+          setUserDepartmentId(null);
+        }
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [eventId, fetchEventRole]);
+
+  const fetchMembersAndDepartment = async () => {
     try {
-      const department = await departmentService.getDepartmentDetail(
-        eventId,
-        id
-      );
-      setDepartment(department || []);
-      const members = await departmentService.getMembersByDepartment(
-        eventId,
-        id
-      );
-      setMembers(members || []);
-      console.log(members);
+      const dep = await departmentService.getDepartmentDetail(eventId, id);
+      setDepartment(dep || null);
+      const mems = await departmentService.getMembersByDepartment(eventId, id);
+      setMembers(mems || []);
+      
+      // If userDepartmentId is not set from API, try to get it from members
+      // Find if current user is HoD of this department
+      if (!userDepartmentId && eventRole === 'HoD' && mems) {
+        const hodMember = mems.find(m => m.role === 'HoD');
+        if (hodMember) {
+          // Check if this HoD's department matches current department
+          const memberDeptId = hodMember.departmentId || hodMember.department?._id || hodMember.department?.id;
+          if (memberDeptId === id) {
+            setUserDepartmentId(id);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error fetching members of department:", error);
       toast.error("Lỗi khi tải danh sách thành viên của ban");
     }
-  }
-
+  };
 
   const handleEdit = () => {
     if (department) {
@@ -118,7 +180,7 @@ const HoOCDepartmentDetail = () => {
       try {
         await departmentApi.deleteDepartment(eventId, id);
         toast.success("Xóa ban thành công!");
-        navigate(`/events/${eventId}/hooc-manage-department`);
+        navigate(`/events/${eventId}/`);
       } catch (error) {
         toast.error(error?.response?.data?.message || "Xóa ban thất bại!");
       }
@@ -129,12 +191,12 @@ const HoOCDepartmentDetail = () => {
 
   const handleCancelDelete = () => {
     setShowDeleteModal(false);
-    setDeleteConfirmName(department.name);
+    setDeleteConfirmName("");
   };
 
   const handleMemberAction = (memberId, action) => {
     if (action === "remove") {
-      const member = members.find((m) => m.id === memberId);
+      const member = members.find((m) => (m._id || m.id) === memberId);
       setMemberToRemove(member);
       setShowRemoveMemberModal(true);
     } else if (action === "change_leader") {
@@ -154,9 +216,7 @@ const HoOCDepartmentDetail = () => {
       toast.success("Đã xóa thành viên khỏi ban");
       setShowRemoveMemberModal(false);
       setMemberToRemove(null);
-      // Reload members list
       await fetchMembersAndDepartment();
-      // You might want to reload the department data here
     } catch (error) {
       console.error("Error removing member:", error);
       toast.error("Không thể xóa thành viên khỏi ban");
@@ -169,10 +229,8 @@ const HoOCDepartmentDetail = () => {
   };
 
   const handleAddMember = async () => {
-    const response = await eventService.getUnassignedMembersByEvent(eventId);
-    setUnassignedMembers(response.data || []);
-    setShowAddMemberModal(true);
     await loadUnassignedMembers();
+    setShowAddMemberModal(true);
   };
 
   const loadUnassignedMembers = async () => {
@@ -212,9 +270,7 @@ const HoOCDepartmentDetail = () => {
       setShowAddMemberModal(false);
       setSelectedMembers([]);
       setMemberSearchQuery("");
-      // Reload members list
       await fetchMembersAndDepartment();
-      // You might want to reload the department data here
     } catch (error) {
       console.error("Error adding members:", error);
       toast.error("Không thể thêm thành viên vào ban");
@@ -233,7 +289,6 @@ const HoOCDepartmentDetail = () => {
       return;
     }
 
-    // Check if there are any available members to choose from
     const availableMembers = members.filter(member =>
       member.role !== 'HoOC' && member.role !== 'HoD'
     );
@@ -245,13 +300,11 @@ const HoOCDepartmentDetail = () => {
 
     try {
       setChangingLeader(true);
-      // Backend expects a userId, not membership id
-      const newHoDUserId = selectedNewLeader.userId || selectedNewLeader.id;
+      const newHoDUserId = selectedNewLeader.userId || selectedNewLeader._id || selectedNewLeader.id;
       await departmentService.changeHoD(eventId, id, newHoDUserId);
       toast.success("Thay đổi trưởng ban thành công!");
       setShowChangeLeaderModal(false);
       setSelectedNewLeader(null);
-      // Reload department and members data
       await fetchMembersAndDepartment();
     } catch (error) {
       console.error("Error changing leader:", error);
@@ -267,37 +320,36 @@ const HoOCDepartmentDetail = () => {
   };
 
   const openAssignLeaderModal = () => {
-  setSelectedAssignLeader(null);
-  setShowAssignLeaderModal(true);
-};
+    setSelectedAssignLeader(null);
+    setShowAssignLeaderModal(true);
+  };
 
-const handleCancelAssignLeader = () => {
-  setShowAssignLeaderModal(false);
-  setSelectedAssignLeader(null);
-};
-
-const handleConfirmAssignLeader = async () => {
-  if (!selectedAssignLeader) {
-    toast.warning("Vui lòng chọn 1 thành viên để gán làm trưởng ban");
-    return;
-  }
-
-  try {
-    setAssigningLeader(true);
-    // Backend cần userId (fallback sang id nếu dữ liệu khác)
-    const newHoDUserId = selectedAssignLeader.userId || selectedAssignLeader.id;
-    await departmentService.changeHoD(eventId, id, newHoDUserId);
-    toast.success("Đã gán trưởng ban thành công!");
+  const handleCancelAssignLeader = () => {
     setShowAssignLeaderModal(false);
     setSelectedAssignLeader(null);
-    await fetchMembersAndDepartment(); // refresh lại dữ liệu
-  } catch (error) {
-    console.error("Assign HoD error:", error);
-    toast.error("Không thể gán trưởng ban");
-  } finally {
-    setAssigningLeader(false);
-  }
-};
+  };
+
+  const handleConfirmAssignLeader = async () => {
+    if (!selectedAssignLeader) {
+      toast.warning("Vui lòng chọn 1 thành viên để gán làm trưởng ban");
+      return;
+    }
+
+    try {
+      setAssigningLeader(true);
+      const newHoDUserId = selectedAssignLeader.userId || selectedAssignLeader._id || selectedAssignLeader.id;
+      await departmentService.changeHoD(eventId, id, newHoDUserId);
+      toast.success("Đã gán trưởng ban thành công!");
+      setShowAssignLeaderModal(false);
+      setSelectedAssignLeader(null);
+      await fetchMembersAndDepartment();
+    } catch (error) {
+      console.error("Assign HoD error:", error);
+      toast.error("Không thể gán trưởng ban");
+    } finally {
+      setAssigningLeader(false);
+    }
+  };
 
   const filteredMembers = members.filter((member) => {
     const name = String(getMemberDisplayName(member)).toLowerCase()
@@ -337,7 +389,7 @@ const handleConfirmAssignLeader = async () => {
   return (
     <UserLayout
       title="Chi tiết phân ban"
-      sidebarType="hooc"
+      sidebarType={getSidebarType()}
       activePage="department-management"
     >
       {/* Main Content */}
@@ -354,41 +406,42 @@ const handleConfirmAssignLeader = async () => {
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="row mb-4">
-          <div className="col-md-3">
-            <div className="bg-light rounded-3 p-3 text-center">
-              <i className="bi bi-people-fill text-primary me-2"></i>
-              <span style={{ fontWeight: "600" }}>
-                {department.memberCount} thành viên
-              </span>
+        {(eventRole === "HoD" || eventRole === "HoOC") && (
+          <div className="row mb-4">
+            <div className="col-md-3">
+              <div className="bg-light rounded-3 p-3 text-center">
+                <i className="bi bi-people-fill text-primary me-2"></i>
+                <span style={{ fontWeight: "600" }}>
+                  {department.memberCount} thành viên
+                </span>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="bg-light rounded-3 p-3 text-center">
+                <i className="bi bi-person-plus text-success me-2"></i>
+                <span style={{ fontWeight: "600" }}>
+                  {department.newMembersToday || 0} thành viên mới hôm nay
+                </span>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="bg-light rounded-3 p-3 text-center">
+                <i className="bi bi-clock text-info me-2"></i>
+                <span style={{ fontWeight: "600" }}>
+                  Ngày tạo ban: {formatDate(department.createdAt)}
+                </span>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="bg-light rounded-3 p-3 text-center">
+                <i className="bi bi-clock text-warning me-2"></i>
+                <span style={{ fontWeight: "600" }}>
+                  Thay đổi lần cuối: {formatDate(department.updatedAt)}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="col-md-3">
-            <div className="bg-light rounded-3 p-3 text-center">
-              <i className="bi bi-person-plus text-success me-2"></i>
-              <span style={{ fontWeight: "600" }}>
-                {department.newMembersToday || 0} thành viên mới hôm nay
-              </span>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="bg-light rounded-3 p-3 text-center">
-              <i className="bi bi-clock text-info me-2"></i>
-              <span style={{ fontWeight: "600" }}>
-                Ngày tạo ban: {formatDate(department.createdAt)}
-              </span>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="bg-light rounded-3 p-3 text-center">
-              <i className="bi bi-clock text-warning me-2"></i>
-              <span style={{ fontWeight: "600" }}>
-                Thay đổi lần cuối: {formatDate(department.updatedAt)}
-              </span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Tabs */}
         <div className="border-bottom mb-4">
@@ -407,20 +460,21 @@ const handleConfirmAssignLeader = async () => {
               >
                 Thông tin
               </button>
-              <button
-                className={`nav-link ${activeTab === "settings" ? "active" : ""
-                  }`}
-                onClick={() => setActiveTab("settings")}
-                style={{
-                  border: "none",
-                  color: activeTab === "settings" ? "#dc2626" : "#6b7280",
-                  fontWeight: "500",
-                  borderBottom:
-                    activeTab === "settings" ? "2px solid #dc2626" : "none",
-                }}
-              >
-                Cài đặt
-              </button>
+              {canManage && (
+                <button
+                  className={`nav-link ${activeTab === "settings" ? "active" : ""}`}
+                  onClick={() => setActiveTab("settings")}
+                  style={{
+                    border: "none",
+                    color: activeTab === "settings" ? "#dc2626" : "#6b7280",
+                    fontWeight: "500",
+                    borderBottom:
+                      activeTab === "settings" ? "2px solid #dc2626" : "none",
+                  }}
+                >
+                  Cài đặt
+                </button>
+              )}
             </div>
           </nav>
         </div>
@@ -428,7 +482,6 @@ const handleConfirmAssignLeader = async () => {
         {/* Tab Content */}
         {activeTab === "info" && (
           <div>
-            {/* Member Management Bar */}
             <div className="d-flex justify-content-between align-items-center mb-4">
               <input
                 type="text"
@@ -438,20 +491,22 @@ const handleConfirmAssignLeader = async () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: "300px", borderRadius: "8px" }}
               />
-              <button
-                className="btn btn-danger d-flex align-items-center"
-                onClick={handleAddMember}
-                style={{
-                  backgroundColor: "#dc2626",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "10px 20px",
-                  fontWeight: "500",
-                }}
-              >
-                <i className="bi bi-plus-lg me-2"></i>
-                Thêm thành viên
-              </button>
+              {canManage && (
+                <button
+                  className="btn btn-danger d-flex align-items-center"
+                  onClick={handleAddMember}
+                  style={{
+                    backgroundColor: "#dc2626",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "10px 20px",
+                    fontWeight: "500",
+                  }}
+                >
+                  <i className="bi bi-plus-lg me-2"></i>
+                  Thêm thành viên
+                </button>
+              )}
             </div>
 
             {/* Members Table */}
@@ -477,7 +532,7 @@ const handleConfirmAssignLeader = async () => {
                         color: "#374151",
                       }}
                     >
-                      Họ và tên
+                      Tên
                     </th>
                     <th
                       style={{
@@ -499,16 +554,18 @@ const handleConfirmAssignLeader = async () => {
                     >
                       Email
                     </th>
-                    <th
-                      style={{
-                        border: "none",
-                        padding: "15px",
-                        fontWeight: "600",
-                        color: "#374151",
-                      }}
-                    >
-                      Hành động
-                    </th>
+                    {canManage && (
+                      <th
+                        style={{
+                          border: "none",
+                          padding: "15px",
+                          fontWeight: "600",
+                          color: "#374151",
+                        }}
+                      >
+                        Hành động
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -532,44 +589,46 @@ const handleConfirmAssignLeader = async () => {
                       <td style={{ padding: "15px", color: "#6b7280" }}>
                         {getMemberEmail(member)}
                       </td>
-                       <td style={{ padding: "15px" }}>
-                        <div className="dropdown">
-                          <button
-                            className="btn btn-link text-decoration-none"
-                            data-bs-toggle="dropdown"
-                            style={{ color: "#6b7280" }}
-                          >
-                            <i className="bi bi-three-dots"></i>
-                          </button>
-                          <ul className="dropdown-menu">
-                            <li>
-                              <button
-                                className="dropdown-item"
-                                onClick={() =>
-                                  handleMemberAction(member.id, "remove")
-                                }
-                              >
-                                Xoá thành viên khỏi ban
-                              </button>
-                            </li>
-                            {member.role !== "HoD" && (
+                      {canManage && (
+                        <td style={{ padding: "15px" }}>
+                          <div className="dropdown">
+                            <button
+                              className="btn btn-link text-decoration-none"
+                              data-bs-toggle="dropdown"
+                              style={{ color: "#6b7280" }}
+                            >
+                              <i className="bi bi-three-dots"></i>
+                            </button>
+                            <ul className="dropdown-menu">
                               <li>
                                 <button
                                   className="dropdown-item"
                                   onClick={() =>
-                                    handleMemberAction(
-                                      member.id,
-                                      "change_leader"
-                                    )
+                                    handleMemberAction(member._id || member.id, "remove")
                                   }
                                 >
-                                  Thay đổi trưởng ban
+                                  Xoá thành viên khỏi ban
                                 </button>
                               </li>
-                            )}
-                          </ul>
-                        </div>
-                      </td>
+                              {member.role !== "HoD" && (
+                                <li>
+                                  <button
+                                    className="dropdown-item"
+                                    onClick={() =>
+                                      handleMemberAction(
+                                        member._id || member.id,
+                                        "change_leader"
+                                      )
+                                    }
+                                  >
+                                    Thay đổi trưởng ban
+                                  </button>
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -578,7 +637,7 @@ const handleConfirmAssignLeader = async () => {
           </div>
         )}
 
-        {activeTab === "settings" && (
+        {activeTab === "settings" && canManage && (
           <div className="row">
             {/* Cột trái - Chi tiết ban */}
             <div className="col-md-6">
@@ -588,13 +647,14 @@ const handleConfirmAssignLeader = async () => {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    marginBottom: "20px",
                   }}
                 >
                   <h5
                     style={{
                       color: "#1f2937",
                       fontWeight: "600",
-                      marginBottom: "20px",
+                      marginBottom: 0,
                     }}
                   >
                     <i className="bi bi-info-circle me-2"></i>
@@ -610,7 +670,7 @@ const handleConfirmAssignLeader = async () => {
                       Chỉnh sửa
                     </button>
                   ) : (
-                    <>
+                    <div className="d-flex gap-2">
                       <button
                         className="btn btn-danger d-flex align-items-center"
                         onClick={handleSave}
@@ -627,7 +687,7 @@ const handleConfirmAssignLeader = async () => {
                         <i className="bi bi-x-lg me-2"></i>
                         Hủy
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
 
@@ -674,17 +734,49 @@ const handleConfirmAssignLeader = async () => {
                       marginBottom: "20px",
                     }}
                   >
-                    <i className="bi bi-person-badge me-2"></i>
+                    <i className="bi bi-person-circle me-2"></i>
                     Trưởng ban
                   </h5>
-                  <p style={{ color: "#6b7280", marginBottom: "15px" }}>
-                    Mỗi ban cần phải có một trưởng ban. Trưởng ban{" "}
-                    {department.name} hiện tại:{" "}
-                    <strong>{getLeaderDisplayName(department.leader)}</strong>
-                  </p>
+                  <div className="d-flex align-items-center mb-3">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                      style={{
+                        width: "60px",
+                        height: "60px",
+                        backgroundColor: "#f3f4f6",
+                        fontSize: "1.5rem",
+                        fontWeight: "600",
+                        color: "#6b7280",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {department.leader ? (
+                        <img
+                          src={
+                            department.leader.avatarUrl ||
+                            `https://i.pravatar.cc/100?u=${department.leader.email}`
+                          }
+                          alt={department.leader.fullName}
+                          className="rounded-circle"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        "?"
+                      )}
+                    </div>
+                    <div className="flex-grow-1">
+                      <div className="fw-semibold">
+                        {getLeaderDisplayName(department.leader)}
+                      </div>
+                      <div className="small text-muted">
+                        {department.leader?.email || ""}
+                      </div>
+                    </div>
+                  </div>
+
                   {department.leader ? (
                     <button
-                      className="btn btn-primary d-flex align-items-center"
+                      className="btn btn-outline-danger d-flex align-items-center"
                       style={{ borderRadius: "8px", fontWeight: "400" }}
                       onClick={() => setShowChangeLeaderModal(true)}
                     >
@@ -893,8 +985,8 @@ const handleConfirmAssignLeader = async () => {
                     <div
                       key={member._id}
                       className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(member._id)
-                          ? "bg-light border-primary"
-                          : "border-light"
+                        ? "bg-light border-primary"
+                        : "border-light"
                         }`}
                       onClick={() => handleMemberSelect(member._id)}
                       style={{
@@ -934,7 +1026,7 @@ const handleConfirmAssignLeader = async () => {
                               className="mb-0"
                               style={{ color: "#6b7280", fontSize: "0.9rem" }}
                             >
-                              {member.email || ""}
+                              {member.userId?.email || ""}
                             </p>
                           </div>
                         </div>
@@ -1012,7 +1104,7 @@ const handleConfirmAssignLeader = async () => {
             </div>
 
             <p style={{ color: "#6b7280", marginBottom: "20px" }}>
-              Bạn có chắc chắn muốn xoá <strong>{memberToRemove.name}</strong>{" "}
+              Bạn có chắc chắn muốn xoá <strong>{getMemberDisplayName(memberToRemove)}</strong>{" "}
               khỏi ban {department.name}?
             </p>
 
@@ -1093,29 +1185,29 @@ const handleConfirmAssignLeader = async () => {
 
                   return availableMembers.map((member) => (
                     <div
-                      key={member.id}
-                      className={`p-3 border-bottom d-flex align-items-center ${selectedNewLeader?.id === member.id ? 'bg-primary text-white' : ''
+                      key={member._id || member.id}
+                      className={`p-3 border-bottom d-flex align-items-center ${selectedNewLeader?._id === member._id ? 'bg-primary text-white' : ''
                         }`}
                       style={{
                         cursor: 'pointer',
-                        backgroundColor: selectedNewLeader?.id === member.id ? '#0d6efd' : 'transparent'
+                        backgroundColor: selectedNewLeader?._id === member._id ? '#0d6efd' : 'transparent'
                       }}
                       onClick={() => setSelectedNewLeader(member)}
                     >
                       <img
-                        src={member.avatar || `https://i.pravatar.cc/100?u=${member.email}`}
+                        src={getMemberAvatar(member)}
                         className="rounded-circle me-3"
-                        style={{ width: "40px", height: "40px" }}
-                        alt={member.name}
+                        style={{ width: "40px", height: "40px", objectFit: "cover" }}
+                        alt={getMemberDisplayName(member)}
                       />
                       <div className="flex-grow-1">
-                        <div className="fw-semibold">{member.name}</div>
-                        <div className="small text-muted">{member.email}</div>
+                        <div className="fw-semibold">{getMemberDisplayName(member)}</div>
+                        <div className="small text-muted">{getMemberEmail(member)}</div>
                         <div className="small">
                           <span className="badge bg-secondary">{member.role}</span>
                         </div>
                       </div>
-                      {selectedNewLeader?.id === member.id && (
+                      {selectedNewLeader?._id === member._id && (
                         <i className="bi bi-check-circle-fill text-white"></i>
                       )}
                     </div>
@@ -1187,25 +1279,25 @@ const handleConfirmAssignLeader = async () => {
                 }
                 return candidates.map(member => (
                   <div
-                    key={member.id || member._id}
-                    className={`p-3 d-flex align-items-center justify-content-between ${selectedAssignLeader?.id === member.id ? 'bg-primary text-white' : ''}`}
+                    key={member._id || member.id}
+                    className={`p-3 d-flex align-items-center justify-content-between ${selectedAssignLeader?._id === member._id ? 'bg-primary text-white' : ''}`}
                     style={{ cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
                     onClick={() => setSelectedAssignLeader(member)}
                   >
                     <div className="d-flex align-items-center">
                       <img
-                        src={member.avatar || `https://i.pravatar.cc/100?u=${member.email}`}
-                        alt={member.name}
+                        src={getMemberAvatar(member)}
+                        alt={getMemberDisplayName(member)}
                         className="rounded-circle me-3"
-                        style={{ width: 40, height: 40 }}
+                        style={{ width: 40, height: 40, objectFit: "cover" }}
                       />
                       <div>
-                        <div style={{ fontWeight: 600 }}>{member.name}</div>
-                        <div className="small text-muted">{member.email}</div>
+                        <div style={{ fontWeight: 600 }}>{getMemberDisplayName(member)}</div>
+                        <div className="small text-muted">{getMemberEmail(member)}</div>
                       </div>
                     </div>
                     <div>
-                      {selectedAssignLeader?.id === member.id && <i className="bi bi-check-circle-fill" style={{ fontSize: 20 }}></i>}
+                      {selectedAssignLeader?._id === member._id && <i className="bi bi-check-circle-fill" style={{ fontSize: 20 }}></i>}
                     </div>
                   </div>
                 ));
@@ -1244,4 +1336,4 @@ const handleConfirmAssignLeader = async () => {
   );
 };
 
-export default HoOCDepartmentDetail;
+export default DepartmentDetail;
