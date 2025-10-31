@@ -66,34 +66,28 @@ export default function EventTaskPage() {
       .then((apiRes) => {
         const arr = apiRes?.data || [];
         const mapped = arr.map((task) => ({
-          id: task._id,
-          name: task.title || "",
-          description: task.description || "",
-          department: task.departmentId.name || "Chưa phân công",
-          assignee: task.assigneeId.userId.fullName || "Chưa phân công",
-          milestone: task.milestoneId || "Chưa có",
-          parent: task.parentId || "Chưa có",
-          due: task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "",
+          id: task?._id,
+          name: task?.title || "",
+          description: task?.description || "",
+          department: task?.departmentId?.name || "Chưa phân công",
+          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+          milestone: task?.milestoneId || "Chưa có",
+          parent: task?.parentId || "Chưa có",
+          due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
           status:
- task.status === "done"
+            task?.status === "done"
               ? "Hoàn thành"
-              : task.status === "blocked"
+              : task?.status === "blocked"
               ? "Tạm hoãn"
-              : task.status === "todo"
+              : task?.status === "todo"
               ? "Chưa bắt đầu"
-              : task.status === "cancelled"
+              : task?.status === "cancelled"
               ? "Đã huỷ"
               : "Đang làm",
-          estimate: task.estimate + task.estimateUnit || "Ước tính",
-          createdAt: task.createdAt
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "Thời gian",
-          updatedAt: task.updatedAt
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "Thời gian",
-          progressPct: task.progressPct || "Tiến đọo",
+          estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
+          createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
+          updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
+          progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
         }));
         setTasks(mapped);
       })
@@ -139,7 +133,7 @@ export default function EventTaskPage() {
       if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
       return 0;
     });
-
+    
   const taskStats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "Hoàn thành").length,
@@ -194,6 +188,27 @@ export default function EventTaskPage() {
   const [parents, setParents] = useState([]);
   const [deps, setDeps] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
+  const [depFilterDepartment, setDepFilterDepartment] = useState("Tất cả");
+  const [depSearch, setDepSearch] = useState("");
+  const filteredDeps = useMemo(() => {
+    const text = (depSearch || "").toLowerCase();
+    return (deps || []).filter((d) => {
+      const depName = d?.departmentId?.name || "";
+      const byDept = depFilterDepartment === "Tất cả" || depName === depFilterDepartment;
+      const byText = (d?.title || "").toLowerCase().includes(text);
+      return byDept && byText;
+    });
+  }, [deps, depFilterDepartment, depSearch]);
+
+  const selectedDepartmentName = useMemo(() => (
+    departments.find((d) => d._id === addTaskForm.departmentId)?.name || ""
+  ), [departments, addTaskForm.departmentId]);
+
+  const filteredParents = useMemo(() => {
+    const list = Array.isArray(parents) ? parents : [];
+    if (!addTaskForm.departmentId) return list;
+    return list.filter((p) => (p?.departmentId?.name || "") === selectedDepartmentName);
+  }, [parents, addTaskForm.departmentId, selectedDepartmentName]);
 
   useEffect(() => {
     if (!eventId || !showAddModal) return;
@@ -762,8 +777,8 @@ export default function EventTaskPage() {
               tabIndex={-1}
               style={{ zIndex: 1060 }}
             >
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
+              <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 900, width: '90%' }}>
+                <div className="modal-content" style={{ borderRadius: 16 }}>
                   <div className="modal-header">
                     <h5 className="modal-title">➕ Thêm công việc mới</h5>
                     <button
@@ -772,7 +787,7 @@ export default function EventTaskPage() {
                       onClick={() => setShowAddModal(false)}
                     />
                   </div>
-                  <div className="modal-body">
+                  <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {addTaskError && (
                       <div className="alert alert-danger mb-2">
                         {addTaskError}
@@ -799,6 +814,7 @@ export default function EventTaskPage() {
                           handleAddTaskInput("description", e.target.value)
                         }
                         placeholder="Mô tả ngắn..."
+                        rows={3}
                       />
                     </div>
                     <div className="row">
@@ -831,8 +847,8 @@ export default function EventTaskPage() {
                         >
                           <option value="">Chọn người phụ trách</option>
                           {assignees.map((m) => (
-                            <option key={m._id} value={m._id}>
-                              {m.userId?.fullName || m.fullName}
+                            <option key={m._id || m.id || m.userId} value={m._id || m.id || m.userId}>
+                              {m.userId?.fullName || m.fullName || m.name}
                             </option>
                           ))}
                         </select>
@@ -873,6 +889,7 @@ export default function EventTaskPage() {
                         >
                           <option value="h">giờ</option>
                           <option value="d">ngày</option>
+                          <option value="w">tuần</option>
                         </select>
                       </div>
                     </div>
@@ -899,38 +916,54 @@ export default function EventTaskPage() {
                         <select
                           className="form-select"
                           value={addTaskForm.parentId}
-                          onChange={(e) =>
-                            handleAddTaskInput("parentId", e.target.value)
-                          }
+                          onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
+                          disabled={!addTaskForm.departmentId}
                         >
                           <option value="">Không có</option>
-                          {parents
-                            .filter((p) => !p.parentId)
-                            .map((p) => (
-                              <option key={p._id} value={p._id}>
-                                {p.title}
-                              </option>
-                            ))}
+                          {filteredParents.map((p) => (
+                            <option key={p._id} value={p._id}>
+                              {p.title}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Task phụ thuộc</label>
+                      <div className="d-flex gap-2 mb-2">
+                        <select
+                          className="form-select form-select-sm soft-input"
+                          style={{ width: 200, height: 40 }}
+                          value={depFilterDepartment}
+                          onChange={(e) => setDepFilterDepartment(e.target.value)}
+                        >
+                          <option value="Tất cả">Tất cả ban</option>
+                          {departments.map((dept) => (
+                            <option key={dept._id} value={dept.name}>{dept.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          className="form-control soft-input"
+                          style={{ height: 40 }}
+                          placeholder="Tìm theo tên task"
+                          value={depSearch}
+                          onChange={(e) => setDepSearch(e.target.value)}
+                        />
+                      </div>
                       <select
                         multiple
                         className="form-select"
+                        size={6}
+                        style={{ minHeight: 160 }}
                         value={addTaskForm.dependencies}
                         onChange={(e) =>
                           handleAddTaskInput(
                             "dependencies",
-                            Array.from(
-                              e.target.selectedOptions,
-                              (opt) => opt.value
-                            )
+                            Array.from(e.target.selectedOptions, (opt) => opt.value)
                           )
                         }
                       >
-                        {deps.map((d) => (
+                        {filteredDeps.map((d) => (
                           <option key={d._id} value={d._id}>
                             {d.title}
                           </option>

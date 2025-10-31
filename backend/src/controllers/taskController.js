@@ -67,6 +67,39 @@ export const getTaskDetail = async (req, res) => {
     }
 };
 
+export const getTaskByDepartment = async (req, res) => {
+    try {
+        const { eventId, taskId, departmentId } = req.params;
+
+        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
+        if (!member) return res.status(403).json({ message: 'Không có quyền xem chi tiết task' });
+        // Validate department thuộc event
+        const deptExists = await Department.exists({ _id: departmentId, eventId });
+        if (!deptExists) return res.status(404).json({ message: 'Ban không tồn tại trong sự kiện này' });
+
+        const task = await Task.findOne({ _id: taskId, eventId, departmentId })
+            .populate([
+                {
+                    path: 'assigneeId',
+                    select: 'userId role departmentId',
+                    populate: [
+                        { path: 'userId', model: 'User', select: 'fullName email avatarUrl' },
+                        { path: 'departmentId', model: 'Department', select: 'name' }
+                    ]
+                },
+                { path: 'departmentId', select: 'name' },
+                { path: 'milestoneId', select: 'name' }
+            ])
+            .lean();
+
+        if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
+
+        return res.status(200).json({ data: task });
+    } catch (err) {
+        return res.status(500).json({ message: 'Lỗi lấy chi tiết task của ban' });
+    }
+};
+
 
 // POST /api/task/:eventId/tasks (HoOC/HoD)
 export const createTask = async (req, res) => {

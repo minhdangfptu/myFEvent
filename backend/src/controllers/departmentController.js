@@ -44,7 +44,6 @@ export const listDepartmentsByEvent = async (req, res) => {
         id: dept._id,
         name: dept.name,
         description: dept.description,
-        leaderId: dept.leaderId,
         leader: dept.leaderId,
         leaderName: dept.leaderId?.fullName || 'Chưa có',
         memberCount: memberCount,
@@ -77,19 +76,16 @@ export const getDepartmentDetail = async (req, res) => {
       .lean();
     if (!department) return res.status(404).json({ message: 'Department not found' });
 
-    // Get member count for this department
     const memberCount = await EventMember.countDocuments({ 
       departmentId: department._id,
-      role: { $ne: 'HoOC' } // Exclude HoOC from member count
+      role: { $ne: 'HoOC' } 
     });
 
-    // Format data for frontend
+
     const formattedDepartment = {
       _id: department._id,
-      id: department._id,
       name: department.name,
       description: department.description,
-      leaderId: department.leaderId,
       leader: department.leaderId,
       leaderName: department.leaderId?.fullName || 'Chưa có',
       memberCount: memberCount,

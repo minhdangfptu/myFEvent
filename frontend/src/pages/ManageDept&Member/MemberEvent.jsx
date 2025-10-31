@@ -232,7 +232,7 @@ export default function MemberPage() {
                         <div className="card h-100 p-3">
                           <MemberCard
                             name={member.name}
-                            role={member.role}
+                            role= {member.role === "HoOC"? "Trưởng ban Tổ chức": member.role === "HoD"? "Trưởng ban": " Thành viên"}
                             avatar={member.avatar}
                             department="Core Team"
                           />
@@ -267,9 +267,9 @@ export default function MemberPage() {
                           <div className="card h-100 p-3">
                             <MemberCard
                               name={member.name}
-                              role={member.role}
+                              role= {member.role === "HoOC"? "Trưởng ban Tổ chức": member.role === "HoD"? "Trưởng ban": " Thành viên"} 
                               avatar={member.avatar}
-                              department={member.department}
+                              department= {member.department}
                             />
                           </div>
                         </div>

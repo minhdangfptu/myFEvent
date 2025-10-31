@@ -241,9 +241,8 @@ export default function ManageMemberPage() {
   }, [prefetchedMembersByDepartment, selectedEvent]);
 
   const filtered = members.filter((r) =>
-    r.name.toLowerCase().includes(query.toLowerCase())
+    r.name.toLowerCase().includes(query.toLowerCase()),
   );
-
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
   const isMember = eventRole === 'Member';
 
@@ -319,11 +318,11 @@ export default function ManageMemberPage() {
                   <th style={{ width: 48, fontSize: "14px", fontWeight: "500", color: "#374151" }}>
                     <input className="form-check-input" type="checkbox" />
                   </th>
-                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }} >Ảnh</th>
+                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Ảnh</th>
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Tên</th>
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Ban</th>
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Vai trò</th>
-                  <th style={{ width: 56, fontSize: "14px", fontWeight: "500", color: "#374151" }}>Action</th>
+                  {/* <th style={{ width: 56, fontSize: "14px", fontWeight: "500", color: "#374151" }}>Action</th> */}
                 </tr>
               </thead>
               <tbody>
@@ -339,12 +338,10 @@ export default function ManageMemberPage() {
                         style={{ width: 28, height: 28 }}
                       />
                     </td>
-                    <td style={{ padding: "10px", fontWeight: "500", color: "#374151" }}>{r.name}</td>
-                    <td>{r.dept}</td>
-                    <td>{r.role}</td>
-                    <td className="cell-action text-end">
-                      <i className="bi bi-three-dots" />
-                    </td>
+                    <td style={{ padding: "10px", fontWeight: "400", color: "#374151" }}>{r.name}</td>
+                    <td style={{ padding: "10px", fontWeight: "400", color: "#374151" }}>{r.role ==="HoOC" ? 'Đội core': r.dept}</td>
+                    <td style={{ padding: "10px", fontWeight: "400", color: "#374151" }}>{r.role === "HoOC" ? 'Trưởng ban Tổ chức' : r.role ==="HoD"? 'Trưởng ban': "Thành viên"}</td>
+                    
                   </tr>
                 ))}
               </tbody>

@@ -1,7 +1,4 @@
-/**
- * Unit tests for controller: updateMilestone
- * Only business logic is tested, not Mongoose internals
- */
+
 
 import { vi, beforeEach, describe, test, expect } from 'vitest'
 
