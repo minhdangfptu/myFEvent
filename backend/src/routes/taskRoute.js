@@ -14,23 +14,22 @@ import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-// Lấy danh sách task của event (tùy chọn filter departmentId), phân quyền bên trong controller
-router.get('/events/:eventId/tasks', authenticateToken, listTasksByEventOrDepartment);
+router.get('/:eventId/', authenticateToken, listTasksByEventOrDepartment);
 // Lấy chi tiết 1 task
-router.get('/events/:eventId/tasks/:taskId', authenticateToken, getTaskDetail);
+router.get('/:eventId/:taskId', authenticateToken, getTaskDetail);
 // Tạo task (HoD)
-router.post('/events/:eventId/tasks', authenticateToken, createTask);
+router.post('/:eventId/create-new-task', authenticateToken, createTask);
 // Sửa task (HoD)
-router.patch('/events/:eventId/tasks/:taskId', authenticateToken, editTask);
+router.patch('/:eventId/edit-task/:taskId', authenticateToken, editTask);
 // Xoá task (HoD)
-router.delete('/events/:eventId/tasks/:taskId', authenticateToken, deleteTask);
+router.delete('/:eventId/:taskId', authenticateToken, deleteTask);
 // Thành viên update progress
-router.patch('/events/:eventId/tasks/:taskId/progress', authenticateToken, updateTaskProgress);
-// Gán task cho ai đó (HoD)
-router.patch('/events/:eventId/tasks/:taskId/assign', authenticateToken, assignTask);
+router.patch('/:eventId/:taskId/progress', authenticateToken, updateTaskProgress);
+// Gán task cho ai đó (Hooc, HoD)
+router.patch('/:eventId/:taskId/assign', authenticateToken, assignTask);
 // Huỷ gán
-router.patch('/events/:eventId/tasks/:taskId/unassign', authenticateToken, unassignTask);
+router.patch('/:eventId/:taskId/unassign', authenticateToken, unassignTask);
 // Thống kê tiến độ/burnup chart
-router.get('/events/:eventId/tasks/progress', authenticateToken, getEventTaskProgressChart);
+router.get('/:eventId/:taskId/progress', authenticateToken, getEventTaskProgressChart);
 
 export default router;

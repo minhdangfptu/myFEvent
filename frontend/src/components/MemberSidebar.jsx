@@ -93,9 +93,9 @@ export default function MemberSidebar({
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
-    { id: "work-board", label: "Bảng công việc", path: "/task" },
-    { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}milestones` },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/timelines` },
     // Không có work-stats (thống kê tiến độ)
   ];
 
