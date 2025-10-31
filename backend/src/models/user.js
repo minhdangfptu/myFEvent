@@ -8,16 +8,23 @@ const UserSchema = new Schema({
     lowercase: true,
     trim: true,
   },
-  passwordHash: {           
+  passwordHash: {
     type: String,
-    required: true,
+    required: function () { return this.authProvider === 'local'; }
   },
-  fullName: { type: String, trim: true },
+  fullName: { 
+    type: String, 
+    trim: true,
+    required: true
+  },
   avatarUrl: String,
+  bio: { type: String, default: '' },
+  highlight: { type: String, default: '' },
+  tags: { type: [String], default: [] },
   phone: {
     type: String,
-    required: true,
-    unique: true,
+    required: function () { return this.authProvider === 'local'; },
+    set: v => (v && String(v).trim() ? String(v).trim() : undefined),
     trim: true,
   },
   status: {
@@ -25,12 +32,15 @@ const UserSchema = new Schema({
     enum: ['active', 'pending', 'banned'],
     default: 'active',
   },
-  isFirstLogin: { type: Boolean, default: true },
+  googleId: { type: String, unique: true, sparse: true },
+  authProvider: { type: String, enum: ['local', 'google'], default: 'google' },
   role: {
     type: String,
-    enum: ['user', 'admin', 'mentor','IC-PDP'],
+    enum: ['user', 'admin'],
     default: 'user',
   },
 }, { timestamps: true });
+UserSchema.index({ phone: 1 },    { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
+UserSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: "string" } } });
 
 export default mongoose.model('User', UserSchema);

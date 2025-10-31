@@ -4,7 +4,7 @@ dotenv.config();
 
 export const config = {
     // Server
-    PORT: process.env.PORT || 8017,
+    PORT: process.env.PORT || 8080,
     NODE_ENV: process.env.NODE_ENV || 'development',
     
     // Database
@@ -21,6 +21,9 @@ export const config = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+    
+    // Bcrypt
+    BCRYPT_SALT_ROUNDS: Number(process.env.BCRYPT_SALT_ROUNDS || 10),
     
     // Frontend
     FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',

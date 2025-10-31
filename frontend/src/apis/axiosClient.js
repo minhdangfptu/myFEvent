@@ -1,93 +1,60 @@
-/* eslint-disable no-undef */
 import axios from 'axios';
-import { baseUrl } from '../config';
+import { baseUrl } from '../config/index.js';
+
 const axiosClient = axios.create({
-  baseURL: `${baseUrl}`,
+  baseURL: baseUrl,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 10000,
 });
 
-// Request interceptor - Thêm token vào mọi request
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - Xử lý refresh token
 axiosClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Nếu gặp lỗi 401 và chưa retry
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
-        
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
+        if (!refreshToken) throw new Error('No refresh token available');
 
-        // Gọi API refresh token
         const response = await axios.post(
-          `${baseUrl}/reptitist/auth/refresh-token`,
-          {
-            refresh_token: refreshToken,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            }
-          }
+          `${baseUrl}/api/auth/refresh-token`,
+          { refreshToken },
+          { headers: { 'Content-Type': 'application/json' } }
         );
 
-        const newAccessToken = response.data.access_token;
+        const newAccessToken = response?.data?.accessToken || response?.data?.access_token;
+        if (!newAccessToken) throw new Error('No access token in refresh response');
 
-        if (newAccessToken) {
-          // Lưu token mới
-          localStorage.setItem('access_token', newAccessToken);
-          
-          // Thêm token mới vào request gốc
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          
-          // Retry request gốc
-          return axiosClient(originalRequest);
-        } else {
-          throw new Error('No access token in refresh response');
-        }
-
+        localStorage.setItem('access_token', newAccessToken);
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return axiosClient(originalRequest);
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
-        
-        // Clear tokens và redirect về login
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        
-        // Dispatch custom event để AuthContext biết user đã logout
+
         window.dispatchEvent(new CustomEvent('auth:logout'));
-        
-        // Chỉ redirect nếu không phải là trang login/signup
-        if (!window.location.pathname.includes('/Login') && 
-            !window.location.pathname.includes('/SignUp')) {
-          window.location.href = '/Login';
+
+        const path = (window.location.pathname || '').toLowerCase();
+        if (!path.includes('/login') && !path.includes('/signup')) {
+          window.location.href = '/login';
         }
-        
+
         return Promise.reject(refreshError);
       }
     }
