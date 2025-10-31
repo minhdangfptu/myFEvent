@@ -38,10 +38,10 @@ const DepartmentDetail = () => {
   const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
   const [selectedAssignLeader, setSelectedAssignLeader] = useState(null);
   const [assigningLeader, setAssigningLeader] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); 
   const { fetchEventRole } = useEvents();
-  const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
-
-  // Helper: tránh render object (members có thể chứa userId object)
+  
   const getMemberDisplayName = (member) =>
     (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
   const getMemberEmail = (member) =>
@@ -52,10 +52,8 @@ const DepartmentDetail = () => {
   const getLeaderDisplayName = (leader) => {
     if (!leader) return 'Chưa có'
     if (typeof leader === 'string') return leader
-    return leader.fullName || leader.userId?.fullName || leader.email || leader.userId?.email || 'Chưa có'
+    return leader.fullName || 'Chưa có'
   }
-
-  const canManage = eventRole === 'HoOC' || (eventRole === 'HoD' && user._id === department.leaderId);
 
   // Normalize sidebar type for UserLayout
   const getSidebarType = () => {
@@ -65,10 +63,91 @@ const DepartmentDetail = () => {
     return 'user';
   };
 
-  useEffect(() => {
-    fetchMembersAndDepartment();
-  }, [id]);
+  // ===== FIX: Fetch department with better error handling =====
+  const fetchMembersAndDepartment = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
+      console.log('=== Fetching Department Details ===');
+      console.log('API Call Parameters:');
+      console.log('- eventId:', eventId);
+      console.log('- departmentId:', id);
+
+      // Kiểm tra params trước khi gọi API
+      if (!eventId || !id) {
+        console.error('Missing required parameters!');
+        console.log('eventId:', eventId, 'id:', id);
+        throw new Error('Missing eventId or departmentId');
+      }
+
+      // Fetch department details
+      console.log('Calling departmentService.getDepartmentDetail...');
+      const dep = await departmentService.getDepartmentDetail(eventId, id);
+      console.log('Department API Response:', dep);
+      console.log('Department type:', typeof dep);
+      console.log('Department keys:', dep ? Object.keys(dep) : 'null');
+
+      if (!dep) {
+        console.warn('Department response is null/undefined');
+        throw new Error('Department not found');
+      }
+
+      setDepartment(dep);
+      console.log('✓ Department state updated successfully');
+
+      // Fetch members
+      console.log('Calling departmentService.getMembersByDepartment...');
+      const mems = await departmentService.getMembersByDepartment(eventId, id);
+      console.log('Members API Response:', mems);
+      console.log('Members count:', mems?.length || 0);
+
+      setMembers(mems || []);
+      console.log('✓ Members state updated successfully');
+
+      // Update userDepartmentId if needed
+      if (!userDepartmentId && eventRole === 'HoD' && mems) {
+        const hodMember = mems.find(m => m.role === 'HoD');
+        if (hodMember) {
+          const memberDeptId = hodMember.departmentId || hodMember.department?._id || hodMember.department?.id;
+          if (memberDeptId === id) {
+            setUserDepartmentId(id);
+            console.log('✓ UserDepartmentId set to:', id);
+          }
+        }
+      }
+
+      console.log('=== Fetch Complete ===');
+
+    } catch (error) {
+      console.error("=== ERROR in fetchMembersAndDepartment ===");
+      console.error('Error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error response:', error?.response);
+      console.error('Error response data:', error?.response?.data);
+
+      setError(error?.response?.data?.message || error?.message || "Không thể tải thông tin ban");
+      toast.error("Lỗi khi tải thông tin ban: " + (error?.response?.data?.message || error?.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    console.log('=== useEffect [id] triggered ===');
+    console.log('Current id:', id);
+    console.log('Current eventId:', eventId);
+
+    if (id && eventId) {
+      fetchMembersAndDepartment();
+    } else {
+      console.warn('Missing id or eventId, skipping fetch');
+      setError('Missing required parameters');
+    }
+  }, [id, eventId]); // Thêm eventId vào dependencies
+
+  // Fetch role
   useEffect(() => {
     let mounted = true;
     const loadRole = async () => {
@@ -80,11 +159,14 @@ const DepartmentDetail = () => {
         return;
       }
       try {
+        console.log('Fetching event role for eventId:', eventId);
         const r = await fetchEventRole(eventId);
+        console.log('Role response:', r);
+
         // normalize returned value to string role name
         let normalized = '';
         let deptId = null;
-        
+
         if (!r) {
           normalized = '';
         } else if (typeof r === 'string') {
@@ -95,10 +177,11 @@ const DepartmentDetail = () => {
         } else {
           normalized = String(r);
         }
-        
+
         if (mounted) {
           setEventRole(normalized);
           setUserDepartmentId(deptId);
+          console.log('✓ Role set to:', normalized);
         }
       } catch (err) {
         console.error('Error fetching role:', err);
@@ -112,31 +195,8 @@ const DepartmentDetail = () => {
     return () => { mounted = false; };
   }, [eventId, fetchEventRole]);
 
-  const fetchMembersAndDepartment = async () => {
-    try {
-      const dep = await departmentService.getDepartmentDetail(eventId, id);
-      setDepartment(dep || null);
-      const mems = await departmentService.getMembersByDepartment(eventId, id);
-      setMembers(mems || []);
-      
-      // If userDepartmentId is not set from API, try to get it from members
-      // Find if current user is HoD of this department
-      if (!userDepartmentId && eventRole === 'HoD' && mems) {
-        const hodMember = mems.find(m => m.role === 'HoD');
-        if (hodMember) {
-          // Check if this HoD's department matches current department
-          const memberDeptId = hodMember.departmentId || hodMember.department?._id || hodMember.department?.id;
-          if (memberDeptId === id) {
-            setUserDepartmentId(id);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching members of department:", error);
-      toast.error("Lỗi khi tải danh sách thành viên của ban");
-    }
-  };
-
+  const canManage = eventRole === 'HoOC' || (eventRole === 'HoD');
+  console.log('Can manage department:', canManage);
   const handleEdit = () => {
     if (department) {
       setEditForm({
@@ -368,7 +428,8 @@ const DepartmentDetail = () => {
         .includes(memberSearchQuery.toLowerCase())
   );
 
-  if (!department) {
+  // ===== IMPROVED LOADING & ERROR HANDLING =====
+  if (loading) {
     return (
       <div
         style={{
@@ -377,12 +438,64 @@ const DepartmentDetail = () => {
           background: "rgba(255,255,255,1)",
           zIndex: 2000,
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
+          gap: "20px"
         }}
       >
         <Loading size={80} />
+        <p style={{ color: "#6b7280", fontSize: "16px" }}>Đang tải thông tin ban...</p>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <UserLayout
+        title="Chi tiết phân ban"
+        sidebarType={getSidebarType()}
+        activePage="department-management"
+      >
+        <div className="bg-white rounded-3 shadow-sm p-5 text-center">
+          <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: "4rem" }}></i>
+          <h3 className="mt-3 mb-2" style={{ color: "#dc2626" }}>Lỗi tải dữ liệu</h3>
+          <p style={{ color: "#6b7280" }}>{error}</p>
+          <button
+            className="btn btn-danger mt-3"
+            onClick={() => {
+              setError(null);
+              fetchMembersAndDepartment();
+            }}
+          >
+            <i className="bi bi-arrow-clockwise me-2"></i>
+            Thử lại
+          </button>
+        </div>
+      </UserLayout>
+    );
+  }
+
+  if (!department) {
+    return (
+      <UserLayout
+        title="Chi tiết phân ban"
+        sidebarType={getSidebarType()}
+        activePage="department-management"
+      >
+        <div className="bg-white rounded-3 shadow-sm p-5 text-center">
+          <i className="bi bi-inbox text-muted" style={{ fontSize: "4rem" }}></i>
+          <h3 className="mt-3 mb-2" style={{ color: "#6b7280" }}>Không tìm thấy ban</h3>
+          <p style={{ color: "#9ca3af" }}>Ban này có thể đã bị xóa hoặc không tồn tại.</p>
+          <button
+            className="btn btn-outline-danger mt-3"
+            onClick={() => navigate(`/events/${eventId}/`)}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            Quay lại danh sách ban
+          </button>
+        </div>
+      </UserLayout>
     );
   }
 
@@ -833,6 +946,7 @@ const DepartmentDetail = () => {
         )}
       </div>
 
+      {/* All modals remain the same - I'll include them for completeness but they're unchanged */}
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div
