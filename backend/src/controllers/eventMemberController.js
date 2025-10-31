@@ -103,7 +103,7 @@ export const getMemberDetail = async (req, res) => {
 		}
 		const member = await EventMember.findOne({ _id: memberId, eventId })
 			.populate([
-				{ path: 'userId', select: 'fullName email avatarUrl' },
+				{ path: 'userId', select: 'fullName email avatarUrl phone status' },
 				{ path: 'departmentId', select: 'name' }
 			])
 			.lean();

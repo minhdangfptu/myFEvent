@@ -6,6 +6,7 @@ import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
 import { toast } from 'react-toastify';
 import { eventService } from '~/services/eventService';
+import { formatDate } from '~/utils/formatDate';
 
 export default function MemberProfilePage() {
   const { eventId, memberId } = useParams();
@@ -153,9 +154,11 @@ export default function MemberProfilePage() {
   const memberAvatar = member.avatar || member.avatarUrl || member.userId?.avatarUrl || `https://i.pravatar.cc/120?u=${memberEmail}`;
   const memberRole = member.role || 'Member';
   const memberDepartment = member.department || member.departmentName || member.dept || 'Chưa có ban';
-  const memberPhone = member.phoneNumber || member.phone || member.userId?.phoneNumber || '';
+  const memberPhone = member.userId.phone;
   const memberStudentId = member.studentId || member.userId?.studentId || '';
   const memberBio = member.bio || member.userId?.bio || '';
+  const memberStatus = member.userId?.status || 'active';
+  const memberJoinedAt =  member.createdAt || '';
 
   // Check if current user can manage this member
   const canManage = eventRole === 'HoOC' || eventRole === 'HoD';
@@ -342,11 +345,11 @@ export default function MemberProfilePage() {
                 </span>
                 <span className="badge-status badge-active">
                   <i className="bi bi-check-circle me-1"></i>
-                  Hiệu cần
+                  Hậu cần
                 </span>
                 <span className="badge-status badge-verified">
                   <i className="bi bi-patch-check me-1"></i>
-                  Vẫn hoá
+                  Văn hoá
                 </span>
               </div>
             </div>
@@ -423,7 +426,6 @@ export default function MemberProfilePage() {
 
               {memberStats.totalTasks !== undefined && (
                 <div className="mb-2">
-                  <div className="small text-muted mb-1">Tổng số kiếm đố tham gio</div>
                   <div className="fw-bold text-dark">
                     <i className="bi bi-list-task me-2 text-primary"></i>
                     {memberStats.totalTasks} nhiệm vụ
@@ -432,27 +434,7 @@ export default function MemberProfilePage() {
               )}
             </div>
 
-            {/* Stats */}
-            <div className="profile-card">
-              <h5 className="fw-bold mb-3">
-                <i className="bi bi-bar-chart me-2 text-danger"></i>
-                Thống kê
-              </h5>
-              <div className="row g-3">
-                <div className="col-6">
-                  <div className="stat-card">
-                    <div className="stat-number">{memberStats.totalTasks || 7}</div>
-                    <div className="stat-label">xử kiện</div>
-                  </div>
-                </div>
-                <div className="col-6">
-                  <div className="stat-card">
-                    <div className="stat-number">{memberStats.completedTasks || 0}</div>
-                    <div className="stat-label">Năng kế</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            
 
             {/* Thông tin khác */}
             <div className="profile-card">
@@ -463,12 +445,12 @@ export default function MemberProfilePage() {
               
               <div className="d-flex justify-content-between mb-2">
                 <span className="text-muted">Trạng thái tài khoản</span>
-                <span className="badge bg-success">GLA VAL TAN</span>
+                <span className="badge bg-success">{memberStatus}</span>
               </div>
               
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Ngày tham gia</span>
-                <span className="fw-semibold text-success">8/3/2025</span>
+                <span className="fw-semibold text-success">{formatDate(memberJoinedAt)}</span>
               </div>
             </div>
 
