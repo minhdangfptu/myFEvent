@@ -91,3 +91,28 @@ export const getMembersByDepartment = async (req, res) => {
 	return res.status(500).json({ message: 'Failed to load members' });
   }
 };
+export const getMemberDetail = async (req, res) => {
+	try{
+		const { eventId, memberId } = req.params;
+		if (!eventId || !memberId) {
+			return res.status(400).json({ message: 'Event ID and Member ID are required' });
+		}
+		const event = await Event.findById(eventId).lean();
+		if (!event) {
+			return res.status(404).json({ message: 'Event not found' });
+		}
+		const member = await EventMember.findOne({ _id: memberId, eventId })
+			.populate([
+				{ path: 'userId', select: 'fullName email avatarUrl' },
+				{ path: 'departmentId', select: 'name' }
+			])
+			.lean();
+		if (!member) {
+			return res.status(404).json({ message: 'Member not found' });
+		}
+		return res.status(200).json({ data: member });
+	}catch(error){
+		console.error('getMemberDetail error:', error);
+		return res.status(500).json({ message: 'Failed to load member detail' });
+	}
+}

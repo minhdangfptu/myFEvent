@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
@@ -11,13 +11,19 @@ function MemberCard({
   avatar,
   department,
   eventName,
+  onClick, // Thêm prop onClick
 }) {
   return (
-    <div className="d-flex align-items-center gap-3">
+    <div 
+      className="d-flex align-items-center gap-3"
+      onClick={onClick}
+      style={{ cursor: 'pointer' }}
+    >
       <img
         src={avatar || "https://i.pravatar.cc/100?img=12"}
         className="rounded-circle"
-        style={{ width: 56, height: 56 }}
+        style={{ width: 56, height: 56, objectFit: 'cover' }}
+        alt={name}
       />
       <div className="lh-sm">
         <div className="fw-semibold text-dark">{name}</div>
@@ -57,6 +63,7 @@ function Accordion({ title, count = 0, children }) {
 
 export default function MemberPage() {
   const { eventId } = useParams();
+  const navigate = useNavigate(); // Thêm useNavigate
   const [allMembersByDepartment, setAllMembersByDepartment] = useState({});
   const [filteredMembersByDepartment, setFilteredMembersByDepartment] =
     useState({});
@@ -88,7 +95,6 @@ export default function MemberPage() {
     loadMembers();
   }, [eventId]);
 
-  // Filter members based on search term
   useEffect(() => {
     if (!search.trim()) {
       setFilteredMembersByDepartment(allMembersByDepartment);
@@ -120,6 +126,7 @@ export default function MemberPage() {
         setEventRole(role);
       });
     }, [eventId]);
+    
   const getSidebarType = () => {
     if (eventRole === 'HoOC') return 'HoOC';
     if (eventRole === 'HoD') return 'HoD';
@@ -127,7 +134,11 @@ export default function MemberPage() {
     return 'user';
   };
 
-
+  // Hàm xử lý khi click vào member card
+  const handleMemberClick = (memberId) => {
+    console.log('Member clicked:', memberId);
+    navigate(`/events/${eventId}/members/${memberId}`);
+  };
 
   if (loading) {
     return (
@@ -156,7 +167,7 @@ export default function MemberPage() {
 
   if (error) {
     return (
-      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType}>
+      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()}>
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
@@ -170,6 +181,20 @@ export default function MemberPage() {
       activePage="members"
       sidebarType={getSidebarType()}
     >
+      <style>{`
+        .member-card-wrapper {
+          transition: all 0.3s ease;
+        }
+        .member-card-wrapper:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+        }
+        .member-card-wrapper:hover .card {
+          background-color: #fef2f2;
+          border-color: #ef4444;
+        }
+      `}</style>
+      
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
           <div className="position-relative">
@@ -184,18 +209,18 @@ export default function MemberPage() {
               🔍
             </span>
           </div>
-          {eventRole === 'HoOC' && (<div className="ms-auto d-flex align-items-center gap-2">
-            <Link
-              className="btn btn-danger"
-              to={`/events/${eventId}/hooc-manage-member`}
-              state={{ event, membersByDepartment: allMembersByDepartment }}
-            >
-              Quản lý thành viên
-            </Link>
-          </div>
+          {eventRole === 'HoOC' && (
+            <div className="ms-auto d-flex align-items-center gap-2">
+              <Link
+                className="btn btn-danger"
+                to={`/events/${eventId}/hooc-manage-member`}
+                state={{ event, membersByDepartment: allMembersByDepartment }}
+              >
+                Quản lý thành viên
+              </Link>
+            </div>
           )}
         </div>
-
 
         {Object.keys(filteredMembersByDepartment).length === 0 ? (
           <div className="text-center py-5">
@@ -227,7 +252,7 @@ export default function MemberPage() {
                     {hocMembers.map((member) => (
                       <div
                         key={member.id}
-                        className="col-sm-6 col-lg-4 col-xl-3"
+                        className="col-sm-6 col-lg-4 col-xl-3 member-card-wrapper"
                       >
                         <div className="card h-100 p-3">
                           <MemberCard
@@ -235,6 +260,7 @@ export default function MemberPage() {
                             role={member.role}
                             avatar={member.avatar}
                             department="Core Team"
+                            onClick={() => handleMemberClick(member.id)}
                           />
                         </div>
                       </div>
@@ -262,7 +288,7 @@ export default function MemberPage() {
                       {nonHocMembers.map((member) => (
                         <div
                           key={member.id}
-                          className="col-sm-6 col-lg-4 col-xl-3"
+                          className="col-sm-6 col-lg-4 col-xl-3 member-card-wrapper"
                         >
                           <div className="card h-100 p-3">
                             <MemberCard
@@ -270,6 +296,7 @@ export default function MemberPage() {
                               role={member.role}
                               avatar={member.avatar}
                               department={member.department}
+                              onClick={() => handleMemberClick(member.id)}
                             />
                           </div>
                         </div>
