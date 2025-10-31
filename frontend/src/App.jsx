@@ -35,7 +35,6 @@ import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
 import Risk from './pages/User/Risk';
-import Task from './pages/User/Task';
 import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
@@ -55,6 +54,8 @@ import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 import HoOCManageMember from "./pages/HoOC/HoOCManageMember";
 import { EventProvider } from "./contexts/EventContext";
 import MemberPage from "./pages/ManageDept&Member/MemberEvent";
+import EventTaskPage from "./pages/Task/EventTaskPage";
+import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -255,10 +256,18 @@ export default function App() {
             } 
           />
           <Route 
-            path="/task" 
+            path="events/:eventId/tasks" 
             element={
               <ProtectedRoute requiredRole="user">
-                <Task />
+                <EventTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/tasks/:taskId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <EventTaskDetailPage />
               </ProtectedRoute>
             } 
           />
@@ -290,28 +299,15 @@ export default function App() {
           />
 
               {/* Error Routes */}
-              <Route path="/403" element={<ErrorPage403 />} />
               <Route path="/401" element={<ErrorPage401 />} />
               <Route path="/502" element={<ErrorPage502 />} />
               <Route path="/off" element={<ErrorPageOffline />} />
               <Route
                 path="/unauthorized"
                 element={
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      height: "100vh",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <h1>403 - Unauthorized</h1>
-                    <p>You don't have permission to access this page.</p>
-                  </div>
+                  <ErrorPage403 />
                 }
               />
-
               {/* 404 Route - Must be last */}
               <Route path="*" element={<ErrorPage404 />} />
             </Routes>

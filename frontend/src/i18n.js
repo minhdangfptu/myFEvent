@@ -104,28 +104,28 @@ const resources = {
       },
       taskPage: {
         title: 'Công việc',
-        headerTitle: '📋 Quản lý Nhiệm vụ',
-        headerSubtitle: 'Theo dõi và quản lý tất cả các nhiệm vụ của sự kiện',
+        headerTitle: '📋 Quản lý công việc',
+        headerSubtitle: 'Theo dõi và quản lý tất cả các công việc của sự kiện',
         stats: { completed: 'Hoàn thành', high: 'Ưu tiên cao' },
-        searchPlaceholder: '🔍 Tìm kiếm nhiệm vụ...',
+        searchPlaceholder: '🔍 Tìm kiếm công việc...',
         search: 'Tìm kiếm',
         sortBy: 'Sắp xếp theo',
         filters: { allStatus: 'Tất cả trạng thái', allPriority: 'Tất cả mức độ' },
-        add: 'Thêm nhiệm vụ',
-        columns: { name: 'Tên nhiệm vụ', owner: 'Người phụ trách', due: 'Hạn chót', status: 'Trạng thái', priority: 'Mức độ' },
+        add: 'Thêm công việc',
+        columns: { name: 'Tên công việc', owner: 'Người phụ trách', due: 'Hạn chót', status: 'Trạng thái', priority: 'Mức độ' },
         detail: {
-          title: 'Chi tiết nhiệm vụ',
-          name: 'Tên nhiệm vụ',
+          title: 'Chi tiết công việc',
+          name: 'Tên công việc',
           description: 'Mô tả',
           owner: 'Người phụ trách',
           due: 'Hạn chót',
           status: 'Trạng thái',
           priority: 'Mức độ',
-          delete: 'Xóa nhiệm vụ',
+          delete: 'Xóa công việc',
           noDesc: 'Chưa có mô tả'
         },
         statuses: { doing: 'Đang làm', done: 'Hoàn thành', hold: 'Tạm hoãn' },
-        empty: 'Không tìm thấy nhiệm vụ nào'
+        empty: 'Không tìm thấy công việc nào'
       }
     }
   },

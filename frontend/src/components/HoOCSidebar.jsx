@@ -34,8 +34,8 @@ export default function HoOCSidebar({
   ];
 
   const workSubItems = [
-    { id: "work-board", label: "Bảng công việc", path: "/task" },
-    { id: "work-list", label: "List công việc", path: "/task" },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
     { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];

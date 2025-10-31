@@ -491,7 +491,7 @@ const HoOCManageMilestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole}>
+    <UserLayout eventRole={eventRole} sidebarType="hooc" title='Cột mốc sự kiện'>
       <style>{animationStyles}</style>
 
       <div style={styles.container}>
