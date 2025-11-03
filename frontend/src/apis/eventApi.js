@@ -31,6 +31,7 @@ export const eventApi = {
   },
   getEventSummary: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/summary`);
+    console.log(res)
     return res.data;
   },
   updateEvent: async (eventId, data) => {

@@ -110,9 +110,10 @@ export default function HoOCEventDetail() {
         name: eventRes.data.name || "",
         description: eventRes.data.description || "",
         organizerName: eventRes.data.organizerName || "",
-        eventDate: eventRes.data.eventDate || "",
         location: eventRes.data.location || "",
         status: eventRes.data.status || "",
+        eventStartDate: eventRes.data.eventStartDate || "",
+        eventEndDate: eventRes.data.eventEndDate || "",
       });
     } catch (error) {
       console.error("Error fetching event details:", error);
@@ -141,7 +142,8 @@ export default function HoOCEventDetail() {
         name: editForm.name.trim(),
         description: editForm.description.trim(),
         organizerName: editForm.organizerName.trim(),
-        eventDate: editForm.eventDate,
+        eventEndDate: editForm.eventEndDate,
+        eventStartDate: editForm.eventStartDate,
         location: editForm.location.trim(),
         status: editForm.status,
       });
@@ -436,7 +438,7 @@ export default function HoOCEventDetail() {
 
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
   const isMember = eventRole === 'Member';
-
+  console.log(event)
   if (loading) {
     return (
       <UserLayout
@@ -513,6 +515,11 @@ export default function HoOCEventDetail() {
         .event-image-placeholder { width: 100%; height: 200px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6b7280; margin-bottom: 1rem; }
         .image-actions { display: flex; gap: 0.5rem; }
         .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
+        .event-chip {
+          border-radius:999px; font-size:12px; padding:6px 10px;
+          display:inline-flex; align-items:center; gap:6px;
+        }
+        .chip-date { background:#eff6ff !important; color:#2563eb !important; border:1px solid #bae6fd; }
       `}</style>
 
       {/* Event Header */}
@@ -538,7 +545,7 @@ export default function HoOCEventDetail() {
           <div className="stat-item">
             <i className="bi bi-clock"></i>
             <span>
-              D-Day: {formatDate(event?.eventDate) || "Chưa có thông tin"}
+              D-Day: {formatDate(event?.eventStartDate) || "Chưa có thông tin"}
             </span>
           </div>
         </div>
@@ -679,8 +686,15 @@ export default function HoOCEventDetail() {
                 <strong>Người tổ chức:</strong> {event.organizerName}
               </div>
               <div className="mb-3">
-                <strong>Ngày diễn ra:</strong>{" "}
-                {formatDate(event?.eventDate) || "Chưa có thông tin"}
+                <strong>Ngày diễn ra:</strong>
+                {(event.eventStartDate || event.eventEndDate) ? (
+                  <span className="event-chip chip-date ms-2">
+                    <i className="bi bi-calendar-event me-1" />
+                    {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
+                  </span>
+                ) : (
+                  <span className="text-muted ms-2">Chưa có data</span>
+                )}
               </div>
               <div className="mb-3">
                 <strong>Địa điểm:</strong> {event.location || "Chưa cập nhật"}
@@ -808,21 +822,24 @@ export default function HoOCEventDetail() {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label fw-semibold">Ngày diễn ra</label>
+                <label className="form-label fw-semibold">Ngày bắt đầu</label>
                 <input
                   type="date"
                   className="form-control"
-                  value={editing ? formatDateForInput(editForm.eventDate) : formatDateForInput(event.eventDate)}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, eventDate: e.target.value })
-                  }
+                  value={editing ? formatDateForInput(editForm.eventStartDate) : formatDateForInput(event.eventStartDate)}
+                  onChange={e => setEditForm({...editForm, eventStartDate: e.target.value})}
                   disabled={!editing}
                 />
-                {/* Hiển thị dạng dd-MM-yyyy */}
-                <div className="form-text mt-1">
-                  
-                  Hiển thị dạng dd-MM-yyyy: {toDMY(editing ? editForm.eventDate : event.eventDate) || "Chưa có thông tin"}
-                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Ngày kết thúc</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={editing ? formatDateForInput(editForm.eventEndDate) : formatDateForInput(event.eventEndDate)}
+                  onChange={e => setEditForm({...editForm, eventEndDate: e.target.value})}
+                  disabled={!editing}
+                />
               </div>
               <div className="mb-3">
                 <label className="form-label fw-semibold">Địa điểm</label>

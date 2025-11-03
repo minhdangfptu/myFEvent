@@ -118,7 +118,7 @@ export default function EventsPage() {
         </div>
 
         <div className="border rounded-3 p-3 p-sm-4" style={{ borderColor: '#fca5a5' }}>
-          <div className="text-danger fw-bold mb-3 mb-sm-4" style={{ fontSize: 20 }}>Tất cả sự kiện</div>
+          <div className="text-danger fw-bold mb-3 mb-sm-4" style={{ fontSize: 20 }}>Tất cả sự kiện tại trường</div>
 
           {error && <div className="text-danger mb-3">{error}</div>}
 
@@ -135,9 +135,27 @@ export default function EventsPage() {
                       <img src={img} alt={title} className="card-img-top" style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }} />
                       <div className="card-body">
                         <div className="fw-semibold mb-2" style={{ fontSize: 16, color: '#111827' }}>{title}</div>
-                        <div className="d-flex gap-2 mb-2">
-                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{dateText}</span>
-                          <span className="badge text-bg-light border" style={{ fontSize: 12 }}>{event.location || ''}</span>
+                        <div className="d-flex gap-2 mb-2 flex-wrap">
+                          {event.status ? (
+                            <span className={`event-chip chip-status-${event.status}`}>
+                              <i className="bi bi-lightning-charge-fill me-1" />
+                              {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
+                            </span>
+                          ) : null}
+                          {event.location && (
+                            <span className="event-chip chip-location">
+                              <i className="bi bi-geo-alt me-1" />{event.location}
+                            </span>
+                          )}
+                          {event.eventStartDate && event.eventEndDate ? (
+                            <span className="event-chip chip-date">
+                              <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
+                            </span>
+                          ) : event.eventDate ? (
+                            <span className="event-chip chip-date">
+                              <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventDate)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -190,6 +208,15 @@ export default function EventsPage() {
       </div>
 
       <Footer />
+      <style>{`
+  .event-chip { border-radius:999px; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; }
+  .chip-status-scheduled { background:#dcfce7 !important; color:#22c55e !important; border:1px solid #bbf7d0; }
+  .chip-status-ongoing   { background:#fff7ed !important; color:#f59e42 !important; border:1px solid #fed7aa; }
+  .chip-status-completed { background:#f3f4f6 !important; color:#6b7280 !important; border:1px solid #e5e7eb; }
+  .chip-status-cancelled { background:#fef2f2 !important; color:#dc2626 !important; border:1px solid #fecaca; }
+  .chip-date             { background:#eff6ff !important; color:#2563eb !important; border:1px solid #bae6fd; }
+  .chip-location         { background:#f3e8ff !important; color:#9333ea !important; border:1px solid #e9d5ff; }
+`}</style>
     </>
   )
 }

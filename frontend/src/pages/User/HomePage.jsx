@@ -137,6 +137,7 @@ export default function HomePage() {
     }));
   };
 
+  console.log(blogs)
   // ===== Filter/Sort with stable tokens (không lệch i18n) =====
   const STATUS = {
     ALL: "all",
@@ -199,9 +200,9 @@ export default function HomePage() {
     .sort((a, b) => {
       if (sortBy === SORT.AZ) return a.name.localeCompare(b.name);
       if (sortBy === SORT.NEWEST)
-        return new Date(b.eventDate) - new Date(a.eventDate);
+        return new Date(b.eventStartDate) - new Date(a.eventStartDate);
       if (sortBy === SORT.OLDEST)
-        return new Date(a.eventDate) - new Date(b.eventDate);
+        return new Date(a.eventStartDate) - new Date(b.eventStartDate);
       return 0;
     });
 
@@ -312,17 +313,23 @@ export default function HomePage() {
         .dropdown-item:hover { background:#F3F4F6; }
         .dropdown-header { padding:10px 12px; font-size:12px; color:#6B7280; background:#F9FAFB; border-bottom:1px solid #E5E7EB; }
 
-        .event-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition: box-shadow .2s; } /* <-- fix dấu phẩy sai */
-        .event-card:hover { box-shadow:0 8px 24px rgba(255, 0, 0, 0.08); }
+        .event-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition: box-shadow .2s; box-shadow:0 8px 24px rgba(0, 0, 0, 0.04) } 
         .event-img { height:180px; background:#f3f4f6; position:relative; }
         .event-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
         .event-body { padding:16px; }
         .event-title { font-weight:700; font-size:18px; margin-bottom:6px; }
         .event-chip { border-radius:999px; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; }
         .chip-gray { background:#F3F4F6; color:#374151; border:1px solid #E5E7EB; }
-        .event-desc { color:#6B7280; font-size:14px; }
-        .blog-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition:transform .2s, box-shadow .2s; }
-        .blog-card:hover { box-shadow:0 8px 24px rgba(255, 0, 0, 0.08) }
+        .event-desc {
+          color:#6B7280;
+          font-size:14px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .blog-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition:transform .2s, box-shadow .2s; box-shadow:0 8px 24px rgba(0, 0, 0, 0.04) }
         .blog-img { height:160px; background:#f3f4f6; position:relative; }
         .blog-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
         .blog-body { padding:16px; }
@@ -335,6 +342,15 @@ export default function HomePage() {
         .soft-input:focus { background:#fff; border-color:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,0.1); }
         .ghost-btn { border:1px solid #E5E7EB; border-radius:10px; padding:8px 12px; background:#fff; font-size:14px; }
         .ghost-btn:hover { background:#F9FAFB; }
+        .event-card-bottom {border-radius:0 0 16px 16px; min-height:62px}
+        .soft-btn-top-right{box-shadow:0 2px 6px rgba(0,0,0,0.04);transition:.1s;border-radius:8px;padding:6px 15px;}
+        .soft-btn-top-right:hover{background:#fee2e2 !important;color:#dc2626 !important;border:1px solid #dc2626;}
+        .chip-status-scheduled { background:#dcfce7 !important; color:#22c55e !important; border:1px solid #bbf7d0; }
+        .chip-status-ongoing   { background:#fff7ed !important; color:#f59e42 !important; border:1px solid #fed7aa; }
+        .chip-status-completed { background:#f3f4f6 !important; color:#6b7280 !important; border:1px solid #e5e7eb; }
+        .chip-status-cancelled { background:#fef2f2 !important; color:#dc2626 !important; border:1px solid #fecaca; }
+        .chip-date             { background:#eff6ff !important; color:#2563eb !important; border:1px solid #bae6fd; }
+        .chip-location         { background:#f3e8ff !important; color:#9333ea !important; border:1px solid #e9d5ff; }
       `}</style>
 
       {/* ====== SECTION: Events ====== */}
@@ -450,7 +466,7 @@ export default function HomePage() {
         {filteredEvents.length === 0 ? (
           <div className="d-flex flex-column justify-content-center align-items-center py-5">
             <img src={NoDataImg} alt="Không có sự kiện" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
-            <div className="text-muted mt-3" style={{ fontSize: 18 }}>Bạn chưa tham gia sự kiện nào!</div>
+            <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có sự kiện nào!</div>
           </div>
         ) : (
           <div className="row g-4">
@@ -486,79 +502,82 @@ export default function HomePage() {
                           </span>
                         </div>
                       )}
-                    </div>
-                    <div className="event-body">
-                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                        {event.status && (
-                          <span className="event-chip chip-gray">
-                            <i className="bi bi-lightning-charge-fill me-1" />
-                            {event.status}
-                          </span>
-                        )}
-                        {event.eventDate && (
-                          <span className="event-chip chip-gray">
-                            <i className="bi bi-calendar-event me-1" />
-                            {formatDate(event.eventDate)}
-                          </span>
-                        )}
-                        {event.location && (
-                          <span className="event-chip chip-gray">
-                            <i className="bi bi-geo-alt me-1" />
-                            {event.location}
-                          </span>
-                        )}
-                        {/* Position - role của user trong event */}
-                        <span
-                          style={{ color: "white", backgroundColor: "#dc2626" }}
-                          className="event-chip chip-gray"
-                        >
-                          <i className="bi bi-person-badge me-1" />
-
-                          {event.eventMember?.userId?.fullName || user.fullName}
-                          {" - "}
-                          {event.eventMember?.role || "Không rõ"}
-                        </span>
-                      </div>
-                      <div className="event-title">{event.name}</div>
-                      <p className="event-desc mb-3">{event.description}</p>
-                      <div className="d-flex justify-content-between">
-                        <button
-                          className="ghost-btn"
-                          onClick={() =>
-                            navigate(
-                              `/member-event-detail/${
-                                event.id || event._id || idx
-                              }`
-                            )
+                      {/* Button Xem chi tiết ở góc phải trên */}
+                      <button
+                        className="position-absolute btn btn-light border soft-btn-top-right"
+                        style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
+                        onClick={() =>{
+                          const eid = event.id || event._id || idx;
+                          if (event.eventMember?.role === "Member") {
+                            navigate(`/member-event-detail/${eid}?eventId=${eid}`);
+                            return;
                           }
-                        >
-                          Xem chi tiết
-                        </button>
-                        <button
-                          className="ghost-btn"
-                          style={{ backgroundColor: "#dc2626", color: "white" }}
-                          onClick={() => {
-                            const role = event.eventMember?.role;
-                            const eid = event.id || event._id || idx;
-                            if (role === "Member") {
-                              navigate(
-                                `/member-event-detail/${eid}?eventId=${eid}`
-                              );
-                              return;
-                            }
-                            if (role === "HoOC") {
-                              navigate(`/hooc-dashboard?eventId=${eid}`);
-                              return;
-                            }
-                            if (role === "HoD") {
-                              navigate(`/hod-landing-page?eventId=${eid}`);
-                              return;
-                            }
-                          }}
-                        >
-                          Truy cập
-                        </button>
+                          if (event.eventMember?.role === "HoOC") {
+                            navigate(`/events/${eid}/hooc-event-detail`);
+                            return;
+                          }
+                          if (event.eventMember?.role === "HoD") {
+                            navigate(`/hod-landing-page?eventId=${eid}`);
+                            return;
+                          }
+                        }
+                      }
+                      >
+                        Xem chi tiết
+                      </button>
+                    </div>
+                    <div className="event-body pb-0 d-flex flex-column" style={{ minHeight:190, height:190, justifyContent:'flex-start' }}>
+                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap" style={{minHeight:38}}>
+                        {event.status ? (
+                          <span className={`event-chip chip-status-${event.status}`}>
+                            <i className="bi bi-lightning-charge-fill me-1" />{event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : '-'}
+                          </span>
+                        ) : <span style={{width:80, height:27, opacity:0, display:'inline-block'}}>-</span>}
+                        {event.location ? (
+                          <span className="event-chip chip-location">
+                            <i className="bi bi-geo-alt me-1" />{event.location}
+                          </span>
+                        ) : <span style={{width:120, height:27, opacity:0, display:'inline-block'}}>-</span>}
+                        {event.eventStartDate && event.eventEndDate ? (
+                          <span className="event-chip chip-date">
+                            <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} -  {formatDate(event.eventEndDate)}
+                          </span>
+                        ) : <span style={{width:110, height:27, opacity:0, display:'inline-block'}}>-</span>}
+                        
                       </div>
+                      <div className="event-title" style={{fontWeight:700, fontSize:18, marginBottom:4, minHeight:24, maxHeight:48, overflow:'hidden', lineHeight:'24px'}}>{event.name}</div>
+                      <div style={{flex:1}}></div>
+                      <p className="event-desc mb-3" style={{minHeight:40, marginBottom:0, opacity:(event.description ? '1' : '0')}}>{event.description||'empty'}</p>
+                    </div>
+                    {/*--- Line phân cách mờ và Bottom action section ---*/}
+                    <div className="event-card-bottom d-flex align-items-center justify-content-between gap-2 px-3 py-3" style={{ borderTop: "1px solid #E5E7EB", background: "#FAFAFA", minHeight:62 }}>
+                      
+                      <div className="d-flex align-items-center gap-2 text-dark" style={{ fontSize: 13, fontWeight: 500 }}>
+                        <i className="bi bi-person-badge me-1" style={{ color: '#dc2626' }}/>
+                        {event.eventMember?.role === "Member" ? "Thành viên" : event.eventMember?.role === "HoOC" ? "Trưởng ban Tổ chức" : event.eventMember?.role === "HoD" ? "Trưởng ban" : "Không rõ"}
+                      </div>
+                      <button
+                        className="ghost-btn"
+                        style={{ minWidth: 100 }}
+                        onClick={() => {
+                          const role = event.eventMember?.role;
+                          const eid = event.id || event._id || idx;
+                          if (role === "Member") {
+                            navigate(`/member-event-detail/${eid}?eventId=${eid}`);
+                            return;
+                          }
+                          if (role === "HoOC") {
+                            navigate(`/hooc-dashboard?eventId=${eid}`);
+                            return;
+                          }
+                          if (role === "HoD") {
+                            navigate(`/hod-landing-page?eventId=${eid}`);
+                            return;
+                          }
+                        }}
+                      >
+                        Truy cập
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -581,6 +600,7 @@ export default function HomePage() {
               key={blog._id || blog.id || idx}
               className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
               style={{ cursor: "pointer" }}
+              onClick={() => navigate(`/home-page/events/${blog._id || blog.id || idx}`)}
             >
               <div className="blog-card h-100">
                 <div className="position-relative">
@@ -605,6 +625,14 @@ export default function HomePage() {
                     onLoad={() => {
                     }}
                   />
+                  {/* Button Xem chi tiết ở góc phải trên */}
+                  <button
+                        className="position-absolute btn btn-light border soft-btn-top-right"
+                        style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
+                        onClick={() => navigate(`/home-page/events/${blog._id || blog.id || idx}`)}
+                      >
+                        Xem chi tiết
+                      </button>
                   {/* Image count indicator */}
                   {blog.image && blog.image.length > 1 && (
                     <div className="position-absolute top-0 end-0 m-2">
@@ -618,20 +646,22 @@ export default function HomePage() {
                 <div className="blog-body">
                   <div className="blog-title">{blog.name}</div>
                   <div className="blog-meta">
-                    {blog.status && (
-                      <span className="badge-soft">{blog.status}</span>
-                    )}
-                    {blog.type && (
-                      <span className="badge-soft">{blog.type}</span>
-                    )}
-                    {blog.location && (
-                      <span className="badge-soft">{blog.location}</span>
-                    )}
-                    {blog.eventDate && (
-                      <span className="badge-soft">
-                        {formatDate(blog.eventDate)}
+                    {blog.status ? (
+                      <span className={`badge-soft chip-status-${blog.status}`}>
+                        <i className="bi bi-lightning-charge-fill me-1" />{blog.status === "scheduled" ? "Sắp diễn ra" : blog.status === "ongoing" ? "Đang diễn ra" : blog.status === "completed" ? "Đã kết thúc" : blog.status === "cancelled" ? "Đã hủy" : blog.status}
+                      </span>
+                    ) : null}
+                     {blog.location && (
+                      <span className="badge-soft chip-location">
+                        <i className="bi bi-geo-alt me-1" />{blog.location}
+                      </span>
+                    )}  
+                    {blog.eventStartDate  && (
+                      <span className="badge-soft chip-date">
+                        <i className="bi bi-calendar-event me-1" />{formatDate(blog.eventStartDate)} -  {formatDate(blog.eventEndDate)}
                       </span>
                     )}
+                   
                   </div>
                   {blog.description && (
                     <div className="event-desc mt-2">{blog.description}</div>

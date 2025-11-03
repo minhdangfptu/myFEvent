@@ -28,7 +28,7 @@ export const listPublicEvents = async (req, res) => {
         .sort({ eventDate: 1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('name type description eventDate location image status createdAt updatedAt')
+        .select('name type description eventEndDate location image status createdAt updatedAt eventStartDate')
         .lean(),
       Event.countDocuments(filter)
     ]);
@@ -53,7 +53,7 @@ export const getPublicEventDetail = async (req, res) => {
   try {
     const { id } = req.params;
     const event = await Event.findOne({ _id: id, type: 'public' })
-      .select('name type description eventDate location image status organizerName createdAt updatedAt')
+      .select('name type description eventStartDate eventEndDate location image status organizerName createdAt updatedAt')
       .populate({ path: 'organizerName', select: 'fullName email avatarUrl' })
       .lean();
     if (!event) return res.status(404).json({ message: 'Event not found' });
@@ -69,15 +69,8 @@ export const getPublicEventDetail = async (req, res) => {
 export const getPrivateEventDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // TẠM THỜI BỎ PHÂN QUYỀN - Cho phép tất cả user đã login
-    // const membership = await EventMember.findOne({ eventId: id, userId: req.user.id }).lean();
-    // if (!membership) {
-    //   return res.status(403).json({ message: 'Access denied. You are not a member of this event.' });
-    // }
-
     const event = await Event.findById(id)
-      .select('name type description eventDate location image status organizerName joinCode createdAt updatedAt')
+      .select('name type description eventStartDate eventEndDate location image status organizerName joinCode createdAt updatedAt')
       .lean();
     
     if (!event) return res.status(404).json({ message: 'Event not found' });
@@ -92,13 +85,15 @@ export const getPrivateEventDetail = async (req, res) => {
 // POST /api/events/  (create by HoOC)
 export const createEvent = async (req, res) => {
   try {
-    const { name, description, eventDate, location, type = 'private', images, organizerName } = req.body;
+    const { name, description, eventStartDate, eventEndDate, location, type = 'private', images, organizerName } = req.body;
     
     if (!name) return res.status(400).json({ message: 'Name is required' });
     if (!organizerName) return res.status(400).json({ message: 'Organizer name is required' });
-    const date = eventDate ? new Date(eventDate) : new Date();
-
-    // Generate unique join code (try a few times)
+    const startdate = eventStartDate ? new Date(eventStartDate) : new Date();
+    const endDate = eventEndDate ? new Date(eventEndDate) : new Date();
+    if (endDate < startdate) return res.status(400).json({ message: 'End date must be after start date' });
+    const nowDate = new Date();
+    if (startdate < nowDate || endDate < nowDate) return res.status(400).json({ message: 'Start date and end date must be in the future' });
     let joinCode;
     for (let i = 0; i < 5; i++) {
       const candidate = crypto.randomBytes(3).toString('hex'); // 6 hex chars
@@ -134,7 +129,8 @@ export const createEvent = async (req, res) => {
     const event = await Event.create({
       name,
       description: description || '',
-      eventDate: date,
+      eventStartDate: startdate,
+      eventEndDate: endDate,
       location: location || '',
       type,
       organizerName,
@@ -180,7 +176,7 @@ export const getEventSummary = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id).lean();
     if (!event) return res.status(404).json({ message: 'Event not found' });
-
+    // console.log(event)
     const members = await EventMember.find({ eventId: event._id }).populate('userId', 'fullName email').lean();
     return res.status(200).json({ data: { event, members } });
   } catch (error) {
@@ -199,7 +195,7 @@ export const listMyEvents = async (req, res) => {
 
     const eventIds = memberships.map(m => m.eventId);
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventDate joinCode image type description location organizerName')
+      .select('name status eventStartDate eventEndDate joinCode image type description location organizerName')
       .lean();
 
     // Map events with membership info
@@ -232,7 +228,7 @@ export const listMyEvents = async (req, res) => {
 export const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, organizerName, eventDate, location, type } = req.body;
+    const { name, description, organizerName, eventStartDate, eventEndDate, location, type } = req.body;
     
     const membership = await ensureEventRole(req.user.id, id, ['HoOC']);
     if (!membership) return res.status(403).json({ message: 'Insufficient permissions' });
@@ -241,7 +237,11 @@ export const updateEvent = async (req, res) => {
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (organizerName) updateData.organizerName = organizerName;
-    if (eventDate) updateData.eventDate = new Date(eventDate);
+    if (eventStartDate) updateData.eventStartDate = new Date(eventStartDate);
+    if (eventEndDate) updateData.eventEndDate = new Date(eventEndDate);
+    if (eventEndDate < eventStartDate) return res.status(400).json({ message: 'End date must be after start date' });
+    const nowDate = new Date();
+    if (eventStartDate < nowDate || eventEndDate < nowDate) return res.status(400).json({ message: 'Start date and end date must be in the future' });
     if (location !== undefined) updateData.location = location;
     if (type) updateData.type = type;
 
@@ -351,7 +351,7 @@ export const getAllEventDetail = async (req, res) => {
     
     // Get event details
     const event = await Event.findById(id)
-      .select('name type description eventDate location image status organizerName joinCode createdAt updatedAt')
+      .select('name type description eventStartDate eventEndDate location image status organizerName joinCode createdAt updatedAt')
       .populate({ path: 'organizerName', select: 'fullName email' })
       .lean();
     

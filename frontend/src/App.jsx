@@ -57,6 +57,7 @@ import MemberPage from "./pages/ManageDept&Member/MemberEvent";
 import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
+import EventDetailPage from "./pages/User/EventDetailPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -272,6 +273,7 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          
           <Route 
             path="events/:eventId/tasks/gantt" 
             element={
@@ -293,6 +295,15 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 < HomePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="home-page/events/:eventId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <EventDetailPage />
               </ProtectedRoute>
             } 
           />

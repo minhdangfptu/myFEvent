@@ -1,12 +1,13 @@
-import mongoose, { Schema, Types } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 const EventSchema = new Schema({
     name: { type: String, required: true },
     type: { type: String, enum: ['public', 'private'], required: true },
     description: { type: String },
-    eventDate: { type: Date, required: true },
+    eventStartDate: { type: Date },
+    eventEndDate: { type: Date},
     location: { type: String },
     organizerName: { type: String, required: true },
-    image: [{ type: String }],
+    image: [{ type: String, required: true }],
     status: { type: String, enum: ['cancelled', 'completed', 'ongoing', 'scheduled'], default: 'scheduled' },
     joinCode: { type: String, unique: true, index: true },
 }, { timestamps: true, versionKey: false });
