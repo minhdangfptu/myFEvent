@@ -1,14 +1,3 @@
-<<<<<<< .merge_file_cnSVlf
-import React from 'react'
-
-function MemberDetail() {
-  return (
-    <div>MemberDetail</div>
-  )
-}
-
-export default MemberDetail
-=======
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
@@ -507,4 +496,3 @@ export default function MemberProfilePage() {
     </UserLayout>
   );
 }
->>>>>>> .merge_file_Yy3ahg
