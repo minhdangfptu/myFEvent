@@ -11,7 +11,6 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     email: "",
     fullName: "",
-    phone: "",
     password: "",
     confirmPassword: ""
   });
@@ -142,21 +141,6 @@ export default function SignupPage() {
                   disabled={loading}
                 />
               </div>
-
-              <div className="mb-3">
-                <label className="form-label">Số điện thoại</label>
-                <input
-                  className="form-control"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  placeholder="Nhập số điện thoại của bạn"
-                  required
-                  disabled={loading}
-                />
-              </div>
-
               <div className="mb-3">
                 <label className="form-label">Mật khẩu</label>
                 <input
