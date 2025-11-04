@@ -18,7 +18,7 @@ import {
   removeMemberFromDepartment,
   editDepartment,
 } from '../controllers/departmentController.js';
-import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment,getMemberDetail } from '../controllers/eventMemberController.js';
+import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment } from '../controllers/eventMemberController.js';
 
 const router = express.Router();
 
@@ -75,7 +75,6 @@ router.patch('/:eventId/departments/:departmentId', authenticateToken, editDepar
 router.get('/:eventId/members', authenticateToken, getMembersByEvent);
 router.get('/:eventId/unassigned-members', authenticateToken, getUnassignedMembersByEvent);
 router.get('/:eventId/departments/:departmentId/members', authenticateToken, getMembersByDepartment);
-router.get('/:eventId/members/:memberId', authenticateToken, getMemberDetail);
 
 //Event role 
 
