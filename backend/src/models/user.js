@@ -23,9 +23,7 @@ const UserSchema = new Schema({
   tags: { type: [String], default: [] },
   phone: {
     type: String,
-    required: function () { return this.authProvider === 'local'; },
-    set: v => (v && String(v).trim() ? String(v).trim() : undefined),
-    trim: true,
+    unique: true,
   },
   status: {
     type: String,

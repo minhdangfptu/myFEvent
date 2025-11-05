@@ -1,18 +1,26 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
 const CalendarSchema = new Schema({
-  departmentId: { type: Types.ObjectId, ref: 'Department', required: true, unique: true },
-  name: { type: String, default: 'Department Calendar' },
-
-  
-  events: [{
-    title: { type: String, required: true },
-    description: String,
-    startAt: { type: Date, required: true },
-    endAt: { type: Date, required: true },
-  }]
+  name: { type: String, required: true },
+  type: { type: String, enum: ['event', 'department'], required: true },
+  eventId: {
+    type: Types.ObjectId, ref: 'Event',
+    required: function () { return this.type === 'event'; },
+  },
+  departmentId: {
+    type: Types.ObjectId, ref: 'Department',
+    required: function () { return this.type === 'department'; },
+  },
+  startAt: { type: Date, required: true },
+  endAt: { type: Date, required: true },
+  location: { type: String, required: true },
+  participants: [{
+    member: { type: Schema.Types.ObjectId, ref: 'EventMember' },
+    participateStatus: { type: String, enum: ['confirmed', 'absent', 'unconfirmed'], default: 'unconfirmed' },
+    reasonAbsent: { 
+      type: String,
+      required: function () { return this.participateStatus === 'absent'; },
+  }}],
 }, { timestamps: true, versionKey: false });
-
-CalendarSchema.index({ departmentId: 1 }, { unique: true });
 
 export default mongoose.model('Calendar', CalendarSchema);
