@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
@@ -7,9 +7,11 @@ import NoDataImg from "~/assets/no-data.png";
 import { taskApi } from "~/apis/taskApi";
 import { departmentService } from "~/services/departmentService";
 import { milestoneApi } from "~/apis/milestoneApi";
+import { eventApi } from "~/apis/eventApi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
+import { useAuth } from "~/contexts/AuthContext";
 
 export default function EventTaskPage() {
   const { t } = useTranslation();
@@ -50,6 +52,8 @@ export default function EventTaskPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState("list");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [eventInfo, setEventInfo] = useState(null);
 
   useEffect(() => {
     if (!eventId) return;
@@ -57,9 +61,25 @@ export default function EventTaskPage() {
       .getDepartments(eventId)
       .then((depts) => setDepartments(depts || []))
       .catch(() => setDepartments([]));
+    
+    // Lấy thông tin sự kiện để validate deadline
+    eventApi.getById(eventId)
+      .then((res) => {
+        const event = res?.data?.event || res?.data;
+        if (event) {
+          setEventInfo({
+            eventStartDate: event.eventStartDate,
+            eventEndDate: event.eventEndDate,
+          });
+        }
+      })
+      .catch(() => {
+        // Nếu không lấy được thông tin event, vẫn cho phép tạo task
+        setEventInfo(null);
+      });
   }, [eventId]);
 
-  useEffect(() => {
+  const fetchTasks = useCallback(() => {
     if (!eventId) return;
     taskApi
       .getTaskByEvent(eventId)
@@ -93,6 +113,19 @@ export default function EventTaskPage() {
       })
       .catch((err) => setTasks([]));
   }, [eventId]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Cập nhật thời gian mỗi giây
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const priorityColor = (p) => {
     if (p === "Cao")
@@ -176,6 +209,7 @@ export default function EventTaskPage() {
     description: "",
     departmentId: "",
     assigneeId: "",
+    startDate: "",
     dueDate: "",
     estimate: "",
     estimateUnit: "h",
@@ -255,6 +289,7 @@ export default function EventTaskPage() {
       description: orUndef(addTaskForm.description),
       departmentId: addTaskForm.departmentId,
       assigneeId: orUndef(addTaskForm.assigneeId),      // chỉ gửi khi có
+      startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
       dueDate: toISO(addTaskForm.dueDate),
       estimate: toNum(addTaskForm.estimate),
       estimateUnit: addTaskForm.estimateUnit || "h",
@@ -273,6 +308,7 @@ export default function EventTaskPage() {
         description: "",
         departmentId: "",
         assigneeId: "",
+        startDate: "",
         dueDate: "",
         estimate: "",
         estimateUnit: "h",
@@ -312,8 +348,14 @@ export default function EventTaskPage() {
   
       toast.success("Tạo công việc thành công!");
     } catch (err) {
-      setAddTaskError("Thêm công việc thất bại!");
-      toast.error("Thêm công việc thất bại!");
+      // Hiển thị lỗi từ backend
+      const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
+      const errors = err?.response?.data?.errors || [];
+      const fullError = errors.length > 0 
+        ? `${errorMessage}: ${errors.join(", ")}`
+        : errorMessage;
+      setAddTaskError(fullError);
+      toast.error(fullError);
     }
   };
   
@@ -328,6 +370,8 @@ export default function EventTaskPage() {
     },
     { notStarted: [], inProgress: [], done: [] }
   );
+
+  const { user } = useAuth();
 
   return (
     <>
@@ -429,6 +473,39 @@ export default function EventTaskPage() {
               </div>
               <div className="col-md-6">
                 <div className="row g-2">
+                <div className="col-6">
+                    <div
+                      className="stat-card text-center"
+                      style={{
+                        background: "rgba(255,255,255,0.2)",
+                        border: "none",
+                        color: "white",
+                      }}
+                    >
+                      <div 
+                        className="fs-4 fw-bold"
+                        style={{
+                          fontFamily: "'Courier New', monospace",
+                          letterSpacing: "2px",
+                        }}
+                      >
+                        {currentTime.toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: false,
+                        })}
+                      </div>
+                      <div className="small mt-1">
+                        {currentTime.toLocaleDateString("vi-VN", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </div>
+                    </div>
+                  </div>
                   <div className="col-6">
                     <div
                       className="stat-card text-center"
@@ -442,25 +519,11 @@ export default function EventTaskPage() {
                         {taskStats.completed}/{taskStats.total}
                       </div>
                       <div className="small">
-                        {t("taskPage.stats.completed")}
+                        Công việc đã hoàn thành
                       </div>
                     </div>
                   </div>
-                  <div className="col-6">
-                    <div
-                      className="stat-card text-center"
-                      style={{
-                        background: "rgba(255,255,255,0.2)",
-                        border: "none",
-                        color: "white",
-                      }}
-                    >
-                      <div className="fs-4 fw-bold">
-                        {taskStats.highPriority}
-                      </div>
-                      <div className="small">{t("taskPage.stats.high")}</div>
-                    </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>
@@ -661,7 +724,12 @@ export default function EventTaskPage() {
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <KanbanBoardTask eventId = {eventId} listTask={statusGroup} />
+              <KanbanBoardTask 
+                eventId={eventId}
+                listTask={statusGroup}
+                onTaskMove={fetchTasks}
+                currentUserId={user?._id}
+              />
             </div>
           )}
         </div>
@@ -856,15 +924,71 @@ export default function EventTaskPage() {
                     </div>
                     <div className="row">
                       <div className="col-md-6 mb-3">
+                        <label className="form-label">Thời gian bắt đầu</label>
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          value={addTaskForm.startDate}
+                          onChange={(e) =>
+                            handleAddTaskInput("startDate", e.target.value)
+                          }
+                          min={(() => {
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1); // Thêm 1 phút để đảm bảo sau thời điểm hiện tại
+                            const minDateTime = now.toISOString().slice(0, 16);
+                            if (eventInfo?.eventStartDate) {
+                              const eventStart = new Date(eventInfo.eventStartDate);
+                              const eventStartStr = eventStart.toISOString().slice(0, 16);
+                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            }
+                            return minDateTime;
+                          })()}
+                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
+                        />
+                        {eventInfo && (
+                          <div className="form-text small text-muted">
+                            Thời gian bắt đầu phải sau thời điểm hiện tại
+                            {eventInfo.eventStartDate && ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
+                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-6 mb-3">
                         <label className="form-label">Deadline *</label>
                         <input
-                          type="date"
+                          type="datetime-local"
                           className="form-control"
                           value={addTaskForm.dueDate}
                           onChange={(e) =>
                             handleAddTaskInput("dueDate", e.target.value)
                           }
+                          min={(() => {
+                            // Nếu có startDate, min phải sau startDate, nếu không thì sau thời điểm hiện tại
+                            if (addTaskForm.startDate) {
+                              const startDate = new Date(addTaskForm.startDate);
+                              startDate.setMinutes(startDate.getMinutes() + 1);
+                              return startDate.toISOString().slice(0, 16);
+                            }
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1);
+                            const minDateTime = now.toISOString().slice(0, 16);
+                            if (eventInfo?.eventStartDate) {
+                              const eventStart = new Date(eventInfo.eventStartDate);
+                              const eventStartStr = eventStart.toISOString().slice(0, 16);
+                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            }
+                            return minDateTime;
+                          })()}
+                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
+                        {eventInfo && (
+                          <div className="form-text small text-muted">
+                            Deadline phải sau thời điểm hiện tại
+                            {addTaskForm.startDate && " và sau thời gian bắt đầu"}
+                            {eventInfo.eventStartDate && `, sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
+                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-3 mb-3">
                         <label className="form-label">Ước tính *</label>

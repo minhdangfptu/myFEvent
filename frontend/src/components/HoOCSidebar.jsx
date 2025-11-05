@@ -35,9 +35,9 @@ export default function HoOCSidebar({
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
+    { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
     { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/milestones` },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-statitics", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/task" },

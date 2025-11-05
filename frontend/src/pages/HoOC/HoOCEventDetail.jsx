@@ -30,7 +30,8 @@ export default function HoOCEventDetail() {
     name: "",
     description: "",
     organizerName: "",
-    eventDate: "",
+    eventStartDate: "",
+    eventEndDate: "",
     location: "",
     status: "",
   });
@@ -55,9 +56,12 @@ export default function HoOCEventDetail() {
   const [otpError, setOtpError] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpMsg, setOtpMsg] = useState("");
-  console.log(user);
   const isGoogleUser = user?.authProvider === "google";
   const [showGoogleDeleteWarning, setShowGoogleDeleteWarning] = useState(false);
+  const [validationModal, setValidationModal] = useState({
+    show: false,
+    missingFields: [],
+  });
 
   // Bộ xử lý xác nhận (chung)
   const handleOpenConfirm = (action, message) => {
@@ -69,9 +73,6 @@ export default function HoOCEventDetail() {
     if (confirmModal.action) await confirmModal.action();
     setConfirmModal({ show: false, action: null, message: "" });
   };
-
-  // Check if user is HoOC
-  // const isHoOC = user?.role === "HoOC";
 
   useEffect(() => {
     fetchEventDetails();
@@ -159,8 +160,52 @@ export default function HoOCEventDetail() {
     }
   };
 
+  // Validate event data trước khi public
+  const validateEventDataForPublic = (eventData) => {
+    const missingFields = [];
+    
+    if (!eventData.name || !eventData.name.trim()) {
+      missingFields.push('Tên sự kiện');
+    }
+    if (!eventData.description || !eventData.description.trim()) {
+      missingFields.push('Mô tả');
+    }
+    if (!eventData.organizerName || !eventData.organizerName.trim()) {
+      missingFields.push('Người tổ chức');
+    }
+    if (!eventData.eventStartDate) {
+      missingFields.push('Ngày bắt đầu');
+    }
+    if (!eventData.eventEndDate) {
+      missingFields.push('Ngày kết thúc');
+    }
+    if (!eventData.location || !eventData.location.trim()) {
+      missingFields.push('Địa điểm');
+    }
+    if (!eventData.image || !Array.isArray(eventData.image) || eventData.image.length === 0) {
+      missingFields.push('Hình ảnh sự kiện');
+    }
+    
+    return {
+      isValid: missingFields.length === 0,
+      missingFields
+    };
+  };
+
   //Change event type
   const handleChangeType = async () => {
+    // Kiểm tra dữ liệu trước khi public
+    if (!event) return;
+    
+    const validation = validateEventDataForPublic(event);
+    if (!validation.isValid) {
+      setValidationModal({
+        show: true,
+        missingFields: validation.missingFields
+      });
+      return;
+    }
+    
     handleOpenConfirm(async () => {
       try {
         await eventApi.updateEvent(eventId, { type: "public" });
@@ -168,9 +213,17 @@ export default function HoOCEventDetail() {
         await fetchEventDetails();
       } catch (error) {
         console.error("Change type error:", error);
-        toast.error(
-          error.response?.data?.message || "Thay đổi trạng thái thất bại"
-        );
+        // Nếu backend cũng trả về missingFields, hiển thị modal
+        if (error.response?.data?.missingFields) {
+          setValidationModal({
+            show: true,
+            missingFields: error.response.data.missingFields
+          });
+        } else {
+          toast.error(
+            error.response?.data?.message || "Thay đổi trạng thái thất bại"
+          );
+        }
       }
     }, `Bạn có chắc chắn muốn thay đổi trạng thái công khai sự kiện này? \n Khi bạn thay đổi trạng thái sự kiện, thông tin sự kiện sẽ được công khai cho tất cả mọi người. \nHành động này không thể hoàn tác.`);
   };
@@ -438,7 +491,6 @@ export default function HoOCEventDetail() {
 
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
   const isMember = eventRole === 'Member';
-  console.log(event)
   if (loading) {
     return (
       <UserLayout
@@ -545,7 +597,7 @@ export default function HoOCEventDetail() {
           <div className="stat-item">
             <i className="bi bi-clock"></i>
             <span>
-              D-Day: {formatDate(event?.eventStartDate) || "Chưa có thông tin"}
+              D-Day: {formatDate(event?.eventStartDate) + " - " +  formatDate(event?.eventEndDate) || "Chưa có thông tin"}
             </span>
           </div>
         </div>
@@ -601,7 +653,7 @@ export default function HoOCEventDetail() {
                       onLoad={() => {
                         console.log(
                           "Event image loaded successfully:",
-                          event.image
+                          
                         );
                       }}
                     />
@@ -645,7 +697,7 @@ export default function HoOCEventDetail() {
                     onLoad={() => {
                       console.log(
                         "Event image loaded successfully:",
-                        event.image
+                       
                       );
                     }}
                   />
@@ -830,6 +882,9 @@ export default function HoOCEventDetail() {
                   onChange={e => setEditForm({...editForm, eventStartDate: e.target.value})}
                   disabled={!editing}
                 />
+                <div className="form-text mt-1">
+                  Hiển thị dạng dd-mm-yyyy: {toDMY(editing ? editForm.eventStartDate : event.eventStartDate) || "Chưa có thông tin"}
+                </div>
               </div>
               <div className="mb-3">
                 <label className="form-label fw-semibold">Ngày kết thúc</label>
@@ -840,6 +895,9 @@ export default function HoOCEventDetail() {
                   onChange={e => setEditForm({...editForm, eventEndDate: e.target.value})}
                   disabled={!editing}
                 />
+                <div className="form-text mt-1">
+                  Hiển thị dạng dd-mm-yyyy: {toDMY(editing ? editForm.eventEndDate : event.eventEndDate) || "Chưa có thông tin"}
+                </div>
               </div>
               <div className="mb-3">
                 <label className="form-label fw-semibold">Địa điểm</label>
@@ -887,7 +945,8 @@ export default function HoOCEventDetail() {
                           name: event.name,
                           description: event.description,
                           organizerName: event.organizerName,
-                          eventDate: event.eventDate,
+                          eventStartDate: event.eventStartDate,
+                          eventEndDate: event.eventEndDate,
                           location: event.location,
                           status: event.status,
                         });
@@ -914,7 +973,7 @@ export default function HoOCEventDetail() {
             <div className="info-card">
               <h5>Hành động sự kiện</h5>
               <div className="d-flex gap-2 flex-wrap">
-                {event.type === "public" ? (
+                {event.type === "public" && event.status ==="cancelled" ? (
                   <button
                     disabled
                     className="btn btn-warning"
@@ -1006,7 +1065,7 @@ export default function HoOCEventDetail() {
                       onLoad={() => {
                         console.log(
                           "Event image loaded successfully:",
-                          event.image
+                          
                         );
                       }}
                     />
@@ -1050,7 +1109,7 @@ export default function HoOCEventDetail() {
                     onLoad={() => {
                       console.log(
                         "Event image loaded successfully:",
-                        event.image
+                          
                       );
                     }}
                   />
@@ -1446,6 +1505,75 @@ export default function HoOCEventDetail() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Modal yêu cầu cập nhật đầy đủ dữ liệu */}
+      {validationModal.show && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 3200,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 10,
+              width: 500,
+              padding: 24,
+              maxWidth: "90vw",
+            }}
+          >
+            <div className="mb-3">
+              <h5 className="text-danger fw-bold mb-2">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                Không thể công khai sự kiện
+              </h5>
+              <p className="mb-3">
+                Để công khai sự kiện, vui lòng cập nhật đầy đủ các thông tin sau:
+              </p>
+              <ul className="list-group">
+                {validationModal.missingFields.map((field, index) => (
+                  <li
+                    key={index}
+                    className="list-group-item d-flex align-items-center"
+                  >
+                    <i className="bi bi-x-circle text-danger me-2"></i>
+                    <span>{field}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="d-flex justify-content-end gap-2 mt-3">
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  setValidationModal({ show: false, missingFields: [] })
+                }
+              >
+                Đóng
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setValidationModal({ show: false, missingFields: [] });
+                  setActiveTab("settings");
+                  setEditing(true);
+                }}
+              >
+                <i className="bi bi-pencil me-1"></i>
+                Cập nhật ngay
+              </button>
+            </div>
           </div>
         </div>
       )}
