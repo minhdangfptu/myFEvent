@@ -7,6 +7,10 @@ import eventMemberRoute from './eventMemberRoute.js';
 
 const router = express.Router();
 
+router.use('/:eventId/milestones',milestoneRoute);
+router.use('/:eventId/departments',departmentRoute);
+router.use('/:eventId/members', eventMemberRoute);
+
 // Public events
 router.get('/public', listPublicEvents);
 router.get('/:id', getPublicEventDetail);
@@ -38,9 +42,6 @@ router.patch('/:id/images', authenticateToken, replaceEventImages);
 router.post('/:id/images', authenticateToken, addEventImages);
 router.delete('/:id/images', authenticateToken, removeEventImages);
 
-router.use('/:eventId/milestones',milestoneRoute);
-router.use('/:eventId/departments',departmentRoute);
-router.use('/:eventId/members', eventMemberRoute);
 
 export default router;
 

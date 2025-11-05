@@ -1,5 +1,6 @@
 import ensureEventRole from '../utils/ensureEventRole.js';
 import {
+  ensureEventExists,
   getMembersByEventRaw,
   groupMembersByDepartment,
   getUnassignedMembersRaw,
