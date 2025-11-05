@@ -117,7 +117,11 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
       } catch (error) {
         // Rollback nếu API fail
         setItems(items);
-        toast.error('Cập nhật trạng thái task thất bại!');
+        if (error?.response?.status === 403) {
+          toast.error('Bạn không được cập nhật trạng thái của công việc này');
+        } else {
+          toast.error('Cập nhật trạng thái task thất bại!');
+        }
         console.error('Error updating task status:', error);
       }
       return;
@@ -158,7 +162,11 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
       }
     } catch (error) {
       setItems(items);
-      toast.error('Cập nhật trạng thái task thất bại!');
+      if (error?.response?.status === 403) {
+        toast.error('Bạn không được cập nhật trạng thái của công việc này');
+      } else {
+        toast.error('Cập nhật trạng thái task thất bại!');
+      }
       console.error('Error updating task status:', error);
     }
   };
@@ -184,9 +192,6 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
         <h6 className="card-title fw-600 mb-2" style={{ fontSize: "14px", color: "#2d3748" }}>
           {task.name || task.title}
         </h6>
-        <p className="card-text text-muted mb-2" style={{ fontSize: "13px" }}>
-          {task.description}
-        </p>
         {task.department && <div className="mb-1 small"><span className="badge text-bg-light">{task.department}</span></div>}
         {task.assignee && <div className="mb-1 small"><span className="text-muted">👤 {task.assignee}</span></div>}
         {task.due && <div className="mb-1 small"><span className="text-muted">📅 {task.due}</span></div>}
