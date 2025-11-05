@@ -1,18 +1,17 @@
 import ensureEventRole from '../utils/ensureEventRole.js';
 import {
-  ensureEventExists,
-  getEventByIdLean,
   getMembersByEventRaw,
   groupMembersByDepartment,
   getUnassignedMembersRaw,
   getMembersByDepartmentRaw
 } from '../services/eventMemberService.js';
+import { findEventById } from '../services/eventService.js';
 
 // Get members by event
 export const getMembersByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const event = await getEventByIdLean(eventId);
+    const event = await findEventById(eventId);
     if (!event) return res.status(404).json({ message: 'Event not found' });
     const members = await getMembersByEventRaw(eventId);
     const byDept = groupMembersByDepartment(members);
