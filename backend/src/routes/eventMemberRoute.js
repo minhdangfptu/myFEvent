@@ -7,7 +7,7 @@ import {
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router.get('/', authenticateToken, getMembersByEvent);
 router.get('/unassigned', authenticateToken, getUnassignedMembersByEvent);
