@@ -20,3 +20,9 @@ export function formatDate(value) {
   if (Number.isNaN(d.getTime())) return ''
   return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
 }
+export function formatDateForInput(value) {
+  if (!value) return '';
+  let d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0]; // yyyy-MM-dd
+}

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import HoOCSidebar from '../../components/HoOCSidebar';
+import { useNavigate, useParams } from 'react-router-dom';
+import UserLayout from '../../components/UserLayout';
 
 const HoOCManageMilestoneEmpty = () => {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { eventId } = useParams();
+  
 
   const handleCreateMilestone = () => {
     // Chuyển đến trang tạo cột mốc mới
@@ -12,48 +13,9 @@ const HoOCManageMilestoneEmpty = () => {
   };
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <HoOCSidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen}
-        activePage="work-timeline"
-      />
-      
-      <div 
-        className="flex-grow-1" 
-        style={{ 
-          marginLeft: sidebarOpen ? '230px' : '70px',
-          transition: 'margin-left 0.3s ease',
-          padding: '20px'
-        }}
-      >
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h2 className="mb-1" style={{ color: '#1f2937', fontWeight: '600' }}>
-              Manage Milestone Page - Empty
-            </h2>
-            <div className="d-flex align-items-center">
-              <i className="bi bi-list me-2" style={{ color: '#6b7280' }}></i>
-              <img 
-                src="/website-icon-fix@3x.png" 
-                alt="myFEvent" 
-                style={{ width: 24, height: 24, marginRight: '8px' }}
-              />
-              <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                myFEvent
-              </span>
-            </div>
-          </div>
-          
-          <div className="d-flex align-items-center">
-            <i className="bi bi-bell me-3" style={{ fontSize: '1.2rem', color: '#6b7280' }}></i>
-            <i className="bi bi-person-circle" style={{ fontSize: '1.5rem', color: '#6b7280' }}></i>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
+    <UserLayout title="Manage Milestone Page - Empty" sidebarType="hooc" activePage="work-timeline">
+      {/* Main Content */}
+      <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h3 style={{ color: '#dc2626', fontWeight: '600', margin: 0 }}>
               Cột mốc sự kiện
@@ -138,9 +100,8 @@ const HoOCManageMilestoneEmpty = () => {
               Oops, chưa có cột mốc nào hết, hãy tạo cột mốc đầu tiên!
             </h4>
           </div>
-        </div>
       </div>
-    </div>
+    </UserLayout>
   );
 };
 

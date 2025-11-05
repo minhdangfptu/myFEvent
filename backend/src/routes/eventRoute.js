@@ -1,6 +1,6 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent } from '../controllers/eventController.js';
-import { authenticateToken, requireRole } from '../middlewares/authMiddleware.js';
+import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
+import { authenticateToken } from '../middlewares/authMiddleware.js';
 import {
   createMilestone,
   listMilestones,
@@ -10,11 +10,15 @@ import {
 } from '../controllers/milestoneController.js';
 import {
   listDepartmentsByEvent,
-  getDepartmentDetailByEvent,
+  getDepartmentDetail,
+  createDepartment,
   assignHod,
+  changeHoD,
   addMemberToDepartment,
-  removeMemberFromDepartment
+  removeMemberFromDepartment,
+  editDepartment,
 } from '../controllers/departmentController.js';
+import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment } from '../controllers/eventMemberController.js';
 
 const router = express.Router();
 
@@ -24,6 +28,9 @@ router.get('/:id', getPublicEventDetail);
 
 // Private event detail (authenticated users) - TẠM THỜI BỎ PHÂN QUYỀN
 router.get('/private/:id', authenticateToken, getPrivateEventDetail);
+
+// Get all type event detail
+router.get('/detail/:id', authenticateToken, getAllEventDetail);
 
 // Create event (any authenticated user)
 router.post('/', authenticateToken, createEvent);
@@ -53,12 +60,23 @@ router.patch('/:eventId/milestones/:milestoneId', authenticateToken, updateMiles
 router.delete('/:eventId/milestones/:milestoneId', authenticateToken, deleteMilestone);
 
 router.get('/:eventId/departments', authenticateToken, listDepartmentsByEvent);
-router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetailByEvent);
+router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetail);
 
 // Department management
+router.post('/:eventId/departments', authenticateToken, createDepartment);
+
 router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
+router.patch('/:eventId/departments/:departmentId/change-hod', authenticateToken, changeHoD);
 router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
-router.delete('/:eventId/departments/:departmentId/members/:userId', authenticateToken, removeMemberFromDepartment);
+router.delete('/:eventId/departments/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
+router.patch('/:eventId/departments/:departmentId', authenticateToken, editDepartment)
+
+//Event member management
+router.get('/:eventId/members', authenticateToken, getMembersByEvent);
+router.get('/:eventId/unassigned-members', authenticateToken, getUnassignedMembersByEvent);
+router.get('/:eventId/departments/:departmentId/members', authenticateToken, getMembersByDepartment);
+
+//Event role 
 
 export default router;
 

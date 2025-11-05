@@ -18,7 +18,7 @@ export const authenticateToken = async (req, res, next) => {
       id: user._id,
       email: user.email,
       fullName: user.fullName,
-      roles: Array.isArray(user.roles) ? user.roles : (user.role ? [user.role] : [])
+      role: user.role
     };
 
     next();
@@ -50,7 +50,7 @@ export const authenticateRefreshToken = async (req, res, next) => {
       id: user._id,
       email: user.email,
       fullName: user.fullName,
-      roles: Array.isArray(user.roles) ? user.roles : (user.role ? [user.role] : [])
+      role: user.role
     };
     req.authToken = authToken;
 
@@ -60,15 +60,4 @@ export const authenticateRefreshToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') return res.status(401).json({ message: 'Invalid refresh token!' });
     return res.status(500).json({ message: 'Authentication failed!' });
   }
-};
-
-export const requireRole = (roles) => {
-  const required = Array.isArray(roles) ? roles : [roles];
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: 'Authentication required!' });
-    const userRoles = req.user.roles || [];
-    const hasRequiredRole = required.some((role) => userRoles.includes(role));
-    if (!hasRequiredRole) return res.status(403).json({ message: 'Insufficient permissions!' });
-    next();
-  };
 };

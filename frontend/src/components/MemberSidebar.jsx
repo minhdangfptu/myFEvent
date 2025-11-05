@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
+import { useEvents } from "../contexts/EventContext";
 
 export default function MemberSidebar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
+  eventId, // Nhận eventId qua props
 }) {
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
@@ -18,40 +21,13 @@ export default function MemberSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
-  const [currentEventMembership, setCurrentEventMembership] = useState(null);
-  const hasEvents = events && events.length > 0;
+  // Sử dụng eventId từ props thay vì lấy từ URL
+  const { events, loading } = useEvents();
+  const event = events.find(e => (e._id || e.id) === eventId);
+  const hasEvents = !!event;
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        console.log('MemberSidebar: Fetching events...');
-        const res = await eventApi.listMyEvents();
-        console.log('MemberSidebar: API response:', res);
-        const list = Array.isArray(res?.data) ? res.data : [];
-        console.log('MemberSidebar: Events list:', list);
-        const mapped = list.map(e => ({ 
-          id: e._id || e.id, 
-          name: e.name, 
-          icon: "bi-calendar-event",
-          membership: e.membership
-        }));
-        console.log('MemberSidebar: Mapped events:', mapped);
-        if (mounted) {
-          setEvents(mapped);
-          if (mapped.length && !selectedEvent) {
-            setSelectedEvent(mapped[0].name);
-            setCurrentEventMembership(mapped[0].membership);
-          }
-        }
-      } catch (error) {
-        console.error('MemberSidebar: Error fetching events:', error);
-      }
-    })();
-    return () => { mounted = false };
-  }, []);
+  // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -62,7 +38,12 @@ export default function MemberSidebar({
     }
   }, [sidebarOpen]);
 
-  useEffect(() => () => { if (hoverTimeout) clearTimeout(hoverTimeout); }, [hoverTimeout]);
+  useEffect(
+    () => () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    },
+    [hoverTimeout]
+  );
 
   const handleMouseEnter = (menuType, e) => {
     if (hoverTimeout) {
@@ -79,39 +60,42 @@ export default function MemberSidebar({
     setHoveredMenu(menuType);
   };
   const handleMouseLeave = () => {
-    const timeout = setTimeout(() => { setHoveredMenu(null); setHoverTimeout(null); }, 200);
+    const timeout = setTimeout(() => {
+      setHoveredMenu(null);
+      setHoverTimeout(null);
+    }, 200);
     setHoverTimeout(timeout);
   };
-  const handlePopupMouseEnter = () => { if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); } };
-  const handlePopupMouseLeave = () => { setHoveredMenu(null); };
+  const handlePopupMouseEnter = () => {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      setHoverTimeout(null);
+    }
+  };
+  const handlePopupMouseLeave = () => {
+    setHoveredMenu(null);
+  };
 
-  // Menu chính - LUÔN có "Trang chủ"
-  const mainMenuItems = useMemo(() => {
-    const items = [
-      { id: "home", icon: "bi-house-door", label: "Trang chủ", path: "/member-landing-page" }
-    ];
-    
-    // Member có đầy đủ menu như HoOC trừ thống kê
-    items.push(
-      { id: "event-board", icon: "bi-people", label: "Ban sự kiện", path: "/task" },
-      { id: "members", icon: "bi-person", label: "Thành viên", path: "/member" },
-      { id: "calendar", icon: "bi-calendar", label: "Lịch cá nhân", path: "/task" }
-    );
-    
-    return items;
-  }, []);
 
   // Submenu Tổng quan - Member có đầy đủ quyền trừ thống kê
   const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/member-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/member-event-detail/${events.find(e => e.name === selectedEvent)?.id || ''}` }
+    {
+      id: "overview-dashboard",
+      label: "Dashboard tổng",
+      path: "/member-landing-page",
+    },
+    {
+      id: "overview-detail",
+      label: "Chi tiết sự kiện",
+      path: `/member-event-detail/${eventId || ""}`,
+    },
   ];
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
-    { id: "work-board", label: "Bảng công việc", path: "/task" },
-    { id: "work-list", label: "List công việc", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: "/task" },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
+    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/timelines` },
     // Không có work-stats (thống kê tiến độ)
   ];
 
@@ -131,7 +115,23 @@ export default function MemberSidebar({
   ];
 
   return (
-    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
+    <div
+      ref={sidebarRef}
+      className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+      style={{
+        width: sidebarOpen ? "230px" : "70px",
+        height: "100vh",
+        transition: "width 0.3s ease",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        zIndex: 1000,
+        display: "flex",
+        flexDirection: "column",
+        background: "white",
+        borderRadius: "0",
+      }}
+    >
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
         .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
@@ -182,7 +182,7 @@ export default function MemberSidebar({
       `}</style>
 
       {/* Header */}
-      <div className="p-3" style={{ flexShrink: 0 }}>
+      <div className="p-3 pb-0" style={{ flexShrink: 0 }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
@@ -190,15 +190,30 @@ export default function MemberSidebar({
             style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
           >
             <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginRight: "10px",
+                }}
+              >
+                <img
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
               </div>
               {sidebarOpen && <span className="sidebar-logo">myFEvent</span>}
             </div>
           </div>
 
           {sidebarOpen && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setSidebarOpen(false)}
+              style={{ padding: "4px 8px" }}
+            >
               <i className="bi bi-arrow-left"></i>
             </button>
           )}
@@ -208,94 +223,82 @@ export default function MemberSidebar({
         {sidebarOpen && hasEvents && (
           <div className="mb-3" style={{ paddingBottom: 0 }}>
             <div className="group-title">SỰ KIỆN HIỆN TẠI</div>
-            <div className="dropdown">
-              <button
-                className="btn btn-outline-secondary dropdown-toggle w-100 d-flex align-items-center justify-content-between"
-                type="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                style={{ textAlign: "left", padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", background: "white", color: "#dc2626", fontWeight: "bold", height: 40 }}
+            <div 
+              className="d-flex align-items-center"
+              style={{
+                padding: "8px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "6px",
+                background: "white",
+                color: "#dc2626",
+                fontWeight: "bold",
+                minHeight: 40,
+                overflow: "hidden"
+              }}
+            >
+              
+              <i className="bi bi-calendar-event me-2"></i>
+              <span 
+                style={{ 
+                  overflow: "hidden", 
+                  wordWrap: "break-word", 
+                  whiteSpace: "normal",
+                  lineHeight: "1.2"
+                }}
+                title={event?.name || "(Chưa chọn sự kiện)"}
               >
-                <div className="d-flex align-items-center">
-                  <span>{selectedEvent}</span>
-                </div>
-              </button>
-              <ul className="dropdown-menu w-100" style={{ padding: 0 }}>
-                {events.map((event) => (
-                  <li key={event.id}>
-                    <button
-                      className="dropdown-item d-flex align-items-center"
-                      style={{ textAlign: "left", paddingLeft: 16 }}
-                      onClick={() => {
-                        setSelectedEvent(event.name);
-                        setCurrentEventMembership(event.membership);
-                        
-                        // Redirect đến trang tương ứng với role
-                        if (event.membership === 'HoOC') {
-                          window.location.href = '/hooc-landing-page';
-                        } else if (event.membership === 'Member' || event.membership === 'HoD') {
-                          window.location.href = '/member-landing-page';
-                        }
-                      }}
-                    >
-                      <i className={`${event.icon} me-2`}></i>
-                      {event.name}
-                    </button>
-                  </li>
-                ))}
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <button className="dropdown-item d-flex align-items-center" style={{ textAlign: "left", paddingLeft: 16, color: "#6b7280" }}>
-                    <i className="bi bi-eye me-2"></i>Xem sự kiện của bạn
-                  </button>
-                </li>
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <button className="dropdown-item d-flex align-items-center" style={{ textAlign: "left", paddingLeft: 16, color: "#6b7280" }} onClick={() => window.location.href = '/events'}>
-                    <i className="bi bi-eye me-2"></i>Xem sự kiện tại DH FPT
-                  </button>
-                </li>
-              </ul>
+                {event?.name || "(Chưa chọn sự kiện)"}
+              </span>
             </div>
           </div>
         )}
       </div>
 
       {/* Nội dung cuộn */}
-      <div className="sidebar-content">
+      <div className="sidebar-content pt-0">
+        <div className="mb-4">
+          {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
+          <div className="d-flex flex-column gap-1">
+            <button
+              className={`btn-nav ${
+                activePage === "notifications" ? "active" : ""
+              }`}
+              onClick={() => navigate("/home-page")}
+              title="Trang chủ"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-list me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Trang chủ</span>}
+              </div>
+            </button>
+          </div>
+        </div>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CHỨC NĂNG CHÍNH</div>}
 
           <div className="d-flex flex-column gap-1">
-            {/* Mục chính - Trang chủ luôn hiển thị */}
-            {mainMenuItems.map((item) => {
-              const isActive = activePage === item.id;
-              return (
-                <button
-                  key={item.id}
-                  className={`btn-nav ${isActive ? "active" : ""}`}
-                  onClick={() => (window.location.href = item.path)}
-                  title={item.label}
-                >
-                  <div style={{display: "flex", alignItems: 'center', justifyContent:"center"}} className="d-flex align-items-center">
-                    <i className={`${item.icon} me-3`} style={{ width: 20 }} />
-                    {sidebarOpen && <span>{item.label}</span>}
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Dropdown Tổng quan - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <div
                 className="menu-item-hover"
-                onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("overview", e)}
+                onMouseEnter={(e) =>
+                  !sidebarOpen && handleMouseEnter("overview", e)
+                }
                 onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
               >
                 <button
-                  className={`btn-nav${activePage.startsWith("overview") ? " active" : ""}`}
-                  onClick={() => sidebarOpen && setOverviewOpen((prev) => !prev)}
-                  style={{ cursor: "pointer", background: hoveredMenu === "overview" && !sidebarOpen ? "#e7ebef" : undefined }}
+                  className={`btn-nav${
+                    activePage.startsWith("overview") ? " active" : ""
+                  }`}
+                  onClick={() =>
+                    sidebarOpen && setOverviewOpen((prev) => !prev)
+                  }
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      hoveredMenu === "overview" && !sidebarOpen
+                        ? "#e7ebef"
+                        : undefined,
+                  }}
                   title="Tổng quan"
                 >
                   <div className="d-flex align-items-center">
@@ -303,22 +306,32 @@ export default function MemberSidebar({
                     {sidebarOpen && <span>Tổng quan</span>}
                   </div>
                   {sidebarOpen && (
-                    <i className={`bi ${overviewOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    <i
+                      className={`bi ${
+                        overviewOpen ? "bi-chevron-up" : "bi-chevron-down"
+                      }`}
+                    />
                   )}
                 </button>
 
                 {!sidebarOpen && hoveredMenu === "overview" && (
                   <div
                     className="hover-submenu"
-                    style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                    style={{
+                      left: `${hoverPos.left}px`,
+                      top: `${hoverPos.top}px`,
+                      position: "absolute",
+                    }}
                     onMouseEnter={handlePopupMouseEnter}
                     onMouseLeave={handlePopupMouseLeave}
                   >
                     {overviewSubItems.map((item) => (
                       <button
                         key={item.id}
-                        className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        className={`hover-submenu-item${
+                          activePage === item.id ? " active" : ""
+                        }`}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -331,8 +344,10 @@ export default function MemberSidebar({
                     {overviewSubItems.map((item) => (
                       <button
                         key={item.id}
-                        className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => (window.location.href = item.path)}
+                        className={`btn-submenu${
+                          activePage === item.id ? " active" : ""
+                        }`}
+                        onClick={() => navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -342,41 +357,106 @@ export default function MemberSidebar({
               </div>
             )}
 
+            {/* Ban sự kiện */}
+            <button
+              className={`btn-nav ${
+                activePage === "event-board" ? "active" : ""
+              }`}
+              onClick={() => navigate(`/events/${eventId || ''}/departments`)}
+              title="Ban của bạn"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-people me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Ban sự kiện</span>}
+              </div>
+            </button>
+
+            {/* Thành viên */}
+            <button
+              className={`btn-nav ${
+                activePage === "members" ? "active" : ""
+              }`}
+              onClick={() => navigate(`/events/${eventId || ''}/members`)}
+              title="Thành viên"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-person me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Thành viên</span>}
+              </div>
+            </button>
+
+            {/* Lịch cá nhân */}
+            <button
+              className={`btn-nav ${
+                activePage === "calendar" ? "active" : ""
+              }`}
+              onClick={() => navigate("/task")}
+              title="Lịch cá nhân"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-calendar me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Lịch cá nhân</span>}
+              </div>
+            </button>
+
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <>
                 <div
                   className="menu-item-hover"
-                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
+                  onMouseEnter={(e) =>
+                    !sidebarOpen && handleMouseEnter("work", e)
+                  }
                   onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
                 >
                   <button
-                    className={`btn-nav${activePage.startsWith("work") ? " active" : ""}`}
+                    className={`btn-nav${
+                      activePage.startsWith("work") ? " active" : ""
+                    }`}
                     onClick={() => sidebarOpen && setWorkOpen((prev) => !prev)}
-                    style={{ cursor: "pointer", background: hoveredMenu === "work" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        hoveredMenu === "work" && !sidebarOpen
+                          ? "#e7ebef"
+                          : undefined,
+                    }}
                     title="Công việc"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-file-text me-3" style={{ width: 20 }} />
+                      <i
+                        className="bi bi-file-text me-3"
+                        style={{ width: 20 }}
+                      />
                       {sidebarOpen && <span>Công việc</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${workOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      <i
+                        className={`bi ${
+                          workOpen ? "bi-chevron-up" : "bi-chevron-down"
+                        }`}
+                      />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "work" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{
+                        left: `${hoverPos.left}px`,
+                        top: `${hoverPos.top}px`,
+                        position: "absolute",
+                      }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
                       {workSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`hover-submenu-item${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -389,8 +469,10 @@ export default function MemberSidebar({
                       {workSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`btn-submenu${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -401,13 +483,25 @@ export default function MemberSidebar({
 
                 <div
                   className="menu-item-hover"
-                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("finance", e)}
+                  onMouseEnter={(e) =>
+                    !sidebarOpen && handleMouseEnter("finance", e)
+                  }
                   onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
                 >
                   <button
-                    className={`btn-nav${activePage.startsWith("finance") ? " active" : ""}`}
-                    onClick={() => sidebarOpen && setFinanceOpen((prev) => !prev)}
-                    style={{ cursor: "pointer", background: hoveredMenu === "finance" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    className={`btn-nav${
+                      activePage.startsWith("finance") ? " active" : ""
+                    }`}
+                    onClick={() =>
+                      sidebarOpen && setFinanceOpen((prev) => !prev)
+                    }
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        hoveredMenu === "finance" && !sidebarOpen
+                          ? "#e7ebef"
+                          : undefined,
+                    }}
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
@@ -415,22 +509,32 @@ export default function MemberSidebar({
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${financeOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      <i
+                        className={`bi ${
+                          financeOpen ? "bi-chevron-up" : "bi-chevron-down"
+                        }`}
+                      />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "finance" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{
+                        left: `${hoverPos.left}px`,
+                        top: `${hoverPos.top}px`,
+                        position: "absolute",
+                      }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
                       {financeSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`hover-submenu-item${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -443,8 +547,10 @@ export default function MemberSidebar({
                       {financeSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`btn-submenu${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -455,13 +561,23 @@ export default function MemberSidebar({
 
                 <div
                   className="menu-item-hover"
-                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
+                  onMouseEnter={(e) =>
+                    !sidebarOpen && handleMouseEnter("risk", e)
+                  }
                   onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
                 >
                   <button
-                    className={`btn-nav${activePage.startsWith("risk") ? " active" : ""}`}
+                    className={`btn-nav${
+                      activePage.startsWith("risk") ? " active" : ""
+                    }`}
                     onClick={() => sidebarOpen && setRisksOpen((prev) => !prev)}
-                    style={{ cursor: "pointer", background: hoveredMenu === "risk" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    style={{
+                      cursor: "pointer",
+                      background:
+                        hoveredMenu === "risk" && !sidebarOpen
+                          ? "#e7ebef"
+                          : undefined,
+                    }}
                     title="Rủi ro"
                   >
                     <div className="d-flex align-items-center">
@@ -469,22 +585,32 @@ export default function MemberSidebar({
                       {sidebarOpen && <span>Rủi ro</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      <i
+                        className={`bi ${
+                          risksOpen ? "bi-chevron-up" : "bi-chevron-down"
+                        }`}
+                      />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "risk" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{
+                        left: `${hoverPos.left}px`,
+                        top: `${hoverPos.top}px`,
+                        position: "absolute",
+                      }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
                       {risksSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`hover-submenu-item${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -497,8 +623,10 @@ export default function MemberSidebar({
                       {risksSubItems.map((item) => (
                         <button
                           key={item.id}
-                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => (window.location.href = item.path)}
+                          className={`btn-submenu${
+                            activePage === item.id ? " active" : ""
+                          }`}
+                          onClick={() => navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -508,8 +636,10 @@ export default function MemberSidebar({
                 </div>
 
                 <button
-                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => (window.location.href = "/task")}
+                  className={`btn-nav ${
+                    activePage === "feedback" ? "active" : ""
+                  }`}
+                  onClick={() => navigate("/task")}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
@@ -526,13 +656,23 @@ export default function MemberSidebar({
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
           <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => (window.location.href = "/notifications")} title="Thông báo">
+            <button
+              className={`btn-nav ${
+                activePage === "notifications" ? "active" : ""
+              }`}
+              onClick={() => navigate("/notifications")}
+              title="Thông báo"
+            >
               <div className="d-flex align-items-center">
                 <i className="bi bi-bell me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
-            <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => (window.location.href = "/setting")} title="Cài đặt">
+            <button
+              className={`btn-nav ${activePage === "settings" ? "active" : ""}`}
+              onClick={() => navigate("/setting")}
+              title="Cài đặt"
+            >
               <div className="d-flex align-items-center">
                 <i className="bi bi-gear me-3" style={{ width: 20 }} />
                 {sidebarOpen && <span>Cài đặt</span>}
@@ -543,20 +683,38 @@ export default function MemberSidebar({
       </div>
 
       {/* Theme toggle hoặc Expand button */}
-      <div className="p-2" style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}>
+      <div
+        className="p-2"
+        style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
+      >
         {sidebarOpen ? (
-          <div className="theme-toggle" style={{ paddingBottom: 10, margin: 0 }}>
-            <button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
+          <div
+            className="theme-toggle"
+            style={{ paddingBottom: 10, margin: 0 }}
+          >
+            <button
+              className={`theme-option ${theme === "light" ? "active" : ""}`}
+              onClick={() => setTheme("light")}
+            >
               <i className="bi bi-sun"></i>
               <span>Sáng</span>
             </button>
-            <button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
+            <button
+              className={`theme-option ${theme === "dark" ? "active" : ""}`}
+              onClick={() => setTheme("dark")}
+            >
               <i className="bi bi-moon"></i>
               <span>Tối</span>
             </button>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm w-100" onClick={() => setSidebarOpen(true)} style={{ padding: "5px", margin: "0 1.5px 0 2px" }} title="Mở rộng" aria-label="Mở/đóng thanh bên">
+          <button
+            className="btn btn-ghost btn-sm w-100"
+            onClick={() => setSidebarOpen(true)}
+            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
+            title="Mở rộng"
+            aria-label="Mở/đóng thanh bên"
+          >
             <i className="bi bi-list"></i>
           </button>
         )}

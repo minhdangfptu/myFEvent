@@ -1,8 +1,24 @@
 import axiosClient from './axiosClient';
 
 export const eventApi = {
-  create: async ({ name, description, eventDate, location, type, organizerName }) => {
-    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName });
+  getAllPublicEvents: async () => {
+    try {
+      const response = await axiosClient.get('/api/events/public');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  getEventById: async (eventId) => {
+    try {
+      const response = await axiosClient.get(`/api/events/${eventId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  create: async ({ name, description, eventDate, location, type, organizerName, images }) => {
+    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName, images });
     return res.data;
   },
   replaceImages: async (eventId, images) => {
@@ -15,6 +31,7 @@ export const eventApi = {
   },
   getEventSummary: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/summary`);
+    console.log(res)
     return res.data;
   },
   updateEvent: async (eventId, data) => {
@@ -33,16 +50,28 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
+  replaceEventImages: async (eventId, images) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
+    return res.data;
+  },
   listMyEvents: async () => {
     const res = await axiosClient.get('/api/events/me/list');
     return res.data;
   },
-  getMyEvents: async () => {
-    const res = await axiosClient.get('/api/events/me/list');
+  getAllEventDetail: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/detail/${eventId}`);
     return res.data;
   },
   debugAuth: async () => {
     const res = await axiosClient.get('/api/auth/profile');
+    return res.data;
+  },
+  getMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members`);
+    return res.data;
+  },
+  getUnassignedMembersByEvent: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/unassigned-members`);
     return res.data;
   }
 }

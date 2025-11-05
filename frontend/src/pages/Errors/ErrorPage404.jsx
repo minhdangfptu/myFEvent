@@ -12,7 +12,7 @@ export default function ErrorPage404() {
         <div className="d-flex justify-content-center my-3">
           <img src={error404} alt="404 illustration" style={{ width: '80%', maxWidth: 420 }} />
         </div>
-        <RouterLink to="/" className="btn btn-link fw-bold">
+        <RouterLink to="/home-page" className="btn btn-link fw-bold">
           <i className="bi bi-arrow-left me-2" />Về Trang Chủ
         </RouterLink>
       </div>

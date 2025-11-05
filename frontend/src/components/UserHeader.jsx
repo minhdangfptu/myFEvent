@@ -1,6 +1,7 @@
 import { useAuth } from "../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { toast } from "react-toastify";
 
 export default function UserHeader({
   title,
@@ -17,8 +18,9 @@ export default function UserHeader({
   const handleLogout = async () => {
     try {
       await logout();
-    } finally {
-      window.location.href = "/landingpage";
+      window.location.href = "/landingpage?toast=logout-success";
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi đăng xuất");
     }
   };
 
@@ -69,16 +71,6 @@ export default function UserHeader({
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
-          {/* <button
-            className="btn btn-ghost me-3"
-            onClick={() => {
-              const event = new CustomEvent('toggleSidebar');
-              window.dispatchEvent(event);
-            }}
-            aria-label="Mở/đóng thanh bên"
-          >
-            <i className="bi bi-list"></i>
-          </button> */}
           <h5 className="mb-0 text-muted">{title}</h5>
         </div>
 
@@ -202,70 +194,6 @@ export default function UserHeader({
           </div>
         </div>
       </header>
-
-      {/* Search and Action Bar */}
-      {(showSearch || showEventAction) && (
-        <div className="bg-light border-bottom p-3">
-          <div className="d-flex gap-3 align-items-center">
-            {showSearch && (
-              <div className="flex-grow-1">
-                <div className="position-relative">
-                  <i
-                    className="bi bi-search position-absolute"
-                    style={{ left: 12, top: 12, color: "#9CA3AF" }}
-                    aria-hidden="true"
-                  />
-                  <input
-                    type="text"
-                    className="form-control soft-input ps-5"
-                    placeholder={t("searchPlaceholder")}
-                    onChange={(e) => onSearch && onSearch(e.target.value)}
-                    aria-label={t("searchPlaceholder")}
-                  />
-                </div>
-              </div>
-            )}
-
-            {showEventAction && (
-              <div className="dropdown">
-                <button
-                  className="btn btn-brand-red d-flex align-items-center gap-2"
-                  type="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                  aria-label="Mở menu tạo/tham gia sự kiện"
-                >
-                  <i className="bi bi-plus"></i>
-                  {t("createEvent")}/{t("joinEvent")}
-                  <i className="bi bi-chevron-down"></i>
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
-                  <li>
-                    <button
-                      className="dropdown-item d-flex align-items-center"
-                      onClick={() => onEventAction && onEventAction("create")}
-                      style={{ textAlign: "left", paddingLeft: "16px" }}
-                    >
-                      <i className="bi bi-calendar-plus me-2"></i>
-                      {t("createEvent")}
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="dropdown-item d-flex align-items-center"
-                      onClick={() => onEventAction && onEventAction("join")}
-                      style={{ textAlign: "left", paddingLeft: "16px" }}
-                    >
-                      <i className="bi bi-box-arrow-in-right me-2"></i>
-                      {t("joinEvent")}
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

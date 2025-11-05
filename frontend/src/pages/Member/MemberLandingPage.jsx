@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
+import { userApi } from '../../apis/userApi';
 
 export default function MemberLandingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -19,6 +21,29 @@ export default function MemberLandingPage() {
   const [joinError, setJoinError] = useState('');
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // --- THÊM ĐỂ NHẬN ROLE EVENT VỚI eventId ---
+  const [eventRole, setEventRole] = useState('');
+  const [roleLoading, setRoleLoading] = useState(true);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const eventId = params.get('eventId');
+    if (!eventId) {
+      setRoleLoading(false);
+      return;
+    }
+    setRoleLoading(true);
+    userApi.getUserRoleByEvent(eventId).then(res => {
+      if (res.role !== 'Member') {
+        if (res.role === 'HoOC') navigate(`/hooc-landing-page?eventId=${eventId}`);
+        else if (res.role === 'HoD') navigate(`/hod-landing-page?eventId=${eventId}`);
+        else navigate('/');
+      } else {
+        setEventRole('Member');
+      }
+      setRoleLoading(false);
+    }).catch(() => setRoleLoading(false));
+  }, [location.search, navigate]);
 
   useEffect(() => {
     fetchMyEvents();
@@ -55,16 +80,10 @@ export default function MemberLandingPage() {
       
       // Kiểm tra nếu user không có sự kiện nào, redirect về trang user
       if (events.length === 0) {
-        navigate('/user-landing-page');
+        navigate('/home-page');
         return;
       }
-      
-      // Kiểm tra nếu user là HoOC, redirect đến trang HoOC
-      const hasHoOCEvent = events.some(event => event.membership === 'HoOC');
-      if (hasHoOCEvent) {
-        navigate('/hooc-landing-page');
-        return;
-      }
+     
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -103,8 +122,8 @@ export default function MemberLandingPage() {
     navigate(`/member-event-detail/${eventId}`);
   };
 
-  // Hiển thị loading nếu đang kiểm tra sự kiện
-  if (loading) {
+  // Hiển thị loading nếu đang kiểm tra sự kiện hoặc đang loading role
+  if (loading || roleLoading || eventRole !== 'Member') {
     return (
       <UserLayout title="Trang chủ Member" sidebarType="member">
         <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
@@ -340,7 +359,7 @@ export default function MemberLandingPage() {
                     setCreateForm({ name: '', description: '', organizerName: '' });
                     alert(`Mã tham gia: ${res.data.joinCode}`);
                     // Redirect to event detail page
-                    navigate(`/hooc-event-detail/${res.data.id}`);
+                    navigate(`/events/${res.data.id}/hooc-event-detail`);
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -413,7 +432,7 @@ export default function MemberLandingPage() {
                     const res = await eventApi.joinByCode(joinCode.trim());
                     setShowJoinModal(false);
                     setJoinCode('');
-                    navigate(`/hooc-event-detail/${res.data.eventId}`);
+                    navigate(`/events/${res.data.eventId}/hooc-event-detail`);
                   } catch (err) {
                     setJoinError(err.response?.data?.message || 'Tham gia thất bại');
                   }

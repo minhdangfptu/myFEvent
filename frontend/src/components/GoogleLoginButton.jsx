@@ -10,7 +10,7 @@ export default function GoogleLoginButton() {
     setLoading(true);
     try {
       await loginWithGoogle();
-      window.location.href = "/user-landing-page";
+      window.location.href = "/home-page";
     } catch (e) {
       console.error(e);
       alert(e?.message || "Đăng nhập thất bại");

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import UserLayout from '../../components/UserLayout';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {toast } from "react-toastify";
+import UserLayout from "../../components/UserLayout";
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -18,6 +19,7 @@ export default function UserHomePage() {
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
   // Kiểm tra sự kiện của user và redirect
@@ -47,18 +49,51 @@ export default function UserHomePage() {
     { id: 3, title: 'Halloween 2024', status: 'Đã kết thúc', date: '12/12', description: 'Exercitation veniam consequat sunt nostrud amet...', image: '/api/placeholder/600/360' }
   ]), []);
 
-  const blogs = useMemo(() => ([
-    { id: 1, title: 'Kinh nghiệm chuẩn bị hậu cần', topic: 'Hậu cần', user: 'Lan', date: '15 Sep 2021', image: '/api/placeholder/600/360' },
-    { id: 2, title: 'Checklist âm thanh ánh sáng', topic: 'Kỹ thuật', user: 'Minh', date: '08 Oct 2021', image: '/api/placeholder/600/360' },
-    { id: 3, title: 'Gợi ý truyền thông trước sự kiện', topic: 'Truyền thông', user: 'Hà', date: '20 Oct 2021', image: '/api/placeholder/600/360' },
-  ]), []);
+  const blogs = useMemo(
+    () => [
+      {
+        id: 1,
+        title: "Kinh nghiệm chuẩn bị hậu cần",
+        topic: "Hậu cần",
+        user: "Lan",
+        date: "15 Sep 2021",
+        image: "/api/placeholder/600/360",
+      },
+      {
+        id: 2,
+        title: "Checklist âm thanh ánh sáng",
+        topic: "Kỹ thuật",
+        user: "Minh",
+        date: "08 Oct 2021",
+        image: "/api/placeholder/600/360",
+      },
+      {
+        id: 3,
+        title: "Gợi ý truyền thông trước sự kiện",
+        topic: "Truyền thông",
+        user: "Hà",
+        date: "20 Oct 2021",
+        image: "/api/placeholder/600/360",
+      },
+    ],
+    []
+  );
 
   // ====== FILTERS / SORT ======
-  const STATUS_OPTIONS = [t('home.statuses.all'), t('home.statuses.upcoming'), t('home.statuses.ongoing'), t('home.statuses.past')];
-  const SORT_OPTIONS = [t('home.sorts.newest'), t('home.sorts.oldest'), t('home.sorts.az')];
+  const STATUS_OPTIONS = [
+    t("home.statuses.all"),
+    t("home.statuses.upcoming"),
+    t("home.statuses.ongoing"),
+    t("home.statuses.past"),
+  ];
+  const SORT_OPTIONS = [
+    t("home.sorts.newest"),
+    t("home.sorts.oldest"),
+    t("home.sorts.az"),
+  ];
 
-  const [statusFilter, setStatusFilter] = useState(t('home.statuses.all'));
-  const [sortBy, setSortBy] = useState(t('home.sorts.newest'));
+  const [statusFilter, setStatusFilter] = useState(t("home.statuses.all"));
+  const [sortBy, setSortBy] = useState(t("home.sorts.newest"));
 
   // Dropdown UI state
   const [openMenu, setOpenMenu] = useState(null); // 'status' | 'sort' | null
@@ -67,27 +102,47 @@ export default function UserHomePage() {
   useEffect(() => {
     const onClickOutside = (e) => {
       if (
-        statusMenuRef.current && !statusMenuRef.current.contains(e.target) &&
-        sortMenuRef.current && !sortMenuRef.current.contains(e.target)
-      ) setOpenMenu(null);
+        statusMenuRef.current &&
+        !statusMenuRef.current.contains(e.target) &&
+        sortMenuRef.current &&
+        !sortMenuRef.current.contains(e.target)
+      )
+        setOpenMenu(null);
     };
-    document.addEventListener('click', onClickOutside);
-    return () => document.removeEventListener('click', onClickOutside);
+    document.addEventListener("click", onClickOutside);
+    return () => document.removeEventListener("click", onClickOutside);
   }, []);
 
   // Filter + sort logic
   const filteredEvents = events
-    .filter(ev =>
-      ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ev.description.toLowerCase().includes(searchQuery.toLowerCase())
+    .filter(
+      (ev) =>
+        ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ev.description.toLowerCase().includes(searchQuery.toLowerCase())
     )
-    .filter(ev => (statusFilter === 'Tất cả' ? true : ev.status === statusFilter))
+    .filter((ev) =>
+      statusFilter === "Tất cả" ? true : ev.status === statusFilter
+    )
     .sort((a, b) => {
       if (sortBy === 'A-Z') return a.title.localeCompare(b.title);
       if (sortBy === 'Mới nhất') return b.id - a.id;
       if (sortBy === 'Cũ nhất') return a.id - b.id;
       return 0;
     });
+    // Thêm ref để track việc đã show toast
+    const toastShown = useRef(false);
+
+    useEffect(() => {
+      const toastData = location.state?.toast;
+      if (toastData && !toastShown.current) {
+        toast.dismiss(); 
+        const fn = toast[toastData.type] || toast.success;
+        fn(toastData.message);
+        toastShown.current = true;
+        // remove state so toast doesn't show again on refresh/back
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    }, [location, navigate]);
 
   // Hiển thị loading nếu đang kiểm tra sự kiện
   if (loading) {
@@ -150,7 +205,6 @@ export default function UserHomePage() {
         .ghost-btn { border:1px solid #E5E7EB; border-radius:10px; padding:8px 12px; background:#fff; font-size:14px; }
         .ghost-btn:hover { background:#F9FAFB; }
       `}</style>
-
       {/* ====== SECTION: Events ====== */}
       <div className="mb-5">
         <div className="section-head">
@@ -231,7 +285,11 @@ export default function UserHomePage() {
               <div className="event-card h-100">
                 <div
                   className="event-img"
-                  style={{ backgroundImage: `url(${event.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                  style={{
+                    backgroundImage: `url(${event.image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
                 />
                 <div className="event-body">
                   <div className="d-flex align-items-center gap-2 mb-2">
@@ -247,8 +305,11 @@ export default function UserHomePage() {
                   <div className="event-title">{event.title}</div>
                   <p className="event-desc mb-3">{event.description}</p>
                   <div className="d-flex justify-content-between">
-                    <button className="ghost-btn" onClick={() => navigate('/event-detail')}>
-                      {t('actions.viewDetails')}
+                    <button
+                      className="ghost-btn"
+                      onClick={() => navigate("/event-detail")}
+                    >
+                      {t("actions.viewDetails")}
                     </button>
                     {/* ⛔ ĐÃ BỎ NÚT THAM GIA TRONG EVENT-BODY */}
                   </div>
@@ -259,7 +320,7 @@ export default function UserHomePage() {
           {filteredEvents.length === 0 && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                {t('home.noEvents')}
+                {t("home.noEvents")}
               </div>
             </div>
           )}
@@ -269,7 +330,7 @@ export default function UserHomePage() {
       {/* ====== SECTION: Blog ====== */}
       <div>
         <div className="section-head">
-          <h4 className="section-title">{t('home.blog')}</h4>
+          <h4 className="section-title">{t("home.blog")}</h4>
         </div>
         <div className="row g-4">
           {blogs.map((blog) => (
@@ -277,7 +338,11 @@ export default function UserHomePage() {
               <div className="blog-card h-100">
                 <div
                   className="blog-img"
-                  style={{ backgroundImage: `url(${blog.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                  style={{
+                    backgroundImage: `url(${blog.image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
                 />
                 <div className="blog-body">
                   <div className="blog-title">{blog.title}</div>
@@ -293,7 +358,7 @@ export default function UserHomePage() {
           {blogs.length === 0 && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                {t('home.noPosts')}
+                {t("home.noPosts")}
               </div>
             </div>
           )}
@@ -327,7 +392,7 @@ export default function UserHomePage() {
                     setCreateForm({ name: '', description: '', organizerName: '' });
                     alert(`Mã tham gia: ${res.data.joinCode}`);
                     // Redirect to event detail page
-                    navigate(`/hooc-event-detail/${res.data.id}`);
+                    navigate(`/events/${res.data.id}/hooc-event-detail`);
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -381,15 +446,22 @@ export default function UserHomePage() {
 
       {/* ====== JOIN MODAL: cho mọi user ====== */}
       {showJoinModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header border-0">
                 <div className="d-flex align-items-center">
                   <i className="bi bi-clipboard-data brand-red me-2"></i>
-                  <h5 className="modal-title fw-bold">{t('joinEvent')}</h5>
+                  <h5 className="modal-title fw-bold">{t("joinEvent")}</h5>
                 </div>
-                <button type="button" className="btn-close" onClick={() => setShowJoinModal(false)}></button>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowJoinModal(false)}
+                ></button>
               </div>
               <div className="modal-body">
                 <p className="text-muted mb-3">{t('joinEvent')}</p>
@@ -400,7 +472,7 @@ export default function UserHomePage() {
                     const res = await eventApi.joinByCode(joinCode.trim());
                     setShowJoinModal(false);
                     setJoinCode('');
-                    navigate(`/hooc-event-detail/${res.data.eventId}`);
+                    navigate(`/events/${res.data.eventId}/hooc-event-detail`);
                   } catch (err) {
                     setJoinError(err.response?.data?.message || 'Tham gia thất bại');
                   }
@@ -411,8 +483,16 @@ export default function UserHomePage() {
                   </div>
                   {joinError && <div className="alert alert-danger py-2">{joinError}</div>}
                   <div className="d-flex gap-2 justify-content-end">
-                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowJoinModal(false)}>{t('actions.cancel')}</button>
-                    <button type="submit" className="btn btn-danger">OK</button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => setShowJoinModal(false)}
+                    >
+                      {t("actions.cancel")}
+                    </button>
+                    <button type="submit" className="btn btn-danger">
+                      OK
+                    </button>
                   </div>
                 </form>
               </div>

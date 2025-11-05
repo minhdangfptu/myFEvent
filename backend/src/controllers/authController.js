@@ -11,7 +11,7 @@ import AuthToken from '../models/authToken.js';
 const emailVerificationStore = new Map();
 // Pending registrations kept in-memory until verified
 const pendingRegistrations = new Map();
-
+const deleteEventOtpStore = new Map();
 const setEmailVerificationCode = (email) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const ttlMs = 60 * 1000; // 1 minute
@@ -62,7 +62,7 @@ const saveRefreshToken = async (userId, token, req) => {
 };
 
 // Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
-const sendVerificationEmail = async (email, fullName, req) => {
+export const sendVerificationEmail = async (email, fullName, req) => {
   const { code } = setEmailVerificationCode(email);
 
   const html = `
@@ -98,6 +98,10 @@ export const signup = async (req, res) => {
       }
     }
 
+    if (!email || !password || !fullName || !phone) {
+      return res.status(400).json({ message: 'Missing required fields!' });
+    }
+
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -129,13 +133,16 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Sai tài khoản hoặc mật khẩu' });
+    if (!user) return res.status(404).json({ message: 'Email or password is incorrect' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Sai tài khoản hoặc mật khẩu' });
+    if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
 
-    if (!user.verified || user.status !== 'active') {
-      return res.status(403).json({ message: 'Tài khoản chưa được xác minh. Vui lòng kiểm tra email để xác minh tài khoản.' });
+    if ( user.status == 'pending') {
+      return res.status(403).json({ message: 'Account is not active' });
+    }
+    if ( user.status == 'banned') {
+      return res.status(403).json({ message: 'Account is banned' });
     }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
@@ -156,7 +163,6 @@ export const login = async (req, res) => {
   }
 };
 
-// Uses authenticateRefreshToken middleware (req.user, req.authToken)
 export const refreshToken = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -259,7 +265,8 @@ export const loginWithGoogle = async (req, res) => {
            email: user.email,
            fullName: user.fullName,
            avatarUrl: user.avatarUrl,
-           role: user.role
+           role: user.role,
+           authProvider: user.authProvider,
          }
       });
     } catch (error) {
@@ -463,5 +470,92 @@ export const changePassword = async (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     return res.status(500).json({ message: 'Failed to change password' });
+  }
+};
+
+export const checkPassWord = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(400).json({ message: 'Incorrect information' });
+    return res.status(200).json({ message: 'Correct information' });
+  } catch (error) {
+    console.error('Check password error:', error);
+    return res.status(500).json({ message: 'Failed to check information' });
+  }
+};
+// Thêm vào đầu file:
+
+
+const setDeleteEventOtp = (email) => {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const ttlMs = 2 * 60 * 1000; // 2 phút
+  const expiresAt = Date.now() + ttlMs;
+
+  // Clear timeout nếu có
+  const existing = deleteEventOtpStore.get(email);
+  if (existing?.timeout) clearTimeout(existing.timeout);
+
+  const timeout = setTimeout(() => deleteEventOtpStore.delete(email), ttlMs);
+  deleteEventOtpStore.set(email, { code, expiresAt, timeout });
+
+  return code;
+};
+
+export const sendDeleteOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    // Bảo vệ: chỉ user đang đăng nhập mới gửi otp cho chính email đó
+    if (!req.user || req.user.email !== email) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const code = setDeleteEventOtp(email);
+    await sendMail({
+      to: email,
+      subject: 'Mã xác nhận xoá sự kiện - myFEvent',
+      html: `
+        <div style="font-family:Arial,sans-serif;font-size:14px;color:#111827">
+          <h2>Mã xác nhận xoá sự kiện</h2>
+          <p>Xin chào ${email},</p>
+          <p>Mã xác nhận của bạn là:</p>
+          <div style="font-size:28px;font-weight:700;letter-spacing:6px;">${code}</div>
+          <p>Mã chỉ có hiệu lực trong 2 phút.</p>
+          <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({ message: 'Đã gửi mã xác nhận qua email.' });
+  } catch (error) {
+    console.error('Send delete OTP error:', error);
+    return res.status(500).json({ message: 'Không gửi được mã xác nhận.' });
+  }
+};
+
+export const verifyDeleteOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ message: 'Thiếu email hoặc mã otp.' });
+    // Bảo vệ: chỉ user đăng nhập được xác nhận
+    if (!req.user || req.user.email !== email) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const entry = deleteEventOtpStore.get(email);
+    if (!entry || entry.expiresAt < Date.now()) {
+      return res.status(400).json({ message: 'Mã hết hạn. Vui lòng gửi lại!' });
+    }
+    if (entry.code !== otp) {
+      return res.status(400).json({ message: 'Mã xác nhận không đúng!' });
+    }
+    if (entry.timeout) clearTimeout(entry.timeout);
+    deleteEventOtpStore.delete(email);
+    return res.status(200).json({ message: 'Xác thực thành công.' });
+  } catch (error) {
+    console.error('Verify delete OTP error:', error);
+    return res.status(500).json({ message: 'Không xác thực được OTP.' });
   }
 };

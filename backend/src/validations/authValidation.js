@@ -72,4 +72,13 @@ export const changePasswordValidation = [
   body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
 ]
 
+export const sendDeleteOtpValidation = [
+  body('email').isEmail().withMessage('Email is not valid')
+];
+
+export const verifyDeleteOtpValidation = [
+  body('email').isEmail().withMessage('Email is not valid'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be at least 6 characters')
+];
+
 

@@ -11,7 +11,9 @@ import {
   resetPassword,
   verifyEmail,
   resendVerification,
-  changePassword
+  changePassword,
+  sendDeleteOtp,
+  verifyDeleteOtp
 } from '../controllers/authController.js';
 import { authenticateToken, authenticateRefreshToken } from '../middlewares/authMiddleware.js';
 import User from '../models/user.js';
@@ -25,7 +27,9 @@ import {
   resetPasswordValidation,
   resendVerificationValidation,
   verifyCodeValidation,
-  changePasswordValidation
+  changePasswordValidation,
+  sendDeleteOtpValidation,
+  verifyDeleteOtpValidation
 } from '../validations/authValidation.js';
 
 const router = express.Router();
@@ -100,5 +104,18 @@ router.delete('/profile/tag', authenticateToken, async (req, res) => {
     return res.status(500).json({ message: 'Failed to remove tag' });
   }
 });
-
+router.post(
+  '/send-delete-otp',
+  sendDeleteOtpValidation,
+  handleValidationErrors,
+  authenticateToken,
+  sendDeleteOtp
+);
+router.post(
+  '/verify-delete-otp',
+  verifyDeleteOtpValidation,
+  handleValidationErrors,
+  authenticateToken,
+  verifyDeleteOtp
+);
 export default router;
