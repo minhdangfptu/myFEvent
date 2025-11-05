@@ -6,10 +6,6 @@ export const ensureEventExists = async (eventId) => {
   return !!event;
 };
 
-export const getEventByIdLean = async (eventId) => {
-  return await Event.findById(eventId).lean();
-};
-
 export const getMembersByEventRaw = async (eventId) => {
   return await EventMember.find({ eventId })
     .populate([
@@ -63,6 +59,18 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     departmentId: member.departmentId,
     joinedAt: member.createdAt
   }));
+};
+
+export const findEventMemberById = async (memberId) => {
+  return await EventMember.findOne({ _id: memberId }).lean();
+};
+
+export const getRequesterMembership = async (eventId, userId) => {
+  if (!userId) return null;
+  return await EventMember.findOne({ eventId, userId }).lean();
+};
+export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
+  return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' } });
 };
 
 

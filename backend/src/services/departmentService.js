@@ -1,5 +1,4 @@
 import Department from '../models/department.js';
-import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import User from '../models/user.js';
 
@@ -13,14 +12,6 @@ export const ensureDepartmentInEvent = async (eventId, departmentId) => {
   return await Department.findOne({ _id: departmentId, eventId });
 };
 
-export const getRequesterMembership = async (eventId, userId) => {
-  if (!userId) return null;
-  return await EventMember.findOne({ eventId, userId }).lean();
-};
-
-export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
-  return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' } });
-};
 
 // Query services
 export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) => {
@@ -67,6 +58,10 @@ export const updateDepartmentDoc = async (departmentId, set) => {
   ).populate({ path: 'leaderId', select: 'fullName email avatarUrl' }).lean();
 };
 
+export const deleteDepartmentDoc = async (departmentId) => {
+  return await Department.findByIdAndDelete(departmentId).lean();
+};
+
 export const assignHoDToDepartment = async (eventId, department, userId) => {
   const previousLeaderId = department.leaderId?.toString();
   department.leaderId = userId;
@@ -99,12 +94,12 @@ export const isUserMemberOfDepartment = async (eventId, departmentId, userId) =>
   return !!m;
 };
 
-export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId) => {
+export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, roleToSet) => {
   return await EventMember.findOneAndUpdate(
     { _id: memberId },
-    { $set: { departmentId } },
+    { $set: { departmentId, ...(roleToSet ? { role: roleToSet } : {}) } },
     { new: true }
-  );
+  ).populate('userId', 'fullName email avatarUrl');
 };
 
 export const removeMemberFromDepartmentDoc = async (eventId, departmentId, memberId) => {
@@ -113,6 +108,10 @@ export const removeMemberFromDepartmentDoc = async (eventId, departmentId, membe
     { $set: { departmentId: null, role: 'Member' } },
     { new: true }
   );
+};
+
+export const findEventMemberById = async (memberId) => {
+  return await EventMember.findOne({ _id: memberId }).lean();
 };
 
 
