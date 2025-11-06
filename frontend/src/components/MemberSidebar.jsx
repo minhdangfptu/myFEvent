@@ -204,7 +204,11 @@ export default function MemberSidebar({
                   style={{ width: 40, height: 40 }}
                 />
               </div>
-              {sidebarOpen && <span className="sidebar-logo">myFEvent</span>}
+              {sidebarOpen &&  <img
+              src="/logo-03.png"
+              alt="myFEvent"
+              style={{ width: "auto", height: 40 }}
+            />}
             </div>
           </div>
 

@@ -65,7 +65,6 @@ export const eventService = {
       pagination: { page: p, limit: lim, total, totalPages: Math.ceil(total / lim) }
     };
   },
-
   // GET /api/events/:id (public)
   async getPublicEventDetail({ id }) {
     const event = await Event.findOne({ _id: id, type: 'public' })
@@ -415,4 +414,10 @@ export const eventService = {
     }
     return { data: { event } };
   }
+
+};
+export const findEventById = async (id, select = null) => {
+  const q = Event.findById(id);
+  if (select) q.select(select);
+  return await q.lean();
 };

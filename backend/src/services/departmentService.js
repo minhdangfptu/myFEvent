@@ -1,10 +1,11 @@
+import Event from '../models/event.js';
 import Department from '../models/department.js';
 import EventMember from '../models/eventMember.js';
 import User from '../models/user.js';
 
 // Basic helpers
 export const ensureEventExists = async (eventId) => {
-  const exists = await Event.exists({ _id: eventId });
+  const exists = await Event.findOne({ _id: eventId });
   return !!exists;
 };
 

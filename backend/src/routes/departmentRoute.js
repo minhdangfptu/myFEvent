@@ -8,13 +8,16 @@ import {
   addMemberToDepartment,
   removeMemberFromDepartment,
   editDepartment,
+  
 } from '../controllers/departmentController.js';
+import {getMembersByDepartment} from "../controllers/eventMemberController.js"
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
 
 router.get('/', authenticateToken, listDepartmentsByEvent);
 router.get('/:departmentId', authenticateToken, getDepartmentDetail);
+router.get('/:departmentId/members', authenticateToken, getMembersByDepartment);
 router.post('/', authenticateToken, createDepartment);
 router.patch('/:departmentId/assign-hod', authenticateToken, assignHod);
 router.patch('/:departmentId/change-hod', authenticateToken, changeHoD);

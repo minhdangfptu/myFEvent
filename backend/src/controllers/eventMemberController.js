@@ -7,6 +7,7 @@ import {
   getMembersByDepartmentRaw
 } from '../services/eventMemberService.js';
 import { findEventById } from '../services/eventService.js';
+import eventMember from '../models/eventMember.js';
 
 // Get members by event
 export const getMembersByEvent = async (req, res) => {
@@ -57,7 +58,7 @@ export const getMemberDetail = async (req, res) => {
 		if (!event) {
 			return res.status(404).json({ message: 'Event not found' });
 		}
-		const member = await EventMember.findOne({ _id: memberId, eventId })
+		const member = await eventMember.findOne({ _id: memberId, eventId })
 			.populate([
 				{ path: 'userId', select: 'fullName email avatarUrl phone status' },
 				{ path: 'departmentId', select: 'name' }

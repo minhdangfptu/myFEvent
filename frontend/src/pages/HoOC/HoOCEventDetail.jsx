@@ -25,8 +25,6 @@ export default function HoOCEventDetail() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const isLocked =
-  ['cancelled', 'completed'].includes(event?.status);
   const [eventRole, setEventRole] = useState("");
   const [editForm, setEditForm] = useState({
     name: "",
@@ -929,7 +927,7 @@ export default function HoOCEventDetail() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, status: e.target.value })
                   }
-                  disabled={true}
+                  disabled={!editing}
                 >
                   <option value="scheduled">Sắp diễn ra</option>
                   <option value="ongoing">Đang diễn ra</option>
@@ -982,7 +980,7 @@ export default function HoOCEventDetail() {
             <div className="info-card">
               <h5>Hành động sự kiện</h5>
               <div className="d-flex gap-2 flex-wrap">
-                {event.type === "public" && event.status ==="cancelled" || event.status === "completed" ? (
+                {event.type === "public" && event.status ==="cancelled" ? (
                   <button
                     disabled
                     className="btn btn-warning"
@@ -998,15 +996,9 @@ export default function HoOCEventDetail() {
                     <i className="bi bi-eye me-2"></i>Công khai sự kiện
                   </button>
                 )}
-                {event.status === "completed" ? (
-                <button disabled className="btn btn-danger" onClick={handleDelete}>
+                <button className="btn btn-danger" onClick={handleDelete}>
                   <i className="bi bi-trash me-2"></i>Xóa sự kiện
                 </button>
-                ) : (
-                  <button className="btn btn-danger" onClick={handleDelete}>
-                    <i className="bi bi-trash me-2"></i>Xóa sự kiện
-                  </button>
-                )}
               </div>
               <p className="text-muted small mt-3 mb-0">
                 <i className="bi bi-exclamation-triangle me-1"></i>
@@ -1130,112 +1122,148 @@ export default function HoOCEventDetail() {
                   />
                 )}
               </div>
-              {!isLocked && (
-  <div className="mb-2">
-    <label className="form-label fw-semibold">Tải lên hình ảnh mới</label>
+              <div className="mb-2">
+                <label className="form-label fw-semibold">
+                  Tải lên hình ảnh mới
+                </label>
 
-    {/* Image Input Type Toggle */}
-    <div className="d-flex gap-2 mb-3">
-      <button
-        type="button"
-        className={`btn btn-sm ${imageInputType === "url" ? "btn-primary" : "btn-outline-primary"}`}
-        onClick={() => setImageInputType("url")}
-        disabled={submitting}
-      >
-        <i className="bi bi-link-45deg me-1"></i> URL
-      </button>
-      <button
-        type="button"
-        className={`btn btn-sm ${imageInputType === "file" ? "btn-primary" : "btn-outline-primary"}`}
-        onClick={() => setImageInputType("file")}
-        disabled={submitting}
-      >
-        <i className="bi bi-upload me-1"></i> Upload File
-      </button>
-    </div>
+                {/* Image Input Type Toggle */}
+                <div className="d-flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${
+                      imageInputType === "url"
+                        ? "btn-primary"
+                        : "btn-outline-primary"
+                    }`}
+                    onClick={() => setImageInputType("url")}
+                    disabled={submitting}
+                  >
+                    <i className="bi bi-link-45deg me-1"></i>
+                    URL
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${
+                      imageInputType === "file"
+                        ? "btn-primary"
+                        : "btn-outline-primary"
+                    }`}
+                    onClick={() => setImageInputType("file")}
+                    disabled={submitting}
+                  >
+                    <i className="bi bi-upload me-1"></i>
+                    Upload File
+                  </button>
+                </div>
 
-    {/* URL Input */}
-    {imageInputType === "url" && (
-      <div className="d-flex gap-2 mb-3">
-        <input
-          type="url"
-          className="form-control"
-          placeholder="Nhập URL hình ảnh..."
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          disabled={submitting}
-        />
-        <button
-          type="button"
-          className="btn btn-outline-primary"
-          onClick={handleUrlAdd}
-          disabled={submitting || !imageUrl.trim()}
-        >
-          <i className="bi bi-plus"></i>
-        </button>
-      </div>
-    )}
+                {/* URL Input */}
+                {imageInputType === "url" && (
+                  <div className="d-flex gap-2 mb-3">
+                    <input
+                      type="url"
+                      className="form-control"
+                      placeholder="Nhập URL hình ảnh..."
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      disabled={submitting}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={handleUrlAdd}
+                      disabled={submitting || !imageUrl.trim()}
+                    >
+                      <i className="bi bi-plus"></i>
+                    </button>
+                  </div>
+                )}
 
-    {/* File Upload */}
-    {imageInputType === "file" && (
-      <div className="mb-3">
-        <input
-          type="file"
-          className="form-control"
-          accept="image/*"
-          onChange={handleFileUpload}
-          disabled={submitting}
-        />
-        <small className="text-muted">Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB</small>
-      </div>
-    )}
+                {/* File Upload */}
+                {imageInputType === "file" && (
+                  <div className="mb-3">
+                    <input
+                      type="file"
+                      className="form-control"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      disabled={submitting}
+                    />
+                    <small className="text-muted">
+                      Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
+                    </small>
+                  </div>
+                )}
 
-    {/* Image Preview */}
-    {imagePreviews.length > 0 && (
-      <div className="mt-3">
-        <label className="form-label fw-semibold">Hình ảnh đã chọn:</label>
-        <div className="row g-2">
-          {imagePreviews.map((img, index) => (
-            <div key={index} className="col-md-3">
-              <div className="position-relative">
-                <img
-                  src={img}
-                  alt={`Preview ${index + 1}`}
-                  className="img-fluid rounded"
-                  style={{ width: "100%", height: "105px", objectFit: "cover" }}
-                  onError={(e) => { e.target.src = "/default-events.jpg"; }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
-                  onClick={() => removeImage(index)}
-                  disabled={submitting}
-                  style={{ width: "24px", height: "24px", padding: 0 }}
-                >
-                  <i className="bi bi-x" style={{ fontSize: 12 }}></i>
-                </button>
+                {/* Image Preview */}
+                {imagePreviews.length > 0 && (
+                  <div className="mt-3">
+                    <label className="form-label fw-semibold">
+                      Hình ảnh đã chọn:
+                    </label>
+                    <div className="row g-2">
+                      {imagePreviews.map((img, index) => (
+                        <div key={index} className="col-md-3">
+                          <div className="position-relative">
+                            <img
+                              src={img}
+                              alt={`Preview ${index + 1}`}
+                              className="img-fluid rounded"
+                              style={{
+                                width: "100%",
+                                height: "105px",
+                                objectFit: "cover",
+                              }}
+                              onError={(e) => {
+                                e.target.src = "/default-events.jpg";
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                              onClick={() => removeImage(index)}
+                              disabled={submitting}
+                              style={{
+                                width: "24px",
+                                height: "24px",
+                                padding: "0",
+                              }}
+                            >
+                              <i
+                                className="bi bi-x"
+                                style={{ fontSize: "12px" }}
+                              ></i>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {imagePreviews.length > 0 && (
+                  <div className="d-flex gap-2 mt-3">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={handleImageUpload}
+                      disabled={submitting}
+                    >
+                      {submitting ? "Đang tải lên..." : "Tải lên ảnh"}
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={() => {
+                        setImageFiles([]);
+                        setImagePreviews([]);
+                        setImageUrl("");
+                        setError("");
+                      }}
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
-
-    {imagePreviews.length > 0 && (
-      <div className="d-flex gap-2 mt-3">
-        <button className="btn btn-primary btn-sm" onClick={handleImageUpload} disabled={submitting}>
-          {submitting ? "Đang tải lên..." : "Tải lên ảnh"}
-        </button>
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => { setImageFiles([]); setImagePreviews([]); setImageUrl(""); setError(""); }}
-        >
-          Hủy
-        </button>
-      </div>
-    )}
-  </div>
-)}
             </div>
           </div>
         </div>

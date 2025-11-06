@@ -474,37 +474,7 @@ export default function EventTaskPage() {
               <div className="col-md-6">
                 <div className="row g-2">
                 <div className="col-6">
-                    <div
-                      className="stat-card text-center"
-                      style={{
-                        background: "rgba(255,255,255,0.2)",
-                        border: "none",
-                        color: "white",
-                      }}
-                    >
-                      <div 
-                        className="fs-4 fw-bold"
-                        style={{
-                          fontFamily: "'Courier New', monospace",
-                          letterSpacing: "2px",
-                        }}
-                      >
-                        {currentTime.toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                          hour12: false,
-                        })}
-                      </div>
-                      <div className="small mt-1">
-                        {currentTime.toLocaleDateString("vi-VN", {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </div>
-                    </div>
+                    
                   </div>
                   <div className="col-6">
                     <div
@@ -920,6 +890,7 @@ export default function EventTaskPage() {
                             </option>
                           ))}
                         </select>
+                        {console.log('assignees', assignees)}
                       </div>
                     </div>
                     <div className="row">

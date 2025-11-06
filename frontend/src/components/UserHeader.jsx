@@ -2,6 +2,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { toast } from "react-toastify";
+import { useEffect, useState } from "react";
 
 export default function UserHeader({
   title,
@@ -14,7 +15,14 @@ export default function UserHeader({
   const { t } = useTranslation();
   const { notifications, unreadCount, markAllRead } = useNotifications();
   const unread = notifications.filter((n) => n.unread).slice(0, 5);
-
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [timeFormat, setTimeFormat] = useState(() => {
+    return localStorage.getItem('timeFormat') || '24h';
+  });
+  useEffect(() => {
+    localStorage.setItem('timeFormat', timeFormat);
+  }, [timeFormat]);
+  
   const handleLogout = async () => {
     try {
       await logout();
@@ -22,6 +30,49 @@ export default function UserHeader({
     } catch (error) {
       toast.error("Có lỗi xảy ra khi đăng xuất");
     }
+  };
+  
+  // Cập nhật thời gian mỗi giây
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Toggle time format
+  const toggleTimeFormat = () => {
+    setTimeFormat(prev => prev === '24h' ? '12h' : '24h');
+  };
+
+  // Format time display
+  const formatTime = () => {
+    if (timeFormat === '24h') {
+      return currentTime.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    } else {
+      return currentTime.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+  };
+
+  // Format date display - rút gọn
+  const formatDate = () => {
+    const day = currentTime.toLocaleDateString("vi-VN", { weekday: "long" });
+    
+    // Đảm bảo ngày và tháng luôn có 2 chữ số
+    const dayNum = currentTime.getDate().toString().padStart(2, '0');
+    const monthNum = (currentTime.getMonth() + 1).toString().padStart(2, '0');
+    const year = currentTime.getFullYear();
+    
+    return `${day}, ${dayNum}/${monthNum}/${year}`;
   };
 
   return (
@@ -66,12 +117,142 @@ export default function UserHeader({
           background:#F9FAFB;
           color:#111827;
         }
+
+        /* Styles cho phần thời gian */
+        .time-display {
+          background: none;
+          border-radius: 10px;
+          padding: 8px 16px;
+          color: #212529BF;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .time-display:hover {
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .time-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .time-text {
+          font-size: 18px;
+          font-weight: 600;
+          font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          letter-spacing: 0.5px;
+        }
+
+        .date-text {
+          font-size: 13px;
+          font-weight: 400;
+          opacity: 0.9;
+          font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .time-separator {
+          width: 1px;
+          height: 20px;
+          background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Responsive cho mobile */
+        @media (max-width: 768px) {
+          .time-display {
+            padding: 6px 12px;
+          }
+          
+          .time-text {
+            font-size: 16px;
+          }
+          
+          .date-text {
+            display: none; /* Ẩn ngày trên mobile */
+          }
+          
+          .time-separator {
+            display: none;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .time-wrapper {
+            gap: 8px;
+          }
+        }
+
+        /* Animation cho số giây */
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.7; }
+          100% { opacity: 1; }
+        }
+
+        .time-seconds {
+          animation: pulse 1s ease-in-out infinite;
+        }
+
+        /* Tooltip style */
+        .time-tooltip {
+          position: relative;
+        }
+
+        .time-tooltip::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          bottom: -30px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(0,0,0,0.8);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.3s;
+        }
+
+        .time-tooltip:hover::after {
+          opacity: 1;
+        }
       `}</style>
 
       {/* Header */}
       <header className="bg-white shadow-sm p-3 d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center">
           <h5 className="mb-0 text-muted">{title}</h5>
+        </div>
+        
+        {/* Phần thời gian được cải thiện */}
+        <div 
+          className="time-display time-tooltip"
+          onClick={toggleTimeFormat}
+          data-tooltip={`Múi giờ: GMT+7 • Click để đổi format ${timeFormat === '24h' ? '12h' : '24h'}`}
+        >
+          <div className="time-wrapper">
+            <div className="d-flex align-items-center gap-2">
+              <i className="bi bi-clock" style={{ fontSize: '16px' }}></i>
+              <span className="time-text">
+                {formatTime()}
+                {timeFormat === '24h' && (
+                  <>:<span className="time-seconds">
+                    {currentTime.toLocaleTimeString("vi-VN", {
+                      second: "2-digit",
+                    }).slice(-2)}
+                  </span></>
+                )}
+              </span>
+            </div>
+            <div className="time-separator"></div>
+            <div className="date-text">
+              {formatDate()}
+            </div>
+          </div>
         </div>
 
         <div className="d-flex align-items-center gap-3">
