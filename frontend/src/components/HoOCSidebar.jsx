@@ -178,6 +178,7 @@ export default function HoOCSidebar({
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
             }}
           >
             <Loading size={100} />

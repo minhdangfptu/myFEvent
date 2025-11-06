@@ -364,6 +364,7 @@ export default function HomePage() {
               {/* Status */}
               <div className="position-relative me-2" ref={statusMenuRef}>
                 <button
+                style={{color:"black"}}
                   type="button"
                   className={`dropdown-trigger ${
                     openMenu === "status" ? "active-red" : ""
@@ -394,7 +395,7 @@ export default function HomePage() {
                   <div className="dropdown-panel">
                     <div className="dropdown-header">{t("home.status")}</div>
                     {STATUS_OPTIONS.map((opt) => (
-                      <div
+                      <div 
                         key={opt.key}
                         className={`dropdown-item ${
                           statusFilter === opt.key ? "active-red" : ""
@@ -404,7 +405,7 @@ export default function HomePage() {
                           setOpenMenu(null);
                         }}
                       >
-                        <span>{opt.label}</span>
+                        <span >{opt.label}</span>
                         {statusFilter === opt.key && (
                           <i className="bi bi-check-lg" />
                         )}
@@ -416,7 +417,7 @@ export default function HomePage() {
 
               {/* Sort */}
               <div className="position-relative" ref={sortMenuRef}>
-                <button
+                <button style={{color:"black"}}
                   type="button"
                   className={`dropdown-trigger ${
                     openMenu === "sort" ? "active-red" : ""
@@ -426,9 +427,9 @@ export default function HomePage() {
                     setOpenMenu(openMenu === "sort" ? null : "sort");
                   }}
                 >
-                  <span>
+                  <span >
                     {t("home.sort")}:{" "}
-                    <strong>
+                    <strong >
                       {SORT_OPTIONS.find((o) => o.key === sortBy)?.label}
                     </strong>
                   </span>
