@@ -13,30 +13,30 @@ import {
 } from "~/services/departmentService";
 import { getRequesterMembership } from "~/services/eventMemberService";
 
-export const getCalendarForEvent = async (req, res) => {
+export const getCalendarsForEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
         const event = findEventById(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
-        const calendar = await getCalendarByEventId(eventId);
-        return res.status(200).json({ data: calendar });
+        const calendars = await getCalendarByEventId(eventId);
+        return res.status(200).json({ data: calendars });
     } catch (error) {
         console.error('getCalendarForEvent error:', error);
         return res.status(500).json({ message: 'Failed to load calendar' });
     }
 };
 
-export const getCalendarForDepartment = async (req, res) => {
+export const getCalendarsForDepartment = async (req, res) => {
     try {
         const { departmentId } = req.params;
         const department = findEventById(departmentId);
         if (!department) {
             return res.status(404).json({ message: 'Department not found' });
         }
-        const calendar = await getCalendarByDepartmentId(departmentId);
-        return res.status(200).json({ data: calendar });
+        const calendars = await getCalendarByDepartmentId(departmentId);
+        return res.status(200).json({ data: calendars });
     } catch (error) {
         console.error('getCalendarForDepartment error:', error);
         return res.status(500).json({ message: 'Failed to load calendar' });
