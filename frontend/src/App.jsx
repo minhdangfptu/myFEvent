@@ -58,6 +58,7 @@ import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
+import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -287,6 +288,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <MemberPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/members/:memberId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <MemberProfilePage/>
               </ProtectedRoute>
             } 
           />

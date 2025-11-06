@@ -4,7 +4,8 @@ import {
   getMembersByEventRaw,
   groupMembersByDepartment,
   getUnassignedMembersRaw,
-  getMembersByDepartmentRaw
+  getMembersByDepartmentRaw,
+  getEventMemberProfileById
 } from '../services/eventMemberService.js';
 import { findEventById } from '../services/eventService.js';
 import eventMember from '../models/eventMember.js';
@@ -54,16 +55,11 @@ export const getMemberDetail = async (req, res) => {
 		if (!eventId || !memberId) {
 			return res.status(400).json({ message: 'Event ID and Member ID are required' });
 		}
-		const event = await Event.findById(eventId).lean();
+		const event = await findEventById(eventId);
 		if (!event) {
 			return res.status(404).json({ message: 'Event not found' });
 		}
-		const member = await eventMember.findOne({ _id: memberId, eventId })
-			.populate([
-				{ path: 'userId', select: 'fullName email avatarUrl phone status' },
-				{ path: 'departmentId', select: 'name' }
-			])
-			.lean();
+		const member = await getEventMemberProfileById(memberId);
 		if (!member) {
 			return res.status(404).json({ message: 'Member not found' });
 		}
