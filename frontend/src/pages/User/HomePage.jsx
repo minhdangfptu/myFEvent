@@ -558,7 +558,7 @@ export default function HomePage() {
                       </div>
                       <button
                         className="ghost-btn"
-                        style={{ minWidth: 100 }}
+                        style={{ minWidth: 100, color: '#212529', fontWeight:500 }}
                         onClick={() => {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;

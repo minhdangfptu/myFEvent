@@ -23,17 +23,17 @@ export default function FPTEvent_Landing() {
   }, [searchParams]);
   return (
     <div className="min-vh-100 bg-white overflow-hidden">
-       {/* Overlay loading */}
+      {/* Overlay loading */}
       {loading && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             inset: 0,
-            background: 'rgba(255,255,255,0.75)',
+            background: "rgba(255,255,255,0.75)",
             zIndex: 2000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
           <Loading size={80} />
@@ -42,123 +42,299 @@ export default function FPTEvent_Landing() {
       <Header />
 
       <section
-        className="py-5"
+        className=""
         style={{
-          background: "linear-gradient(135deg,#F5F3FF 0%,#EEF2FF 100%)",
+          paddingTop: "0.2rem",
+          background: "linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%)",
+          minHeight: "92vh",
+          display: "flex",
+          alignItems: "center",
         }}
       >
-        <div className="container-xl px-2">
-          <div className="row align-items-center g-4">
-            <div className="col-12 col-sm-6">
+        <div className="container">
+          <div className="row align-items-center g-5">
+            {/* Left Content */}
+            <div className="col-lg-6">
+              <span
+                className="badge px-3 py-2 mb-3"
+                style={{
+                  background: "#fef2f2",
+                  color: "#ef4444",
+                  fontWeight: "600",
+                }}
+              >
+                <i className="bi bi-star-fill me-2"></i>
+                Platform #1 cho sự kiện tại ĐH FPT Hà Nội
+              </span>
+
               <h1
-                className="fw-bold"
-                style={{ color: "#111827", lineHeight: 1.15, fontSize: "3rem" }}
+                className="display-4 fw-bold mb-4"
+                style={{
+                  lineHeight: 1.2,
+                  color: "#1f2937",
+                }}
               >
                 Quản lý sự kiện tại trường ĐH FPT chưa bao giờ{" "}
-                <span style={{ color: "#ef4444" }}> dễ dàng đến thế!</span>
+                <span style={{ color: "#ef4444" }}>dễ dàng đến thế!</span>
               </h1>
-              <p className="text-secondary fs-5">
+
+              <p className="lead mb-4" style={{ color: "#6b7280" }}>
                 Giúp bạn tổ chức, tạo và quản lý mọi hoạt động trong các sự kiện
                 của mình một cách dễ dàng và chuyên nghiệp.
               </p>
-              <div className="d-flex gap-2 flex-wrap">
-                <RouterLink to="/signup0" className="btn btn-danger">
+
+              <div className="d-flex gap-3 flex-wrap mb-4">
+                <RouterLink
+                  to="/signup"
+                  className="btn btn-lg px-4 shadow"
+                  style={{
+                    background: "#ef4444",
+                    color: "white",
+                    border: "none",
+                    fontWeight: "400",
+                  }}
+                >
+                  <i className="bi bi-rocket-takeoff me-1"></i>
                   Bắt đầu ngay
                 </RouterLink>
-                <RouterLink to="/about" className="btn btn-outline-secondary">
+                <RouterLink
+                  to="/about"
+                  className="btn btn-lg px-4"
+                  style={{
+                    background: "white",
+                    color: "#ef4444",
+                    border: "1px solid #ef4444",
+                    fontWeight: "600",
+                  }}
+                >
                   Xem thêm
                 </RouterLink>
               </div>
-            </div>
-            <div className="col-12 col-sm-6 d-flex justify-content-sm-end justify-content-center ps-sm-0 ms-sm-n3">
-              <div
-                className="card shadow w-100"
-                style={{
-                  maxWidth: 720,
-                  background:
-                    "linear-gradient(135deg, #0f172a 0%, #111827 100%)",
-                }}
-              >
-                <div className="card-body">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                      <div
-                        style={{
-                          width: 128,
-                          height: 12,
-                          backgroundColor: "#334155",
-                          borderRadius: 4,
-                          marginBottom: 6,
-                        }}
-                      />
-                      <div
-                        style={{
-                          width: 96,
-                          height: 8,
-                          backgroundColor: "#1f2937",
-                          borderRadius: 4,
-                        }}
-                      />
-                    </div>
+
+              <div className="d-flex align-items-center gap-3 mt-5">
+                <div className="d-flex">
+                  {[1, 2, 3, 4, 5].map((i) => (
                     <div
+                      key={i}
+                      className="rounded-circle"
                       style={{
-                        width: 48,
-                        height: 48,
-                        backgroundColor: "#334155",
-                        borderRadius: "50%",
+                        width: 32,
+                        height: 32,
+                        marginLeft: i > 1 ? -10 : 0,
+                        backgroundImage: `url(https://i.pravatar.cc/32?img=${i})`,
+                        backgroundSize: "cover",
+                        border: "2px solid white",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                       }}
                     />
+                  ))}
+                </div>
+                <small style={{ color: "#6b7280" }}>
+                  <strong style={{ color: "#ef4444" }}>50 +</strong> sự kiện tin
+                  dùng thành công
+                </small>
+              </div>
+            </div>
+
+            {/* Right Dashboard Preview */}
+            <div className="col-lg-6">
+              <div
+                className="card shadow-xl border-0"
+                style={{
+                  background: "white",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                }}
+              >
+                <div className="card-body p-4">
+                  {/* Header */}
+                  <div
+                    className="d-flex justify-content-between align-items-center pb-3 mb-4"
+                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                  >
+                    <div className="d-flex align-items-center gap-3">
+                      <img
+                        src="/website-icon-fix@3x.png"
+                        alt="myFEvent"
+                        style={{ width: 32, height: 32 }}
+                      />
+                      <span
+                        className="fw-semibold"
+                        style={{ color: "#1f2937" }}
+                      >
+                        Tổng quan
+                      </span>
+                    </div>
+                    <div className="d-flex gap-2">
+                      <div
+                        className="rounded-circle"
+                        style={{
+                          width: 32,
+                          height: 32,
+                          background: "#f3f4f6",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <i
+                          className="bi bi-bell"
+                          style={{ color: "#6b7280" }}
+                        ></i>
+                      </div>
+                    </div>
                   </div>
-                  <div className="row g-2">
-                    {["#3b82f6", "#8b5cf6", "#10b981"].map((c, i) => (
+
+                  {/* Stats */}
+                  <div className="row g-3 mb-4">
+                    {[
+                      {
+                        icon: "bi-calendar-event",
+                        value: "24",
+                        label: "Sự kiện",
+                      },
+                      {
+                        icon: "bi-people",
+                        value: "100",
+                        label: "Thành viên",
+                      },
+                      {
+                        icon: "bi-trophy",
+                        value: "98%",
+                        label: "Công việc hoàn thành",
+                      },
+                    ].map((stat, i) => (
                       <div className="col-4" key={i}>
                         <div
-                          className="p-2 rounded-3"
-                          style={{ background: "rgba(30,41,59,.5)" }}
+                          className="p-3 rounded"
+                          style={{
+                            background: "#fef2f2",
+                            border: "1px solid #fee2e2",
+                          }}
                         >
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <i
+                              className={stat.icon}
+                              style={{
+                                color: "#ef4444",
+                                fontSize: "1.2rem",
+                              }}
+                            />
+                            <small
+                              style={{ color: "#16a34a", fontSize: "0.75rem" }}
+                            >
+                              {stat.trend}
+                            </small>
+                          </div>
                           <div
-                            style={{
-                              width: 64,
-                              height: 8,
-                              background: "#334155",
-                              borderRadius: 4,
-                              marginBottom: 8,
-                            }}
-                          />
+                            className="fw-bold fs-5"
+                            style={{ color: "#1f2937" }}
+                          >
+                            {stat.value}
+                          </div>
                           <div
-                            style={{
-                              height: 24,
-                              borderRadius: 4,
-                              background: c,
-                            }}
-                          />
+                            style={{ color: "#6b7280", fontSize: "0.85rem" }}
+                          >
+                            {stat.label}
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* Chart */}
                   <div
-                    className="mt-3 rounded-3 p-3"
-                    style={{ background: "rgba(30,41,59,.5)" }}
+                    className="p-3 rounded"
+                    style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                    }}
                   >
+                    <div className="mb-3">
+                      <div className="fw-semibold" style={{ color: "#1f2937" }}>
+                        Hoạt động tháng này
+                      </div>
+                      <div className="small" style={{ color: "#6b7280" }}>
+                        Số lượng người tham gia
+                      </div>
+                    </div>
                     <div
-                      className="d-flex align-items-end gap-2"
-                      style={{ height: 96 }}
+                      className="d-flex align-items-end gap-1"
+                      style={{ height: 100 }}
                     >
-                      {[45, 65, 55, 85, 75, 95].map((h, idx) => (
-                        <div
-                          key={idx}
+                      {[45, 65, 35, 85, 55, 75, 95, 60, 80, 70, 85, 75].map(
+                        (h, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              flex: 1,
+                              height: `${h}%`,
+                              background: i === 6 ? "#ef4444" : "#fee2e2",
+                              borderRadius: "3px 3px 0 0",
+                              cursor: "pointer",
+                              transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = "#ef4444";
+                              e.target.style.transform = "scaleY(1.05)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background =
+                                i === 6 ? "#ef4444" : "#fee2e2";
+                              e.target.style.transform = "scaleY(1)";
+                            }}
+                          />
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Recent Activity */}
+                  <div className="mt-4">
+                    <div
+                      className="fw-semibold mb-3"
+                      style={{ color: "#1f2937" }}
+                    >
+                      Thông tin
+                    </div>
+                    {[
+                      {
+                        icon: "bi-check-circle-fill",
+                        text: "Tổ chức thành công sự kiện",
+                        time: "2 phút",
+                      },
+                      {
+                        icon: "bi-person-plus-fill",
+                        text: "Tuyển thành viên cho sự kiện",
+                        time: "10 phút",
+                      },
+                    ].map((activity, i) => (
+                      <div
+                        key={i}
+                        className="d-flex align-items-center gap-3 p-2 rounded mb-2"
+                        style={{
+                          background: "#f9fafb",
+                          border: "1px solid #f3f4f6",
+                        }}
+                      >
+                        <i
+                          className={activity.icon}
                           style={{
-                            flex: 1,
-                            height: `${h}%`,
-                            borderRadius: 4,
-                            background:
-                              idx % 2
-                                ? "linear-gradient(180deg, rgba(139,92,246,.7), rgba(139,92,246,.3))"
-                                : "linear-gradient(180deg, rgba(59,130,246,.7), rgba(59,130,246,.3))",
+                            color: "#ef4444",
+                            fontSize: "1rem",
                           }}
                         />
-                      ))}
-                    </div>
+                        <div
+                          className="flex-grow-1"
+                          style={{ color: "#374151" }}
+                        >
+                          {activity.text}
+                        </div>
+                        <small style={{ color: "#9ca3af" }}>
+                          {activity.time}
+                        </small>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -181,6 +357,7 @@ export default function FPTEvent_Landing() {
               chuyên nghiệp
             </p>
           </div>
+
           <div className="row g-3">
             {[
               {
@@ -191,21 +368,21 @@ export default function FPTEvent_Landing() {
                 color: "#3b82f6",
               },
               {
-                icon: "bi-people",
+                icon: "bi-people-fill",
                 title: "Tổ chức sự kiện",
-                text: "Tạo, lên lịch và quản lý sự kiên với tính năng thống báo, lên lịch họp và các mốc thời gian chi tiết.",
+                text: "Tạo, lên lịch và quản lý sự kiện với tính năng thông báo, lên lịch họp và các mốc thời gian chi tiết.",
                 bg: "#fef3c7",
                 color: "#f59e0b",
               },
               {
-                icon: "bi-bar-chart",
+                icon: "bi-bar-chart-fill",
                 title: "Thống kê chi tiết",
                 text: "Xem báo cáo và thống kê chi tiết về hiệu quả của các sự kiện đã tổ chức.",
                 bg: "#d1fae5",
                 color: "#10b981",
               },
               {
-                icon: "bi-bell",
+                icon: "bi-bell-fill",
                 title: "Thông báo tức thời",
                 text: "Nhận thông báo về các sự kiện sắp diễn ra và cập nhật quan trọng.",
                 bg: "#eee7ff",
@@ -216,7 +393,7 @@ export default function FPTEvent_Landing() {
                 <div className="card h-100 border-0 shadow-sm">
                   <div className="card-body">
                     <div
-                      className="rounded-2 d-grid place-items-center mb-2"
+                      className="rounded-2 d-flex align-items-center justify-content-center mb-2"
                       style={{
                         width: 48,
                         height: 48,
@@ -224,8 +401,9 @@ export default function FPTEvent_Landing() {
                         color: f.color,
                       }}
                     >
-                      <i className={`bi ${f.icon}`} />
+                      <i className={`bi ${f.icon} fs-3`} aria-hidden="true" />
                     </div>
+
                     <h6 className="fw-semibold" style={{ color: "#111827" }}>
                       {f.title}
                     </h6>

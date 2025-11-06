@@ -109,10 +109,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="d-flex align-items-center justify-content-center"
-      style={{ minHeight: "100vh", backgroundColor: "#f5f5f5" }}
-    >
+    <div className="login-page d-flex align-items-center justify-content-center">
+      <style>{`
+        /* page */
+        .login-page { min-height: 100vh; background-color: #f5f5f5; }
+
+        /* inputs: high specificity + !important to beat bootstrap/autofill */
+        .login-page .card .form-control.login-input,
+        .login-page input.form-control.login-input,
+        .login-page textarea.form-control.login-input {
+          background-color: #ffffff !important;
+          color: #111827 !important;
+          border: 1px solid #d1d5db !important;
+          box-shadow: none !important;
+          background-clip: padding-box !important;
+          transition: background-color 0s !important; /* prevent autofill animation */
+        }
+        .login-page .card .form-control.login-input::placeholder,
+        .login-page input.form-control.login-input::placeholder {
+          color: #9ca3af !important;
+          opacity: 1 !important;
+        }
+
+        .login-page input.form-control.login-input:disabled {
+          background-color: #ffffff !important;
+          color: #6b7280 !important;
+          opacity: 1 !important;
+        }
+
+        /* Chrome / Edge autofill override */
+        .login-page input.form-control.login-input:-webkit-autofill,
+        .login-page input.form-control.login-input:-webkit-autofill:hover,
+        .login-page input.form-control.login-input:-webkit-autofill:focus,
+        .login-page input.form-control.login-input:-webkit-autofill:active {
+          -webkit-text-fill-color: #111827 !important;
+          -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+                  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+          background-clip: padding-box !important;
+        }
+      `}</style>
       <div className="container" style={{ maxWidth: 480 }}>
         <div className="card shadow-sm border-0">
           <div className="card-body p-4">
@@ -143,7 +178,8 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
-                  className="form-control"
+                  className="form-control login-input"
+                  autoComplete="email"
                   placeholder="Nhập địa chỉ email của bạn"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -159,7 +195,8 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type="password"
-                  className="form-control"
+                  className="form-control login-input"
+                  autoComplete="current-password"
                   placeholder="Nhập mật khẩu của bạn"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
