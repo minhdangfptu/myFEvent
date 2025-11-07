@@ -16,8 +16,22 @@ export function EventProvider({ children }) {
   const [error, setError] = useState("");
   const [eventRoles, setEventRoles] = useState({}); 
 
+  const extractEventArray = useCallback((payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.events)) return payload.events;
+    if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.results)) return payload.results;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (typeof payload === "object") {
+      for (const value of Object.values(payload)) {
+        if (Array.isArray(value)) return value;
+      }
+    }
+    return [];
+  }, []);
+
   const fetchEvents = useCallback(async () => {
-    // Đợi AuthContext load xong trước khi fetch events
     if (authLoading) {
       setLoading(true);
       return;
@@ -28,18 +42,20 @@ export function EventProvider({ children }) {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError("");
     try {
       const res = await eventService.listMyEvents();
-      setEvents(Array.isArray(res?.data) ? res.data : []);
+      const list = extractEventArray(res);
+      setEvents(list);
     } catch (err) {
       setEvents([]);
       setError("Lỗi lấy dữ liệu sự kiện");
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, extractEventArray]);
 
   useEffect(() => {
     fetchEvents();
@@ -52,7 +68,7 @@ export function EventProvider({ children }) {
     if (eventRoles[eventId]) return eventRoles[eventId];
     try {
       const res = await userApi.getUserRoleByEvent(eventId);
-      const role = res?.role || "";
+      const role = res?.role || res?.data?.role || "";
       setEventRoles((prev) => ({ ...prev, [eventId]: role }));
       return role;
     } catch (e) {

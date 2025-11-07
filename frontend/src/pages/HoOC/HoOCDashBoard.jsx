@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams, useLocation } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { eventApi } from "../../apis/eventApi"
 import { milestoneService } from "../../services/milestoneService"
+import { departmentService } from "../../services/departmentService"
 import Loading from "../../components/Loading"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
@@ -30,6 +31,100 @@ function generateCalendarDays() {
   }
   
   return days
+}
+
+const unwrapApiData = (payload) => {
+  let current = payload
+  while (
+    current &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    (current.data !== undefined || current.result !== undefined || current.payload !== undefined)
+  ) {
+    current = current.data ?? current.result ?? current.payload
+  }
+  return current
+}
+
+const dedupeMembers = (members = []) => {
+  const seen = new Set()
+  return members.filter((member) => {
+    const id = [
+      member?.id,
+      member?._id,
+      member?.userId,
+      member?.userId?._id,
+      member?.user?.id,
+      member?.user?._id,
+      member?.user?.userId
+    ].find(Boolean)
+
+    if (!id) return true
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
+
+const normalizeMembers = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return dedupeMembers(data)
+  if (Array.isArray(data.members)) return dedupeMembers(data.members)
+  if (Array.isArray(data.list)) return dedupeMembers(data.list)
+  if (Array.isArray(data.items)) return dedupeMembers(data.items)
+  if (Array.isArray(data.results)) return dedupeMembers(data.results)
+  if (typeof data === "object") {
+    const aggregated = Object.values(data).reduce((acc, value) => {
+      if (Array.isArray(value)) acc.push(...value)
+      else if (Array.isArray(value?.members)) acc.push(...value.members)
+      return acc
+    }, [])
+    return dedupeMembers(aggregated)
+  }
+  return []
+}
+
+const normalizeMilestones = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.milestones)) return data.milestones
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  if (Array.isArray(data.results)) return data.results
+  return []
+}
+
+const normalizeDepartments = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.departments)) return data.departments
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  if (Array.isArray(data.results)) return data.results
+  return []
+}
+
+const parseMilestoneDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date
+  return null
+}
+
+const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
+
+const isCompletedStatus = (status) => {
+  const normalized = normalizeStatus(status)
+  return (
+    normalized === "completed" ||
+    normalized === "done" ||
+    normalized === "đã hoàn thành" ||
+    normalized === "hoàn thành" ||
+    normalized === "da hoan thanh"
+  )
 }
 
 export default function HoOCDashBoard() {
@@ -73,47 +168,56 @@ export default function HoOCDashBoard() {
   useEffect(() => {
     if (!eventId) return
 
+    let cancelled = false
+
     const fetchData = async () => {
       try {
         setLoading(true)
-        
-  // Fetch event details
-  const eventResponse = await eventApi.getById(eventId)
-  // Normalize: backend responses often wrap payload as { data: <event> } or { data: { event } }
-  const fetchedEvent = eventResponse?.data?.event || eventResponse?.data || eventResponse || null
-  setEventData(fetchedEvent)
 
-        // Fetch members
-        const membersResponse = await eventApi.getMembersByEvent(eventId)
-        const membersData = membersResponse.data || []
-        // Flatten members from department structure
-        const flatMembers = []
-        Object.values(membersData).forEach(deptMembers => {
-          if (Array.isArray(deptMembers)) {
-            flatMembers.push(...deptMembers)
-          }
-        })
-        setMembers(flatMembers)
+        const [eventResponse, membersResponse, milestonesResponse, departmentsResponse] = await Promise.all([
+          eventApi.getById(eventId),
+          eventApi.getMembersByEvent(eventId),
+          milestoneService.listMilestones(eventId, {
+            sortBy: "targetDate",
+            sortDir: "asc"
+          }),
+          departmentService.getDepartments(eventId)
+        ])
 
-        // Fetch milestones
-        const milestonesResponse = await milestoneService.listMilestones(eventId, {
-          sortBy: 'targetDate',
-          sortDir: 'asc'
-        })
-        setMilestones(milestonesResponse.data || [])
+        if (cancelled) return
 
-        // Fetch departments
-        const departmentsResponse = await eventApi.getDepartments(eventId)
-        setDepartments(departmentsResponse.data || [])
+        const eventPayload = unwrapApiData(eventResponse)
+        setEventData(eventPayload?.event ?? eventPayload ?? null)
 
+        setMembers(normalizeMembers(membersResponse))
+
+        const milestoneList = normalizeMilestones(milestonesResponse)
+        const sortedMilestones = milestoneList
+          .slice()
+          .sort((a, b) => {
+            const da = parseMilestoneDate(a?.targetDate) || new Date(8640000000000000)
+            const db = parseMilestoneDate(b?.targetDate) || new Date(8640000000000000)
+            return da.getTime() - db.getTime()
+          })
+        setMilestones(sortedMilestones)
+
+        setDepartments(normalizeDepartments(departmentsResponse))
       } catch (error) {
-        console.error('Error fetching dashboard data:', error)
+        if (!cancelled) {
+          console.error("Error fetching dashboard data:", error)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      cancelled = true
+    }
   }, [eventId])
 
   // Add smooth animations on load
@@ -141,31 +245,124 @@ export default function HoOCDashBoard() {
 
   // Calculate stats
   const totalMilestones = milestones.length
-  const completedMilestones = milestones.filter(m => m.status === 'completed').length
+  const completedMilestones = useMemo(
+    () => milestones.filter((m) => isCompletedStatus(m?.status)).length,
+    [milestones]
+  )
+  const milestoneCompletionPercent = totalMilestones > 0
+    ? Math.round((completedMilestones / totalMilestones) * 100)
+    : 0
+  const milestoneProgressRatio = totalMilestones > 0
+    ? Math.min(100, Math.max(0, (completedMilestones / totalMilestones) * 100))
+    : 0
   const totalMembers = members.length
   const totalDepartments = departments.length
-  const budgetUsed = 68 // This would come from budget API when available
+
+  const budgetStats = useMemo(() => {
+    let allocated = 0
+    let spent = 0
+    const items = []
+
+    departments.forEach((dept) => {
+      const name = dept?.name || "Ban chưa đặt tên"
+
+      const budgetValue = Number(
+        dept?.budget ??
+        dept?.allocatedBudget ??
+        dept?.budgetAllocated ??
+        dept?.budgetEstimate ??
+        dept?.totalBudget ??
+        dept?.planBudget ??
+        0
+      ) || 0
+
+      const spendingValue = Number(
+        dept?.spent ??
+        dept?.budgetSpent ??
+        dept?.actualBudget ??
+        dept?.actualSpending ??
+        dept?.actualCost ??
+        dept?.spending ??
+        0
+      ) || 0
+
+      if (budgetValue > 0 || spendingValue > 0) {
+        items.push({
+          category: name,
+          budget: Math.max(0, Math.round(budgetValue)),
+          spending: Math.max(0, Math.round(spendingValue))
+        })
+      }
+
+      allocated += Math.max(0, budgetValue)
+      spent += Math.max(0, spendingValue)
+    })
+
+    const percent = allocated > 0
+      ? Math.max(0, Math.min(100, Math.round((spent / allocated) * 100)))
+      : null
+
+    return {
+      items,
+      percent,
+      allocated,
+      spent
+    }
+  }, [departments])
+
+  const { items: budgetItems, percent: budgetUsagePercent } = budgetStats
+  const totalBudgetAllocated = budgetStats.allocated
+  const totalBudgetSpent = budgetStats.spent
+  const budgetUsageDisplay = budgetUsagePercent != null ? `${budgetUsagePercent}%` : "—"
+  const budgetSummaryLabel = totalBudgetAllocated > 0
+    ? `${totalBudgetSpent.toLocaleString("vi-VN")} / ${totalBudgetAllocated.toLocaleString("vi-VN")}`
+    : "Chưa có dữ liệu"
+  const budgetSpendingData = useMemo(() => budgetItems.slice(0, 4), [budgetItems])
+  const budgetChartScale = useMemo(() => {
+    if (!budgetSpendingData.length) return 1
+    const maxValue = budgetSpendingData.reduce(
+      (max, item) => Math.max(max, item.budget, item.spending),
+      0
+    )
+    return maxValue > 0 ? 160 / maxValue : 1
+  }, [budgetSpendingData])
+
+  const majorTasks = useMemo(() => {
+    return departments.slice(0, 2).map((dept) => {
+      const progressSources = [
+        dept?.progress,
+        dept?.progressPercent,
+        dept?.progressPercentage,
+        dept?.completionRate,
+        dept?.performance?.progress
+      ]
+      const progressValue = progressSources.find((value) => typeof value === "number") ?? 0
+      const normalizedProgress = Math.max(0, Math.min(100, Math.round(progressValue)))
+
+      const deadlineSource =
+        dept?.deadline ||
+        dept?.dueDate ||
+        dept?.plannedEndDate ||
+        dept?.expectedCompletionDate
+
+      return {
+        title: dept?.name || "Ban chưa đặt tên",
+        progress: normalizedProgress,
+        deadline: deadlineSource ? formatDate(deadlineSource) : "Đang cập nhật"
+      }
+    })
+  }, [departments])
 
   // Prepare timeline data from milestones (max 5)
-  const eventTimeline = milestones.slice(0, 5).map(milestone => ({
-    name: milestone.name,
-    date: formatDate(milestone.targetDate),
-    completed: milestone.status === 'completed'
-  }))
-
-  // Prepare major tasks (mock for now - would come from task API)
-  const majorTasks = departments.slice(0, 2).map(dept => ({
-    title: dept.name,
-    progress: Math.floor(Math.random() * 100), // Would calculate from real task progress
-    deadline: "Đang cập nhật"
-  }))
-
-  // Prepare budget data (mock for now - would come from budget API)
-  const budgetSpendingData = departments.slice(0, 4).map(dept => ({
-    category: dept.name,
-    budget: 100 + Math.floor(Math.random() * 50),
-    spending: 80 + Math.floor(Math.random() * 40)
-  }))
+  const eventTimeline = useMemo(
+    () =>
+      milestones.slice(0, 5).map((milestone) => ({
+        name: milestone?.name || "Cột mốc",
+        date: formatDate(milestone?.targetDate || milestone?.dueDate),
+        completed: isCompletedStatus(milestone?.status)
+      })),
+    [milestones]
+  )
 
   // Calendar data (current month)
   const calendarDays = generateCalendarDays()
@@ -237,7 +434,7 @@ export default function HoOCDashBoard() {
                       📅
                     </div>
                     <span className="fw-semibold" style={{ fontSize: "13px", color: "#10b981" }}>
-                      {completedMilestones > 0 ? `+${Math.round((completedMilestones/totalMilestones)*100)}%` : '0%'}
+                      {milestoneCompletionPercent > 0 ? `+${milestoneCompletionPercent}%` : "0%"}
                     </span>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
@@ -324,11 +521,11 @@ export default function HoOCDashBoard() {
                       💰
                     </div>
                     <span className="fw-semibold" style={{ fontSize: "13px", color: "#ef4444" }}>
-                      -3%
+                      {budgetSummaryLabel}
                     </span>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
-                    {budgetUsed}%
+                    {budgetUsageDisplay}
                   </div>
                   <div className="text-muted" style={{ fontSize: "13px" }}>
                     Ngân sách đã sử dụng
@@ -446,7 +643,7 @@ export default function HoOCDashBoard() {
                               className="chart-bar rounded-top"
                               style={{
                                 width: "32px",
-                                height: `${item.budget}px`,
+                                height: `${Math.max(4, Math.round(item.budget * budgetChartScale))}px`,
                                 backgroundColor: "#ef4444",
                                 transition: "height 0.5s ease"
                               }}
@@ -455,7 +652,7 @@ export default function HoOCDashBoard() {
                               className="chart-bar rounded-top"
                               style={{
                                 width: "32px",
-                                height: `${item.spending}px`,
+                                height: `${Math.max(4, Math.round(item.spending * budgetChartScale))}px`,
                                 backgroundColor: "#991b1b",
                                 transition: "height 0.5s ease"
                               }}
@@ -632,7 +829,7 @@ export default function HoOCDashBoard() {
                             top: "0",
                             left: "0",
                             height: "100%",
-                            width: `${(completedMilestones / totalMilestones) * 100}%`,
+                            width: `${milestoneProgressRatio}%`,
                             backgroundColor: "#dc2626",
                             transition: "width 0.5s ease",
                           }}
