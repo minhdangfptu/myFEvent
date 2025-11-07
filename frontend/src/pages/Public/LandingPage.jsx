@@ -136,209 +136,140 @@ export default function FPTEvent_Landing() {
               </div>
             </div>
 
-            {/* Right Dashboard Preview */}
-            <div className="col-lg-6">
+            {/* Right Dashboard Preview (code 2 style) — stretched + responsive inner scale */}
+            <div className="col-lg-6 d-flex align-items-stretch justify-content-lg-end justify-content-center ps-lg-0 ms-lg-n3">
               <div
-                className="card shadow-xl border-0"
+                className="card shadow w-100 h-100"
                 style={{
-                  background: "white",
-                  borderRadius: 16,
-                  overflow: "hidden",
+                  maxWidth: 720,
+                  background:
+                    "linear-gradient(135deg, #0f172a 0%, #111827 100%)",
                 }}
               >
-                <div className="card-body p-4">
-                  {/* Header */}
+                <div
+                  className="card-body"
+                  style={{
+                    // chiều cao tham chiếu cho toàn bộ nội dung, mọi phần tử con scale theo
+                    "--cardH": "clamp(420px, 52vh, 600px)",
+                    minHeight: "var(--cardH)",
+                  }}
+                >
+                  {/* Header skeleton */}
                   <div
-                    className="d-flex justify-content-between align-items-center pb-3 mb-4"
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
-                  >
-                    <div className="d-flex align-items-center gap-3">
-                      <img
-                        src="/website-icon-fix@3x.png"
-                        alt="myFEvent"
-                        style={{ width: 32, height: 32 }}
-                      />
-                      <span
-                        className="fw-semibold"
-                        style={{ color: "#1f2937" }}
-                      >
-                        Tổng quan
-                      </span>
-                    </div>
-                    <div className="d-flex gap-2">
-                      <div
-                        className="rounded-circle"
-                        style={{
-                          width: 32,
-                          height: 32,
-                          background: "#f3f4f6",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <i
-                          className="bi bi-bell"
-                          style={{ color: "#6b7280" }}
-                        ></i>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="row g-3 mb-4">
-                    {[
-                      {
-                        icon: "bi-calendar-event",
-                        value: "24",
-                        label: "Sự kiện",
-                      },
-                      {
-                        icon: "bi-people",
-                        value: "100",
-                        label: "Thành viên",
-                      },
-                      {
-                        icon: "bi-trophy",
-                        value: "98%",
-                        label: "Công việc hoàn thành",
-                      },
-                    ].map((stat, i) => (
-                      <div className="col-4" key={i}>
-                        <div
-                          className="p-3 rounded"
-                          style={{
-                            background: "#fef2f2",
-                            border: "1px solid #fee2e2",
-                          }}
-                        >
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <i
-                              className={stat.icon}
-                              style={{
-                                color: "#ef4444",
-                                fontSize: "1.2rem",
-                              }}
-                            />
-                            <small
-                              style={{ color: "#16a34a", fontSize: "0.75rem" }}
-                            >
-                              {stat.trend}
-                            </small>
-                          </div>
-                          <div
-                            className="fw-bold fs-5"
-                            style={{ color: "#1f2937" }}
-                          >
-                            {stat.value}
-                          </div>
-                          <div
-                            style={{ color: "#6b7280", fontSize: "0.85rem" }}
-                          >
-                            {stat.label}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Chart */}
-                  <div
-                    className="p-3 rounded"
+                    className="d-flex justify-content-between align-items-center"
                     style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
+                      marginBottom:
+                        "clamp(12px, calc(var(--cardH) * 0.035), 24px)",
                     }}
                   >
-                    <div className="mb-3">
-                      <div className="fw-semibold" style={{ color: "#1f2937" }}>
-                        Hoạt động tháng này
-                      </div>
-                      <div className="small" style={{ color: "#6b7280" }}>
-                        Số lượng người tham gia
-                      </div>
+                    <div>
+                      <div
+                        style={{
+                          width: 128,
+                          height: 12,
+                          backgroundColor: "#334155",
+                          borderRadius: 4,
+                          marginBottom:
+                            "clamp(6px, calc(var(--cardH) * 0.012), 10px)",
+                        }}
+                      />
+                      <div
+                        style={{
+                          width: 96,
+                          height: 8,
+                          backgroundColor: "#1f2937",
+                          borderRadius: 4,
+                        }}
+                      />
                     </div>
                     <div
-                      className="d-flex align-items-end gap-1"
-                      style={{ height: 100 }}
-                    >
-                      {[45, 65, 35, 85, 55, 75, 95, 60, 80, 70, 85, 75].map(
-                        (h, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              flex: 1,
-                              height: `${h}%`,
-                              background: i === 6 ? "#ef4444" : "#fee2e2",
-                              borderRadius: "3px 3px 0 0",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.background = "#ef4444";
-                              e.target.style.transform = "scaleY(1.05)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.background =
-                                i === 6 ? "#ef4444" : "#fee2e2";
-                              e.target.style.transform = "scaleY(1)";
-                            }}
-                          />
-                        )
-                      )}
-                    </div>
+                      style={{
+                        width: "clamp(40px, calc(var(--cardH) * 0.08), 64px)",
+                        height: "clamp(40px, calc(var(--cardH) * 0.08), 64px)",
+                        backgroundColor: "#334155",
+                        borderRadius: "50%",
+                      }}
+                    />
                   </div>
 
-                  {/* Recent Activity */}
-                  <div className="mt-4">
-                    <div
-                      className="fw-semibold mb-3"
-                      style={{ color: "#1f2937" }}
-                    >
-                      Thông tin
-                    </div>
-                    {[
-                      {
-                        icon: "bi-check-circle-fill",
-                        text: "Tổ chức thành công sự kiện",
-                        time: "2 phút",
-                      },
-                      {
-                        icon: "bi-person-plus-fill",
-                        text: "Tuyển thành viên cho sự kiện",
-                        time: "10 phút",
-                      },
-                    ].map((activity, i) => (
-                      <div
-                        key={i}
-                        className="d-flex align-items-center gap-3 p-2 rounded mb-2"
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #f3f4f6",
-                        }}
-                      >
-                        <i
-                          className={activity.icon}
-                          style={{
-                            color: "#ef4444",
-                            fontSize: "1rem",
-                          }}
-                        />
+                  {/* 3 ô nhỏ */}
+                  <div
+                    className="row g-2"
+                    style={{
+                      marginBottom:
+                        "clamp(8px, calc(var(--cardH) * 0.02), 16px)",
+                    }}
+                  >
+                    {["#3b82f6", "#8b5cf6", "#10b981"].map((c, i) => (
+                      <div className="col-4" key={i}>
                         <div
-                          className="flex-grow-1"
-                          style={{ color: "#374151" }}
+                          className="p-2 rounded-3"
+                          style={{ background: "rgba(30,41,59,.5)" }}
                         >
-                          {activity.text}
+                          <div
+                            style={{
+                              width:
+                                "clamp(56px, calc(var(--cardH) * 0.12), 96px)",
+                              height:
+                                "clamp(8px, calc(var(--cardH) * 0.02), 12px)",
+                              background: "#334155",
+                              borderRadius: 4,
+                              marginBottom:
+                                "clamp(6px, calc(var(--cardH) * 0.012), 10px)",
+                            }}
+                          />
+                          <div
+                            style={{
+                              height:
+                                "clamp(20px, calc(var(--cardH) * 0.06), 48px)",
+                              borderRadius: 4,
+                              background: c,
+                            }}
+                          />
                         </div>
-                        <small style={{ color: "#9ca3af" }}>
-                          {activity.time}
-                        </small>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Biểu đồ cột */}
+                  <div
+                    className="rounded-3 p-3"
+                    style={{ background: "rgba(30,41,59,.5)" }}
+                  >
+                    <div
+                      className="d-flex align-items-end gap-2"
+                      style={{
+                        height:
+                          "clamp(280px, calc(var(--cardH) * 0.42), 280px)",
+                      }}
+                    >
+                      {[45, 65, 55, 85, 75, 95].map((h, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            flex: 1,
+                            height: `${h}%`,
+                            borderRadius: 4,
+                            background:
+                              idx % 2
+                                ? "linear-gradient(180deg, rgba(139,92,246,.7), rgba(139,92,246,.3))"
+                                : "linear-gradient(180deg, rgba(59,130,246,.7), rgba(59,130,246,.3))",
+                            transition: "transform .15s ease",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.transform = "scaleY(1.03)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "scaleY(1)")
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+            {/* END Right Dashboard Preview */}
           </div>
         </div>
       </section>

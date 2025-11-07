@@ -99,25 +99,53 @@ export default function UserProfilePage() {
     if (saving) return;
     setSaving(true);
     try {
-      const payload = { ...form };
+      // Đảm bảo gửi đầy đủ các field, kể cả khi chúng là empty string
+      const payload = {
+        fullName: form.fullName || '',
+        phone: form.phone || '',
+        bio: form.bio || '',
+        highlight: form.highlight || '',
+        tags: Array.isArray(form.tags) ? form.tags : []
+      };
+      
+      // Chỉ gửi avatarUrl nếu có file mới hoặc muốn giữ nguyên avatar hiện tại
       if (avatarFile) {
         try {
           const b64 = await fileToBase64(avatarFile);
           payload.avatarUrl = b64;
         } catch (_) {
           notify('warning', 'Không thể đọc ảnh đại diện. Vui lòng thử lại.');
+          setSaving(false);
+          return;
         }
       }
+      // Nếu không có avatarFile mới, không gửi avatarUrl để giữ nguyên avatar hiện tại
 
-      await authApi.updateProfile(payload);
-
-      // reload profile từ server để chắc chắn ảnh đã lưu
-      const res = await authApi.getProfile();
-      const newProfile = res?.data || res || null;
-      setProfile(newProfile);
-      try {
-        window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
-      } catch (e) { /* noop */ }
+      const response = await authApi.updateProfile(payload);
+      
+      // Sử dụng dữ liệu từ response hoặc reload từ server
+      let newProfile = response?.data || null;
+      if (!newProfile) {
+        const res = await authApi.getProfile();
+        newProfile = res?.data || res || null;
+      }
+      
+      if (newProfile) {
+        setProfile(newProfile);
+        // Cập nhật form state với dữ liệu mới từ server
+        setForm({
+          fullName: newProfile.fullName || '',
+          phone: newProfile.phone || '',
+          bio: newProfile.bio || '',
+          highlight: newProfile.highlight || '',
+          tags: Array.isArray(newProfile.tags) ? newProfile.tags : []
+        });
+        setAvatarPreview(newProfile.avatarUrl || null);
+        
+        try {
+          window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
+        } catch (e) { /* noop */ }
+      }
 
       setEditing(false);
       setAvatarFile(null);
@@ -129,7 +157,9 @@ export default function UserProfilePage() {
         notify('success', 'Ảnh đại diện đã được cập nhật.');
       }
     } catch (e) {
-      notify('error', 'Lưu thất bại. Vui lòng thử lại.');
+      console.error('Save profile error:', e);
+      const errorMessage = e?.response?.data?.message || e?.message || 'Lưu thất bại. Vui lòng thử lại.';
+      notify('error', errorMessage);
     } finally {
       setSaving(false);
     }

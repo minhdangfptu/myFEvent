@@ -7,7 +7,7 @@ import { eventApi } from '../../apis/eventApi';
 import { userApi } from '../../apis/userApi';
 
 export default function MemberLandingPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
@@ -46,8 +46,11 @@ export default function MemberLandingPage() {
   }, [location.search, navigate]);
 
   useEffect(() => {
-    fetchMyEvents();
-  }, []);
+    // Đợi authLoading xong trước khi fetch events
+    if (!authLoading) {
+      fetchMyEvents();
+    }
+  }, [authLoading]);
 
   // ====== FILTERS / SORT ======
   const STATUS_OPTIONS = [t('home.statuses.all'), t('home.statuses.upcoming'), t('home.statuses.ongoing'), t('home.statuses.past')];
@@ -72,6 +75,11 @@ export default function MemberLandingPage() {
   }, []);
 
   const fetchMyEvents = async () => {
+    // Đợi authLoading xong và có user trước khi fetch
+    if (authLoading || !user) {
+      setLoading(true);
+      return;
+    }
     try {
       setLoading(true);
       const response = await eventApi.listMyEvents();

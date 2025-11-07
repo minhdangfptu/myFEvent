@@ -37,6 +37,10 @@ const UserSchema = new Schema({
     enum: ['user', 'admin'],
     default: 'user',
   },
+  verified: {
+    type: Boolean,
+    default: false,
+  },
 }, { timestamps: true });
 UserSchema.index({ phone: 1 },    { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 UserSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: "string" } } });
