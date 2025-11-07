@@ -42,7 +42,9 @@ export default function ManageFeedbackEventPage() {
   const loadEvent = async () => {
     try {
       const res = await eventApi.getAllEventDetail(eventId);
-      setEvent(res.data);
+      // backend may return { data: { event } } or { data: event }
+      const fetchedEvent = res?.data?.event || res?.data || res?.event || res;
+      setEvent(fetchedEvent);
     } catch (error) {
       console.error('Error loading event:', error);
       toast.error('Không thể tải thông tin sự kiện');

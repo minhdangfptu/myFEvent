@@ -13,6 +13,61 @@ import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
 
+const unwrapApiData = (payload) => {
+  let current = payload;
+  const visited = new Set();
+  while (
+    current &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    !visited.has(current) &&
+    (current.data !== undefined || current.result !== undefined || current.payload !== undefined)
+  ) {
+    visited.add(current);
+    current = current.data ?? current.result ?? current.payload;
+  }
+  return current;
+};
+
+const toArray = (payload) => {
+  const data = unwrapApiData(payload);
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.list)) return data.list;
+  if (Array.isArray(data.results)) return data.results;
+  if (Array.isArray(data.data)) return data.data;
+  if (typeof data === "object") {
+    const arrays = [];
+    Object.values(data).forEach((value) => {
+      if (Array.isArray(value)) arrays.push(...value);
+    });
+    if (arrays.length > 0) return arrays;
+  }
+  return [];
+};
+
+const dedupeById = (items = []) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const identifier =
+      item?.id ||
+      item?._id ||
+      item?.eventId ||
+      item?.slug ||
+      item?.code ||
+      item?.joinCode ||
+      item?.eventMemberId;
+
+    if (!identifier) return true;
+    if (seen.has(identifier)) return false;
+    seen.add(identifier);
+    return true;
+  });
+};
+
+const normalizeEventList = (payload) => dedupeById(toArray(payload));
+
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -67,20 +122,26 @@ export default function HomePage() {
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
 
   const { events, loading: eventsLoading } = useEvents();
+  const myEvents = useMemo(() => dedupeById(events || []), [events]);
 
   // ===== Fetch blogs and stop loading =====
   useEffect(() => {
+    let cancelled = false;
     const fetchBlogs = async () => {
       try {
-        const res = await eventApi.getAllPublicEvents();
-        setBlogs(Array.isArray(res?.data) ? res.data : []);
-      } catch {
-        setBlogs([]);
-      } finally {
-        // setLoading(false);
+        const res = await eventService.fetchAllPublicEvents();
+        if (!cancelled) {
+          setBlogs(normalizeEventList(res));
+        }
+      } catch (err) {
+        console.error("fetch public events failed", err);
+        if (!cancelled) setBlogs([]);
       }
     };
     fetchBlogs();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ===== Image handling functions =====
@@ -187,7 +248,7 @@ export default function HomePage() {
 
   // ===== Filter + sort =====
   const norm = (s) => (s || "").toLowerCase();
-  const filteredEvents = events
+  const filteredEvents = myEvents
     .filter(
       (ev) =>
         norm(ev.name).includes(norm(searchQuery)) ||

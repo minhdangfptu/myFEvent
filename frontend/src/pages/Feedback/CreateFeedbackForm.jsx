@@ -71,7 +71,9 @@ export default function CreateFeedbackForm() {
   const loadEvent = async () => {
     try {
       const res = await eventApi.getAllEventDetail(eventId);
-      setEvent(res.data);
+      // Normalize response shape: backend may return { data: { event } } or { data: event }
+      const fetchedEvent = res?.data?.event || res?.data || res?.event || res;
+      setEvent(fetchedEvent);
     } catch (error) {
       console.error('Error loading event:', error);
       // Don't throw, just log - event loading is not critical for form creation
