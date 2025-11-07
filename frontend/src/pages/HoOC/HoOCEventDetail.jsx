@@ -9,7 +9,6 @@ import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
 import { formatDate, formatDateForInput } from "../../utils/formatDate";
-import { userApi } from "~/apis/userApi";
 
 function toDMY(value) {
   const d = new Date(value);

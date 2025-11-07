@@ -8,7 +8,7 @@ import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function HoDLandingPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [eventsHod, setEventsHod] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,17 @@ export default function HoDLandingPage() {
 
   // Fetch API lấy event HoD phụ trách
   useEffect(() => {
+    // Đợi authLoading xong trước khi fetch events
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     const fetchEvents = async () => {
+      // Đợi authLoading xong và có user trước khi fetch
+      if (authLoading || !user) {
+        setLoading(true);
+        return;
+      }
       try {
         setLoading(true);
         const res = await eventApi.listMyEvents();
@@ -52,7 +62,7 @@ export default function HoDLandingPage() {
       }
     };
     fetchEvents();
-  }, []);
+  }, [authLoading, user]);
 
   // Lọc/sắp xếp/search
   const filteredEvents = useMemo(() => {

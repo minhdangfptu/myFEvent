@@ -14,7 +14,7 @@ import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
@@ -66,7 +66,7 @@ export default function HomePage() {
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
 
-  const { events, loading } = useEvents();
+  const { events, loading: eventsLoading } = useEvents();
 
   // ===== Fetch blogs and stop loading =====
   useEffect(() => {
@@ -222,7 +222,8 @@ export default function HomePage() {
     }
   }, [location, navigate]);
 
-  if (loading) {
+  // Check cả authLoading và eventsLoading
+  if (authLoading || eventsLoading) {
     return (
       <UserLayout title={title} sidebarType={sidebarType}>
         <div

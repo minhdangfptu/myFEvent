@@ -95,7 +95,7 @@ export default function FeedbackSummary() {
 
   if (loading || !summaryData) {
     return (
-      <UserLayout title="Summary" sidebarType="hooc" activePage="feedback" eventId={eventId}>
+      <UserLayout title="Tổng kết" sidebarType="hooc" activePage="feedback" eventId={eventId}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
           <Loading size={100} />
         </div>
@@ -106,14 +106,14 @@ export default function FeedbackSummary() {
   const { form, summary, questionStats } = summaryData;
 
   return (
-    <UserLayout title="Summary" sidebarType="hooc" activePage="feedback" eventId={eventId}>
+    <UserLayout title="Tổng kết" sidebarType="hooc" activePage="feedback" eventId={eventId}>
       <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '24px' }}>
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
               <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-                Summary
+                Tổng kết 
               </h1>
               <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
                 Tổng hợp phản hồi
