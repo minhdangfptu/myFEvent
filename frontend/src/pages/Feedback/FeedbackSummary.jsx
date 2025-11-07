@@ -316,14 +316,46 @@ export default function FeedbackSummary() {
                         ))}
                       </div>
                       {/* Line chart */}
-                      <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: '20px', right: 0, bottom: 0 }}>
+                      <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: '20px', right: 0, bottom: 0, overflow: 'visible' }}>
+                        <defs>
+                          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#dc2626" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        {/* Area under line */}
+                        <polygon
+                          points={(() => {
+                            const options = Object.keys(stat.statistics.distribution);
+                            const width = 100;
+                            const height = 100;
+                            const stepX = options.length > 1 ? width / (options.length - 1) : 0;
+                            const points = options.map((option, idx) => {
+                              const percentage = parseFloat(stat.statistics.percentages[option] || '0');
+                              const x = idx * stepX;
+                              const y = height - (percentage / 100) * height;
+                              return `${x},${y}`;
+                            });
+                            // Add bottom points for area
+                            const lastX = (options.length - 1) * stepX;
+                            return `${points.join(' ')} ${lastX},${height} 0,${height}`;
+                          })()}
+                          fill="url(#lineGradient)"
+                        />
+                        {/* Line */}
                         <polyline
-                          points={Object.keys(stat.statistics.distribution).map((option, idx) => {
-                            const percentage = parseFloat(stat.statistics.percentages[option] || '0');
-                            const x = (idx / (Object.keys(stat.statistics.distribution).length - 1 || 1)) * 100 + '%';
-                            const y = 100 - percentage + '%';
-                            return `${idx * (100 / Math.max(Object.keys(stat.statistics.distribution).length - 1, 1))},${100 - percentage}`;
-                          }).join(' ')}
+                          points={(() => {
+                            const options = Object.keys(stat.statistics.distribution);
+                            const width = 100;
+                            const height = 100;
+                            const stepX = options.length > 1 ? width / (options.length - 1) : 0;
+                            return options.map((option, idx) => {
+                              const percentage = parseFloat(stat.statistics.percentages[option] || '0');
+                              const x = idx * stepX;
+                              const y = height - (percentage / 100) * height;
+                              return `${x},${y}`;
+                            }).join(' ');
+                          })()}
                           fill="none"
                           stroke="#dc2626"
                           strokeWidth="3"
@@ -332,14 +364,18 @@ export default function FeedbackSummary() {
                         />
                         {/* Data points */}
                         {Object.keys(stat.statistics.distribution).map((option, idx) => {
+                          const options = Object.keys(stat.statistics.distribution);
+                          const width = 100;
+                          const height = 100;
+                          const stepX = options.length > 1 ? width / (options.length - 1) : 0;
                           const percentage = parseFloat(stat.statistics.percentages[option] || '0');
-                          const x = (idx / (Object.keys(stat.statistics.distribution).length - 1 || 1)) * 100;
-                          const y = 100 - percentage;
+                          const x = idx * stepX;
+                          const y = height - (percentage / 100) * height;
                           return (
                             <circle
                               key={idx}
-                              cx={`${x}%`}
-                              cy={`${y}%`}
+                              cx={x}
+                              cy={y}
                               r="5"
                               fill="#dc2626"
                               stroke="white"
