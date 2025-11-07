@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { userApi } from "../apis/userApi";
+import { useEvents } from "~/contexts/EventContext";
 
 export default function HoDSideBar({
   sidebarOpen,
@@ -11,7 +12,6 @@ export default function HoDSideBar({
 }) {
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
-  const [risksOpen, setRisksOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
   const [theme, setTheme] = useState("light");
 
@@ -21,49 +21,47 @@ export default function HoDSideBar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
+  // local event list for sidebar (so we can reorder / map safely)
+  const [myEvents, setMyEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
   const [currentEventMembership, setCurrentEventMembership] = useState(null);
-  const hasEvents = events && events.length > 0;
+
+  // get context events (if needed) and loading flag
+  const { events: ctxEvents, loading: ctxLoading } = useEvents();
+
+  const hasEvents = myEvents && myEvents.length > 0;
   const location = useLocation();
   const navigate = useNavigate();
-  const params = new URLSearchParams(location.search);
-  // Lấy eventId từ query hoặc từ path (ví dụ: /hooc-event-detail/abc123)
-  let eventIdFromUrl = params.get("eventId");
-  if (!eventIdFromUrl && location.pathname.includes('/hooc-event-detail/')) {
-    const pathParts = location.pathname.split('/');
-    const index = pathParts.findIndex(part => part === 'hooc-event-detail');
-    if (index !== -1 && pathParts[index + 1]) {
-      eventIdFromUrl = pathParts[index + 1];
-    }
-  }
+
+  // allow using passed eventId as the "eventIdFromUrl"
+  const eventIdFromUrl = eventId;
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        console.log('HoOC: Fetching events...');
         const res = await eventApi.listMyEvents();
-        console.log('HoOC: API response:', res);
         const list = Array.isArray(res?.data) ? res.data : [];
-        console.log('HoOC: Events list:', list);
-        let sortedList = list;
+
+        // If there's an eventId in props/URL, prefer that event first
+        let sortedList = list.slice();
         if (eventIdFromUrl) {
-          const idx = list.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
+          const idx = sortedList.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
           if (idx !== -1) {
-            const [currentEvent] = list.splice(idx, 1);
-            sortedList = [currentEvent, ...list];
+            const [currentEvent] = sortedList.splice(idx, 1);
+            sortedList = [currentEvent, ...sortedList];
           }
         }
-        const mapped = sortedList.map(e => ({ 
-          id: e._id || e.id, 
-          name: e.name, 
+
+        const mapped = sortedList.map(e => ({
+          id: e._id || e.id,
+          name: e.name,
           icon: "bi-calendar-event",
           membership: e.membership,
         }));
-        console.log('HoOC: Mapped events:', mapped);
+
         if (mounted) {
-          setEvents(mapped);
+          setMyEvents(mapped);
           if (eventIdFromUrl) {
             const evt = mapped.find((ev) => ev.id === eventIdFromUrl);
             if (evt) {
@@ -79,22 +77,24 @@ export default function HoDSideBar({
           }
         }
       } catch (error) {
-        console.error('HoOC: Error fetching events:', error);
+        console.error('HoD: Error fetching events for sidebar:', error);
       }
     })();
     return () => { mounted = false };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIdFromUrl]);
 
   useEffect(() => {
     if (!sidebarOpen) {
       setWorkOpen(false);
       setFinanceOpen(false);
-      setRisksOpen(false);
       setOverviewOpen(false);
     }
   }, [sidebarOpen]);
 
-  useEffect(() => () => { if (hoverTimeout) clearTimeout(hoverTimeout); }, [hoverTimeout]);
+  useEffect(() => {
+    return () => { if (hoverTimeout) clearTimeout(hoverTimeout); };
+  }, [hoverTimeout]);
 
   const handleMouseEnter = (menuType, e) => {
     if (hoverTimeout) {
@@ -135,11 +135,10 @@ export default function HoDSideBar({
     { id: "income", label: "Thu nhập", path: "/task" },
     { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
   ];
-  const risksSubItems = [
-    { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
-    { id: "risk-analysis", label: "Phân tích rủi ro", path: "/risk" },
-    { id: "risk-mitigation", label: "Giảm thiểu rủi ro", path: "/risk" },
-  ];
+
+  // find the event object (from myEvents)
+  const currentEvent = myEvents.find(e => e.id === (eventId || selectedEvent));
+  const hasEvent = !!currentEvent;
 
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
@@ -204,7 +203,11 @@ export default function HoDSideBar({
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
                 <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
               </div>
-              {sidebarOpen && <span className="sidebar-logo">myFEvent</span>}
+              {sidebarOpen &&  <img
+              src="/logo-03.png"
+              alt="myFEvent"
+              style={{ width: "auto", height: 40 }}
+            />}
             </div>
           </div>
 
@@ -219,7 +222,7 @@ export default function HoDSideBar({
         {sidebarOpen && hasEvents && (
           <div className="mb-3" style={{ paddingBottom: 0 }}>
             <div className="group-title">SỰ KIỆN HIỆN TẠI</div>
-            <div 
+            <div
               className="d-flex align-items-center"
               style={{
                 padding: "8px 12px",
@@ -232,29 +235,29 @@ export default function HoDSideBar({
                 overflow: "hidden"
               }}
             >
-                
+
               <i className="bi bi-calendar-event me-2"></i>
-              <span 
-                style={{ 
-                  overflow: "hidden", 
-                  wordWrap: "break-word", 
+              <span
+                style={{
+                  overflow: "hidden",
+                  wordWrap: "break-word",
                   whiteSpace: "normal",
                   lineHeight: "1.2"
                 }}
-                title={events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                title={myEvents.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
               >
-                {events.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                {myEvents.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
               </span>
             </div>
           </div>
         )}
-        
+
       </div>
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-      <div className="mb-4">
-          {sidebarOpen && <div style={{marginTop: "0px"}} className="group-title">ĐIỀU HƯỚNG</div>}
+        <div className="mb-4">
+          {sidebarOpen && <div style={{ marginTop: "0px" }} className="group-title">ĐIỀU HƯỚNG</div>}
           <div className="d-flex flex-column gap-1">
             <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
               <div className="d-flex align-items-center">
@@ -327,10 +330,9 @@ export default function HoDSideBar({
 
             {/* Ban sự kiện */}
             <button
-              className={`btn-nav ${
-                activePage === "event-board" ? "active" : ""
-              }`}
-              onClick={() => navigate("/task")}
+              className={`btn-nav ${activePage === "event-board" ? "active" : ""
+                }`}
+              onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -341,10 +343,9 @@ export default function HoDSideBar({
 
             {/* Thành viên */}
             <button
-              className={`btn-nav ${
-                activePage === "members" ? "active" : ""
-              }`}
-              onClick={() => navigate("/member")}
+              className={`btn-nav ${activePage === "members" ? "active" : ""
+                }`}
+              onClick={() => navigate(`/events/${eventId || ''}/members`)}
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
@@ -355,9 +356,8 @@ export default function HoDSideBar({
 
             {/* Lịch cá nhân */}
             <button
-              className={`btn-nav ${
-                activePage === "calendar" ? "active" : ""
-              }`}
+              className={`btn-nav ${activePage === "calendar" ? "active" : ""
+                }`}
               onClick={() => navigate("/task")}
               title="Lịch cá nhân"
             >
@@ -478,59 +478,17 @@ export default function HoDSideBar({
                   )}
                 </div>
 
-                <div
-                  className="menu-item-hover"
-                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
-                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
+                {/* Rủi ro */}
+                <button
+                  className={`btn-nav ${activePage === "risk" || activePage === "risk-list" ? "active" : ""}`}
+                  onClick={() => navigate(`/events/${eventId || ''}/risks`)}
+                  title="Rủi ro"
                 >
-                  <button
-                    className={`btn-nav${activePage.startsWith("risk") ? " active" : ""}`}
-                    onClick={() => sidebarOpen && setRisksOpen((prev) => !prev)}
-                    style={{ cursor: "pointer", background: hoveredMenu === "risk" && !sidebarOpen ? "#e7ebef" : undefined }}
-                    title="Rủi ro"
-                  >
-                    <div className="d-flex align-items-center">
-                      <i className="bi bi-bug me-3" style={{ width: 20 }} />
-                      {sidebarOpen && <span>Rủi ro</span>}
-                    </div>
-                    {sidebarOpen && (
-                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
-                    )}
-                  </button>
-
-                  {!sidebarOpen && hoveredMenu === "risk" && (
-                    <div
-                      className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
-                      onMouseEnter={handlePopupMouseEnter}
-                      onMouseLeave={handlePopupMouseLeave}
-                    >
-                      {risksSubItems.map((item) => (
-                        <button
-                          key={item.id}
-                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {risksOpen && sidebarOpen && (
-                    <div className="ms-2">
-                      {risksSubItems.map((item) => (
-                        <button
-                          key={item.id}
-                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-bug me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Rủi ro</span>}
+                  </div>
+                </button>
 
                 <button
                   className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}

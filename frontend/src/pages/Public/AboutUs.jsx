@@ -1,7 +1,7 @@
 import * as React from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-
+import img from "/aboutus_event.jpg"
 function MaxContainer({ children }) {
   return <div className="container-xl px-2">{children}</div>;
 }
@@ -210,7 +210,7 @@ export default function AboutUs() {
               <div className="col-12 col-md-6">
                 <div className="rounded-3 overflow-hidden shadow">
                   <img
-                    src="https://scontent-nrt1-1.xx.fbcdn.net/v/t39.30808-6/484110049_624627620425798_7528644231331946866_n.jpg?stp=dst-jpg_p526x395_tt6&_nc_cat=103&ccb=1-7&_nc_sid=127cfc&_nc_eui2=AeHcHXuQCDyyrXNxtjIfYQ3vxC-mHv1dtgrEL6Ye_V22CnMCdzE5UD1VSBEaUsV7uOQw-gnwGbqJJKxlQeemn8bY&_nc_ohc=QR0wBr2xiNYQ7kNvwEqfvfe&_nc_oc=AdnueF6bHCHSDMf843DFtSmS_G_vz4Hqcm4oIuS95QhrVEFUGuHk9KJofqVSDoKyDhg&_nc_zt=23&_nc_ht=scontent-nrt1-1.xx&_nc_gid=Knpo8uZDvGElF0Ao5xi4MQ&oh=00_AfdTdw8mPozF331X5LOlkWGC1SWEjuySNqEyvHQgoSIwkA&oe=68FD3DD9"
+                  src = {img}
                     alt="Team working"
                     className="w-100"
                     style={{ objectFit: "cover" }}
@@ -235,7 +235,7 @@ export default function AboutUs() {
             <div className="d-flex justify-content-center flex-wrap gap-3">
               {[
                 "https://scontent-nrt1-1.xx.fbcdn.net/v/t1.15752-9/550846168_1968528680605325_4350914197767645049_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeH5NRKQC7FgJVF0mHjhLG78zpKtZwS3i1LOkq1nBLeLUklgB7c-d3OueHA-ONZiqLPPg7G34jgHhR5teF7ufNBA&_nc_ohc=SoeGOlah02AQ7kNvwGomeSD&_nc_oc=AdkBYcyN9tSd0EZFfdPfHE6tEDutPCG8OZg8GlGuJBlkeW2CoGAHfqpt8rPxp6lAx2M&_nc_zt=23&_nc_ht=scontent-nrt1-1.xx&oh=03_Q7cD3gGZYlOK6-tkk8I2xkiH8x6Kp7SVWXaUikpCrNlTqMdCSg&oe=691EBC63",
-                "https://scontent-nrt1-1.xx.fbcdn.net/v/t39.30808-6/501097517_1364118738205468_8966950183379537098_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeEc_14EaPZu1_8c0uRjk_UgXcd7dwcztv5dx3t3BzO2_mSO8iPgo-tuBP1JRkObZ6tnxaEtUv5v2ZrNSVVnBYkA&_nc_ohc=og2SFzngzYsQ7kNvwE1_JiU&_nc_oc=Adm-a4CGhp_PxX9YHy-VVp7GmDdwSSAlc8ZnlaE7DPdCNk2lH0BHiFVUa7-tst3W5xo&_nc_zt=23&_nc_ht=scontent-nrt1-1.xx&_nc_gid=Oy6ta0-Ps2OchriOdVfbyg&oh=00_AffDJ2h0VI0hJoC__0rLI4ulaHbBwpKsR5eJ4mqe03oMcw&oe=68FD2272",
+                "https://scontent-nrt1-2.xx.fbcdn.net/v/t1.15752-9/574901600_2242003846283916_3523672598757401474_n.png?_nc_cat=105&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeGIQexfs2kLoigAwEmQ_wklCP69VkBhdVYI_r1WQGF1Vjyeb0bUmOa48ClAIZARuMElgjsUvF1pRRTaJlpVQ-P6&_nc_ohc=fTNz0Agm7rMQ7kNvwHJxfE0&_nc_oc=Adm9XCGBMuD96x-NhxLNGSKSqTom5eDSb_th6etfxde6TsCWxWkziA8HwbLC1HNIniE&_nc_zt=23&_nc_ht=scontent-nrt1-2.xx&oh=03_Q7cD3wEybW3FovD9KpHp2H4HufPOOE2bnW-WVBiHYuBQri_mOA&oe=69336515",
                 "https://scontent-nrt1-2.xx.fbcdn.net/v/t1.15752-9/566596919_827011233025594_2922072484590488873_n.png?_nc_cat=104&ccb=1-7&_nc_sid=0024fc&_nc_eui2=AeF7tzW_kYsYebPRpAtrFStwCsAgRWRYfjgKwCBFZFh-OP7ySXBE9FHAtfeMr4dginM1RfjBhqtUFvVa9emP7Bhl&_nc_ohc=6HOhTqE0va4Q7kNvwEZ1lRq&_nc_oc=AdkHG5hcOzbdJejCWaEqMPHivwuVQnQ3JobXqdfFF-3omwqyjR9DJt2I8_adsUHEc-w&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-nrt1-2.xx&oh=03_Q7cD3gF27Nn4dGrpPelsEGt0PFN4OQHLF_NxB1Mhz2EjaH-nzg&oe=691EC1EE",
                 "https://scontent-nrt1-1.xx.fbcdn.net/v/t1.15752-9/566368049_1145930187044398_1627346525192196137_n.png?_nc_cat=111&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeHJloFxOY5q8p9aKOhVSTMtp6XYczSpctunpdhzNKly24mMHnzwpMgqwG5cJx70Ih44nPLdcf9W_ftiMD_Ln9gU&_nc_ohc=-t6RjWwdC4oQ7kNvwES89Vf&_nc_oc=AdkDzBv-cx-Z1Xq7Y3uCNIoehHBqQDQX0A16dRSyvw_Zp9TSZvwD0bHiTvFs_eTNvZA&_nc_zt=23&_nc_ht=scontent-nrt1-1.xx&oh=03_Q7cD3gE9YHWq12BYmWXlLJuCQRF62XfP4ISk5qxUfOw16XiAPg&oe=691EDDDF",
                 "https://scontent-nrt1-1.xx.fbcdn.net/v/t1.15752-9/506738012_1711083279781638_3339800596618501383_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeHDtzXOXWt7-xS1ty9-A0BQS2mUanFYWb9LaZRqcVhZvzrkTsI4gdYjzBV3Il0NYrhlFRWzkllQGdNlS_1ZLMad&_nc_ohc=wZeO951oc-gQ7kNvwERBLGZ&_nc_oc=AdloFyqA0WxaSesHEWZXLz_XBVpHeTcxIhdUKqgjX_GlJ6lp_0yAt9jgx9Pw6_KGXak&_nc_zt=23&_nc_ht=scontent-nrt1-1.xx&oh=03_Q7cD3gGl5JFoiZX1keQyD-rvHg65I9nynDT4G-yxsGwwZTYkog&oe=691EC3CB",

@@ -1,8 +1,24 @@
-import Department from '../models/department.js';
-import Event from '../models/event.js';
-import EventMember from '../models/eventMember.js';
-import User from '../models/user.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import {
+  ensureEventExists,
+  ensureDepartmentInEvent,
+  findDepartmentsByEvent,
+  findDepartmentById,
+  createDepartmentDoc,
+  updateDepartmentDoc,
+  deleteDepartmentDoc,
+  assignHoDToDepartment,
+  ensureUserExists,
+  isUserMemberOfDepartment,
+  addMemberToDepartmentDoc,
+  removeMemberFromDepartmentDoc,
+} from '../services/departmentService.js';
+
+import {
+  findEventMemberById,
+  getRequesterMembership,
+  countDepartmentMembersExcludingHoOC,
+} from '../services/eventMemberService.js';
 
 // GET /api/events/:eventId/departments
 export const listDepartmentsByEvent = async (req, res) => {
@@ -12,32 +28,11 @@ export const listDepartmentsByEvent = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const skip = (page - 1) * limit;
     const search = (req.query.search || '').trim();
-
-    const filter = { eventId };
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const [items, total] = await Promise.all([
-      Department.find(filter)
-        .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Department.countDocuments(filter)
-    ]);
+    const { items, total } = await findDepartmentsByEvent(eventId, { search, skip, limit });
 
     // Format data for frontend
     const formattedItems = await Promise.all(items.map(async (dept) => {
-      // Get member count for this department
-      const memberCount = await EventMember.countDocuments({ 
-        departmentId: dept._id,
-        role: { $ne: 'HoOC' } // Exclude HoOC from member count
-      });
+      const memberCount = await countDepartmentMembersExcludingHoOC(dept._id);
 
       return {
         _id: dept._id,
@@ -71,19 +66,12 @@ export const listDepartmentsByEvent = async (req, res) => {
 // GET /api/events/:eventId/departments/:departmentId
 export const getDepartmentDetail = async (req, res) => {
   try {
-    const {departmentId } = req.params;
-    const department = await Department.findOne({ _id: departmentId })
-      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
-      .lean();
+    const { departmentId } = req.params;
+    const department = await findDepartmentById(departmentId);
     if (!department) return res.status(404).json({ message: 'Department not found' });
 
-    // Get member count for this department
-    const memberCount = await EventMember.countDocuments({ 
-      departmentId: department._id,
-      role: { $ne: 'HoOC' } // Exclude HoOC from member count
-    });
+    const memberCount = await countDepartmentMembersExcludingHoOC(department._id);
 
-    // Format data for frontend
     const formattedDepartment = {
       _id: department._id,
       id: department._id,
@@ -110,29 +98,16 @@ export const createDepartment = async (req, res) => {
   try {
     const { eventId } = req.params;
     const { name, description, leaderId } = req.body || {};
-    // Kiểm tra event tồn tại
     if (!(await ensureEventExists(eventId))) {
       return res.status(404).json({ message: 'Event không tồn tại' });
     }
-    // Kiểm tra quyền HooC
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
     }
-    // Tạo department
-    const depart = await Department.create({
-      eventId,
-      name,
-      description,
-      leaderId
-    });
 
-    // Populate leader info
-    const populatedDepart = await Department.findById(depart._id)
-      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
-      .lean();
+    const populatedDepart = await createDepartmentDoc({ eventId, name, description, leaderId });
 
-    // Format data for frontend
     const formattedDepartment = {
       _id: populatedDepart._id,
       id: populatedDepart._id,
@@ -141,7 +116,7 @@ export const createDepartment = async (req, res) => {
       leaderId: populatedDepart.leaderId,
       leader: populatedDepart.leaderId,
       leaderName: populatedDepart.leaderId?.fullName || 'Chưa có',
-      memberCount: 0, // New department has no members yet
+      memberCount: 0,
       createdAt: populatedDepart.createdAt,
       updatedAt: populatedDepart.updatedAt
     };
@@ -171,12 +146,13 @@ export const editDepartment = async (req, res) => {
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
     }
-    // Cập nhật
-    if (typeof name === 'string') department.name = name;
-    if (typeof description === 'string') department.description = description;
-    if (leaderId) department.leaderId = leaderId;
-    await department.save();
-    return res.status(200).json({ data: department });
+    // Cập nhật qua service
+    const set = {};
+    if (typeof name === 'string') set.name = name;
+    if (typeof description === 'string') set.description = description;
+    if (leaderId) set.leaderId = leaderId;
+    const updated = await updateDepartmentDoc(departmentId, set);
+    return res.status(200).json({ data: updated });
   } catch (error) {
     console.error('editDepartment error:', error);
     return res.status(500).json({ message: 'Sửa department thất bại' });
@@ -199,28 +175,12 @@ export const deleteDepartment = async (req, res) => {
     if (!requesterMembership || requesterMembership.role !== 'HooC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
     }
-    await department.deleteOne();
+    await deleteDepartmentDoc(departmentId);
     return res.status(200).json({ message: 'Xoá department thành công' });
   } catch (error) {
     console.error('deleteDepartment error:', error);
     return res.status(500).json({ message: 'Xoá department thất bại' });
   }
-};
-
-// Helpers
-const ensureEventExists = async (eventId) => {
-	const exists = await Event.exists({ _id: eventId });
-	return !!exists;
-};
-
-const ensureDepartmentInEvent = async (eventId, departmentId) => {
-	const department = await Department.findOne({ _id: departmentId, eventId });
-	return department;
-};
-
-const getRequesterMembership = async (eventId, userId) => {
-	if (!userId) return null;
-	return await EventMember.findOne({ eventId, userId }).lean();
 };
 
 // PATCH /api/events/:eventId/departments/:departmentId/assign-hod
@@ -243,32 +203,10 @@ export const assignHod = async (req, res) => {
 		}
 
 		// Ensure target user exists
-		const targetUser = await User.findById(userId).lean();
+		const targetUser = await ensureUserExists(userId);
 		if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-		// Update department leader
-		const previousLeaderId = department.leaderId?.toString();
-		department.leaderId = userId;
-		await department.save();
-
-		// Upsert target membership to HoD of this department
-		await EventMember.findOneAndUpdate(
-			{ eventId, userId },
-			{ $set: { departmentId, role: 'HoD' } },
-			{ upsert: true, new: true }
-		);
-
-		// Demote previous leader if different
-		if (previousLeaderId && previousLeaderId !== userId) {
-			await EventMember.findOneAndUpdate(
-				{ eventId, userId: previousLeaderId },
-				{ $set: { departmentId, role: 'staff' } }
-			);
-		}
-
-		const updated = await Department.findById(department._id)
-			.populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
-			.lean();
+		const updated = await assignHoDToDepartment(eventId, department, userId);
 		return res.status(200).json({ data: updated });
 	} catch (error) {
 		console.error('assignHod error:', error);
@@ -303,49 +241,21 @@ export const changeHoD = async (req, res) => {
     }
 
     // Check if new HoD exists
-    const newHoD = await User.findById(newHoDId).lean();
+    const newHoD = await ensureUserExists(newHoDId);
     if (!newHoD) {
       return res.status(404).json({ message: 'New HoD user not found'  });
     }
 
     // Check if new HoD is a member of this department
-    const newHoDMembership = await EventMember.findOne({ 
-      eventId, 
-      userId: newHoDId, 
-      departmentId: department._id 
-    }).lean();
-    
-    if (!newHoDMembership) {
+    const isMember = await isUserMemberOfDepartment(eventId, department._id, newHoDId);
+    if (!isMember) {
       return res.status(400).json({ 
         message: 'New HoD must be a member of this department' 
       });
     }
 
-    // Get current HoD
-    const currentHoDId = department.leaderId?.toString();
-    
-    // Update department leader
-    department.leaderId = newHoDId;
-    await department.save();
-
-    // Update new HoD's role to HoD
-    await EventMember.findOneAndUpdate(
-      { eventId, userId: newHoDId, departmentId: department._id },
-      { $set: { role: 'HoD' } }
-    );
-
-    // Demote previous HoD to staff if different
-    if (currentHoDId && currentHoDId !== newHoDId) {
-      await EventMember.findOneAndUpdate(
-        { eventId, userId: currentHoDId, departmentId: department._id },
-        { $set: { role: 'Member' } }
-      );
-    }
-
-    // Get updated department with populated leader
-    const updatedDepartment = await Department.findById(department._id)
-      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
-      .lean();
+    // Assign HoD using service helper (handles demotion of previous leader)
+    const updatedDepartment = await assignHoDToDepartment(eventId, department, newHoDId);
 
     // Format response
     const formattedDepartment = {
@@ -356,10 +266,7 @@ export const changeHoD = async (req, res) => {
       leaderId: updatedDepartment.leaderId,
       leader: updatedDepartment.leaderId,
       leaderName: updatedDepartment.leaderId?.fullName || 'Chưa có',
-      memberCount: await EventMember.countDocuments({ 
-        departmentId: updatedDepartment._id,
-        role: { $ne: 'HoOC' }
-      }),
+      memberCount: await countDepartmentMembersExcludingHoOC(updatedDepartment._id),
       createdAt: updatedDepartment.createdAt,
       updatedAt: updatedDepartment.updatedAt
     };
@@ -394,10 +301,10 @@ export const addMemberToDepartment = async (req, res) => {
 		if (!isHoOC && !isHoDOfThis) {
 			return res.status(403).json({ message: 'Insufficient permissions' });
 		}
-		const { memberId } = req.body || {};
+    const { memberId } = req.body || {};
 		if (!memberId) return res.status(400).json({ message: 'memberId is required' });
-		
-		const targetMembership = await EventMember.findOne({ _id: memberId }).lean();
+    
+    const targetMembership = await findEventMemberById(memberId);
 		if (!targetMembership) {
 			return res.status(404).json({ message: "EventMember not found!" });
 		}
@@ -408,16 +315,8 @@ export const addMemberToDepartment = async (req, res) => {
 			return res.status(409).json({ message: 'User is HoD of another department' });
 		}
 
-		const updatedMembership = await EventMember.findOneAndUpdate(
-			{ _id: memberId },
-			{
-				$set: {
-					departmentId, 
-					role: targetMembership.role === 'HoD' ? 'HoD' : 'Member',
-				},
-			},
-			{ new: true } 
-		).populate('userId', 'fullName email avatarUrl');
+    const roleToSet = targetMembership.role === 'HoD' ? 'HoD' : 'Member';
+    const updatedMembership = await addMemberToDepartmentDoc(eventId, departmentId, memberId, roleToSet);
 
 		return res.status(200).json({ data: updatedMembership });
 	} catch (error) {
@@ -445,7 +344,7 @@ export const removeMemberFromDepartment = async (req, res) => {
 			return res.status(403).json({ message: 'Insufficient permissions' });
 		}
 
-		const targetMembership = await EventMember.findOne({ _id: memberId });
+    const targetMembership = await findEventMemberById(memberId);
 		if (!targetMembership || targetMembership.departmentId?.toString() !== departmentId) {
 			return res.status(404).json({ message: 'Member is not in this department' });
 		}
@@ -456,10 +355,8 @@ export const removeMemberFromDepartment = async (req, res) => {
 			return res.status(409).json({ message: 'Unassign HoD before removing from department' });
 		}
 
-		targetMembership.departmentId = undefined;
-		await targetMembership.save();
-
-		return res.status(200).json({ message: 'Member removed from department' });
+    await removeMemberFromDepartmentDoc(eventId, departmentId, memberId);
+    return res.status(200).json({ message: 'Member removed from department' });
 	} catch (error) {
 		console.error('removeMemberFromDepartment error:', error);
 		return res.status(500).json({ message: 'Failed to remove member from department' });

@@ -11,22 +11,19 @@ export default function UserSidebar({
   eventId, // Nhận eventId qua props
 }) {
   const [theme, setTheme] = useState("light");
-
+  // UI state cho menu
+  const [workOpen, setWorkOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
+  const [risksOpen, setRisksOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const sidebarRef = useRef(null);
   // Hover popup (khi sidebar đóng)
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
-  const sidebarRef = useRef(null);
 
   const { events, loading } = useEvents();
   const navigate = useNavigate();
-
-
-  const getSelectedEventId = () => {
-    if (!hasEvents || events.length === 0) return null;
-    const selectedEventObj = events.find(e => e.name === selectedEvent);
-    return selectedEventObj ? selectedEventObj.id : events[0].id;
-  };
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -37,11 +34,31 @@ export default function UserSidebar({
     }
   }, [sidebarOpen]);
 
-  useEffect(() => () => { if (hoverTimeout) clearTimeout(hoverTimeout); }, [hoverTimeout]);
-
+  useEffect(
+    () => () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    },
+    [hoverTimeout]
+  );
 
   return (
-    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
+    <div
+      ref={sidebarRef}
+      className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+      style={{
+        width: sidebarOpen ? "230px" : "70px",
+        height: "100vh",
+        transition: "width 0.3s ease",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        zIndex: 1000,
+        display: "flex",
+        flexDirection: "column",
+        background: "white",
+        borderRadius: "0",
+      }}
+    >
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
         .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
@@ -100,15 +117,36 @@ export default function UserSidebar({
             style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
           >
             <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginRight: "10px",
+                }}
+              >
+                <img
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
               </div>
-              {sidebarOpen && <span className="sidebar-logo">myFEvent</span>}
+              {sidebarOpen && (
+                <img
+                  src="/logo-03.png"
+                  alt="myFEvent"
+                  style={{ width: "auto", height: 40 }}
+                />
+              )}
             </div>
           </div>
 
           {sidebarOpen && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setSidebarOpen(false)}
+              style={{ padding: "4px 8px" }}
+            >
               <i className="bi bi-arrow-left"></i>
             </button>
           )}
@@ -130,6 +168,7 @@ export default function UserSidebar({
             }}
           >
             <Loading size={40} />
+            
           </div>
         ) : (
           <>
@@ -137,10 +176,26 @@ export default function UserSidebar({
             <div className="mb-4">
               {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
+                <button
+                  className={`btn-nav ${activePage === "home" ? "active" : ""}`}
+                  onClick={() => navigate("/home-page")}
+                  title="Trang chủ"
+                >
                   <div className="d-flex align-items-center">
                     <i className="bi bi-list me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
+                  </div>
+                </button>
+              </div>
+              <div className="d-flex flex-column gap-1">
+                <button
+                  className={`btn-nav ${activePage === "account" ? "active" : ""}`}
+                  onClick={() => navigate("/user-profile")}
+                  title="Hồ sơ"
+                >
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-person-circle me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Hồ sơ</span>}
                   </div>
                 </button>
               </div>
@@ -149,13 +204,25 @@ export default function UserSidebar({
             <div className="mb-4">
               {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
               <div className="d-flex flex-column gap-1">
-                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
+                <button
+                  className={`btn-nav ${
+                    activePage === "notifications" ? "active" : ""
+                  }`}
+                  onClick={() => navigate("/notifications")}
+                  title="Thông báo"
+                >
                   <div className="d-flex align-items-center">
                     <i className="bi bi-bell me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Thông báo</span>}
                   </div>
                 </button>
-                <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
+                <button
+                  className={`btn-nav ${
+                    activePage === "settings" ? "active" : ""
+                  }`}
+                  onClick={() => navigate("/setting")}
+                  title="Cài đặt"
+                >
                   <div className="d-flex align-items-center">
                     <i className="bi bi-gear me-3" style={{ width: 20 }} />
                     {sidebarOpen && <span>Cài đặt</span>}
@@ -168,20 +235,38 @@ export default function UserSidebar({
       </div>
 
       {/* Theme toggle hoặc Expand button */}
-      <div className="p-2" style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}>
+      <div
+        className="p-2"
+        style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
+      >
         {sidebarOpen ? (
-          <div className="theme-toggle" style={{ paddingBottom: 10, margin: 0 }}>
-            <button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
+          <div
+            className="theme-toggle"
+            style={{ paddingBottom: 10, margin: 0 }}
+          >
+            <button
+              className={`theme-option ${theme === "light" ? "active" : ""}`}
+              onClick={() => setTheme("light")}
+            >
               <i className="bi bi-sun"></i>
               <span>Sáng</span>
             </button>
-            <button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
+            <button
+              className={`theme-option ${theme === "dark" ? "active" : ""}`}
+              onClick={() => setTheme("dark")}
+            >
               <i className="bi bi-moon"></i>
               <span>Tối</span>
             </button>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm w-100" onClick={() => setSidebarOpen(true)} style={{ padding: "5px", margin: "0 1.5px 0 2px" }} title="Mở rộng" aria-label="Mở/đóng thanh bên">
+          <button
+            className="btn btn-ghost btn-sm w-100"
+            onClick={() => setSidebarOpen(true)}
+            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
+            title="Mở rộng"
+            aria-label="Mở/đóng thanh bên"
+          >
             <i className="bi bi-list"></i>
           </button>
         )}

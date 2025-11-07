@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
 import NoDataImg from '~/assets/no-data.png';
@@ -109,6 +109,7 @@ const Department = () => {
       sidebarType= {getSidebarType()}
       activePage="department-management"
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       {/* Main Content */}
       <div  className="bg-white rounded-3 shadow-sm" style={{height: "80vh", padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">

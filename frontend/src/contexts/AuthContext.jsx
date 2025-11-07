@@ -118,6 +118,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    setUser, // Expose setUser for profile update
     loading,
     login,
     loginWithGoogle,

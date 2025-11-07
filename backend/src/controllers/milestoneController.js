@@ -1,14 +1,13 @@
-import Milestone from '../models/milestone.js';
-import Event from '../models/event.js';
-import EventMember from '../models/eventMember.js';
-import Task from '../models/task.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
-
-// Helpers
-const ensureEventExists = async (eventId) => {
-  const exists = await Event.exists({ _id: eventId });
-  return !!exists;
-};
+import {
+  ensureEventExists,
+  createMilestoneDoc,
+  listMilestonesByEvent,
+  findMilestoneDetail,
+  getEventMembership,
+  updateMilestoneDoc,
+  softDeleteMilestoneIfNoTasks
+} from '../services/milestoneService.js';
 
 // POST /api/events/:eventId/milestones
 export const createMilestone = async (req, res) => {
@@ -24,14 +23,7 @@ export const createMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    const milestone = await Milestone.create({
-      eventId,
-      name,
-      description,
-      targetDate,
-      status
-    });
-
+    const milestone = await createMilestoneDoc({ eventId, name, description, targetDate, status });
     return res.status(201).json({ data: milestone });
   } catch (error) {
     console.error('createMilestone error:', error.message);
@@ -54,17 +46,7 @@ export const listMilestones = async (req, res) => {
     const sortBy = (req.query.sortBy || 'dueDate');
     const sortDir = (req.query.sortDir || 'asc') === 'desc' ? -1 : 1;
 
-    const filter = { eventId, isDeleted: false };
-    if (status) filter.status = status;
-
-    const [items, total] = await Promise.all([
-      Milestone.find(filter)
-        .sort({ [sortBy]: sortDir, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Milestone.countDocuments(filter)
-    ]);
+    const { items, total } = await listMilestonesByEvent(eventId, { status, skip, limit, sortBy, sortDir });
 
     return res.status(200).json({
       data: items,
@@ -87,9 +69,9 @@ export const getMilestoneDetail = async (req, res) => {
     const { eventId, milestoneId } = req.params;
     const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'staff']);
     if (!member) return res.status(403).json({ message: 'Can not view milestone detail!' });
-    const milestone = await Milestone.findOne({ _id: milestoneId, eventId }).lean();
-    if (!milestone) return res.status(404).json({ message: 'Milestone not found' });
-    const tasks = await Task.findOne({milestoneId: milestoneId,eventId: eventId}).select('name status').lean();
+    const result = await findMilestoneDetail(eventId, milestoneId);
+    if (!result) return res.status(404).json({ message: 'Milestone not found' });
+    const { milestone, tasks } = result;
     const payload = {
       id: String(milestone._id),
       name: milestone.name,
@@ -114,7 +96,7 @@ export const updateMilestone = async (req, res) => {
   try {
     const { eventId, milestoneId } = req.params;
     // Only HooC can update milestone
-    const membership = await EventMember.findOne({ eventId, userId: req.user?.id }).lean();
+    const membership = await getEventMembership(eventId, req.user?.id);
     if (!membership || membership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Only HoOC can update milestone' });
     }
@@ -125,11 +107,7 @@ export const updateMilestone = async (req, res) => {
     if (dueDate !== undefined) updates.dueDate = dueDate;
     if (status !== undefined) updates.status = status;
 
-    const milestone = await Milestone.findOneAndUpdate(
-      { _id: milestoneId, eventId },
-      { $set: updates },
-      { new: true }
-    );
+    const milestone = await updateMilestoneDoc(eventId, milestoneId, updates);
     if (!milestone) return res.status(404).json({ message: 'Milestone not found' });
     return res.status(200).json({ data: milestone });
   } catch (error) {
@@ -143,18 +121,13 @@ export const deleteMilestone = async (req, res) => {
   try {
     const { eventId, milestoneId } = req.params;
     // Only HooC can delete milestone
-    const membership = await EventMember.findOne({ eventId, userId: req.user?.id }).lean();
+    const membership = await getEventMembership(eventId, req.user?.id);
     if (!membership || membership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Only HoOC can delete milestone' });
     }
-    const deleted = await Milestone.findOne({ _id: milestoneId, eventId });
-    if (!deleted) return res.status(404).json({ message: 'Milestone not found' });
-    const tasks = await Task.find({ milestoneId: milestoneId });
-    if (tasks.length > 0) {
-      return res.status(400).json({ message: 'Milestone has tasks' });
-    }
-    deleted.isDeleted = true;
-    await deleted.save();
+    const result = await softDeleteMilestoneIfNoTasks(eventId, milestoneId);
+    if (result.code === 'NOT_FOUND') return res.status(404).json({ message: 'Milestone not found' });
+    if (result.code === 'HAS_TASKS') return res.status(400).json({ message: 'Milestone has tasks' });
     return res.status(200).json({ message: 'Milestone deleted' });
   } catch (error) {
     console.error('deleteMilestone error:', error);

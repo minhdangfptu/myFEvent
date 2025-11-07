@@ -13,6 +13,7 @@ const TaskSchema = new Schema({
 
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },
+  startDate: Date,
   dueDate: Date,
 
   assigneeId:   { type: Types.ObjectId, ref: 'EventMember' },
@@ -25,5 +26,6 @@ const TaskSchema = new Schema({
 
 TaskSchema.index({ eventId: 1, departmentId: 1, dueDate: 1 });
 TaskSchema.index({ assigneeId: 1, status: 1 });
+TaskSchema.index({ startDate: 1, status: 1 }); // Index để query task cần auto-update
 
 export default mongoose.model('Task', TaskSchema);

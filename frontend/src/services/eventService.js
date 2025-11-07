@@ -32,4 +32,12 @@ export const eventService = {
             throw error;
         }
     },
+    getMemberDetail: async (eventId, memberId) => {
+        try {
+            const response = await eventApi.getMemberDetail(eventId, memberId);
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
 };

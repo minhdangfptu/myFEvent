@@ -8,15 +8,18 @@ import {
   updateTaskProgress,
   assignTask,
   unassignTask,
+  getTaskByDepartment,
   getEventTaskProgressChart
 } from '../controllers/taskController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router.get('/:eventId/', authenticateToken, listTasksByEventOrDepartment);
 // Lấy chi tiết 1 task
 router.get('/:eventId/:taskId', authenticateToken, getTaskDetail);
+//Lấy task của 1 department
+router.get('/:eventId/:taskId/:departmentId', authenticateToken, getTaskByDepartment);
 // Tạo task (HoD)
 router.post('/:eventId/create-new-task', authenticateToken, createTask);
 // Sửa task (HoD)

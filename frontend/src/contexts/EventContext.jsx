@@ -10,13 +10,19 @@ export function useEvents() {
 }
 
 export function EventProvider({ children }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [eventRoles, setEventRoles] = useState({}); // { [eventId]: "HoOC" | "HoD" | "Member" | "" }
+  const [eventRoles, setEventRoles] = useState({}); 
 
   const fetchEvents = useCallback(async () => {
+    // Đợi AuthContext load xong trước khi fetch events
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user) {
       setEvents([]);
       setLoading(false);
@@ -33,12 +39,13 @@ export function EventProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
 
+  // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {
     if (!eventId) return "";
     // Return cached role if available

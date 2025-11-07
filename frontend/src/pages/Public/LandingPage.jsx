@@ -23,17 +23,17 @@ export default function FPTEvent_Landing() {
   }, [searchParams]);
   return (
     <div className="min-vh-100 bg-white overflow-hidden">
-       {/* Overlay loading */}
+      {/* Overlay loading */}
       {loading && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             inset: 0,
-            background: 'rgba(255,255,255,0.75)',
+            background: "rgba(255,255,255,0.75)",
             zIndex: 2000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
           <Loading size={80} />
@@ -42,45 +42,126 @@ export default function FPTEvent_Landing() {
       <Header />
 
       <section
-        className="py-5"
+        className=""
         style={{
-          background: "linear-gradient(135deg,#F5F3FF 0%,#EEF2FF 100%)",
+          paddingTop: "0.2rem",
+          background: "linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%)",
+          minHeight: "92vh",
+          display: "flex",
+          alignItems: "center",
         }}
       >
-        <div className="container-xl px-2">
-          <div className="row align-items-center g-4">
-            <div className="col-12 col-sm-6">
+        <div className="container">
+          <div className="row align-items-center g-5">
+            {/* Left Content */}
+            <div className="col-lg-6">
+              <span
+                className="badge px-3 py-2 mb-3"
+                style={{
+                  background: "#fef2f2",
+                  color: "#ef4444",
+                  fontWeight: "600",
+                }}
+              >
+                <i className="bi bi-star-fill me-2"></i>
+                Platform #1 cho sự kiện tại ĐH FPT Hà Nội
+              </span>
+
               <h1
-                className="fw-bold"
-                style={{ color: "#111827", lineHeight: 1.15, fontSize: "3rem" }}
+                className="display-4 fw-bold mb-4"
+                style={{
+                  lineHeight: 1.2,
+                  color: "#1f2937",
+                }}
               >
                 Quản lý sự kiện tại trường ĐH FPT chưa bao giờ{" "}
-                <span style={{ color: "#ef4444" }}> dễ dàng đến thế!</span>
+                <span style={{ color: "#ef4444" }}>dễ dàng đến thế!</span>
               </h1>
-              <p className="text-secondary fs-5">
+
+              <p className="lead mb-4" style={{ color: "#6b7280" }}>
                 Giúp bạn tổ chức, tạo và quản lý mọi hoạt động trong các sự kiện
                 của mình một cách dễ dàng và chuyên nghiệp.
               </p>
-              <div className="d-flex gap-2 flex-wrap">
-                <RouterLink to="/signup0" className="btn btn-danger">
+
+              <div className="d-flex gap-3 flex-wrap mb-4">
+                <RouterLink
+                  to="/signup"
+                  className="btn btn-lg px-4 shadow"
+                  style={{
+                    background: "#ef4444",
+                    color: "white",
+                    border: "none",
+                    fontWeight: "400",
+                  }}
+                >
+                  <i className="bi bi-rocket-takeoff me-1"></i>
                   Bắt đầu ngay
                 </RouterLink>
-                <RouterLink to="/about" className="btn btn-outline-secondary">
+                <RouterLink
+                  to="/about"
+                  className="btn btn-lg px-4"
+                  style={{
+                    background: "white",
+                    color: "#ef4444",
+                    border: "1px solid #ef4444",
+                    fontWeight: "600",
+                  }}
+                >
                   Xem thêm
                 </RouterLink>
               </div>
+
+              <div className="d-flex align-items-center gap-3 mt-5">
+                <div className="d-flex">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="rounded-circle"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        marginLeft: i > 1 ? -10 : 0,
+                        backgroundImage: `url(https://i.pravatar.cc/32?img=${i})`,
+                        backgroundSize: "cover",
+                        border: "2px solid white",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      }}
+                    />
+                  ))}
+                </div>
+                <small style={{ color: "#6b7280" }}>
+                  <strong style={{ color: "#ef4444" }}>50 +</strong> sự kiện tin
+                  dùng thành công
+                </small>
+              </div>
             </div>
-            <div className="col-12 col-sm-6 d-flex justify-content-sm-end justify-content-center ps-sm-0 ms-sm-n3">
+
+            {/* Right Dashboard Preview (code 2 style) — stretched + responsive inner scale */}
+            <div className="col-lg-6 d-flex align-items-stretch justify-content-lg-end justify-content-center ps-lg-0 ms-lg-n3">
               <div
-                className="card shadow w-100"
+                className="card shadow w-100 h-100"
                 style={{
                   maxWidth: 720,
                   background:
                     "linear-gradient(135deg, #0f172a 0%, #111827 100%)",
                 }}
               >
-                <div className="card-body">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
+                <div
+                  className="card-body"
+                  style={{
+                    // chiều cao tham chiếu cho toàn bộ nội dung, mọi phần tử con scale theo
+                    "--cardH": "clamp(420px, 52vh, 600px)",
+                    minHeight: "var(--cardH)",
+                  }}
+                >
+                  {/* Header skeleton */}
+                  <div
+                    className="d-flex justify-content-between align-items-center"
+                    style={{
+                      marginBottom:
+                        "clamp(12px, calc(var(--cardH) * 0.035), 24px)",
+                    }}
+                  >
                     <div>
                       <div
                         style={{
@@ -88,7 +169,8 @@ export default function FPTEvent_Landing() {
                           height: 12,
                           backgroundColor: "#334155",
                           borderRadius: 4,
-                          marginBottom: 6,
+                          marginBottom:
+                            "clamp(6px, calc(var(--cardH) * 0.012), 10px)",
                         }}
                       />
                       <div
@@ -102,14 +184,22 @@ export default function FPTEvent_Landing() {
                     </div>
                     <div
                       style={{
-                        width: 48,
-                        height: 48,
+                        width: "clamp(40px, calc(var(--cardH) * 0.08), 64px)",
+                        height: "clamp(40px, calc(var(--cardH) * 0.08), 64px)",
                         backgroundColor: "#334155",
                         borderRadius: "50%",
                       }}
                     />
                   </div>
-                  <div className="row g-2">
+
+                  {/* 3 ô nhỏ */}
+                  <div
+                    className="row g-2"
+                    style={{
+                      marginBottom:
+                        "clamp(8px, calc(var(--cardH) * 0.02), 16px)",
+                    }}
+                  >
                     {["#3b82f6", "#8b5cf6", "#10b981"].map((c, i) => (
                       <div className="col-4" key={i}>
                         <div
@@ -118,16 +208,20 @@ export default function FPTEvent_Landing() {
                         >
                           <div
                             style={{
-                              width: 64,
-                              height: 8,
+                              width:
+                                "clamp(56px, calc(var(--cardH) * 0.12), 96px)",
+                              height:
+                                "clamp(8px, calc(var(--cardH) * 0.02), 12px)",
                               background: "#334155",
                               borderRadius: 4,
-                              marginBottom: 8,
+                              marginBottom:
+                                "clamp(6px, calc(var(--cardH) * 0.012), 10px)",
                             }}
                           />
                           <div
                             style={{
-                              height: 24,
+                              height:
+                                "clamp(20px, calc(var(--cardH) * 0.06), 48px)",
                               borderRadius: 4,
                               background: c,
                             }}
@@ -136,13 +230,18 @@ export default function FPTEvent_Landing() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Biểu đồ cột */}
                   <div
-                    className="mt-3 rounded-3 p-3"
+                    className="rounded-3 p-3"
                     style={{ background: "rgba(30,41,59,.5)" }}
                   >
                     <div
                       className="d-flex align-items-end gap-2"
-                      style={{ height: 96 }}
+                      style={{
+                        height:
+                          "clamp(280px, calc(var(--cardH) * 0.42), 280px)",
+                      }}
                     >
                       {[45, 65, 55, 85, 75, 95].map((h, idx) => (
                         <div
@@ -155,7 +254,14 @@ export default function FPTEvent_Landing() {
                               idx % 2
                                 ? "linear-gradient(180deg, rgba(139,92,246,.7), rgba(139,92,246,.3))"
                                 : "linear-gradient(180deg, rgba(59,130,246,.7), rgba(59,130,246,.3))",
+                            transition: "transform .15s ease",
                           }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.transform = "scaleY(1.03)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "scaleY(1)")
+                          }
                         />
                       ))}
                     </div>
@@ -163,6 +269,7 @@ export default function FPTEvent_Landing() {
                 </div>
               </div>
             </div>
+            {/* END Right Dashboard Preview */}
           </div>
         </div>
       </section>
@@ -181,6 +288,7 @@ export default function FPTEvent_Landing() {
               chuyên nghiệp
             </p>
           </div>
+
           <div className="row g-3">
             {[
               {
@@ -191,21 +299,21 @@ export default function FPTEvent_Landing() {
                 color: "#3b82f6",
               },
               {
-                icon: "bi-people",
+                icon: "bi-people-fill",
                 title: "Tổ chức sự kiện",
-                text: "Tạo, lên lịch và quản lý sự kiên với tính năng thống báo, lên lịch họp và các mốc thời gian chi tiết.",
+                text: "Tạo, lên lịch và quản lý sự kiện với tính năng thông báo, lên lịch họp và các mốc thời gian chi tiết.",
                 bg: "#fef3c7",
                 color: "#f59e0b",
               },
               {
-                icon: "bi-bar-chart",
+                icon: "bi-bar-chart-fill",
                 title: "Thống kê chi tiết",
                 text: "Xem báo cáo và thống kê chi tiết về hiệu quả của các sự kiện đã tổ chức.",
                 bg: "#d1fae5",
                 color: "#10b981",
               },
               {
-                icon: "bi-bell",
+                icon: "bi-bell-fill",
                 title: "Thông báo tức thời",
                 text: "Nhận thông báo về các sự kiện sắp diễn ra và cập nhật quan trọng.",
                 bg: "#eee7ff",
@@ -216,7 +324,7 @@ export default function FPTEvent_Landing() {
                 <div className="card h-100 border-0 shadow-sm">
                   <div className="card-body">
                     <div
-                      className="rounded-2 d-grid place-items-center mb-2"
+                      className="rounded-2 d-flex align-items-center justify-content-center mb-2"
                       style={{
                         width: 48,
                         height: 48,
@@ -224,8 +332,9 @@ export default function FPTEvent_Landing() {
                         color: f.color,
                       }}
                     >
-                      <i className={`bi ${f.icon}`} />
+                      <i className={`bi ${f.icon} fs-3`} aria-hidden="true" />
                     </div>
+
                     <h6 className="fw-semibold" style={{ color: "#111827" }}>
                       {f.title}
                     </h6>

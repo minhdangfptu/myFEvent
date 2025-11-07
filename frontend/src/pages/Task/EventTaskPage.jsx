@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
@@ -7,9 +7,11 @@ import NoDataImg from "~/assets/no-data.png";
 import { taskApi } from "~/apis/taskApi";
 import { departmentService } from "~/services/departmentService";
 import { milestoneApi } from "~/apis/milestoneApi";
+import { eventApi } from "~/apis/eventApi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
+import { useAuth } from "~/contexts/AuthContext";
 
 export default function EventTaskPage() {
   const { t } = useTranslation();
@@ -50,6 +52,8 @@ export default function EventTaskPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState("list");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [eventInfo, setEventInfo] = useState(null);
 
   useEffect(() => {
     if (!eventId) return;
@@ -57,48 +61,71 @@ export default function EventTaskPage() {
       .getDepartments(eventId)
       .then((depts) => setDepartments(depts || []))
       .catch(() => setDepartments([]));
+    
+    // Lấy thông tin sự kiện để validate deadline
+    eventApi.getById(eventId)
+      .then((res) => {
+        const event = res?.data?.event || res?.data;
+        if (event) {
+          setEventInfo({
+            eventStartDate: event.eventStartDate,
+            eventEndDate: event.eventEndDate,
+          });
+        }
+      })
+      .catch(() => {
+        // Nếu không lấy được thông tin event, vẫn cho phép tạo task
+        setEventInfo(null);
+      });
   }, [eventId]);
 
-  useEffect(() => {
+  const fetchTasks = useCallback(() => {
     if (!eventId) return;
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
         const mapped = arr.map((task) => ({
-          id: task._id,
-          name: task.title || "",
-          description: task.description || "",
-          department: task.departmentId.name || "Chưa phân công",
-          assignee: task.assigneeId.userId.fullName || "Chưa phân công",
-          milestone: task.milestoneId || "Chưa có",
-          parent: task.parentId || "Chưa có",
-          due: task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "",
+          id: task?._id,
+          name: task?.title || "",
+          description: task?.description || "",
+          department: task?.departmentId?.name || "Chưa phân công",
+          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+          milestone: task?.milestoneId || "Chưa có",
+          parent: task?.parentId || "Chưa có",
+          due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
           status:
- task.status === "done"
+            task?.status === "done"
               ? "Hoàn thành"
-              : task.status === "blocked"
+              : task?.status === "blocked"
               ? "Tạm hoãn"
-              : task.status === "todo"
+              : task?.status === "todo"
               ? "Chưa bắt đầu"
-              : task.status === "cancelled"
+              : task?.status === "cancelled"
               ? "Đã huỷ"
               : "Đang làm",
-          estimate: task.estimate + task.estimateUnit || "Ước tính",
-          createdAt: task.createdAt
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "Thời gian",
-          updatedAt: task.updatedAt
-            ? new Date(task.dueDate).toLocaleDateString("vi-VN")
-            : "Thời gian",
-          progressPct: task.progressPct || "Tiến đọo",
+          estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
+          createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
+          updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
+          progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
         }));
         setTasks(mapped);
       })
       .catch((err) => setTasks([]));
   }, [eventId]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Cập nhật thời gian mỗi giây
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const priorityColor = (p) => {
     if (p === "Cao")
@@ -139,7 +166,7 @@ export default function EventTaskPage() {
       if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
       return 0;
     });
-
+    
   const taskStats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "Hoàn thành").length,
@@ -182,6 +209,7 @@ export default function EventTaskPage() {
     description: "",
     departmentId: "",
     assigneeId: "",
+    startDate: "",
     dueDate: "",
     estimate: "",
     estimateUnit: "h",
@@ -194,6 +222,27 @@ export default function EventTaskPage() {
   const [parents, setParents] = useState([]);
   const [deps, setDeps] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
+  const [depFilterDepartment, setDepFilterDepartment] = useState("Tất cả");
+  const [depSearch, setDepSearch] = useState("");
+  const filteredDeps = useMemo(() => {
+    const text = (depSearch || "").toLowerCase();
+    return (deps || []).filter((d) => {
+      const depName = d?.departmentId?.name || "";
+      const byDept = depFilterDepartment === "Tất cả" || depName === depFilterDepartment;
+      const byText = (d?.title || "").toLowerCase().includes(text);
+      return byDept && byText;
+    });
+  }, [deps, depFilterDepartment, depSearch]);
+
+  const selectedDepartmentName = useMemo(() => (
+    departments.find((d) => d._id === addTaskForm.departmentId)?.name || ""
+  ), [departments, addTaskForm.departmentId]);
+
+  const filteredParents = useMemo(() => {
+    const list = Array.isArray(parents) ? parents : [];
+    if (!addTaskForm.departmentId) return list;
+    return list.filter((p) => (p?.departmentId?.name || "") === selectedDepartmentName);
+  }, [parents, addTaskForm.departmentId, selectedDepartmentName]);
 
   useEffect(() => {
     if (!eventId || !showAddModal) return;
@@ -240,6 +289,7 @@ export default function EventTaskPage() {
       description: orUndef(addTaskForm.description),
       departmentId: addTaskForm.departmentId,
       assigneeId: orUndef(addTaskForm.assigneeId),      // chỉ gửi khi có
+      startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
       dueDate: toISO(addTaskForm.dueDate),
       estimate: toNum(addTaskForm.estimate),
       estimateUnit: addTaskForm.estimateUnit || "h",
@@ -258,6 +308,7 @@ export default function EventTaskPage() {
         description: "",
         departmentId: "",
         assigneeId: "",
+        startDate: "",
         dueDate: "",
         estimate: "",
         estimateUnit: "h",
@@ -297,8 +348,14 @@ export default function EventTaskPage() {
   
       toast.success("Tạo công việc thành công!");
     } catch (err) {
-      setAddTaskError("Thêm công việc thất bại!");
-      toast.error("Thêm công việc thất bại!");
+      // Hiển thị lỗi từ backend
+      const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
+      const errors = err?.response?.data?.errors || [];
+      const fullError = errors.length > 0 
+        ? `${errorMessage}: ${errors.join(", ")}`
+        : errorMessage;
+      setAddTaskError(fullError);
+      toast.error(fullError);
     }
   };
   
@@ -313,6 +370,8 @@ export default function EventTaskPage() {
     },
     { notStarted: [], inProgress: [], done: [] }
   );
+
+  const { user } = useAuth();
 
   return (
     <>
@@ -414,6 +473,9 @@ export default function EventTaskPage() {
               </div>
               <div className="col-md-6">
                 <div className="row g-2">
+                <div className="col-6">
+                    
+                  </div>
                   <div className="col-6">
                     <div
                       className="stat-card text-center"
@@ -427,25 +489,11 @@ export default function EventTaskPage() {
                         {taskStats.completed}/{taskStats.total}
                       </div>
                       <div className="small">
-                        {t("taskPage.stats.completed")}
+                        Công việc đã hoàn thành
                       </div>
                     </div>
                   </div>
-                  <div className="col-6">
-                    <div
-                      className="stat-card text-center"
-                      style={{
-                        background: "rgba(255,255,255,0.2)",
-                        border: "none",
-                        color: "white",
-                      }}
-                    >
-                      <div className="fs-4 fw-bold">
-                        {taskStats.highPriority}
-                      </div>
-                      <div className="small">{t("taskPage.stats.high")}</div>
-                    </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>
@@ -646,7 +694,12 @@ export default function EventTaskPage() {
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <KanbanBoardTask eventId = {eventId} listTask={statusGroup} />
+              <KanbanBoardTask 
+                eventId={eventId}
+                listTask={statusGroup}
+                onTaskMove={fetchTasks}
+                currentUserId={user?._id}
+              />
             </div>
           )}
         </div>
@@ -762,8 +815,8 @@ export default function EventTaskPage() {
               tabIndex={-1}
               style={{ zIndex: 1060 }}
             >
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
+              <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 900, width: '90%' }}>
+                <div className="modal-content" style={{ borderRadius: 16 }}>
                   <div className="modal-header">
                     <h5 className="modal-title">➕ Thêm công việc mới</h5>
                     <button
@@ -772,7 +825,7 @@ export default function EventTaskPage() {
                       onClick={() => setShowAddModal(false)}
                     />
                   </div>
-                  <div className="modal-body">
+                  <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {addTaskError && (
                       <div className="alert alert-danger mb-2">
                         {addTaskError}
@@ -799,6 +852,7 @@ export default function EventTaskPage() {
                           handleAddTaskInput("description", e.target.value)
                         }
                         placeholder="Mô tả ngắn..."
+                        rows={3}
                       />
                     </div>
                     <div className="row">
@@ -831,24 +885,81 @@ export default function EventTaskPage() {
                         >
                           <option value="">Chọn người phụ trách</option>
                           {assignees.map((m) => (
-                            <option key={m._id} value={m._id}>
-                              {m.userId?.fullName || m.fullName}
+                            <option key={m._id || m.id || m.userId} value={m._id || m.id || m.userId}>
+                              {m.userId?.fullName || m.fullName || m.name}
                             </option>
                           ))}
                         </select>
+                        {console.log('assignees', assignees)}
                       </div>
                     </div>
                     <div className="row">
                       <div className="col-md-6 mb-3">
+                        <label className="form-label">Thời gian bắt đầu</label>
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          value={addTaskForm.startDate}
+                          onChange={(e) =>
+                            handleAddTaskInput("startDate", e.target.value)
+                          }
+                          min={(() => {
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1); // Thêm 1 phút để đảm bảo sau thời điểm hiện tại
+                            const minDateTime = now.toISOString().slice(0, 16);
+                            if (eventInfo?.eventStartDate) {
+                              const eventStart = new Date(eventInfo.eventStartDate);
+                              const eventStartStr = eventStart.toISOString().slice(0, 16);
+                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            }
+                            return minDateTime;
+                          })()}
+                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
+                        />
+                        {eventInfo && (
+                          <div className="form-text small text-muted">
+                            Thời gian bắt đầu phải sau thời điểm hiện tại
+                            {eventInfo.eventStartDate && ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
+                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-6 mb-3">
                         <label className="form-label">Deadline *</label>
                         <input
-                          type="date"
+                          type="datetime-local"
                           className="form-control"
                           value={addTaskForm.dueDate}
                           onChange={(e) =>
                             handleAddTaskInput("dueDate", e.target.value)
                           }
+                          min={(() => {
+                            // Nếu có startDate, min phải sau startDate, nếu không thì sau thời điểm hiện tại
+                            if (addTaskForm.startDate) {
+                              const startDate = new Date(addTaskForm.startDate);
+                              startDate.setMinutes(startDate.getMinutes() + 1);
+                              return startDate.toISOString().slice(0, 16);
+                            }
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1);
+                            const minDateTime = now.toISOString().slice(0, 16);
+                            if (eventInfo?.eventStartDate) {
+                              const eventStart = new Date(eventInfo.eventStartDate);
+                              const eventStartStr = eventStart.toISOString().slice(0, 16);
+                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            }
+                            return minDateTime;
+                          })()}
+                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
+                        {eventInfo && (
+                          <div className="form-text small text-muted">
+                            Deadline phải sau thời điểm hiện tại
+                            {addTaskForm.startDate && " và sau thời gian bắt đầu"}
+                            {eventInfo.eventStartDate && `, sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
+                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-3 mb-3">
                         <label className="form-label">Ước tính *</label>
@@ -873,6 +984,7 @@ export default function EventTaskPage() {
                         >
                           <option value="h">giờ</option>
                           <option value="d">ngày</option>
+                          <option value="w">tuần</option>
                         </select>
                       </div>
                     </div>
@@ -899,38 +1011,54 @@ export default function EventTaskPage() {
                         <select
                           className="form-select"
                           value={addTaskForm.parentId}
-                          onChange={(e) =>
-                            handleAddTaskInput("parentId", e.target.value)
-                          }
+                          onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
+                          disabled={!addTaskForm.departmentId}
                         >
                           <option value="">Không có</option>
-                          {parents
-                            .filter((p) => !p.parentId)
-                            .map((p) => (
-                              <option key={p._id} value={p._id}>
-                                {p.title}
-                              </option>
-                            ))}
+                          {filteredParents.map((p) => (
+                            <option key={p._id} value={p._id}>
+                              {p.title}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Task phụ thuộc</label>
+                      <div className="d-flex gap-2 mb-2">
+                        <select
+                          className="form-select form-select-sm soft-input"
+                          style={{ width: 200, height: 40 }}
+                          value={depFilterDepartment}
+                          onChange={(e) => setDepFilterDepartment(e.target.value)}
+                        >
+                          <option value="Tất cả">Tất cả ban</option>
+                          {departments.map((dept) => (
+                            <option key={dept._id} value={dept.name}>{dept.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          className="form-control soft-input"
+                          style={{ height: 40 }}
+                          placeholder="Tìm theo tên task"
+                          value={depSearch}
+                          onChange={(e) => setDepSearch(e.target.value)}
+                        />
+                      </div>
                       <select
                         multiple
                         className="form-select"
+                        size={6}
+                        style={{ minHeight: 160 }}
                         value={addTaskForm.dependencies}
                         onChange={(e) =>
                           handleAddTaskInput(
                             "dependencies",
-                            Array.from(
-                              e.target.selectedOptions,
-                              (opt) => opt.value
-                            )
+                            Array.from(e.target.selectedOptions, (opt) => opt.value)
                           )
                         }
                       >
-                        {deps.map((d) => (
+                        {filteredDeps.map((d) => (
                           <option key={d._id} value={d._id}>
                             {d.title}
                           </option>

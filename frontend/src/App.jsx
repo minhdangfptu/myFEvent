@@ -34,7 +34,7 @@ import DepartmentDetail from './pages/ManageDept&Member/DepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import Risk from './pages/User/Risk';
+import RiskListPage from './pages/Risk/ListRiskPage';
 import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
@@ -56,6 +56,14 @@ import { EventProvider } from "./contexts/EventContext";
 import MemberPage from "./pages/ManageDept&Member/MemberEvent";
 import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
+import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
+import EventDetailPage from "./pages/User/EventDetailPage";
+import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
+
+// Feedback Pages
+import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
+import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
+import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -248,10 +256,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/risk" 
+            path="/events/:eventId/risks"  
             element={
               <ProtectedRoute requiredRole="user">
-                <Risk />
+                <RiskListPage />
               </ProtectedRoute>
             } 
           />
@@ -271,6 +279,15 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          
+          <Route 
+            path="events/:eventId/tasks/gantt" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <GanttChartTaskPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/events/:eventId/members" 
             element={
@@ -280,10 +297,61 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/members/:memberId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <MemberProfilePage/>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/home-page" 
             element={
               <ProtectedRoute requiredRole="user">
                 < HomePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="home-page/events/:eventId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <EventDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Feedback Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/feedback" 
+            element={
+              <ProtectedRoute>
+                <ManageFeedbackEventPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/create" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/summary" 
+            element={
+              <ProtectedRoute>
+                <FeedbackSummary />
               </ProtectedRoute>
             } 
           />

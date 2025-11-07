@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
 import { authApi } from '../../apis/authApi';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import Loading from '~/components/Loading';
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [notice, setNotice] = useState({ open: false, type: 'success', message: '' });
-  const showNotice = (type, message) => {
-    setNotice({ open: true, type, message });
-    window.clearTimeout(showNotice._t);
-    showNotice._t = window.setTimeout(() => setNotice(n => ({ ...n, open: false })), 3200);
+  // notify wrapper using react-toastify
+  const notify = (type, msg) => {
+    if (!msg) return;
+    if (type === 'success') toast.success(msg);
+    else if (type === 'error') toast.error(msg);
+    else toast.warn(msg);
   };
-  const notify = (type, msg) => showNotice(type, msg);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -96,21 +99,53 @@ export default function UserProfilePage() {
     if (saving) return;
     setSaving(true);
     try {
-      const payload = { ...form };
+      // Đảm bảo gửi đầy đủ các field, kể cả khi chúng là empty string
+      const payload = {
+        fullName: form.fullName || '',
+        phone: form.phone || '',
+        bio: form.bio || '',
+        highlight: form.highlight || '',
+        tags: Array.isArray(form.tags) ? form.tags : []
+      };
+      
+      // Chỉ gửi avatarUrl nếu có file mới hoặc muốn giữ nguyên avatar hiện tại
       if (avatarFile) {
         try {
           const b64 = await fileToBase64(avatarFile);
           payload.avatarUrl = b64;
         } catch (_) {
           notify('warning', 'Không thể đọc ảnh đại diện. Vui lòng thử lại.');
+          setSaving(false);
+          return;
         }
       }
+      // Nếu không có avatarFile mới, không gửi avatarUrl để giữ nguyên avatar hiện tại
 
-      await authApi.updateProfile(payload);
-
-      // reload profile từ server để chắc chắn ảnh đã lưu
-      const res = await authApi.getProfile();
-      setProfile(res?.data || res || null);
+      const response = await authApi.updateProfile(payload);
+      
+      // Sử dụng dữ liệu từ response hoặc reload từ server
+      let newProfile = response?.data || null;
+      if (!newProfile) {
+        const res = await authApi.getProfile();
+        newProfile = res?.data || res || null;
+      }
+      
+      if (newProfile) {
+        setProfile(newProfile);
+        // Cập nhật form state với dữ liệu mới từ server
+        setForm({
+          fullName: newProfile.fullName || '',
+          phone: newProfile.phone || '',
+          bio: newProfile.bio || '',
+          highlight: newProfile.highlight || '',
+          tags: Array.isArray(newProfile.tags) ? newProfile.tags : []
+        });
+        setAvatarPreview(newProfile.avatarUrl || null);
+        
+        try {
+          window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
+        } catch (e) { /* noop */ }
+      }
 
       setEditing(false);
       setAvatarFile(null);
@@ -122,7 +157,9 @@ export default function UserProfilePage() {
         notify('success', 'Ảnh đại diện đã được cập nhật.');
       }
     } catch (e) {
-      notify('error', 'Lưu thất bại. Vui lòng thử lại.');
+      console.error('Save profile error:', e);
+      const errorMessage = e?.response?.data?.message || e?.message || 'Lưu thất bại. Vui lòng thử lại.';
+      notify('error', errorMessage);
     } finally {
       setSaving(false);
     }
@@ -207,7 +244,23 @@ export default function UserProfilePage() {
   }, [showAvatarDropdown]);
 
   return (
-    <UserLayout title="Hồ sơ của tôi" activePage="profile">
+    <UserLayout title="Hồ sơ của tôi" activePage="account">
+      {loading ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(255,255,255,1)",
+            zIndex: 2000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Loading size={100} />
+        </div>
+      ) : null}
+
       <style>{`
         .mp-primary { color: #EF4444; }
         .mp-bg-primary { background: #EF4444; }
@@ -256,7 +309,7 @@ export default function UserProfilePage() {
       <div className="container-fluid">
         <div className="position-relative" style={{ minHeight: 120 }}>
           <div className="mp-header d-flex align-items-start justify-content-between" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 180, zIndex: 0 }}>
-            <div className="mp-section text-white fw-semibold p-3 fs-4 mt-4">MY PROFILE </div>
+            <div className="mp-section text-white fw-semibold p-3 fs-4 mt-4">HỒ SƠ CỦA TÔI </div>
           </div>
 
           <div className="mp-section position-relative" style={{ zIndex: 1, paddingTop: 120 }}>
@@ -616,31 +669,18 @@ export default function UserProfilePage() {
         </>
       )}
 
-      {/* Toast/Window Notice */}
-      {notice.open && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`mp-toast ${
-            notice.type === 'success' ? 'mp-toast-success'
-            : notice.type === 'error' ? 'mp-toast-error'
-            : 'mp-toast-warning'
-          }`}
-        >
-          <div style={{ fontSize: 22 }}>
-            {notice.type === 'success' ? '✅' : notice.type === 'error' ? '❌' : '⚠️'}
-          </div>
-          <div className="flex-grow-1">
-            <div className="mp-toast-title">
-              {notice.type === 'success' ? 'Thành công' : notice.type === 'error' ? 'Thất bại' : 'Lưu ý'}
-            </div>
-            <div className="mp-toast-msg">{notice.message}</div>
-          </div>
-          <button className="mp-toast-close" aria-label="Đóng" onClick={() => setNotice(n => ({ ...n, open: false }))}>
-            ×
-          </button>
-        </div>
-      )}
+      {/* React Toastify container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </UserLayout>
   );
 }

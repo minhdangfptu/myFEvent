@@ -23,9 +23,7 @@ const UserSchema = new Schema({
   tags: { type: [String], default: [] },
   phone: {
     type: String,
-    required: function () { return this.authProvider === 'local'; },
-    set: v => (v && String(v).trim() ? String(v).trim() : undefined),
-    trim: true,
+    unique: true,
   },
   status: {
     type: String,
@@ -38,6 +36,10 @@ const UserSchema = new Schema({
     type: String,
     enum: ['user', 'admin'],
     default: 'user',
+  },
+  verified: {
+    type: Boolean,
+    default: false,
   },
 }, { timestamps: true });
 UserSchema.index({ phone: 1 },    { unique: true, partialFilterExpression: { phone: { $type: "string" } } });

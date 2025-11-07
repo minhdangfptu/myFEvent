@@ -17,9 +17,16 @@ export const eventApi = {
       throw error;
     }
   },
-  create: async ({ name, description, eventDate, location, type, organizerName, images }) => {
-    const res = await axiosClient.post('/api/events', { name, description, eventDate, location, type, organizerName, images });
-    return res.data;
+  create: async ({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images }) => {
+    // console.log({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
+    const res = await axiosClient.post('/api/events', { name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
+    // console.log(res);
+    // Trả về cả status, message và data nếu có
+    return {
+      status: res.status,
+      message: res.data?.message,
+      data: res.data?.data || res.data
+    };
   },
   replaceImages: async (eventId, images) => {
     const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
@@ -31,6 +38,7 @@ export const eventApi = {
   },
   getEventSummary: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/summary`);
+    console.log(res)
     return res.data;
   },
   updateEvent: async (eventId, data) => {
@@ -72,7 +80,12 @@ export const eventApi = {
   getUnassignedMembersByEvent: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/unassigned-members`);
     return res.data;
-  }
+  },
+  getMemberDetail: async (eventId, memberId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
+    return res.data;
+  },
+
 }
 
 

@@ -5,6 +5,10 @@ export const taskApi = {
     const res = await axiosClient.get(`/api/tasks/${eventId}`);
     return res.data;
   },
+  getTaskByEventAndDepartment: async (eventId, departmentId, taskId) => {
+    const res = await axiosClient.get(`/api/tasks/${eventId}/${taskId}/${departmentId}`);
+    return res.data;
+  },
   createTask: async (eventId, data) => {
     const res = await axiosClient.post(`/api/tasks/${eventId}/create-new-task`, data);
     return res.data;
@@ -20,7 +24,7 @@ export const taskApi = {
   deleteTask: async (eventId, taskId) => {
     const res = await axiosClient.delete(`/api/tasks/${eventId}/${taskId}`);
     console.log(res);
-    if(res.status === 403) return res.status
+    if (res.status === 403) return res.status
     return res.data;
   },
   // Update status/progress; 'payload' can be a string status or an object { status, progressPct, force }
@@ -39,5 +43,5 @@ export const taskApi = {
     const res = await axiosClient.patch(`/api/tasks/${eventId}/${taskId}/unassign`);
     return res.data;
   },
-  
+
 }

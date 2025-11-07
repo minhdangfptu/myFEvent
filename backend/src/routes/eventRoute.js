@@ -1,26 +1,17 @@
 import express from 'express';
 import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
-import {
-  createMilestone,
-  listMilestones,
-  getMilestoneDetail,
-  updateMilestone,
-  deleteMilestone
-} from '../controllers/milestoneController.js';
-import {
-  listDepartmentsByEvent,
-  getDepartmentDetail,
-  createDepartment,
-  assignHod,
-  changeHoD,
-  addMemberToDepartment,
-  removeMemberFromDepartment,
-  editDepartment,
-} from '../controllers/departmentController.js';
-import { getMembersByEvent, getUnassignedMembersByEvent,getMembersByDepartment } from '../controllers/eventMemberController.js';
+import milestoneRoute from './milestoneRoute.js';
+import departmentRoute from './departmentRoute.js';
+import eventMemberRoute from './eventMemberRoute.js';
+import riskRoute from './riskRoute.js';
 
 const router = express.Router();
+
+router.use('/:eventId/milestones',milestoneRoute);
+router.use('/:eventId/departments',departmentRoute);
+router.use('/:eventId/members', eventMemberRoute);
+router.use('/:eventId/risks', riskRoute);
 
 // Public events
 router.get('/public', listPublicEvents);
@@ -53,30 +44,6 @@ router.patch('/:id/images', authenticateToken, replaceEventImages);
 router.post('/:id/images', authenticateToken, addEventImages);
 router.delete('/:id/images', authenticateToken, removeEventImages);
 
-router.post('/:eventId/milestones', authenticateToken, createMilestone);
-router.get('/:eventId/milestones', authenticateToken, listMilestones);
-router.get('/:eventId/milestones/:milestoneId', authenticateToken, getMilestoneDetail);
-router.patch('/:eventId/milestones/:milestoneId', authenticateToken, updateMilestone);
-router.delete('/:eventId/milestones/:milestoneId', authenticateToken, deleteMilestone);
-
-router.get('/:eventId/departments', authenticateToken, listDepartmentsByEvent);
-router.get('/:eventId/departments/:departmentId', authenticateToken, getDepartmentDetail);
-
-// Department management
-router.post('/:eventId/departments', authenticateToken, createDepartment);
-
-router.patch('/:eventId/departments/:departmentId/assign-hod', authenticateToken, assignHod);
-router.patch('/:eventId/departments/:departmentId/change-hod', authenticateToken, changeHoD);
-router.post('/:eventId/departments/:departmentId/members', authenticateToken, addMemberToDepartment);
-router.delete('/:eventId/departments/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
-router.patch('/:eventId/departments/:departmentId', authenticateToken, editDepartment)
-
-//Event member management
-router.get('/:eventId/members', authenticateToken, getMembersByEvent);
-router.get('/:eventId/unassigned-members', authenticateToken, getUnassignedMembersByEvent);
-router.get('/:eventId/departments/:departmentId/members', authenticateToken, getMembersByDepartment);
-
-//Event role 
 
 export default router;
 

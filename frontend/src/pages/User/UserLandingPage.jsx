@@ -7,7 +7,7 @@ import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function UserHomePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -24,10 +24,18 @@ export default function UserHomePage() {
 
   // Kiểm tra sự kiện của user và redirect
   useEffect(() => {
-    checkUserEvents();
-  }, []);
+    // Đợi authLoading xong trước khi check events
+    if (!authLoading) {
+      checkUserEvents();
+    }
+  }, [authLoading]);
 
   const checkUserEvents = async () => {
+    // Đợi authLoading xong và có user trước khi fetch
+    if (authLoading || !user) {
+      setLoading(true);
+      return;
+    }
     try {
       setLoading(true);
       const response = await eventApi.listMyEvents();

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { ToastContainer, toast } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
+import ConfirmModal from "~/components/ConfirmModal"
 import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
@@ -330,6 +333,7 @@ const Milestone = () => {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showCreatedModal, setShowCreatedModal] = useState(false)
 
   const currentEvent = events.find((event) => event._id === eventId)
 
@@ -470,7 +474,8 @@ const Milestone = () => {
       await fetchMilestones()
       setShowCreateModal(false)
       setCreateForm({ name: "", description: "", targetDate: "", status: "Đã lên kế hoạch" })
-      alert("Tạo cột mốc thành công!")
+      setShowCreatedModal(true)
+      toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
       setError(err.response?.data?.message || "Tạo cột mốc thất bại")
@@ -491,8 +496,9 @@ const Milestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole} sidebarType="hooc" title='Cột mốc sự kiện'>
+    <UserLayout eventRole={eventRole} activePage= "work-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
       <style>{animationStyles}</style>
+      <ToastContainer position="top-right" autoClose={3000} />
 
       <div style={styles.container}>
         <div style={styles.header}>
@@ -743,6 +749,12 @@ const Milestone = () => {
           </div>
         )}
       </div>
+      <ConfirmModal
+        show={showCreatedModal}
+        onClose={() => setShowCreatedModal(false)}
+        onConfirm={() => setShowCreatedModal(false)}
+        message="Tạo cột mốc thành công!"
+      />
     </UserLayout>
   )
 }

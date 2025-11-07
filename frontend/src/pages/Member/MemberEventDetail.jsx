@@ -146,7 +146,7 @@ export default function MemberEventDetail() {
             <h5 className="fw-bold mb-3">Thông tin sự kiện</h5>
             <div className="row">
               <div className="col-md-6">
-                <p><strong>Ngày tổ chức:</strong> {new Date(event.eventDate).toLocaleDateString('vi-VN')}</p>
+                <p><strong>Ngày tổ chức:</strong> {new Date(event.eventStartDate).toLocaleDateString('vi-VN')} " - " {new Date(event?.eventEndDate).toLocaleDateString('vi-VN')} </p>
                 <p><strong>Địa điểm:</strong> {event.location || 'Chưa cập nhật'}</p>
                 <p><strong>Đơn vị tổ chức:</strong> {event.organizerName?.fullName || event.organizerName || 'Chưa cập nhật'}</p>
               </div>
