@@ -4,12 +4,14 @@ import { authenticateToken } from '../middlewares/authMiddleware.js';
 import milestoneRoute from './milestoneRoute.js';
 import departmentRoute from './departmentRoute.js';
 import eventMemberRoute from './eventMemberRoute.js';
+import riskRoute from './riskRoute.js';
 
 const router = express.Router();
 
 router.use('/:eventId/milestones',milestoneRoute);
 router.use('/:eventId/departments',departmentRoute);
 router.use('/:eventId/members', eventMemberRoute);
+router.use('/:eventId/risks', riskRoute);
 
 // Public events
 router.get('/public', listPublicEvents);

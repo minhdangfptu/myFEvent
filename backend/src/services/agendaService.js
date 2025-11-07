@@ -1,5 +1,4 @@
 import Agenda from '../models/agenda.js';
-import Milestone from '../models/milestone.js';
 
 export const getAgendasByMilestoneId = async (milestoneId) => {
     return await Agenda.find({ milestoneId }).sort({ startTime: 1 }).lean();

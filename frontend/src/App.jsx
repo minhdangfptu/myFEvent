@@ -34,7 +34,7 @@ import DepartmentDetail from './pages/ManageDept&Member/DepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import Risk from './pages/User/Risk';
+import RiskListPage from './pages/Risk/ListRiskPage';
 import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
@@ -58,6 +58,7 @@ import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
+import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -250,10 +251,10 @@ export default function App() {
             } 
           />
           <Route 
-            path="/risk" 
+            path="/events/:eventId/risks"  
             element={
               <ProtectedRoute requiredRole="user">
-                <Risk />
+                <RiskListPage />
               </ProtectedRoute>
             } 
           />
@@ -287,6 +288,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <MemberPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/members/:memberId" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <MemberProfilePage/>
               </ProtectedRoute>
             } 
           />
