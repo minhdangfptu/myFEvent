@@ -59,6 +59,11 @@ import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 
+// Feedback Pages
+import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
+import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
+import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -304,6 +309,40 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <EventDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Feedback Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/feedback" 
+            element={
+              <ProtectedRoute>
+                <ManageFeedbackEventPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/create" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/summary" 
+            element={
+              <ProtectedRoute>
+                <FeedbackSummary />
               </ProtectedRoute>
             } 
           />

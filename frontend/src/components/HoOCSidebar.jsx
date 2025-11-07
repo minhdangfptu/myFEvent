@@ -460,7 +460,7 @@ export default function HoOCSidebar({
 
                 <button
                   className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => navigate("/task")}
+                  onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
                   title="Phản hồi"
                 >
                   <div className="d-flex align-items-center">
