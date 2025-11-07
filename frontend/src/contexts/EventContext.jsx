@@ -39,6 +39,7 @@ export function EventProvider({ children }) {
     fetchEvents();
   }, [fetchEvents]);
 
+  // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {
     if (!eventId) return "";
     // Return cached role if available

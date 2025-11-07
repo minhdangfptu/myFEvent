@@ -65,7 +65,6 @@ export const eventService = {
       pagination: { page: p, limit: lim, total, totalPages: Math.ceil(total / lim) }
     };
   },
-
   // GET /api/events/:id (public)
   async getPublicEventDetail({ id }) {
     const event = await Event.findOne({ _id: id, type: 'public' })
@@ -111,17 +110,17 @@ export const eventService = {
       throw err;
     }
 
-    const startdate = eventStartDate ? new Date(eventStartDate) : new Date();
-    const endDate = eventEndDate ? new Date(eventEndDate) : new Date();
+    const startdate = new Date(eventStartDate);
+    const endDate =  new Date(eventEndDate);
     if (endDate < startdate) {
-      const err = new Error('End date must be after start date');
+      const err = new Error('Ngày kết thúc phải ở sau ngày bắt đầu');
       err.status = 400;
       throw err;
     }
 
     const nowDate = new Date();
     if (startdate < nowDate || endDate < nowDate) {
-      const err = new Error('Start date and end date must be in the future');
+      const err = new Error('Ngày bắt đầu và ngày kết thúc phải là ngày trong tương lai');
       err.status = 400;
       throw err;
     }
@@ -415,4 +414,10 @@ export const eventService = {
     }
     return { data: { event } };
   }
+
+};
+export const findEventById = async (id, select = null) => {
+  const q = Event.findById(id);
+  if (select) q.select(select);
+  return await q.lean();
 };

@@ -84,21 +84,15 @@ export const sendVerificationEmail = async (email, fullName, req) => {
 
 export const signup = async (req, res) => {
   try {
-    const { email, password, fullName, phone } = req.body;
+    const { email, password, fullName} = req.body;
 
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
       return res.status(400).json({ message: 'Email already exists!' });
     }
 
-    if (phone) {
-      const existingPhone = await User.findOne({ phone });
-      if (existingPhone) {
-        return res.status(400).json({ message: 'Phone number already exists!' });
-      }
-    }
 
-    if (!email || !password || !fullName || !phone) {
+    if (!email || !password || !fullName ) {
       return res.status(400).json({ message: 'Missing required fields!' });
     }
 
@@ -110,7 +104,6 @@ export const signup = async (req, res) => {
       email,
       passwordHash,
       fullName,
-      phone,
       verified: false,
       status: 'pending',
     };

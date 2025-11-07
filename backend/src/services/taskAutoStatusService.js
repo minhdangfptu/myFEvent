@@ -85,7 +85,7 @@ export const autoUpdateTaskStatusByStartDate = async () => {
  * Chạy mỗi phút để kiểm tra các task cần cập nhật
  */
 export const startTaskAutoStatusScheduler = () => {
-  console.log('[Auto Status] Đã khởi động scheduler tự động cập nhật trạng thái task');
+  // console.log('[Auto Status] Đã khởi động scheduler tự động cập nhật trạng thái task');
   
   // Chạy ngay lập tức lần đầu
   autoUpdateTaskStatusByStartDate();

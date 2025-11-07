@@ -133,7 +133,11 @@ export default function HoOCSidebar({
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
                 <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
               </div>
-              {sidebarOpen && <span className="sidebar-logo">myFEvent</span>}
+              {sidebarOpen &&  <img
+              src="/logo-03.png"
+              alt="myFEvent"
+              style={{ width: "auto", height: 40 }}
+            />}
             </div>
           </div>
 
@@ -174,6 +178,7 @@ export default function HoOCSidebar({
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
             }}
           >
             <Loading size={100} />

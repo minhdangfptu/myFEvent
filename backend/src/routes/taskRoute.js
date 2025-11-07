@@ -13,7 +13,7 @@ import {
 } from '../controllers/taskController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router.get('/:eventId/', authenticateToken, listTasksByEventOrDepartment);
 // Lấy chi tiết 1 task

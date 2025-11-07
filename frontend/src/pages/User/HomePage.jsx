@@ -10,8 +10,8 @@ import { eventService } from "../../services/eventService";
 import { userApi } from "../../apis/userApi";
 import { useEvents } from "../../contexts/EventContext";
 import Loading from "../../components/Loading";
-import ConfirmModal from '../../components/ConfirmModal';
-import NoDataImg from '~/assets/no-data.png';
+import ConfirmModal from "../../components/ConfirmModal";
+import NoDataImg from "~/assets/no-data.png";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -51,13 +51,16 @@ export default function HomePage() {
     name: "",
     description: "",
     organizerName: "",
-    images: [], // Thêm field images
+    eventStartDate: "",
+    eventEndDate: "",
+    location: "",
+    images: [],
   });
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
-  const [imageInputType, setImageInputType] = useState("url"); // "url" hoặc "file"
+  const [imageInputType, setImageInputType] = useState("url");
   const [imageUrl, setImageUrl] = useState("");
   const [blogs, setBlogs] = useState([]);
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
@@ -137,7 +140,7 @@ export default function HomePage() {
     }));
   };
 
-  console.log(blogs)
+  // console.log(blogs);
   // ===== Filter/Sort with stable tokens (không lệch i18n) =====
   const STATUS = {
     ALL: "all",
@@ -329,6 +332,13 @@ export default function HomePage() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        .event-desc-3lines {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
         .blog-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition:transform .2s, box-shadow .2s; box-shadow:0 8px 24px rgba(0, 0, 0, 0.04) }
         .blog-img { height:160px; background:#f3f4f6; position:relative; }
         .blog-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
@@ -338,10 +348,10 @@ export default function HomePage() {
         .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; margin-bottom:16px; flex-wrap:wrap; }
         .section-title { color:red; margin:0; font-size:18px; font-weight:700; }
         .filters { display:flex; gap:10px; flex-wrap:wrap; }
-        .soft-input { background:#F9FAFB; border:1px solid #E5E7EB; border-radius:12px; height:44px; transition:.2s; }
+        .soft-input { background:#F9FAFB; border:1px solid #4d363638; border-radius:12px; height:44px; transition:.2s; }
         .soft-input:focus { background:#fff; border-color:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,0.1); }
-        .ghost-btn { border:1px solid #E5E7EB; border-radius:10px; padding:8px 12px; background:#fff; font-size:14px; }
-        .ghost-btn:hover { background:#F9FAFB; }
+        .ghost-btn { border:1px solid #ffffffff; border-radius:10px; padding:8px 12px; background:#fff; font-size:14px; }
+        .ghost-btn:hover {border:1px solid #EF4444; background:#F9FAFB; }
         .event-card-bottom {border-radius:0 0 16px 16px; min-height:62px}
         .soft-btn-top-right{box-shadow:0 2px 6px rgba(0,0,0,0.04);transition:.1s;border-radius:8px;padding:6px 15px;}
         .soft-btn-top-right:hover{background:#fee2e2 !important;color:#dc2626 !important;border:1px solid #dc2626;}
@@ -364,6 +374,7 @@ export default function HomePage() {
               {/* Status */}
               <div className="position-relative me-2" ref={statusMenuRef}>
                 <button
+                  style={{ color: "black" }}
                   type="button"
                   className={`dropdown-trigger ${
                     openMenu === "status" ? "active-red" : ""
@@ -417,6 +428,7 @@ export default function HomePage() {
               {/* Sort */}
               <div className="position-relative" ref={sortMenuRef}>
                 <button
+                  style={{ color: "black" }}
                   type="button"
                   className={`dropdown-trigger ${
                     openMenu === "sort" ? "active-red" : ""
@@ -465,8 +477,14 @@ export default function HomePage() {
 
         {filteredEvents.length === 0 ? (
           <div className="d-flex flex-column justify-content-center align-items-center py-5">
-            <img src={NoDataImg} alt="Không có sự kiện" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
-            <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có sự kiện nào!</div>
+            <img
+              src={NoDataImg}
+              alt="Không có sự kiện"
+              style={{ width: 200, maxWidth: "50vw", opacity: 0.8 }}
+            />
+            <div className="text-muted mt-3" style={{ fontSize: 18 }}>
+              Chưa có sự kiện nào!
+            </div>
           </div>
         ) : (
           <div className="row g-4">
@@ -503,7 +521,7 @@ export default function HomePage() {
                         </div>
                       )}
                       {/* Button Xem chi tiết ở góc phải trên */}
-                      <button
+                      {/* <button
                         className="position-absolute btn btn-light border soft-btn-top-right"
                         style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
                         onClick={() =>{
@@ -524,46 +542,160 @@ export default function HomePage() {
                       }
                       >
                         Xem chi tiết
-                      </button>
+                      </button> */}
                     </div>
-                    <div className="event-body pb-0 d-flex flex-column" style={{ minHeight:190, height:190, justifyContent:'flex-start' }}>
-                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap" style={{minHeight:38}}>
+                    <div
+                      className="event-body pb-0 d-flex flex-column"
+                      style={{
+                        minHeight: 200,
+                        height: 200,
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <div
+                        className="d-flex align-items-center gap-2 mb-2 flex-wrap"
+                        style={{ minHeight: 38 }}
+                      >
                         {event.status ? (
-                          <span className={`event-chip chip-status-${event.status}`}>
-                            <i className="bi bi-lightning-charge-fill me-1" />{event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : '-'}
+                          <span
+                            className={`event-chip chip-status-${event.status}`}
+                          >
+                            <i className="bi bi-lightning-charge-fill me-1" />
+                            {event.status === "scheduled"
+                              ? "Sắp diễn ra"
+                              : event.status === "ongoing"
+                              ? "Đang diễn ra"
+                              : event.status === "completed"
+                              ? "Đã kết thúc"
+                              : event.status === "cancelled"
+                              ? "Đã hủy"
+                              : "-"}
                           </span>
-                        ) : <span style={{width:80, height:27, opacity:0, display:'inline-block'}}>-</span>}
-                        {event.location ? (
-                          <span className="event-chip chip-location">
-                            <i className="bi bi-geo-alt me-1" />{event.location}
+                        ) : (
+                          <span
+                            style={{
+                              width: 80,
+                              height: 27,
+                              opacity: 0,
+                              display: "inline-block",
+                            }}
+                          >
+                            -
                           </span>
-                        ) : <span style={{width:120, height:27, opacity:0, display:'inline-block'}}>-</span>}
-                        {event.eventStartDate && event.eventEndDate ? (
-                          <span className="event-chip chip-date">
-                            <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} -  {formatDate(event.eventEndDate)}
-                          </span>
-                        ) : <span style={{width:110, height:27, opacity:0, display:'inline-block'}}>-</span>}
-                        
+                        )}
                       </div>
-                      <div className="event-title" style={{fontWeight:700, fontSize:18, marginBottom:4, minHeight:24, maxHeight:48, overflow:'hidden', lineHeight:'24px'}}>{event.name}</div>
-                      <div style={{flex:1}}></div>
-                      <p className="event-desc mb-3" style={{minHeight:40, marginBottom:0, opacity:(event.description ? '1' : '0')}}>{event.description||'empty'}</p>
+
+                      <div
+                        className="fw-bold mb-2"
+                        style={{
+                          fontSize: 18,
+                          minHeight: 24,
+                          maxHeight: 48,
+                          overflow: "hidden",
+                          lineHeight: "24px",
+                        }}
+                      >
+                        {event.name}
+                      </div>
+
+                      <div className="flex-fill"></div>
+
+                      <p
+                        className="text-muted small mb-2 event-desc-3lines"
+                        style={{
+                          minHeight: 20, // Giảm từ 40 xuống 20
+                          opacity: event.description ? "1" : "0",
+                          lineHeight: "1.3", // Giảm line height để tiết kiệm không gian
+                          fontSize: "13px", // Giảm font size nhẹ
+                          color: "#6B7280",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3, // Giới hạn 3 dòng
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {event.description || "Chưa có mô tả"}
+                      </p>
+
+                      {/* Thông tin event: location, date - Bootstrap version */}
+                      <div className=" pb-2 mt-auto">
+                        {event.location && (
+                          <div
+                            style={{ fontSize: "14px" }}
+                            className="d-flex align-items-center"
+                          >
+                            <i
+                              className="bi bi-geo-alt me-2 text-danger"
+                              style={{ fontSize: "12px", width: "12px" }}
+                            />
+                            <small className="text-muted fw-medium text-truncate">
+                              {event.location}
+                            </small>
+                          </div>
+                        )}
+
+                        {event.eventStartDate && event.eventEndDate && (
+                          <div
+                            style={{ fontSize: "14px" }}
+                            className="d-flex align-items-center"
+                          >
+                            <i
+                              className="bi bi-calendar-event me-2 text-danger"
+                              style={{ fontSize: "12px", width: "12px" }}
+                            />
+                            {event.eventStartDate && event.eventEndDate ? (
+                              <small className="text-muted fw-medium text-truncate">
+                                {formatDate(event.eventStartDate)} -{" "}
+                                {formatDate(event.eventEndDate)}
+                              </small>
+                            ) : (
+                              <p>Đang cập nhật</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {/*--- Line phân cách mờ và Bottom action section ---*/}
-                    <div className="event-card-bottom d-flex align-items-center justify-content-between gap-2 px-3 py-3" style={{ borderTop: "1px solid #E5E7EB", background: "#FAFAFA", minHeight:62 }}>
-                      
-                      <div className="d-flex align-items-center gap-2 text-dark" style={{ fontSize: 13, fontWeight: 500 }}>
-                        <i className="bi bi-person-badge me-1" style={{ color: '#dc2626' }}/>
-                        {event.eventMember?.role === "Member" ? "Thành viên" : event.eventMember?.role === "HoOC" ? "Trưởng ban Tổ chức" : event.eventMember?.role === "HoD" ? "Trưởng ban" : "Không rõ"}
+                    <div
+                      className="event-card-bottom d-flex align-items-center justify-content-between gap-2 px-3 py-3"
+                      style={{
+                        borderTop: "1px solid #E5E7EB",
+                        background: "#FAFAFA",
+                        minHeight: 62,
+                      }}
+                    >
+                      <div
+                        className="d-flex align-items-center gap-2 text-dark"
+                        style={{ fontSize: 13, fontWeight: 500 }}
+                      >
+                        <i
+                          className="bi bi-person-badge me-1"
+                          style={{ color: "#dc2626" }}
+                        />
+                        {event.eventMember?.role === "Member"
+                          ? "Thành viên"
+                          : event.eventMember?.role === "HoOC"
+                          ? "Trưởng ban Tổ chức"
+                          : event.eventMember?.role === "HoD"
+                          ? "Trưởng ban"
+                          : "Không rõ"}
                       </div>
                       <button
                         className="ghost-btn"
-                        style={{ minWidth: 100 }}
+                        style={{
+                          minWidth: 100,
+                          color: "#ffffffff",
+                          backgroundColor: "#EF4444",
+                          fontWeight: 500,
+                        }}
                         onClick={() => {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
-                            navigate(`/member-event-detail/${eid}?eventId=${eid}`);
+                            navigate(
+                              `/member-event-detail/${eid}?eventId=${eid}`
+                            );
                             return;
                           }
                           if (role === "HoOC") {
@@ -600,7 +732,9 @@ export default function HomePage() {
               key={blog._id || blog.id || idx}
               className="col-xxl-3 col-xl-3 col-lg-4 col-md-6"
               style={{ cursor: "pointer" }}
-              onClick={() => navigate(`/home-page/events/${blog._id || blog.id || idx}`)}
+              onClick={() =>
+                navigate(`/home-page/events/${blog._id || blog.id || idx}`)
+              }
             >
               <div className="blog-card h-100">
                 <div className="position-relative">
@@ -622,17 +756,26 @@ export default function HomePage() {
                       console.error("Blog image load error:", blog.image?.[0]);
                       e.target.src = "/default-events.jpg";
                     }}
-                    onLoad={() => {
-                    }}
+                    onLoad={() => {}}
                   />
                   {/* Button Xem chi tiết ở góc phải trên */}
                   <button
-                        className="position-absolute btn btn-light border soft-btn-top-right"
-                        style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
-                        onClick={() => navigate(`/home-page/events/${blog._id || blog.id || idx}`)}
-                      >
-                        Xem chi tiết
-                      </button>
+                    className="position-absolute btn btn-light border soft-btn-top-right"
+                    style={{
+                      top: 12,
+                      right: 12,
+                      zIndex: 2,
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                    onClick={() =>
+                      navigate(
+                        `/home-page/events/${blog._id || blog.id || idx}`
+                      )
+                    }
+                  >
+                    Xem chi tiết
+                  </button>
                   {/* Image count indicator */}
                   {blog.image && blog.image.length > 1 && (
                     <div className="position-absolute top-0 end-0 m-2">
@@ -648,24 +791,59 @@ export default function HomePage() {
                   <div className="blog-meta">
                     {blog.status ? (
                       <span className={`badge-soft chip-status-${blog.status}`}>
-                        <i className="bi bi-lightning-charge-fill me-1" />{blog.status === "scheduled" ? "Sắp diễn ra" : blog.status === "ongoing" ? "Đang diễn ra" : blog.status === "completed" ? "Đã kết thúc" : blog.status === "cancelled" ? "Đã hủy" : blog.status}
+                        <i className="bi bi-lightning-charge-fill me-1" />
+                        {blog.status === "scheduled"
+                          ? "Sắp diễn ra"
+                          : blog.status === "ongoing"
+                          ? "Đang diễn ra"
+                          : blog.status === "completed"
+                          ? "Đã kết thúc"
+                          : blog.status === "cancelled"
+                          ? "Đã hủy"
+                          : blog.status}
                       </span>
                     ) : null}
-                     {blog.location && (
-                      <span className="badge-soft chip-location">
-                        <i className="bi bi-geo-alt me-1" />{blog.location}
-                      </span>
-                    )}  
-                    {blog.eventStartDate  && (
-                      <span className="badge-soft chip-date">
-                        <i className="bi bi-calendar-event me-1" />{formatDate(blog.eventStartDate)} -  {formatDate(blog.eventEndDate)}
-                      </span>
-                    )}
-                   
                   </div>
                   {blog.description && (
                     <div className="event-desc mt-2">{blog.description}</div>
                   )}
+                  {/* Thông tin event: location, date - Bootstrap version */}
+                  <div className=" pt-2 pb-2 mt-auto">
+                    {blog.location && (
+                      <div
+                        style={{ fontSize: "14px" }}
+                        className="d-flex align-items-center"
+                      >
+                        <i
+                          className="bi bi-geo-alt me-2 text-danger"
+                          style={{ fontSize: "12px", width: "12px" }}
+                        />
+                        <small className="text-muted fw-medium text-truncate">
+                          {blog.location}
+                        </small>
+                      </div>
+                    )}
+
+                    {blog.eventStartDate && blog.eventEndDate && (
+                      <div
+                        style={{ fontSize: "14px" }}
+                        className="d-flex align-items-center"
+                      >
+                        <i
+                          className="bi bi-calendar-event me-2 text-danger"
+                          style={{ fontSize: "12px", width: "12px" }}
+                        />
+                        {blog.eventStartDate && blog.eventEndDate ? (
+                          <small className="text-muted fw-medium text-truncate">
+                            {formatDate(blog.eventStartDate)} -{" "}
+                            {formatDate(blog.eventEndDate)}
+                          </small>
+                        ) : (
+                          <p>Đang cập nhật</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -702,6 +880,9 @@ export default function HomePage() {
                       name: "",
                       description: "",
                       organizerName: "",
+                      eventStartDate: "",
+                      eventEndDate: "",
+                      location: "",
                       images: [],
                     });
                     setImageUrl("");
@@ -723,35 +904,61 @@ export default function HomePage() {
                   onSubmit={async (e) => {
                     e.preventDefault();
                     setCreateError("");
+
+                    // Validation
                     if (!createForm.name.trim())
                       return setCreateError("Vui lòng nhập tên sự kiện");
                     if (!createForm.organizerName.trim())
                       return setCreateError(
                         "Vui lòng nhập tên CLB/Đội nhóm/Người đại diện tổ chức"
                       );
+                    if (!createForm.eventStartDate)
+                      return setCreateError("Vui lòng chọn ngày bắt đầu");
+                    if (!createForm.eventEndDate)
+                      return setCreateError("Vui lòng chọn ngày kết thúc");
+                    if (!createForm.location.trim())
+                      return setCreateError("Vui lòng nhập địa điểm");
+                    if (!createForm.description.trim())
+                      return setCreateError("Vui lòng nhập mô tả sự kiện");
+
+                    // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
+                    if (
+                      new Date(createForm.eventEndDate) <=
+                      new Date(createForm.eventStartDate)
+                    ) {
+                      return setCreateError(
+                        "Ngày kết thúc phải sau ngày bắt đầu"
+                      );
+                    }
 
                     try {
                       setCreateSubmitting(true);
                       const res = await eventApi.create({
-                        name: createForm.name,
-                        description: createForm.description,
-                        organizerName: createForm.organizerName,
+                        ...createForm,
                         type: "private",
-                        images: createForm.images,
                       });
+                      toast.success("Tạo sự kiện thành công!");
+
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",
                         description: "",
                         organizerName: "",
+                        eventStartDate: "",
+                        eventEndDate: "",
+                        location: "",
                         images: [],
                       });
                       setImageUrl("");
                       setJoinCodeForModal(res.data.joinCode);
                       setShowJoinCodeModal(true);
-                      // Không alert
-                      // alert(`Mã tham gia: ${res.data.joinCode}`);
-                      // navigate(`/event/${res.data.id}/hooc-event-detail`); // chuyển hướng sau khi đóng modal
+                    } catch (err) {
+                      const msg =
+                        err?.response?.data?.message ||
+                        err?.message ||
+                        "Tạo sự kiện thất bại";
+                      toast.error(msg);
+                      setCreateError(msg);
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -792,6 +999,64 @@ export default function HomePage() {
                       disabled={createSubmitting}
                     />
                   </div>
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">
+                        Ngày bắt đầu *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="form-control soft-input"
+                        value={createForm.eventStartDate}
+                        onChange={(e) =>
+                          setCreateForm((f) => ({
+                            ...f,
+                            eventStartDate: e.target.value,
+                          }))
+                        }
+                        required
+                        disabled={createSubmitting}
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">
+                        Ngày kết thúc *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="form-control soft-input"
+                        value={createForm.eventEndDate}
+                        onChange={(e) =>
+                          setCreateForm((f) => ({
+                            ...f,
+                            eventEndDate: e.target.value,
+                          }))
+                        }
+                        required
+                        disabled={createSubmitting}
+                        min={createForm.eventStartDate} // Không cho chọn ngày kết thúc trước ngày bắt đầu
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Địa điểm *</label>
+                    <input
+                      type="text"
+                      className="form-control soft-input"
+                      placeholder="Địa điểm tổ chức sự kiện"
+                      value={createForm.location}
+                      onChange={(e) =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          location: e.target.value,
+                        }))
+                      }
+                      required
+                      disabled={createSubmitting}
+                    />
+                  </div>
+
                   <div className="mb-3">
                     <label className="form-label fw-semibold">Mô tả*</label>
                     <textarea
@@ -939,6 +1204,9 @@ export default function HomePage() {
                           name: "",
                           description: "",
                           organizerName: "",
+                          eventStartDate: "",
+                          eventEndDate: "",
+                          location: "",
                           images: [],
                         });
                         setImageUrl("");
@@ -995,7 +1263,9 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `/member-event-detail/${res.data.eventId || res.data.id}?eventId=${res.data.eventId || res.data.id}`
+                        `/member-event-detail/${
+                          res.data.eventId || res.data.id
+                        }?eventId=${res.data.eventId || res.data.id}`
                       );
                       toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {
@@ -1053,9 +1323,24 @@ export default function HomePage() {
           }}
           message={
             <div>
-              <div className="mb-2"><strong>Mã tham gia sự kiện của bạn:</strong></div>
-              <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 4, color: '#ef4444', marginBottom: 12 }}>{joinCodeForModal}</div>
-              <div className="mb-0">Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự kiện.</div>
+              <div className="mb-2">
+                <strong>Mã tham gia sự kiện của bạn:</strong>
+              </div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  letterSpacing: 4,
+                  color: "#ef4444",
+                  marginBottom: 12,
+                }}
+              >
+                {joinCodeForModal}
+              </div>
+              <div className="mb-0">
+                Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự
+                kiện.
+              </div>
             </div>
           }
         />

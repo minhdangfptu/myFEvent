@@ -13,9 +13,9 @@
     "clean": "rm -rf build && mkdir build",
     "build-babel": "babel ./src -d ./build/src",
     "build": "npm run clean && npm run build-babel",
-    "start": "node ./server.js",
+    "start": "node --no-warnings ./server.js",
     "production": "npm run build && npm run start",
-    "dev": "nodemon ./server.js",
+    "dev": "nodemon --no-warnings ./server.js",
     "send:test-mail": "node ./sendTestMail.js",
     "test": "vitest run",
     "test:watch": "vitest"
