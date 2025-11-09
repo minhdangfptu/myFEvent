@@ -6,6 +6,7 @@ import {
     deleteAgendaById
 } from "../services/agendaService.js";
 import { getMilestoneById } from "../services/milestoneService.js";
+import { notifyAgendaCreated } from "../services/notificationService.js";
 
 export const getAgendasByMilestone = async () => {
     try {
@@ -20,7 +21,7 @@ export const getAgendasByMilestone = async () => {
         res.status(500).json({ message: 'Failed to get agendas' });
     }
 }
-export const createAgenda = async () => {
+export const createAgenda = async (req, res) => {
     try {
         const { milestoneId } = req.params;
         const milestone = await getMilestoneById(milestoneId);
@@ -35,6 +36,15 @@ export const createAgenda = async () => {
             name,
             description
         });
+        
+        // Thông báo cho HoD và Member khi HoOC tạo lịch họp
+        try {
+            await notifyAgendaCreated(milestone.eventId, newAgenda._id, milestoneId);
+        } catch (notifyErr) {
+            console.error('Error sending notification:', notifyErr);
+            // Không fail request nếu notification lỗi
+        }
+        
         return res.status(201).json({ data: newAgenda });
     } catch (error) {
         res.status(500).json({ message: 'Failed to create agenda' });

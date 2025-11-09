@@ -1,70 +1,82 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { notificationApi } from '../apis/notificationApi'
 
 const NotificationsContext = createContext(null)
 
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    category: 'CÔNG VIỆC',
-    icon: 'bi bi-asterisk',
-    avatarUrl: '/logo-03.png',
-    title: 'Đặng Đình Minh đã giao cho bạn 1 công việc',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unread: true,
-    color: '#ef4444'
-  },
-  {
-    id: 'n2',
-    category: 'CÔNG VIỆC',
-    icon: 'bi bi-asterisk',
-    avatarUrl: '/logo-03.png',
-    title: 'Đặng Đình Minh đã giao cho bạn 1 công việc',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unread: true,
-    color: '#ef4444'
-  },
-  {
-    id: 'n3',
-    category: 'LỊCH HỌP',
-    icon: 'bi bi-asterisk',
-    avatarUrl: '/logo-03.png',
-    title: 'Bạn có 1 lịch họp vào ngày mai',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unread: true,
-    color: '#3b82f6'
-  }
-]
-
 export function NotificationsProvider({ children }) {
-  const [notifications, setNotifications] = useState(() => {
+  const [notifications, setNotifications] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch notifications from API
+  const fetchNotifications = async () => {
     try {
-      const raw = localStorage.getItem('notifications')
-      if (raw) return JSON.parse(raw)
-    } catch {}
-    return DEFAULT_NOTIFICATIONS
-  })
+      setLoading(true)
+      const response = await notificationApi.getNotifications()
+      const notificationsData = response?.data || []
+      // Map backend format to frontend format
+      const mapped = notificationsData.map(n => ({
+        id: n._id || n.id,
+        category: n.category || 'KHÁC',
+        icon: n.icon || 'bi bi-bell',
+        avatarUrl: n.avatarUrl || '/logo-03.png',
+        title: n.title || '',
+        createdAt: n.createdAt || n.created_at || new Date().toISOString(),
+        unread: n.unread !== undefined ? n.unread : true,
+        color: n.color || '#ef4444'
+      }))
+      setNotifications(mapped)
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+      setNotifications([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    try {
-      localStorage.setItem('notifications', JSON.stringify(notifications))
-    } catch {}
-  }, [notifications])
+    fetchNotifications()
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
 
   const addNotification = (n) => {
+    // This is now handled by backend, but we can optimistically update UI
     setNotifications(prev => [{ ...n, id: String(Date.now()), unread: true, createdAt: new Date().toISOString() }, ...prev])
+    // Refresh from API to get the real notification
+    setTimeout(fetchNotifications, 500)
   }
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+  const markAllRead = async () => {
+    try {
+      await notificationApi.markAllRead()
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+    } catch (error) {
+      console.error('Error marking all read:', error)
+    }
   }
 
-  const markRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+  const markRead = async (id) => {
+    try {
+      await notificationApi.markRead(id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n))
+    } catch (error) {
+      console.error('Error marking read:', error)
+    }
   }
 
-  const value = useMemo(() => ({ notifications, setNotifications, unreadCount, addNotification, markAllRead, markRead }), [notifications, unreadCount])
+  const value = useMemo(() => ({ 
+    notifications, 
+    setNotifications, 
+    unreadCount, 
+    addNotification, 
+    markAllRead, 
+    markRead,
+    loading,
+    refreshNotifications: fetchNotifications
+  }), [notifications, unreadCount, loading])
 
   return (
     <NotificationsContext.Provider value={value}>

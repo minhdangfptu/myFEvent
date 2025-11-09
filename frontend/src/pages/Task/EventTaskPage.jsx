@@ -34,7 +34,6 @@ export default function EventTaskPage() {
   const [eventRole, setEventRole] = useState("");
 
   const { fetchEventRole } = useEvents();
-  const { addNotification } = useNotifications();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -92,21 +91,6 @@ export default function EventTaskPage() {
         today.setHours(0, 0, 0, 0);
         
         const mapped = arr.map((task) => {
-          const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
-          const isOverdue = dueDate && dueDate < today && task?.status !== "done" && task?.status !== "completed";
-          
-          // Thông báo khi task quá hạn - gửi cho Member và HoD
-          if (isOverdue && task?.assigneeId) {
-            const taskTitle = task?.title || "Công việc";
-            addNotification({
-              category: 'CÔNG VIỆC',
-              icon: 'bi bi-exclamation-triangle',
-              avatarUrl: '/logo-03.png',
-              title: `Công việc "${taskTitle}" đã quá hạn`,
-              color: '#ef4444'
-            });
-          }
-          
           return {
             id: task?._id,
             name: task?.title || "",
@@ -135,7 +119,7 @@ export default function EventTaskPage() {
         setTasks(mapped);
       })
       .catch((err) => setTasks([]));
-  }, [eventId, addNotification]);
+  }, [eventId]);
 
   useEffect(() => {
     fetchTasks();
@@ -242,22 +226,7 @@ export default function EventTaskPage() {
     // Call API to update in database
     try {
       await taskApi.updateTaskProgress(eventId, taskId, backendStatus);
-      toast.success("Đã cập nhật trạng thái công việc");
-      
-      // Thông báo khi task hoàn thành - gửi cho HoD
-      if (newStatus === "Hoàn thành" && task) {
-        // Get department info to notify HoD
-        const taskDept = departments.find(d => d.name === task.department);
-        if (taskDept) {
-          addNotification({
-            category: 'CÔNG VIỆC',
-            icon: 'bi bi-check-circle',
-            avatarUrl: '/logo-03.png',
-            title: `Công việc "${task.name}" đã được hoàn thành`,
-            color: '#10b981'
-          });
-        }
-      }
+      // Backend sẽ tự động tạo notification khi task hoàn thành
     } catch (error) {
       // Rollback on error
       setTasks(previousTasks);
@@ -415,28 +384,7 @@ export default function EventTaskPage() {
         }));
         setTasks(mapped);
       });
-
-      toast.success("Tạo công việc thành công!");
-      
-      // Thông báo khi giao việc cho Member - gửi cho Member
-      if (payload.assigneeId && user) {
-        const assigneeMember = assignees.find(a => 
-          String(a._id) === String(payload.assigneeId) || 
-          String(a.id) === String(payload.assigneeId) ||
-          String(a.userId) === String(payload.assigneeId)
-        );
-        const assigneeName = assigneeMember?.userId?.fullName || assigneeMember?.fullName || "Member";
-        const taskTitle = payload.title || "Công việc mới";
-        
-        // Thông báo cho Member được giao việc
-        addNotification({
-          category: 'CÔNG VIỆC',
-          icon: 'bi bi-asterisk',
-          avatarUrl: '/logo-03.png',
-          title: `${user.fullName || user.name || 'HoOC'} đã giao cho bạn công việc "${taskTitle}"`,
-          color: '#ef4444'
-        });
-      }
+      // Backend sẽ tự động tạo notification khi giao việc cho Member
     } catch (err) {
       // Hiển thị lỗi từ backend
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
