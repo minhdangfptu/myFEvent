@@ -118,9 +118,15 @@ export const eventService = {
       throw err;
     }
 
+    // So sánh chỉ ngày (không tính giờ/phút) để tránh lỗi timezone
     const nowDate = new Date();
-    if (startdate < nowDate || endDate < nowDate) {
-      const err = new Error('Ngày bắt đầu và ngày kết thúc phải là ngày trong tương lai');
+    const nowDateOnly = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const startDateOnly = new Date(startdate.getFullYear(), startdate.getMonth(), startdate.getDate());
+    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    // Cho phép ngày hôm nay hoặc ngày trong tương lai
+    if (startDateOnly < nowDateOnly || endDateOnly < nowDateOnly) {
+      const err = new Error('Ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai');
       err.status = 400;
       throw err;
     }

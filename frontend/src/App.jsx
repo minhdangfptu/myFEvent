@@ -49,7 +49,8 @@ import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
-import HoDLandingPage from "./pages/HoD/HoDLandingPage";
+import HoDDashBoard from "./pages/HoD/HoDDashBoard";
+import HoDEventDetail from "./pages/HoD/HoDEventDetail";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 import HoOCManageMember from "./pages/HoOC/HoOCManageMember";
 import { EventProvider } from "./contexts/EventContext";
@@ -119,14 +120,6 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hod-landing-page" 
-            element={
-              <ProtectedRoute>
-                <HoDLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/events/:eventId/hooc-event-detail" 
             element={
               <ProtectedRoute >
@@ -139,6 +132,22 @@ export default function App() {
             element={
               <ProtectedRoute >
                 <HoOCDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hod-dashboard" 
+            element={
+              <ProtectedRoute >
+                <HoDDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hod-event-detail" 
+            element={
+              <ProtectedRoute >
+                <HoDEventDetail />
               </ProtectedRoute>
             } 
           />

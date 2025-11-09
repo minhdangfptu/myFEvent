@@ -10,12 +10,16 @@ import { deriveEventStatus } from "../../utils/getEventStatus";
 function EventDetailPage() {
   const { eventId } = useParams();
   const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with true to show loading immediately
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadDetail = async () => {
+      if (!eventId) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {

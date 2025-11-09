@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { eventService } from "../services/eventService";
 import { useAuth } from "./AuthContext";
 import { userApi } from "../apis/userApi";
@@ -14,7 +14,8 @@ export function EventProvider({ children }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [eventRoles, setEventRoles] = useState({}); 
+  const [eventRoles, setEventRoles] = useState({});
+  const fetchingRef = useRef(false); // Track if we're currently fetching
 
   const extractEventArray = useCallback((payload) => {
     if (!payload) return [];
@@ -40,9 +41,16 @@ export function EventProvider({ children }) {
     if (!user) {
       setEvents([]);
       setLoading(false);
+      fetchingRef.current = false;
       return;
     }
 
+    // Skip if already fetching to prevent duplicate requests
+    if (fetchingRef.current) {
+      return;
+    }
+
+    fetchingRef.current = true;
     setLoading(true);
     setError("");
     try {
@@ -54,12 +62,13 @@ export function EventProvider({ children }) {
       setError("Lỗi lấy dữ liệu sự kiện");
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   }, [user, authLoading, extractEventArray]);
 
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+  }, [fetchEvents]); // fetchEvents is memoized with user and authLoading dependencies
 
   // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {

@@ -315,9 +315,35 @@ export default function HoOCEventDetail() {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.info("Đã sao chép!");
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Đã copy!", {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        toast.success("Đã copy!", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+      } catch (e) {
+        toast.error("Không thể sao chép", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   const getImageSrc = (image) => {

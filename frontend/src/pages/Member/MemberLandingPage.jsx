@@ -35,8 +35,8 @@ export default function MemberLandingPage() {
     setRoleLoading(true);
     userApi.getUserRoleByEvent(eventId).then(res => {
       if (res.role !== 'Member') {
-        if (res.role === 'HoOC') navigate(`/hooc-landing-page?eventId=${eventId}`);
-        else if (res.role === 'HoD') navigate(`/hod-landing-page?eventId=${eventId}`);
+        if (res.role === 'HoOC') navigate(`/hooc-dashboard?eventId=${eventId}`);
+        else if (res.role === 'HoD') navigate(`/hod-dashboard?eventId=${eventId}`);
         else navigate('/');
       } else {
         setEventRole('Member');

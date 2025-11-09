@@ -582,29 +582,6 @@ export default function HomePage() {
                           </span>
                         </div>
                       )}
-                      {/* Button Xem chi tiết ở góc phải trên */}
-                      {/* <button
-                        className="position-absolute btn btn-light border soft-btn-top-right"
-                        style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
-                        onClick={() =>{
-                          const eid = event.id || event._id || idx;
-                          if (event.eventMember?.role === "Member") {
-                            navigate(`/member-event-detail/${eid}?eventId=${eid}`);
-                            return;
-                          }
-                          if (event.eventMember?.role === "HoOC") {
-                            navigate(`/events/${eid}/hooc-event-detail`);
-                            return;
-                          }
-                          if (event.eventMember?.role === "HoD") {
-                            navigate(`/hod-landing-page?eventId=${eid}`);
-                            return;
-                          }
-                        }
-                      }
-                      >
-                        Xem chi tiết
-                      </button> */}
                     </div>
                     <div
                       className="event-body pb-0 d-flex flex-column"
@@ -765,7 +742,7 @@ export default function HomePage() {
                             return;
                           }
                           if (role === "HoD") {
-                            navigate(`/hod-landing-page?eventId=${eid}`);
+                            navigate(`/hod-dashboard?eventId=${eid}`);
                             return;
                           }
                         }}
@@ -983,11 +960,31 @@ export default function HomePage() {
                     if (!createForm.description.trim())
                       return setCreateError("Vui lòng nhập mô tả sự kiện");
 
+                    // Kiểm tra ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai
+                    const now = new Date();
+                    const startDate = new Date(createForm.eventStartDate);
+                    const endDate = new Date(createForm.eventEndDate);
+                    
+                    // So sánh chỉ ngày (không tính giờ/phút) để tránh lỗi timezone
+                    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                    
+                    // Cho phép ngày hôm nay hoặc ngày trong tương lai
+                    if (startDateOnly < nowDateOnly) {
+                      return setCreateError(
+                        "Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai"
+                      );
+                    }
+                    
+                    if (endDateOnly < nowDateOnly) {
+                      return setCreateError(
+                        "Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai"
+                      );
+                    }
+                    
                     // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
-                    if (
-                      new Date(createForm.eventEndDate) <=
-                      new Date(createForm.eventStartDate)
-                    ) {
+                    if (endDateOnly <= startDateOnly) {
                       return setCreateError(
                         "Ngày kết thúc phải sau ngày bắt đầu"
                       );
@@ -1376,36 +1373,245 @@ export default function HomePage() {
       )}
 
       {showJoinCodeModal && (
-        <ConfirmModal
-          show={showJoinCodeModal}
-          onClose={() => setShowJoinCodeModal(false)}
-          onConfirm={() => {
-            setShowJoinCodeModal(false);
-            window.location.reload();
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 3000,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
           }}
-          message={
-            <div>
-              <div className="mb-2">
-                <strong>Mã tham gia sự kiện của bạn:</strong>
-              </div>
+          onClick={() => setShowJoinCodeModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '90%',
+              maxWidth: '500px',
+              padding: '32px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button (X) */}
+            <button
+              onClick={() => setShowJoinCodeModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                color: '#6b7280',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+            >
+              ×
+            </button>
+
+            {/* Icon */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+              }}
+            >
+              <i
+                className="bi bi-ticket-perforated"
+                style={{ fontSize: '32px', color: '#dc2626' }}
+              ></i>
+            </div>
+
+            {/* Title */}
+            <h4
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#111827',
+                textAlign: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              Mã tham gia sự kiện của bạn
+            </h4>
+
+            {/* Description */}
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                textAlign: 'center',
+                marginBottom: '24px',
+              }}
+            >
+              Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự kiện
+            </p>
+
+            {/* Code Display */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '24px',
+                border: '2px dashed #fca5a5',
+                textAlign: 'center',
+              }}
+            >
               <div
                 style={{
-                  fontSize: 28,
+                  fontSize: '36px',
                   fontWeight: 700,
-                  letterSpacing: 4,
-                  color: "#ef4444",
-                  marginBottom: 12,
+                  letterSpacing: '6px',
+                  color: '#dc2626',
+                  fontFamily: 'monospace',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
               >
                 {joinCodeForModal}
               </div>
-              <div className="mb-0">
-                Vui lòng lưu lại mã này để chia sẻ cho thành viên tham gia sự
-                kiện.
-              </div>
             </div>
-          }
-        />
+
+            {/* Buttons */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'center',
+              }}
+            >
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                      await navigator.clipboard.writeText(joinCodeForModal);
+                    } else {
+                      // Fallback for older browsers
+                      const textArea = document.createElement('textarea');
+                      textArea.value = joinCodeForModal;
+                      textArea.style.position = 'fixed';
+                      textArea.style.left = '-999999px';
+                      textArea.style.top = '0';
+                      document.body.appendChild(textArea);
+                      textArea.focus();
+                      textArea.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(textArea);
+                    }
+                    
+                    // Show toast notification
+                    toast.success('Đã copy mã tham gia!', {
+                      position: 'top-right',
+                      autoClose: 2000,
+                      hideProgressBar: false,
+                    });
+                  } catch (err) {
+                    console.error('Copy failed:', err);
+                    toast.error('Không thể copy mã. Vui lòng thử lại.', {
+                      position: 'top-right',
+                      autoClose: 2000,
+                    });
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                }}
+              >
+                <i className="bi bi-copy"></i>
+                Copy
+              </button>
+              <button
+                onClick={() => {
+                  setShowJoinCodeModal(false);
+                  window.location.reload();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px 24px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#e5e7eb';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#f3f4f6';
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              >
+                <i className="bi bi-x-lg"></i>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </UserLayout>
   );

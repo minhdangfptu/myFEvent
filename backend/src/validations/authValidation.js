@@ -13,6 +13,7 @@ export const signupValidation = [
         .trim()
         .withMessage('Full name is required'),
     body('phone')
+        .optional()
         .isMobilePhone()
         .withMessage('Phone number must be valid')
 ];

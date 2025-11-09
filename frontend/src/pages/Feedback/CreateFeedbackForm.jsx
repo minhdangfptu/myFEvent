@@ -146,14 +146,47 @@ export default function CreateFeedbackForm() {
   };
 
   const handleAddOption = (questionIndex) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((q, i) => 
-        i === questionIndex 
-          ? { ...q, options: [...(q.options || []), ''] }
-          : q
-      )
-    }));
+    setFormData(prev => {
+      const question = prev.questions[questionIndex];
+      if (!question) return prev;
+
+      // Before adding new option, clean up any duplicates in existing options
+      const cleanedOptions = [];
+      const seenValues = new Set();
+      
+      question.options?.forEach((opt) => {
+        const trimmed = opt.trim().toLowerCase();
+        if (trimmed === '' || !seenValues.has(trimmed)) {
+          cleanedOptions.push(opt);
+          if (trimmed !== '') {
+            seenValues.add(trimmed);
+          }
+        }
+      });
+
+      // Add new empty option
+      cleanedOptions.push('');
+
+      // If we removed duplicates, show a message
+      const hadDuplicates = question.options?.length !== cleanedOptions.length - 1;
+      if (hadDuplicates) {
+        setTimeout(() => {
+          toast.info('Đã tự động xóa các lựa chọn trùng lặp.', {
+            position: "top-right",
+            autoClose: 2000,
+          });
+        }, 0);
+      }
+
+      return {
+        ...prev,
+        questions: prev.questions.map((q, i) => 
+          i === questionIndex 
+            ? { ...q, options: cleanedOptions }
+            : q
+        )
+      };
+    });
   };
 
   const handleRemoveOption = (questionIndex, optionIndex) => {
@@ -168,14 +201,110 @@ export default function CreateFeedbackForm() {
   };
 
   const handleOptionChange = (questionIndex, optionIndex, value) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((q, i) => 
-        i === questionIndex 
-          ? { ...q, options: q.options.map((opt, oi) => oi === optionIndex ? value : opt) }
-          : q
-      )
-    }));
+    setFormData(prev => {
+      const question = prev.questions[questionIndex];
+      if (!question || !question.options) return prev;
+
+      const oldValue = question.options[optionIndex] || '';
+      const oldTrimmedValue = oldValue.trim().toLowerCase();
+      const trimmedValue = value.trim();
+      const trimmedValueLower = trimmedValue.toLowerCase();
+      
+      // Check if the old value was a duplicate (before change)
+      const wasDuplicate = oldTrimmedValue !== '' && question.options.some((opt, oi) => 
+        oi !== optionIndex && opt.trim().toLowerCase() === oldTrimmedValue
+      );
+
+      // Find all duplicate option indices (if any) for the new value
+      const duplicateIndices = [];
+      if (trimmedValue !== '') {
+        question.options.forEach((opt, oi) => {
+          if (oi !== optionIndex && opt.trim().toLowerCase() === trimmedValueLower && opt.trim() !== '') {
+            duplicateIndices.push(oi);
+          }
+        });
+      }
+
+      // If value is being set and it's a duplicate, show warning
+      if (trimmedValue !== '' && duplicateIndices.length > 0) {
+        setTimeout(() => {
+          toast.warning('Lựa chọn này đã tồn tại. Vui lòng nhập lựa chọn khác.', {
+            position: "top-right",
+            autoClose: 3000,
+          });
+        }, 0);
+      }
+
+      // Update options
+      let updatedOptions = question.options.map((opt, oi) => {
+        if (oi === optionIndex) {
+          return value; // Update current option
+        }
+        // If the old value was a duplicate and we're clearing/changing it, 
+        // clear all other options that had the same value
+        if (wasDuplicate && trimmedValue === '' && opt.trim().toLowerCase() === oldTrimmedValue) {
+          return ''; // Clear all duplicates when the original is cleared
+        }
+        return opt;
+      });
+
+      return {
+        ...prev,
+        questions: prev.questions.map((q, i) => 
+          i === questionIndex 
+            ? { ...q, options: updatedOptions }
+            : q
+        )
+      };
+    });
+  };
+
+  const handleOptionBlur = (questionIndex, optionIndex) => {
+    setFormData(prev => {
+      const question = prev.questions[questionIndex];
+      if (!question || !question.options) return prev;
+
+      const currentValue = question.options[optionIndex] || '';
+      const trimmedValue = currentValue.trim();
+      
+      if (trimmedValue === '') return prev;
+
+      // Find all duplicate option indices (including the current one)
+      const duplicateIndices = [];
+      question.options.forEach((opt, oi) => {
+        if (opt.trim().toLowerCase() === trimmedValue.toLowerCase() && opt.trim() !== '') {
+          duplicateIndices.push(oi);
+        }
+      });
+
+      // If there are duplicates, keep only the first one (lowest index), clear the rest
+      if (duplicateIndices.length > 1) {
+        const firstIndex = Math.min(...duplicateIndices);
+        const updatedOptions = question.options.map((opt, oi) => {
+          // Keep the first duplicate, clear all others
+          if (duplicateIndices.includes(oi) && oi !== firstIndex) {
+            return '';
+          }
+          return opt;
+        });
+
+        toast.info('Đã tự động xóa các lựa chọn trùng lặp.', {
+          position: "top-right",
+          autoClose: 2000,
+        });
+
+        return {
+          ...prev,
+          questions: prev.questions.map((q, i) => 
+            i === questionIndex 
+              ? { ...q, options: updatedOptions }
+              : q
+          )
+        };
+      }
+
+      return prev;
+    });
   };
 
 
@@ -207,9 +336,18 @@ export default function CreateFeedbackForm() {
         toast.error(`Vui lòng nhập nội dung cho câu hỏi ${i + 1}`);
         return;
       }
-      if (q.questionType === 'multiple-choice' && (!q.options || q.options.length < 2)) {
-        toast.error(`Câu hỏi ${i + 1} (lựa chọn nhiều) phải có ít nhất 2 lựa chọn`);
-        return;
+      if (q.questionType === 'multiple-choice') {
+        if (!q.options || q.options.length < 2) {
+          toast.error(`Câu hỏi ${i + 1} (lựa chọn nhiều) phải có ít nhất 2 lựa chọn`);
+          return;
+        }
+        // Check for duplicate options (case-insensitive, trim whitespace)
+        const trimmedOptions = q.options.map(opt => opt.trim().toLowerCase()).filter(opt => opt !== '');
+        const uniqueOptions = new Set(trimmedOptions);
+        if (trimmedOptions.length !== uniqueOptions.size) {
+          toast.error(`Câu hỏi ${i + 1} có lựa chọn trùng lặp. Vui lòng sửa lại.`);
+          return;
+        }
       }
     }
 
@@ -485,35 +623,50 @@ export default function CreateFeedbackForm() {
                             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                               Lựa chọn:
                             </label>
-                            {question.options?.map((option, optIndex) => (
-                              <div key={optIndex} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => handleOptionChange(index, optIndex, e.target.value)}
-                                  placeholder={`Lựa chọn ${optIndex + 1}`}
-                                  style={{
-                                    flex: 1,
-                                    padding: '8px 12px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '8px',
-                                    fontSize: '14px'
-                                  }}
-                                />
-                                <button
-                                  onClick={() => handleRemoveOption(index, optIndex)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: '#ef4444',
-                                    fontSize: '18px'
-                                  }}
-                                >
-                                  <i className="bi bi-x"></i>
-                                </button>
-                              </div>
-                            ))}
+                            {question.options?.map((option, optIndex) => {
+                              // Check if this option is duplicate
+                              const trimmedOption = option.trim();
+                              const isDuplicate = question.options.some((opt, oi) => 
+                                oi !== optIndex && opt.trim().toLowerCase() === trimmedOption.toLowerCase() && trimmedOption !== ''
+                              );
+                              
+                              return (
+                                <div key={optIndex} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                                  <input
+                                    type="text"
+                                    value={option}
+                                    onChange={(e) => handleOptionChange(index, optIndex, e.target.value)}
+                                    onBlur={() => handleOptionBlur(index, optIndex)}
+                                    placeholder={`Lựa chọn ${optIndex + 1}`}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 12px',
+                                      border: isDuplicate ? '2px solid #ef4444' : '1px solid #d1d5db',
+                                      borderRadius: '8px',
+                                      fontSize: '14px',
+                                      backgroundColor: isDuplicate ? '#fef2f2' : 'white'
+                                    }}
+                                  />
+                                  {isDuplicate && (
+                                    <span style={{ color: '#ef4444', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                      <i className="bi bi-exclamation-circle"></i> Trùng lặp
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => handleRemoveOption(index, optIndex)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      color: '#ef4444',
+                                      fontSize: '18px'
+                                    }}
+                                  >
+                                    <i className="bi bi-x"></i>
+                                  </button>
+                                </div>
+                              );
+                            })}
                             <button
                               onClick={() => handleAddOption(index)}
                               style={{
