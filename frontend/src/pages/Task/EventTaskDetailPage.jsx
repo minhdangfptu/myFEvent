@@ -11,12 +11,16 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Loading from "~/components/Loading";
 import ConfirmModal from "~/components/ConfirmModal";
+import { useNotifications } from "~/contexts/NotificationsContext";
+import { useAuth } from "~/contexts/AuthContext";
 
 export default function EventTaskDetailPage() {
   const { t } = useTranslation();
   const { eventId, taskId } = useParams();
   const navigate = useNavigate();
   const { fetchEventRole } = useEvents();
+  const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const [eventRole, setEventRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -248,6 +252,20 @@ export default function EventTaskDetailPage() {
       setForm((f) => ({ ...f, status: value }));
       toast.success("Đã cập nhật trạng thái");
       setIsEditing(false);
+      
+      // Thông báo khi task hoàn thành - gửi cho HoD
+      if (value === "Đã xong" && form.departmentId) {
+        const dept = departments.find(d => d._id === form.departmentId);
+        if (dept) {
+          addNotification({
+            category: 'CÔNG VIỆC',
+            icon: 'bi bi-check-circle',
+            avatarUrl: '/logo-03.png',
+            title: `Công việc "${form.title}" đã được hoàn thành`,
+            color: '#10b981'
+          });
+        }
+      }
     } catch (err) {
       const msg = err?.response?.data?.message;
       toast.error(msg || "Cập nhật trạng thái thất bại");
@@ -275,6 +293,18 @@ export default function EventTaskDetailPage() {
         setAssigneeFallbackName(a?.userId?.fullName || a?.fullName || "");
         toast.success("Đã gán người thực hiện");
         setIsEditing(false);
+        
+        // Thông báo khi giao việc cho Member - gửi cho Member
+        if (user && form.title) {
+          const assigneeName = a?.userId?.fullName || a?.fullName || "Member";
+          addNotification({
+            category: 'CÔNG VIỆC',
+            icon: 'bi bi-asterisk',
+            avatarUrl: '/logo-03.png',
+            title: `${user.fullName || user.name || 'HoOC'} đã giao cho bạn công việc "${form.title}"`,
+            color: '#ef4444'
+          });
+        }
       }
     } catch {
       toast.error("Cập nhật người thực hiện thất bại");

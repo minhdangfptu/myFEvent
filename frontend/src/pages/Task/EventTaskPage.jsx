@@ -12,6 +12,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
 import { useAuth } from "~/contexts/AuthContext";
+import { useNotifications } from "~/contexts/NotificationsContext";
 
 export default function EventTaskPage() {
   const { t } = useTranslation();
@@ -33,6 +34,8 @@ export default function EventTaskPage() {
   const [eventRole, setEventRole] = useState("");
 
   const { fetchEventRole } = useEvents();
+  const { addNotification } = useNotifications();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchEventRole(eventId).then((role) => {
@@ -85,34 +88,54 @@ export default function EventTaskPage() {
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
-        const mapped = arr.map((task) => ({
-          id: task?._id,
-          name: task?.title || "",
-          description: task?.description || "",
-          department: task?.departmentId?.name || "Chưa phân công",
-          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
-          milestone: task?.milestoneId || "Chưa có",
-          parent: task?.parentId || "Chưa có",
-          due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
-          status:
-            task?.status === "done"
-              ? "Hoàn thành"
-              : task?.status === "blocked"
-              ? "Tạm hoãn"
-              : task?.status === "todo"
-              ? "Chưa bắt đầu"
-              : task?.status === "cancelled"
-              ? "Đã huỷ"
-              : "Đang làm",
-          estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
-          createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
-          updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
-          progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
-        }));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const mapped = arr.map((task) => {
+          const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
+          const isOverdue = dueDate && dueDate < today && task?.status !== "done" && task?.status !== "completed";
+          
+          // Thông báo khi task quá hạn - gửi cho Member và HoD
+          if (isOverdue && task?.assigneeId) {
+            const taskTitle = task?.title || "Công việc";
+            addNotification({
+              category: 'CÔNG VIỆC',
+              icon: 'bi bi-exclamation-triangle',
+              avatarUrl: '/logo-03.png',
+              title: `Công việc "${taskTitle}" đã quá hạn`,
+              color: '#ef4444'
+            });
+          }
+          
+          return {
+            id: task?._id,
+            name: task?.title || "",
+            description: task?.description || "",
+            department: task?.departmentId?.name || "Chưa phân công",
+            assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+            milestone: task?.milestoneId || "Chưa có",
+            parent: task?.parentId || "Chưa có",
+            due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
+            status:
+              task?.status === "done"
+                ? "Hoàn thành"
+                : task?.status === "blocked"
+                ? "Tạm hoãn"
+                : task?.status === "todo"
+                ? "Chưa bắt đầu"
+                : task?.status === "cancelled"
+                ? "Đã huỷ"
+                : "Đang làm",
+            estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
+            createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
+            updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
+            progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
+          };
+        });
         setTasks(mapped);
       })
       .catch((err) => setTasks([]));
-  }, [eventId]);
+  }, [eventId, addNotification]);
 
   useEffect(() => {
     fetchTasks();
@@ -190,13 +213,59 @@ export default function EventTaskPage() {
     setShowAddModal(false);
   };
 
-  const handleUpdateTaskStatus = (taskId, newStatus) => {
-    setTasks(
-      tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    // Map Vietnamese status to backend status
+    const statusMapToBackend = (s) => {
+      if (s === "Hoàn thành") return "done";
+      if (s === "Đang làm") return "in_progress";
+      if (s === "Tạm hoãn") return "blocked";
+      if (s === "Đã huỷ") return "cancelled";
+      return "todo"; // "Chưa bắt đầu"
+    };
+
+    const backendStatus = statusMapToBackend(newStatus);
+    
+    // Save current state for rollback
+    const previousTasks = [...tasks];
+    const previousSelectedTask = selectedTask;
+    
+    // Get task info for notification
+    const task = tasks.find(t => t.id === taskId);
+    
+    // Optimistic update: update UI immediately
+    const updatedTasks = tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t));
+    setTasks(updatedTasks);
     setSelectedTask((st) =>
       st && st.id === taskId ? { ...st, status: newStatus } : st
     );
+
+    // Call API to update in database
+    try {
+      await taskApi.updateTaskProgress(eventId, taskId, backendStatus);
+      toast.success("Đã cập nhật trạng thái công việc");
+      
+      // Thông báo khi task hoàn thành - gửi cho HoD
+      if (newStatus === "Hoàn thành" && task) {
+        // Get department info to notify HoD
+        const taskDept = departments.find(d => d.name === task.department);
+        if (taskDept) {
+          addNotification({
+            category: 'CÔNG VIỆC',
+            icon: 'bi bi-check-circle',
+            avatarUrl: '/logo-03.png',
+            title: `Công việc "${task.name}" đã được hoàn thành`,
+            color: '#10b981'
+          });
+        }
+      }
+    } catch (error) {
+      // Rollback on error
+      setTasks(previousTasks);
+      setSelectedTask(previousSelectedTask);
+      const errorMessage = error?.response?.data?.message || "Cập nhật trạng thái thất bại";
+      toast.error(errorMessage);
+      console.error("Error updating task status:", error);
+    }
   };
 
   const handleDetail = (taskId) => {
@@ -300,8 +369,9 @@ export default function EventTaskPage() {
     };
   
     try {
-      await taskApi.createTask(eventId, payload);
-  
+      const response = await taskApi.createTask(eventId, payload);
+      const createdTask = response?.data || response;
+
       setShowAddModal(false);
       setAddTaskForm({
         title: "",
@@ -316,7 +386,7 @@ export default function EventTaskPage() {
         parentId: "",
         dependencies: [],
       });
-  
+
       taskApi.getTaskByEvent(eventId).then((apiRes) => {
         const arr = apiRes?.data || [];
         const mapped = arr.map((task) => ({
@@ -345,8 +415,28 @@ export default function EventTaskPage() {
         }));
         setTasks(mapped);
       });
-  
+
       toast.success("Tạo công việc thành công!");
+      
+      // Thông báo khi giao việc cho Member - gửi cho Member
+      if (payload.assigneeId && user) {
+        const assigneeMember = assignees.find(a => 
+          String(a._id) === String(payload.assigneeId) || 
+          String(a.id) === String(payload.assigneeId) ||
+          String(a.userId) === String(payload.assigneeId)
+        );
+        const assigneeName = assigneeMember?.userId?.fullName || assigneeMember?.fullName || "Member";
+        const taskTitle = payload.title || "Công việc mới";
+        
+        // Thông báo cho Member được giao việc
+        addNotification({
+          category: 'CÔNG VIỆC',
+          icon: 'bi bi-asterisk',
+          avatarUrl: '/logo-03.png',
+          title: `${user.fullName || user.name || 'HoOC'} đã giao cho bạn công việc "${taskTitle}"`,
+          color: '#ef4444'
+        });
+      }
     } catch (err) {
       // Hiển thị lỗi từ backend
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
@@ -370,8 +460,6 @@ export default function EventTaskPage() {
     },
     { notStarted: [], inProgress: [], done: [] }
   );
-
-  const { user } = useAuth();
 
   return (
     <>

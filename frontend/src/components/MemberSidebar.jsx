@@ -80,7 +80,7 @@ export default function MemberSidebar({
     {
       id: "overview-dashboard",
       label: "Dashboard tổng",
-      path: "/member-landing-page",
+      path: `/member-dashboard${eventId ? `?eventId=${eventId}` : ''}`,
     },
     {
       id: "overview-detail",

@@ -5,13 +5,12 @@ import { useParams, useLocation, useNavigate } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { eventApi } from "../../apis/eventApi"
 import { taskApi } from "../../apis/taskApi"
-import { departmentService } from "../../services/departmentService"
 import { milestoneService } from "../../services/milestoneService"
 import Loading from "../../components/Loading"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
-import { userApi } from "../../apis/userApi"
+import { useAuth } from "../../contexts/AuthContext"
 
 // Helper function to generate calendar days
 function generateCalendarDays() {
@@ -100,68 +99,49 @@ const getTaskStatusText = (status, isOverdueTask = false) => {
   return "Đang làm"
 }
 
-export default function HoDDashBoard() {
+export default function MemberDashBoard() {
   const location = useLocation()
   const navigate = useNavigate()
   const { eventId: paramEventId } = useParams()
-  const { fetchEventRole, events: ctxEvents } = useEvents()
+  const { fetchEventRole } = useEvents()
+  const { user } = useAuth()
   
   // State
   const [loading, setLoading] = useState(true)
   const [eventData, setEventData] = useState(null)
-  const [department, setDepartment] = useState(null)
-  const [members, setMembers] = useState([])
   const [tasks, setTasks] = useState([])
   const [milestones, setMilestones] = useState([])
   const [eventRole, setEventRole] = useState("")
-  const [departmentId, setDepartmentId] = useState(null)
   const [hoveredDay, setHoveredDay] = useState(null)
   
   // Get event ID from URL or EventContext
   const urlEventId = paramEventId || getEventIdFromUrl(location.pathname, location.search)
-  const eventId = urlEventId || (ctxEvents && ctxEvents.length > 0 ? (ctxEvents[0]._id || ctxEvents[0].id) : null)
+  const eventId = urlEventId
 
-  // Load event role and departmentId
+  // Load event role for sidebar
   useEffect(() => {
     let mounted = true
     const loadRole = async () => {
       if (!eventId) {
-        if (mounted) {
-          setEventRole("")
-          setDepartmentId(null)
-        }
+        if (mounted) setEventRole("")
         return
       }
       try {
-        const roleResponse = await userApi.getUserRoleByEvent(eventId)
-        const role = roleResponse?.role || ""
-        
-        // Get departmentId from response if HoD
-        if (role === "HoD" && roleResponse?.departmentId) {
-          const deptId = roleResponse.departmentId?._id || roleResponse.departmentId
-          if (mounted && deptId) {
-            setDepartmentId(deptId)
-          }
-        }
-        
+        const role = await fetchEventRole(eventId)
         if (mounted) setEventRole(role)
       } catch (_) {
-        if (mounted) {
-          setEventRole("")
-          setDepartmentId(null)
-        }
+        if (mounted) setEventRole("")
       }
     }
     loadRole()
     return () => {
       mounted = false
     }
-  }, [eventId])
+  }, [eventId, fetchEventRole])
 
   // Fetch all data
   useEffect(() => {
-    if (!eventId) {
-      // If no eventId, stop loading and show message
+    if (!eventId || !user) {
       setLoading(false)
       return
     }
@@ -172,55 +152,83 @@ export default function HoDDashBoard() {
       try {
         setLoading(true)
 
-        // Fetch event data
-        const eventResponse = await eventApi.getById(eventId)
+        // Fetch event data, tasks, milestones, and members
+        const [eventResponse, tasksResponse, milestonesResponse, membersResponse] = await Promise.all([
+          eventApi.getById(eventId),
+          taskApi.getTaskByEvent(eventId),
+          milestoneService.listMilestones(eventId, {
+            sortBy: "targetDate",
+            sortDir: "asc"
+          }),
+          eventApi.getMembersByEvent(eventId)
+        ])
+
+        if (cancelled) return
+
         const eventPayload = unwrapApiData(eventResponse)
-        if (!cancelled) {
-          setEventData(eventPayload?.event ?? eventPayload ?? null)
-        }
+        if (!cancelled) setEventData(eventPayload?.event ?? eventPayload ?? null)
 
-        // If we have departmentId, fetch department-specific data
-        if (departmentId) {
-          const [deptResponse, membersResponse, tasksResponse, milestonesResponse] = await Promise.all([
-            departmentService.getDepartmentDetail(eventId, departmentId),
-            departmentService.getMembersByDepartment(eventId, departmentId),
-            taskApi.getTaskByEvent(eventId),
-            milestoneService.listMilestones(eventId, {
-              sortBy: "targetDate",
-              sortDir: "asc"
+        // Get current user's EventMember ID
+        const userId = user._id || user.id
+        const membersData = unwrapApiData(membersResponse)
+        const membersArray = Array.isArray(membersData) ? membersData : (membersData?.data || membersData?.members || [])
+        
+        // Find EventMember for current user
+        const currentUserMember = membersArray.find(member => {
+          const memberUserId = member?.userId?._id || member?.userId || member?.userId?.id
+          return memberUserId && String(memberUserId) === String(userId)
+        })
+        const currentUserMemberId = currentUserMember?._id || currentUserMember?.id
+
+        // Filter tasks assigned to current user
+        const tasksData = unwrapApiData(tasksResponse)
+        const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.data || tasksData?.tasks || [])
+        
+        const userTasks = tasksArray.filter(task => {
+          // Case 1: assigneeId is EventMember ID (string/ObjectId) - compare directly
+          const assigneeId = task.assigneeId?._id || task.assigneeId
+          const assigneeIdMatch = currentUserMemberId && assigneeId && String(assigneeId) === String(currentUserMemberId)
+          
+          // Case 2: assigneeId is populated EventMember object - check userId inside
+          const assigneeUserId = task.assigneeId?.userId?._id || task.assigneeId?.userId || task.assigneeId?.userId?.id
+          const assigneeUserIdMatch = assigneeUserId && String(assigneeUserId) === String(userId)
+          
+          // Case 3: Legacy - assigneeId might be userId directly (shouldn't happen but handle it)
+          const directUserIdMatch = assigneeId && String(assigneeId) === String(userId)
+          
+          return assigneeIdMatch || assigneeUserIdMatch || directUserIdMatch
+        })
+        
+        // Debug log (remove in production)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('MemberDashBoard - User ID:', userId)
+          console.log('MemberDashBoard - Current User Member ID:', currentUserMemberId)
+          console.log('MemberDashBoard - Total tasks:', tasksArray.length)
+          console.log('MemberDashBoard - User tasks:', userTasks.length)
+          if (tasksArray.length > 0) {
+            console.log('MemberDashBoard - Sample task:', {
+              id: tasksArray[0]?._id,
+              name: tasksArray[0]?.name || tasksArray[0]?.title,
+              assigneeId: tasksArray[0]?.assigneeId,
+              assigneeIdType: typeof tasksArray[0]?.assigneeId,
+              assigneeUserId: tasksArray[0]?.assigneeId?.userId?._id
             })
-          ])
+          }
+        }
+        
+        if (!cancelled) setTasks(userTasks)
 
-          if (cancelled) return
-
-          const deptData = unwrapApiData(deptResponse)
-          if (!cancelled) setDepartment(deptData || null)
-
-          const membersData = Array.isArray(membersResponse) ? membersResponse : (membersResponse?.data || [])
-          if (!cancelled) setMembers(membersData)
-
-          const tasksData = unwrapApiData(tasksResponse)
-          const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.data || tasksData?.tasks || [])
-          // Filter tasks by departmentId
-          const deptTasks = tasksArray.filter(task => {
-            const taskDeptId = task.departmentId?._id || task.departmentId || task.department?._id || task.department
-            return String(taskDeptId) === String(departmentId)
+        const milestoneList = Array.isArray(milestonesResponse) 
+          ? milestonesResponse 
+          : (milestonesResponse?.data || milestonesResponse?.milestones || [])
+        const sortedMilestones = milestoneList
+          .slice()
+          .sort((a, b) => {
+            const da = parseDate(a?.targetDate) || new Date(8640000000000000)
+            const db = parseDate(b?.targetDate) || new Date(8640000000000000)
+            return da.getTime() - db.getTime()
           })
-          if (!cancelled) setTasks(deptTasks)
-
-          const milestoneList = Array.isArray(milestonesResponse) 
-            ? milestonesResponse 
-            : (milestonesResponse?.data || milestonesResponse?.milestones || [])
-          const sortedMilestones = milestoneList
-            .slice()
-            .sort((a, b) => {
-              const da = parseDate(a?.targetDate) || new Date(8640000000000000)
-              const db = parseDate(b?.targetDate) || new Date(8640000000000000)
-              return da.getTime() - db.getTime()
-            })
-          if (!cancelled) setMilestones(sortedMilestones)
-        }
-        // If no departmentId yet, the useEffect will run again when departmentId is set
+        if (!cancelled) setMilestones(sortedMilestones)
       } catch (error) {
         if (!cancelled) {
           console.error("Error fetching dashboard data:", error)
@@ -237,10 +245,9 @@ export default function HoDDashBoard() {
     return () => {
       cancelled = true
     }
-  }, [eventId, departmentId])
+  }, [eventId, user])
 
   // Calculate stats
-  const totalMembers = members.length
   const totalTasks = tasks.length
   const completedTasks = useMemo(
     () => tasks.filter((t) => isCompletedStatus(t?.status)).length,
@@ -254,40 +261,59 @@ export default function HoDDashBoard() {
     [tasks]
   )
 
-  // Major tasks (parent tasks or tasks with high priority)
-  const majorTasks = useMemo(() => {
-    const parentTasks = tasks.filter(t => !t.parentTaskId || t.parentTaskId === null)
-    return parentTasks
-      .slice(0, 2)
-      .map((task) => {
-        const progress = task.progressPct || task.progress || 0
-        const normalizedProgress = Math.max(0, Math.min(100, Math.round(progress)))
-        
-        const deadline = task.dueDate || task.deadline
-        const deadlineDate = deadline ? formatDate(deadline) : "Đang cập nhật"
-        
-        return {
-          id: task._id || task.id,
-          title: task.title || task.name || "Công việc",
-          progress: normalizedProgress,
-          deadline: deadlineDate
-        }
-      })
-  }, [tasks])
-
-  // Detailed tasks (recent or upcoming tasks)
-  const detailedTasks = useMemo(() => {
+  // Get user tasks for display (sorted by due date, limit to 4)
+  const userTasks = useMemo(() => {
     return tasks
-      .filter(t => t.parentTaskId || t.status !== "completed")
-      .slice(0, 3)
+      .slice()
+      .sort((a, b) => {
+        const dateA = parseDate(a.dueDate || a.deadline) || new Date(8640000000000000)
+        const dateB = parseDate(b.dueDate || b.deadline) || new Date(8640000000000000)
+        return dateA.getTime() - dateB.getTime()
+      })
+      .slice(0, 4)
       .map((task) => {
         const deadline = task.dueDate || task.deadline
-        const deadlineDate = deadline ? formatDate(deadline) : "Đang cập nhật"
+        const deadlineDate = deadline ? parseDate(deadline) : null
+        
+        let deadlineText = "Chưa có hạn"
+        if (deadlineDate) {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const deadlineDay = new Date(deadlineDate)
+          deadlineDay.setHours(0, 0, 0, 0)
+          
+          const diffTime = deadlineDay - today
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          
+          if (diffDays === 0) {
+            const timeStr = deadlineDate.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })
+            deadlineText = `Hạn: ${timeStr} hôm nay`
+          } else if (diffDays === 1) {
+            const timeStr = deadlineDate.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })
+            deadlineText = `Hạn: ${timeStr} mai`
+          } else if (diffDays === -1) {
+            deadlineText = `Hạn: Hôm qua`
+          } else if (diffDays > 1) {
+            const timeStr = deadlineDate.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })
+            deadlineText = `Hạn: ${timeStr} ${formatDate(deadline)}`
+          } else {
+            deadlineText = `Hạn: ${formatDate(deadline)}`
+          }
+        }
         
         return {
           id: task._id || task.id,
           title: task.title || task.name || "Công việc",
-          deadline: deadlineDate,
+          deadline: deadlineText,
           status: task.status || "pending"
         }
       })
@@ -343,7 +369,7 @@ export default function HoDDashBoard() {
   if (loading) {
     return (
       <UserLayout
-        title="Dashboard ban"
+        title="Dashboard tổng quan"
         sidebarType={sidebarType}
         activePage="overview-dashboard"
         eventId={eventId}
@@ -368,7 +394,7 @@ export default function HoDDashBoard() {
   if (!eventId) {
     return (
       <UserLayout
-        title="Dashboard ban"
+        title="Dashboard tổng quan"
         sidebarType={sidebarType}
         activePage="overview-dashboard"
         eventId={null}
@@ -387,39 +413,35 @@ export default function HoDDashBoard() {
     )
   }
 
-  if (!eventData || !department) {
+  if (!eventData) {
     return (
       <UserLayout
-        title="Dashboard ban"
+        title="Dashboard tổng quan"
         sidebarType={sidebarType}
         activePage="overview-dashboard"
         eventId={eventId}
       >
         <div className="alert alert-danger" style={{ margin: "20px" }}>
-          {!eventData ? "Không tìm thấy sự kiện" : "Không tìm thấy ban. Bạn có thể chưa được phân công vào ban nào."}
+          Không tìm thấy sự kiện
         </div>
       </UserLayout>
     )
   }
 
   return (
-    <UserLayout title="Dashboard ban" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+    <UserLayout title="Dashboard tổng quan" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
       <div className="bg-light" style={{ minHeight: "100vh", padding: "24px" }}>
         <div className="container-fluid px-0" style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
           <div className="mb-4">
             <h1 className="mb-2" style={{ color: "#dc2626", fontSize: "28px", fontWeight: 700 }}>
-              {eventData.name}
+              {eventData.name} - Dashboard tổng quan
             </h1>
-            <div className="d-flex align-items-center gap-2">
-              <span style={{ color: "#6b7280", fontSize: "16px" }}>Dashboard ban</span>
-              <span style={{ color: "#dc2626", fontSize: "16px", fontWeight: 600 }}>{department.name}</span>
-            </div>
           </div>
 
           {/* Stats Cards */}
           <div className="row g-4 mb-4">
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col-12 col-sm-6 col-md-6 col-lg-4">
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4">
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -432,32 +454,6 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      👥
-                    </div>
-                  </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
-                    {totalMembers}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Số thành viên
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
-              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                <div className="card-body p-4">
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-3"
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        backgroundColor: "#e9d5ff",
-                        fontSize: "24px",
-                      }}
-                    >
                       📋
                     </div>
                   </div>
@@ -465,13 +461,13 @@ export default function HoDDashBoard() {
                     {totalTasks}
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Tổng số công việc
+                    Tổng số công việc của bạn
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col-12 col-sm-6 col-md-6 col-lg-4">
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4">
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -487,7 +483,7 @@ export default function HoDDashBoard() {
                       ✓
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#10b981", lineHeight: "1" }}>
                     {completedTasksPercent}%
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
@@ -497,7 +493,7 @@ export default function HoDDashBoard() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col-12 col-sm-6 col-md-6 col-lg-4">
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4">
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -513,7 +509,7 @@ export default function HoDDashBoard() {
                       ⚠️
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#ef4444", lineHeight: "1" }}>
                     {overdueTasks}
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
@@ -526,72 +522,17 @@ export default function HoDDashBoard() {
 
           {/* Middle Section */}
           <div className="row g-3 mb-4">
-            {/* Major Tasks */}
+            {/* User Tasks */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3">
                 <div className="card-body p-4">
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "18px", color: "#1f2937" }}>
-                    Công việc lớn của ban
+                    Công việc của bạn
                   </h6>
 
-                  {majorTasks.length > 0 ? (
-                    majorTasks.map((task, index) => (
-                      <div key={task.id} className={index !== majorTasks.length - 1 ? "mb-4 pb-4 border-bottom" : ""}>
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                          <div className="d-flex align-items-center flex-grow-1">
-                            <span
-                              className="rounded-circle me-3"
-                              style={{
-                                width: "12px",
-                                height: "12px",
-                                backgroundColor: "#f59e0b",
-                              }}
-                            ></span>
-                            <span style={{ fontSize: "15px", color: "#374151", fontWeight: "500" }}>{task.title}</span>
-                          </div>
-                          <span className="text-muted" style={{ fontSize: "13px" }}>
-                            {task.deadline}
-                          </span>
-                        </div>
-                        <div className="d-flex align-items-center gap-2">
-                          <div className="progress flex-grow-1" style={{ height: "10px", borderRadius: "10px", backgroundColor: "#f3f4f6" }}>
-                            <div
-                              className="progress-fill rounded"
-                              style={{
-                                width: `${task.progress}%`,
-                                height: "100%",
-                                backgroundColor: "#f59e0b",
-                                transition: "width 0.5s ease"
-                              }}
-                            ></div>
-                          </div>
-                          <span className="fw-semibold" style={{ fontSize: "14px", color: "#f59e0b", minWidth: "45px", textAlign: "right" }}>
-                            {task.progress}%
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted py-5">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📊</div>
-                      <div className="mt-2">Chưa có dữ liệu công việc</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Detailed Tasks */}
-            <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
-                  <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
-                    Công việc chi tiết của ban
-                  </h6>
-
-                  {detailedTasks.length > 0 ? (
+                  {userTasks.length > 0 ? (
                     <div className="d-flex flex-column gap-3">
-                      {detailedTasks.map((task) => {
+                      {userTasks.map((task) => {
                         const taskObj = tasks.find(t => (t._id || t.id) === task.id)
                         const isOverdueTask = taskObj ? isOverdue(taskObj) : false
                         const statusText = getTaskStatusText(task.status, isOverdueTask)
@@ -612,24 +553,12 @@ export default function HoDDashBoard() {
                         return (
                           <div key={task.id} className="d-flex align-items-center justify-content-between p-3 rounded-2" style={{ backgroundColor: "#f9fafb" }}>
                             <div className="d-flex align-items-center flex-grow-1">
-                              <span
-                                className="rounded-circle me-3"
-                                style={{
-                                  width: "10px",
-                                  height: "10px",
-                                  backgroundColor: statusText === "Hoàn thành" 
-                                    ? "#10b981" 
-                                    : statusText === "Quá hạn" || statusText === "Tạm hoãn" || statusText === "Đã hủy"
-                                    ? "#ef4444"
-                                    : "#f59e0b",
-                                }}
-                              ></span>
                               <div>
                                 <div style={{ fontSize: "14px", color: "#374151", fontWeight: "500" }}>
                                   {task.title}
                                 </div>
                                 <div className="text-muted" style={{ fontSize: "12px" }}>
-                                  Hạn tới: {task.deadline}
+                                  {task.deadline}
                                 </div>
                               </div>
                             </div>
@@ -651,16 +580,13 @@ export default function HoDDashBoard() {
                   ) : (
                     <div className="text-center text-muted py-4">
                       <div style={{ fontSize: "48px", opacity: 0.3 }}>📋</div>
-                      <div className="mt-2">Chưa có công việc chi tiết</div>
+                      <div className="mt-2">Chưa có công việc</div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Bottom Section */}
-          <div className="row g-3">
             {/* Calendar */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3">
@@ -677,7 +603,7 @@ export default function HoDDashBoard() {
                   <table className="table table-borderless mb-0" style={{ width: "100%" }}>
                     <thead>
                       <tr>
-                        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => (
+                        {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((day) => (
                           <th
                             key={day}
                             className="text-center text-muted"
@@ -696,6 +622,9 @@ export default function HoDDashBoard() {
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
                             
+                            // Check if this day has milestones
+                            const hasMilestone = dayEvents.length > 0
+                            
                             return (
                               <td
                                 key={dayIndex}
@@ -706,6 +635,8 @@ export default function HoDDashBoard() {
                                   fontSize: "13px",
                                   backgroundColor: dayData?.today
                                     ? "#dc2626"
+                                    : hasMilestone && !dayData?.today
+                                    ? "#fef3c7"
                                     : isHovered
                                     ? "#fee2e2"
                                     : dayData?.highlight
@@ -713,6 +644,8 @@ export default function HoDDashBoard() {
                                     : "transparent",
                                   color: dayData?.today 
                                     ? "white" 
+                                    : hasMilestone && !dayData?.today
+                                    ? "#92400e"
                                     : isHovered 
                                     ? "#dc2626" 
                                     : dayData?.highlight 
@@ -763,74 +696,73 @@ export default function HoDDashBoard() {
                         Không có sự kiện
                       </div>
                     </div>
-                  ) : null}
+                  ) : milestones.length > 0 && (() => {
+                    // Show next upcoming milestone
+                    const upcomingMilestone = milestones.find(m => !isCompletedStatus(m?.status))
+                    if (!upcomingMilestone) return null
+                    const milestoneDate = parseDate(upcomingMilestone?.targetDate || upcomingMilestone?.dueDate)
+                    if (!milestoneDate) return null
+                    
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const milestoneDay = new Date(milestoneDate)
+                    milestoneDay.setHours(0, 0, 0, 0)
+                    
+                    const diffTime = milestoneDay - today
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                    
+                    if (diffDays >= 0 && diffDays <= 7) {
+                      const timeStr = milestoneDate.toLocaleTimeString('vi-VN', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })
+                      const dateStr = diffDays === 0 ? "Hôm nay" : diffDays === 1 ? "Mai" : formatDate(milestoneDate)
+                      
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          <div className="d-flex align-items-center gap-2">
+                            <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                            <div>
+                              <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                                {upcomingMilestone?.name || "Cột mốc"}
+                              </div>
+                              <div className="text-muted" style={{ fontSize: "12px" }}>
+                                {timeStr} {dateStr}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Event Card with Horizontal Timeline */}
-            <div className="col-12 col-lg-6">
+          {/* Bottom Progress Bar */}
+          <div className="row g-3">
+            <div className="col-12">
               <div className="card shadow-sm border-0 rounded-3">
                 <div className="card-body p-4">
-                  {/* Event Header */}
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle"
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        backgroundColor: "#fef2f2",
-                        fontSize: "24px",
-                      }}
-                    >
-                      🎯
-                    </div>
-                    <div className="flex-grow-1">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div>
                       <h6 className="fw-bold mb-1" style={{ fontSize: "18px", color: "#1f2937" }}>
                         {eventData.name}
                       </h6>
-                      <div className="text-muted" style={{ fontSize: "13px" }}>
-                        Thông tin sự kiện
+                      <div className="text-muted" style={{ fontSize: "14px" }}>
+                        {milestones.filter((m) => isCompletedStatus(m?.status)).length}/{milestones.length} hoàn tất
                       </div>
                     </div>
-                  </div>
-
-                  {/* Progress Dots and Status */}
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div style={{ fontSize: "13px", color: "#6b7280" }}>Tiến độ</div>
-                    <div className="d-flex gap-1">
-                      {eventTimeline.map((_, index) => (
-                        <span
-                          key={index}
-                          className="rounded-circle"
-                          style={{
-                            width: "10px",
-                            height: "10px",
-                            backgroundColor: eventTimeline[index]?.completed ? "#dc2626" : "#e5e7eb",
-                          }}
-                        ></span>
-                      ))}
-                    </div>
-                    <span className="fw-semibold" style={{ fontSize: "13px", color: "#dc2626" }}>
-                      {milestones.filter((m) => isCompletedStatus(m?.status)).length}/{milestones.length} hoàn thành
-                    </span>
-                  </div>
-
-                  {/* Next Milestone */}
-                  {eventTimeline.length > 0 && (
-                    <div
-                      className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
-                      style={{ backgroundColor: "#fef2f2" }}
+                    <button 
+                      className="btn btn-danger btn-sm d-flex align-items-center gap-1" 
+                      style={{ fontSize: "13px" }}
+                      onClick={() => navigate(`/member-event-detail/${eventId}`)}
                     >
-                      <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
-                      <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
-                        Tiếp theo: {eventTimeline.find(m => !m.completed)?.name || eventTimeline[0]?.name}
-                      </span>
-                      <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                        ({eventTimeline.find(m => !m.completed)?.date || eventTimeline[0]?.date})
-                      </span>
-                    </div>
-                  )}
+                      Xem chi tiết →
+                    </button>
+                  </div>
 
                   {/* Horizontal Timeline */}
                   {eventTimeline.length > 0 && (

@@ -41,6 +41,7 @@ import HomePage from "./pages/User/HomePage";
 // Member Pages
 import MemberLandingPage from "./pages/Member/MemberLandingPage";
 import MemberEventDetail from "./pages/Member/MemberEventDetail";
+import MemberDashBoard from "./pages/Member/MemberDashBoard";
 
 // Error Pages
 import ErrorPage404 from "./pages/Errors/ErrorPage404";
@@ -220,6 +221,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MemberEventDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/member-dashboard" 
+            element={
+              <ProtectedRoute>
+                <MemberDashBoard />
               </ProtectedRoute>
             } 
           />
