@@ -151,3 +151,28 @@ export const updateParticipateStatus = async (req, res) => {
         return res.status(500).json({ message: 'Failed to update participate status' });
     }
 };
+export const getMyCalendarInEvent = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(403).json({ message: 'Infficient permissions' });
+        };
+        const { eventId } = req.params;
+        const event = await findEventById(eventId);
+        if (!event) {
+            return res.status(404).json({ message: 'Event not found' });
+        }
+        const membership = await getRequesterMembership(eventId, userId);
+        if (!membership) {
+            return res.status(403).json({ message: 'You are not a member of this event' });
+        }
+        const calendars = await getCalendarByEventId(eventId);
+        const myCalendars = calendars.filter(calendar =>
+            calendar.participants.some(participant => participant.member.toString() === membership._id.toString())
+        );
+        return res.status(200).json({ data: myCalendars });
+    } catch (error) {
+        console.error('getMyCalendarInEvent error:', error);
+        return res.status(500).json({ message: 'Failed to load calendar' });
+    }
+};

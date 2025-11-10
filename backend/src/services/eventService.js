@@ -421,3 +421,4 @@ export const findEventById = async (id, select = null) => {
   if (select) q.select(select);
   return await q.lean();
 };
+
