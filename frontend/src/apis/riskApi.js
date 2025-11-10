@@ -3,56 +3,176 @@ import axiosClient from './axiosClient';
 export const riskApi = {
   // ========== BASIC CRUD OPERATIONS ==========
   
-  // Lấy danh sách tất cả risks của một event
-  // GET /:eventId/risk
+  // Lấy danh sách risks với pagination và filtering
+  // GET /api/events/:eventId/risks
   listRisksByEvent: async (eventId, params = {}) => {
     const res = await axiosClient.get(`/api/events/${eventId}/risks`, { params });
     return res.data;
   },
 
+  // Lấy tất cả risks (không pagination) - cho analytics
+  // GET /api/events/:eventId/risks/all
+  getAllRisksByEvent: async (eventId, params = {}) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/all`, { params });
+    return res.data;
+  },
+
   // Tạo risk mới
-  // POST /:eventId/risk
+  // POST /api/events/:eventId/risks
   createRisk: async (eventId, data) => {
     const res = await axiosClient.post(`/api/events/${eventId}/risks`, data);
     return res.data;
   },
 
-  // ========== STATISTICS OPERATIONS ==========
-
-  // Lấy thống kê risks
-  // GET /:eventId/risk/stats
-  getRiskStatistics: async (eventId, params = {}) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/stats`, { params });
-    return res.data;
-  },
-
-  // Lấy thống kê theo category
-  // GET /:eventId/risk/stats/categories
-  getRisksByCategoryStats: async (eventId, params = {}) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/stats/categories`, { params });
-    return res.data;
-  },
-
-  // ========== INDIVIDUAL RISK OPERATIONS ==========
-
   // Lấy chi tiết một risk
-  // GET /:eventId/risk/:riskId
+  // GET /api/events/:eventId/risks/details/:riskId
   getRiskDetail: async (eventId, riskId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/${riskId}`);
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/details/${riskId}`);
     return res.data;
   },
 
   // Cập nhật risk
-  // PATCH /:eventId/risk/:riskId
+  // PUT /api/events/:eventId/risks/details/:riskId
   updateRisk: async (eventId, riskId, data) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/risks/${riskId}`, data);
+    const res = await axiosClient.put(`/api/events/${eventId}/risks/details/${riskId}`, data);
     return res.data;
   },
 
   // Xóa risk
-  // DELETE /:eventId/risk/:riskId
+  // DELETE /api/events/:eventId/risks/details/:riskId
   deleteRisk: async (eventId, riskId) => {
-    const res = await axiosClient.delete(`/api/events/${eventId}/risks/${riskId}`);
+    const res = await axiosClient.delete(`/api/events/${eventId}/risks/details/${riskId}`);
+    return res.data;
+  },
+
+  // ========== OCCURRED RISK OPERATIONS ==========
+
+  // Thêm occurred risk
+  // POST /api/events/:eventId/risks/:riskId/occurred
+  addOccurredRisk: async (eventId, riskId, data) => {
+    const res = await axiosClient.post(`/api/events/${eventId}/risks/${riskId}/occurred`, data);
+    return res.data;
+  },
+
+  // Cập nhật occurred risk
+  // PUT /api/events/:eventId/risks/:riskId/occurred/:occurredRiskId
+  updateOccurredRisk: async (eventId, riskId, occurredRiskId, data) => {
+    const res = await axiosClient.put(`/api/events/${eventId}/risks/${riskId}/occurred/${occurredRiskId}`, data);
+    return res.data;
+  },
+
+  // Xóa occurred risk
+  // DELETE /api/events/:eventId/risks/:riskId/occurred/:occurredRiskId
+  removeOccurredRisk: async (eventId, riskId, occurredRiskId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/risks/${riskId}/occurred/${occurredRiskId}`);
+    return res.data;
+  },
+
+  // ========== ANALYTICS & REPORTING OPERATIONS ==========
+
+  // Lấy thống kê risks
+  // GET /api/events/:eventId/risks/statistics
+  getRiskStatistics: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/statistics`);
+    return res.data;
+  },
+
+  // Lấy high priority risks
+  // GET /api/events/:eventId/risks/high-priority
+  getHighPriorityRisks: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/high-priority`);
+    return res.data;
+  },
+
+  // Lấy risk matrix
+  // GET /api/events/:eventId/risks/matrix
+  getRiskMatrix: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/matrix`);
+    return res.data;
+  },
+
+  // Lấy complete dashboard data
+  // GET /api/events/:eventId/risks/dashboard
+  getRiskDashboard: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/dashboard`);
+    return res.data;
+  },
+
+  // Lấy risks cần attention ngay
+  // GET /api/events/:eventId/risks/needs-attention
+  getRisksNeedingAttention: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/needs-attention`);
+    return res.data;
+  },
+
+  // Lấy risks theo department
+  // GET /api/events/:eventId/departments/:departmentId/risks
+  getRisksByDepartment: async (eventId, departmentId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/risks`);
+    return res.data;
+  },
+
+  // ========== UTILITY OPERATIONS ==========
+
+  // Bulk update risk statuses
+  // PATCH /api/events/:eventId/risks/bulk-status
+  bulkUpdateRiskStatus: async (eventId, { riskIds, status }) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/risks/bulk-status`, {
+      riskIds,
+      status
+    });
+    return res.data;
+  },
+
+  // Export risk data
+  // GET /api/events/:eventId/risks/export
+  exportRiskData: async (eventId, params = {}) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/export`, { 
+      params,
+      responseType: 'blob' // For file download
+    });
+    return res.data;
+  },
+
+  // ========== AUTO-STATUS UPDATE OPERATIONS ==========
+
+  // Manual trigger risk status update
+  // POST /api/events/:eventId/risks/:riskId/update-status
+  updateRiskStatusManually: async (eventId, riskId) => {
+    const res = await axiosClient.post(`/api/events/${eventId}/risks/${riskId}/update-status`);
+    return res.data;
+  },
+
+  // Batch auto-update all risk statuses
+  // POST /api/events/:eventId/risks/batch-update-status
+  batchUpdateRiskStatuses: async (eventId) => {
+    const res = await axiosClient.post(`/api/events/${eventId}/risks/batch-update-status`);
+    return res.data;
+  },
+
+  // Lấy risk severity analysis
+  // GET /api/events/:eventId/risks/:riskId/severity
+  getRiskSeverityAnalysis: async (eventId, riskId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/risks/${riskId}/severity`);
+    return res.data;
+  },
+
+  // ========== GLOBAL OPERATIONS ==========
+
+  // Lấy risk categories
+  // GET /api/risks/categories
+  getRiskCategories: async () => {
+    const res = await axiosClient.get('/api/risks/categories');
+    return res.data;
+  },
+
+  // Calculate risk score
+  // POST /api/risks/calculate-score
+  calculateRiskScore: async (impact, likelihood) => {
+    const res = await axiosClient.post('/api/risks/calculate-score', {
+      impact,
+      likelihood
+    });
     return res.data;
   }
 };
@@ -70,9 +190,18 @@ export const riskApiHelpers = {
     };
   },
 
+  // Format occurred risk data
+  formatOccurredRiskData: (occurredData) => {
+    return {
+      ...occurredData,
+      occurred_date: occurredData.occurred_date ? new Date(occurredData.occurred_date).toISOString() : new Date().toISOString(),
+      occurred_status: occurredData.occurred_status || 'resolving'
+    };
+  },
+
   // Validate risk data before send
   validateRiskData: (riskData) => {
-    const required = ['departmentId', 'name', 'risk_category', 'impact', 'risk_mitigation_plan', 'risk_response_plan'];
+    const required = ['name', 'departmentId', 'risk_category', 'impact', 'likelihood', 'risk_mitigation_plan'];
     const missing = required.filter(field => !riskData[field]);
     
     if (missing.length > 0) {
@@ -88,7 +217,8 @@ export const riskApiHelpers = {
     ];
     
     const validImpacts = ['low', 'medium', 'high'];
-    const validStatuses = ['pending', 'resolved', 'cancelled'];
+    const validLikelihoods = ['very_low', 'low', 'medium', 'high', 'very_high'];
+    const validStatuses = ['not_yet', 'resolved', 'cancelled'];
 
     if (!validCategories.includes(riskData.risk_category)) {
       throw new Error(`Invalid risk_category. Must be one of: ${validCategories.join(', ')}`);
@@ -98,15 +228,64 @@ export const riskApiHelpers = {
       throw new Error(`Invalid impact. Must be one of: ${validImpacts.join(', ')}`);
     }
 
+    if (!validLikelihoods.includes(riskData.likelihood)) {
+      throw new Error(`Invalid likelihood. Must be one of: ${validLikelihoods.join(', ')}`);
+    }
+
     if (riskData.risk_status && !validStatuses.includes(riskData.risk_status)) {
       throw new Error(`Invalid risk_status. Must be one of: ${validStatuses.join(', ')}`);
     }
 
     return true;
-  }
+  },
+
+  // Validate occurred risk data
+  validateOccurredRiskData: (occurredData) => {
+    const required = ['occurred_name'];
+    const missing = required.filter(field => !occurredData[field]);
+    
+    if (missing.length > 0) {
+      throw new Error(`Missing required fields for occurred risk: ${missing.join(', ')}`);
+    }
+
+    const validOccurredStatuses = ['resolving', 'resolved'];
+    if (occurredData.occurred_status && !validOccurredStatuses.includes(occurredData.occurred_status)) {
+      throw new Error(`Invalid occurred_status. Must be one of: ${validOccurredStatuses.join(', ')}`);
+    }
+
+    return true;
+  },
+
+  // Build query params for filtering
+  buildQueryParams: (filters = {}) => {
+    const params = {};
+    
+    // Pagination
+    if (filters.page) params.page = filters.page;
+    if (filters.limit) params.limit = filters.limit;
+    
+    // Sorting
+    if (filters.sortBy) params.sortBy = filters.sortBy;
+    if (filters.sortOrder) params.sortOrder = filters.sortOrder;
+    
+    // Filtering
+    if (filters.search) params.search = filters.search;
+    if (filters.risk_category) params.risk_category = filters.risk_category;
+    if (filters.impact) params.impact = filters.impact;
+    if (filters.likelihood) params.likelihood = filters.likelihood;
+    if (filters.risk_status) params.risk_status = filters.risk_status;
+    if (filters.departmentId) params.departmentId = filters.departmentId;
+    
+    return params;
+  },
 };
 
 // ========== ERROR HANDLING VERSION ==========
+
+export const getFullMember = async (eventId) => {
+  const res = await axiosClient.get(`/api/events/${eventId}/risks/full-members`);
+  return res.data;
+};
 
 export const riskApiWithErrorHandling = {
   // Wrapper function for error handling
@@ -118,29 +297,37 @@ export const riskApiWithErrorHandling = {
         data: response.data || response,
         message: response.message,
         pagination: response.pagination,
-        count: response.count
+        total: response.total
       };
     } catch (error) {
-      console.error('API Error:', error);
+      console.error('Risk API Error:', error);
       return {
         success: false,
         error: error.response?.data?.message || error.message || 'An error occurred',
-        statusCode: error.response?.status
+        statusCode: error.response?.status,
+        details: error.response?.data
       };
     }
   },
 
-  // Wrapped methods with error handling
+  // ===== BASIC CRUD WITH ERROR HANDLING =====
+  
   listRisksByEvent: async (eventId, params = {}) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
       riskApi.listRisksByEvent(eventId, params)
     );
   },
 
+  getAllRisksByEvent: async (eventId, params = {}) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getAllRisksByEvent(eventId, params)
+    );
+  },
+
   createRisk: async (eventId, data) => {
     return riskApiWithErrorHandling.handleApiCall(() => {
       riskApiHelpers.validateRiskData(data);
-      return riskApi.createRisk(eventId, data);
+      return riskApi.createRisk(eventId, riskApiHelpers.formatRiskData(data));
     });
   },
 
@@ -152,7 +339,7 @@ export const riskApiWithErrorHandling = {
 
   updateRisk: async (eventId, riskId, data) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.updateRisk(eventId, riskId, data)
+      riskApi.updateRisk(eventId, riskId, riskApiHelpers.formatRiskData(data))
     );
   },
 
@@ -162,15 +349,102 @@ export const riskApiWithErrorHandling = {
     );
   },
 
-  getRiskStatistics: async (eventId, params = {}) => {
+  // ===== OCCURRED RISK WITH ERROR HANDLING =====
+
+  addOccurredRisk: async (eventId, riskId, data) => {
+    return riskApiWithErrorHandling.handleApiCall(() => {
+      riskApiHelpers.validateOccurredRiskData(data);
+      return riskApi.addOccurredRisk(eventId, riskId, riskApiHelpers.formatOccurredRiskData(data));
+    });
+  },
+
+  updateOccurredRisk: async (eventId, riskId, occurredRiskId, data) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRiskStatistics(eventId, params)
+      riskApi.updateOccurredRisk(eventId, riskId, occurredRiskId, riskApiHelpers.formatOccurredRiskData(data))
     );
   },
 
-  getRisksByCategoryStats: async (eventId, params = {}) => {
+  removeOccurredRisk: async (eventId, riskId, occurredRiskId) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRisksByCategoryStats(eventId, params)
+      riskApi.removeOccurredRisk(eventId, riskId, occurredRiskId)
+    );
+  },
+
+  // ===== ANALYTICS WITH ERROR HANDLING =====
+
+  getRiskStatistics: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRiskStatistics(eventId)
+    );
+  },
+
+  getHighPriorityRisks: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getHighPriorityRisks(eventId)
+    );
+  },
+
+  getRiskMatrix: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRiskMatrix(eventId)
+    );
+  },
+
+  getRiskDashboard: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRiskDashboard(eventId)
+    );
+  },
+
+  getRisksNeedingAttention: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRisksNeedingAttention(eventId)
+    );
+  },
+
+  getRisksByDepartment: async (eventId, departmentId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRisksByDepartment(eventId, departmentId)
+    );
+  },
+
+  // ===== UTILITIES WITH ERROR HANDLING =====
+
+  bulkUpdateRiskStatus: async (eventId, data) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.bulkUpdateRiskStatus(eventId, data)
+    );
+  },
+
+  updateRiskStatusManually: async (eventId, riskId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.updateRiskStatusManually(eventId, riskId)
+    );
+  },
+
+  batchUpdateRiskStatuses: async (eventId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.batchUpdateRiskStatuses(eventId)
+    );
+  },
+
+  getRiskSeverityAnalysis: async (eventId, riskId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRiskSeverityAnalysis(eventId, riskId)
+    );
+  },
+
+  // ===== GLOBAL METHODS WITH ERROR HANDLING =====
+
+  getRiskCategories: async () => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.getRiskCategories()
+    );
+  },
+
+  calculateRiskScore: async (impact, likelihood) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.calculateRiskScore(impact, likelihood)
     );
   }
 };

@@ -69,3 +69,19 @@ export const getMemberDetail = async (req, res) => {
 		return res.status(500).json({ message: 'Failed to load member detail' });
 	}
 }
+
+export const getMemberRawForRisk = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await findEventById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    const members = await getMembersByEventRaw(eventId);
+    return res.status(200).json({
+      data: members,
+      message: "Get All member Successfully"
+    });
+  } catch (error) {
+    console.error('getMembersByEvent error:', error);
+    return res.status(500).json({ message: 'Failed to load members' });
+  }
+};

@@ -23,12 +23,11 @@ export default function Header() {
     try {
       await logout()
       handleMenuClose()
-      navigate('/login')
+      window.location.href = "/landingpage?toast=logout-success";
     } catch (error) {
       console.error('Logout failed:', error)
       // Vẫn đóng menu và redirect dù có lỗi
       handleMenuClose()
-      navigate('/login')
     } finally {
       setLogoutLoading(false)
     }
@@ -40,12 +39,10 @@ export default function Header() {
     try {
       await logoutAllDevices()
       handleMenuClose()
-      navigate('/login')
     } catch (error) {
       console.error('Logout failed:', error)
       // Vẫn đóng menu và redirect dù có lỗi
       handleMenuClose()
-      navigate('/login')
     } finally {
       setLogoutLoading(false)
     }

@@ -18,14 +18,14 @@ export default function Navbar() {
   const handleLogout = async () => {
     handleClose();
     await logout();
-    navigate('/login');
+    window.location.href = "/landingpage?toast=logout-success";
   };
 
   const handleLogoutAll = async () => {
     handleClose();
     try {
       await logoutAllDevices();
-      navigate('/login');
+      window.location.href = "/landingpage?toast=logout-success";
     } catch (error) {
       console.error('Logout all devices failed:', error);
     }
