@@ -13,6 +13,7 @@ const CalendarSchema = new Schema({
   },
   startAt: { type: Date, required: true },
   endAt: { type: Date, required: true },
+  locationType: { type: String, enum: ['online', 'offline'], required: true },
   location: { type: String, required: true },
   participants: [{
     member: { type: Schema.Types.ObjectId, ref: 'EventMember' },

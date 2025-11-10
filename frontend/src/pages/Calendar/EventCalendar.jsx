@@ -1,112 +1,71 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { calendarApi } from "../../apis/calendarApi";
-
+import { useEffect, useState } from "react";
+import { useEvents } from "../../contexts/EventContext";
+import { useNavigate, useParams } from "react-router-dom"
+import UserLayout from "../../components/UserLayout"
+import { ToastContainer } from "react-toastify";
+import calendarService from "../../services/calendarService";
 export default function EventCalendar() {
+  const navigate = useNavigate();
   const { eventId } = useParams();
-  const [calendars, setCalendars] = useState({}); 
-  const [loading, setLoading] = useState(true);
-  
+  const { fetchEventRole, getEventRole } = useEvents();
+  const [eventRole, setEventRole] = useState("");
+  const [calendars, setCalendars] = useState([]);
+
+  useEffect(() => {
+    let mounted = true
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("")
+        return
+      }
+      try {
+        const role = await fetchEventRole(eventId)
+        if (mounted) setEventRole(role)
+      } catch (_) {
+        if (mounted) setEventRole("")
+      }
+    }
+    loadRole()
+    fetchCalendars();
+    return () => {
+      mounted = false
+    }
+  }, [eventId, fetchEventRole]);
+  console.log("Event Role:", eventRole);
+
+  const fetchCalendars = async () => {
+    try{
+      const response = await calendarService.getMyCalendarInEvent(eventId);
+      console.log("API Response:", response);
+      console.log("Calendars fetched:", response.data);
+      setCalendars(response);
+    }catch(error){
+      console.error("Failed to fetch calendars:", error);
+    }
+  };
+
   // Lấy ngày hiện tại
   const today = new Date();
   const todayDay = today.getDate();
   const todayMonth = today.getMonth();
   const todayYear = today.getFullYear();
-  
-  const [currentMonth, setCurrentMonth] = useState(todayMonth);
-  const [currentYear, setCurrentYear] = useState(todayYear);
-  const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // Load calendars từ API
-  useEffect(() => {
-    const loadCalendars = async () => {
-      if (!eventId) return;
-      
-      setLoading(true);
-      try {
-        const response = await calendarApi.getMyCalendarInEvent(eventId);
-        
-        // Format dữ liệu: group theo ngày
-        const formattedCalendars = groupCalendarsByDate(response.data);
-        setEvents(formattedCalendars);
-        
-      } catch (err) {
-        console.error('Error loading calendars:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadCalendars();
-  }, [eventId]);
+  const [currentMonth, setCurrentMonth] = useState(10); // November = 10
+  const [currentYear, setCurrentYear] = useState(2025);
+  const [selectedCalendar, setSelectedCalendar] = useState(null);
 
-  // Hàm group calendars theo ngày
-  const groupCalendarsByDate = (calendars) => {
-    const grouped = {};
-    
-    calendars.forEach(calendar => {
-      const startDate = new Date(calendar.startAt);
-      
-      // Tạo key theo format: "YYYY-MM-DD"
-      const year = startDate.getFullYear();
-      const month = String(startDate.getMonth() + 1).padStart(2, '0');
-      const day = String(startDate.getDate()).padStart(2, '0');
-      const dateKey = `${year}-${month}-${day}`;
-      
-      // Khởi tạo array nếu chưa có
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      
-      // Format thời gian để hiển thị
-      const startHour = String(startDate.getHours()).padStart(2, '0');
-      const startMinute = String(startDate.getMinutes()).padStart(2, '0');
-      
-      const endDate = new Date(calendar.endAt);
-      const endHour = String(endDate.getHours()).padStart(2, '0');
-      const endMinute = String(endDate.getMinutes()).padStart(2, '0');
-      
-      // Thêm vào array
-      grouped[dateKey].push({
-        id: calendar._id,
-        title: calendar.name,
-        time: `${startHour}:${startMinute}`,
-        timeRange: `${startHour}:${startMinute} - ${endHour}:${endMinute}`,
-        location: calendar.location,
-        type: calendar.type, // 'event' hoặc 'department'
-        participants: calendar.participants,
-        participantCount: calendar.participants.length,
-        // Giữ data gốc để dùng khi click
-        startAt: calendar.startAt,
-        endAt: calendar.endAt,
-        originalData: calendar
-      });
-    });
-    
-    // Sort events trong mỗi ngày theo thời gian
-    Object.keys(grouped).forEach(dateKey => {
-      grouped[dateKey].sort((a, b) => 
-        new Date(a.startAt) - new Date(b.startAt)
-      );
-    });
-    
-    return grouped;
-  };
-
-  // Lấy events của 1 ngày cụ thể
-  const getEventsForDay = (day, month, year) => {
+  const getCalendarsForDay = (day, month, year) => {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return events[dateKey] || [];
+    return calendars[dateKey] || [];
   };
 
-  // ... các hàm khác giữ nguyên (getDaysInMonth, getFirstDayOfMonth, generateCalendarDays)
-  
   const getDaysInMonth = (month, year) => {
     return new Date(year, month + 1, 0).getDate();
   };
 
   const getFirstDayOfMonth = (month, year) => {
-    return new Date(year, month, 1).getDay();
+    const firstDay = new Date(year, month, 1).getDay();
+    return firstDay === 0 ? 6 : firstDay - 1;
   };
 
   const generateCalendarDays = () => {
@@ -116,7 +75,6 @@ export default function EventCalendar() {
 
     const days = [];
 
-    // Ngày tháng trước
     for (let i = firstDay - 1; i >= 0; i--) {
       days.push({
         day: daysInPrevMonth - i,
@@ -126,7 +84,6 @@ export default function EventCalendar() {
       });
     }
 
-    // Ngày tháng hiện tại
     for (let i = 1; i <= daysInMonth; i++) {
       days.push({
         day: i,
@@ -136,7 +93,6 @@ export default function EventCalendar() {
       });
     }
 
-    // Ngày tháng sau
     const remainingDays = 35 - days.length;
     for (let i = 1; i <= remainingDays; i++) {
       days.push({
@@ -153,215 +109,315 @@ export default function EventCalendar() {
   const days = generateCalendarDays();
   const weekDays = ["MON", "TUE", "WED", "THUR", "FRI", "SAT", "SUN"];
 
-  const handleEventClick = (event) => {
-    setSelectedEvent(event);
+  const handleCalendarClick = (calendar) => {
+    setSelectedCalendar(calendar);
   };
+  const handleCreateCalendar = () => {
+    if(eventRole == "HoOC"){
+      navigate(`/events/${eventId}/calendars/create-event-calendar`);
+    }else if(eventRole == "HoD"){
 
-  if (loading) {
-    return <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>;
+    }
   }
 
   return (
-    <div style={{ padding: "20px", backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "600", color: "#333" }}>
-            Lịch sự kiện
-          </h2>
-          <button
-            onClick={() => {
-              if (currentMonth === 0) {
-                setCurrentMonth(11);
-                setCurrentYear(currentYear - 1);
-              } else {
-                setCurrentMonth(currentMonth - 1);
-              }
-            }}
-            style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "#999" }}
-          >
-            ‹
-          </button>
-          <span style={{ fontSize: "14px", color: "#666", minWidth: "60px", textAlign: "center" }}>
-            {currentMonth + 1}/{currentYear}
-          </span>
-          <button
-            onClick={() => {
-              if (currentMonth === 11) {
-                setCurrentMonth(0);
-                setCurrentYear(currentYear + 1);
-              } else {
-                setCurrentMonth(currentMonth + 1);
-              }
-            }}
-            style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "#999" }}
-          >
-            ›
-          </button>
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button style={{ width: "32px", height: "32px", borderRadius: "6px", border: "none", backgroundColor: "#4285f4", color: "white", cursor: "pointer", fontSize: "16px" }}>
-            ✎
-          </button>
-          <button style={{ width: "32px", height: "32px", borderRadius: "6px", border: "none", backgroundColor: "#ea4335", color: "white", cursor: "pointer", fontSize: "16px" }}>
-            🗑
-          </button>
-        </div>
-      </div>
-
-      {/* Calendar Grid */}
-      <div style={{ backgroundColor: "white", borderRadius: "8px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-        {/* Week days */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid #e0e0e0" }}>
-          {weekDays.map((day) => (
-            <div key={day} style={{ padding: "12px", textAlign: "center", fontSize: "11px", fontWeight: "600", color: "#999", backgroundColor: "#fafafa" }}>
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar days */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridAutoRows: "120px" }}>
-          {days.map((dayObj, index) => {
-            // Lấy events cho ngày này
-            const dayEvents = getEventsForDay(dayObj.day, dayObj.month, dayObj.year);
-            
-
-            const isToday = dayObj.isCurrentMonth && 
-                           dayObj.day === todayDay && 
-                           dayObj.month === todayMonth && 
-                           dayObj.year === todayYear;
-
-            return (
-              <div
-                key={index}
+    <UserLayout title="Event Calendar Page" sidebarType={eventRole} activePage="work-timeline">
+      <ToastContainer position="top-right" autoClose={3000} />
+      <div style={{ padding: "20px", backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
+        {/* Header */}
+        <div style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          padding: "16px 20px",
+          marginBottom: "16px",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#1a1a1a" }}>
+              Lịch sự kiện
+            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button
+                onClick={() => {
+                  if (currentMonth === 0) {
+                    setCurrentMonth(11);
+                    setCurrentYear(currentYear - 1);
+                  } else {
+                    setCurrentMonth(currentMonth - 1);
+                  }
+                }}
                 style={{
-                  borderRight: index % 7 !== 6 ? "1px solid #e0e0e0" : "none",
-                  borderBottom: index < 28 ? "1px solid #e0e0e0" : "none",
-                  padding: "8px",
-                  backgroundColor: isToday ? "#d2e3fc" : (dayObj.isCurrentMonth ? "white" : "#fafafa"),
-                  position: "relative",
-                  overflow: "hidden",
-                  outline: isToday ? "3px solid #1a73e8" : "none",
-                  outlineOffset: "-3px",
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  color: "#666",
+                  padding: "0 4px"
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: isToday ? "700" : (dayObj.isCurrentMonth ? "500" : "normal"),
-                    marginBottom: "6px",
-                    backgroundColor: isToday ? "#1a73e8" : "transparent",
-                    color: isToday ? "white" : (dayObj.isCurrentMonth ? "#333" : "#ccc"),
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {dayObj.day}
-                </div>
-
-                {/* Events */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                  {dayEvents.slice(0, 3).map((event) => (
-                    <div
-                      key={event.id}
-                      onClick={() => handleEventClick(event)}
-                      style={{
-                        fontSize: "10px",
-                        padding: "2px 4px",
-                        borderRadius: "2px",
-                        cursor: "pointer",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        color: event.type === "event" ? "#1a73e8" : "#ea4335",
-                        backgroundColor: "transparent",
-                      }}
-                    >
-                      <span style={{ fontWeight: "500" }}>{event.title}</span>
-                      {event.time && <span style={{ marginLeft: "3px" }}>- {event.time}</span>}
-                    </div>
-                  ))}
-                  {dayEvents.length > 3 && (
-                    <div style={{ fontSize: "9px", color: "#999", marginTop: "2px" }}>
-                      +{dayEvents.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Event Detail Modal */}
-      {selectedEvent && (
-        <div
-          onClick={() => setSelectedEvent(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white",
-              borderRadius: "8px",
-              padding: "24px",
-              minWidth: "320px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            }}
-          >
-            <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "600", color: "#1a73e8" }}>
-              {selectedEvent.title}
-            </h3>
-            <div style={{ marginBottom: "12px", fontSize: "14px", color: "#666" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span>📍</span>
-                <span>{selectedEvent.location}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span>⏰</span>
-                <span>{selectedEvent.timeRange}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>👥</span>
-                <span>{selectedEvent.participantCount} người tham gia</span>
-              </div>
+                ‹
+              </button>
+              <span style={{ fontSize: "14px", color: "#333", minWidth: "80px", textAlign: "center", fontWeight: "500" }}>
+                {currentMonth + 1}/{currentYear}
+              </span>
+              <button
+                onClick={() => {
+                  if (currentMonth === 11) {
+                    setCurrentMonth(0);
+                    setCurrentYear(currentYear + 1);
+                  } else {
+                    setCurrentMonth(currentMonth + 1);
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  color: "#666",
+                  padding: "0 4px"
+                }}
+              >
+                ›
+              </button>
             </div>
-            <button
-              onClick={() => setSelectedEvent(null)}
-              style={{
-                marginTop: "20px",
-                width: "100%",
-                padding: "10px",
-                backgroundColor: "#4285f4",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: "500",
-              }}
-            >
-              Đóng
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button  style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "6px",
+              border: "none",
+              backgroundColor: "#4285f4",
+              color: "white",
+              cursor: "pointer",
+              fontSize: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              ⟳
+            </button>
+            <button onClick={handleCreateCalendar} style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "6px",
+              border: "none",
+              backgroundColor: "#ea4335",
+              color: "white",
+              cursor: "pointer",
+              fontSize: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              +
             </button>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Calendar Grid */}
+        <div style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          overflow: "hidden",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+          border: "1px solid #e5e7eb"
+        }}>
+          {/* Week days */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            borderBottom: "1px solid #e5e7eb",
+            backgroundColor: "#f9fafb"
+          }}>
+            {weekDays.map((day) => (
+              <div key={day} style={{
+                padding: "12px",
+                textAlign: "center",
+                fontSize: "12px",
+                fontWeight: "600",
+                color: "#6b7280"
+              }}>
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar days */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+            {days.map((dayObj, index) => {
+              const dayCalendars = getCalendarsForDay(dayObj.day, dayObj.month, dayObj.year);
+
+              const isToday = dayObj.isCurrentMonth &&
+                dayObj.day === todayDay &&
+                dayObj.month === todayMonth &&
+                dayObj.year === todayYear;
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    borderRight: index % 7 !== 6 ? "1px solid #e5e7eb" : "none",
+                    borderBottom: index < 28 ? "1px solid #e5e7eb" : "none",
+                    padding: "8px",
+                    minHeight: "200px",
+                    backgroundColor: dayObj.isCurrentMonth ? "white" : "#fafafa",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: dayObj.isCurrentMonth ? "500" : "normal",
+                      marginBottom: "8px",
+                      color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
+                      display: "inline-block",
+                    }}
+                  >
+                    {dayObj.day}
+                  </div>
+
+                  {/* Events */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {dayCalendars.map((calendar) => (
+                      <div
+                        key={calendar._id}
+                        onClick={() => handleCalendarClick(calendar)}
+                        style={{
+                          fontSize: "11px",
+                          padding: "3px 6px",
+                          borderRadius: "3px",
+                          cursor: "pointer",
+                          backgroundColor: calendar.type === "event" ? "#e8f0fe" : "#fef3e8",
+                          color: calendar.type === "event" ? "#1967d2" : "#f57c00",
+                          lineHeight: "1.4",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = "0.8";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                        }}
+                      >
+                        <div style={{ fontWeight: "500" }}>{calendar.title} - {calendar.time}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Event Detail Modal */}
+        {selectedCalendar && (
+          <div
+            onClick={() => setSelectedCalendar(null)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "white",
+                borderRadius: "12px",
+                padding: "24px",
+                minWidth: "360px",
+                maxWidth: "480px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              }}
+            >
+              <h3 style={{
+                margin: "0 0 20px 0",
+                fontSize: "18px",
+                fontWeight: "600",
+                color: "#1a1a1a",
+                borderBottom: "1px solid #e5e7eb",
+                paddingBottom: "12px"
+              }}>
+                {selectedCalendar.title}
+              </h3>
+              <div style={{ marginBottom: "20px", fontSize: "14px", color: "#4b5563" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "16px" }}>📍</span>
+                  <div>
+                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                      Địa điểm
+                    </div>
+                    <div>{selectedCalendar.location}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "16px" }}>⏰</span>
+                  <div>
+                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                      Thời gian
+                    </div>
+                    <div>{selectedCalendar.timeRange}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                  <span style={{ fontSize: "16px" }}>👥</span>
+                  <div>
+                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                      Người tham gia
+                    </div>
+                    <div>{selectedCalendar.participantCount} người</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => setSelectedCalendar(null)}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    backgroundColor: "#f3f4f6",
+                    color: "#374151",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  Đóng
+                </button>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    backgroundColor: "#4285f4",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                >
+                  Chi tiết
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </UserLayout>
   );
 }

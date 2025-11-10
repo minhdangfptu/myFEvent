@@ -17,11 +17,11 @@ const calendarApi = {
     return axiosClient.patch(url, data);
   },
   deleteCalendarEvent: (eventId, calendarId) => {
-    const url = `/events/${eventId}/calendars/${calendarId}`;
+    const url = `/api/events/${eventId}/calendars/${calendarId}`;
     return axiosClient.delete(url);
   },
   getMyCalendarInEvent: (eventId) => {
-    const url = `/events/${eventId}/my-calendars`;
+    const url = `/api/events/${eventId}/calendars/my-event-calendars`;
     return axiosClient.get(url);
   }
 };

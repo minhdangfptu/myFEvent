@@ -2,11 +2,10 @@ import express from 'express';
 import {
     getCalendarsForEvent,
     getCalendarsForDepartment,
-    getCalendarEventDetail,
-    createCalendarEvent,
-    updateCalendarEvent,
-    deleteCalendarEvent,
-    getMyCalendarInEvent
+    createCalendarForEntity,
+    updateCalendarForEntity,
+    getMyCalendarInEvent,
+    updateParticipateStatus
 } from '../controllers/calendarController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';

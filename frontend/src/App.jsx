@@ -59,6 +59,8 @@ import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
+import EventCalendar from "./pages/Calendar/EventCalendar";
+import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -298,6 +300,22 @@ export default function App() {
                 <MemberProfilePage/>
               </ProtectedRoute>
             } 
+          />
+          <Route
+            path="/events/:eventId/my-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <EventCalendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/calendars/create-event-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CreateEventCalenderPage />
+              </ProtectedRoute>
+            }
           />
           <Route 
             path="/home-page" 

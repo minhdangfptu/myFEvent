@@ -1,11 +1,10 @@
 import Calendar from '../models/calendar.js';
 
 export const getCalendarByEventId = async (eventId) => {
-    return await Calendar.findOne({ eventId });
+    return await Calendar.find({ eventId });
 };
-
 export const getCalendarByDepartmentId = async (departmentId) => {
-    return await Calendar.findOne({ departmentId });
+    return await Calendar.find({ departmentId });
 };
 
 export const createCalendar = async (calendarData) => {

@@ -4,14 +4,14 @@ import {
     createCalendar,
     updateCalendar,
     getCalendarById,
-} from "~/services/calendarService";
+} from "../services/calendarService.js";
 import {
     findEventById
-} from "~/services/eventService";
+} from "../services/eventService.js";
 import {
     findDepartmentById
-} from "~/services/departmentService";
-import { getRequesterMembership } from "~/services/eventMemberService";
+} from "../services/departmentService.js";
+import { getRequesterMembership } from "../services/eventMemberService.js";
 
 export const getCalendarsForEvent = async (req, res) => {
     try {
