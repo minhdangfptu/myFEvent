@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import calendarService from "~/services/calendarService";
@@ -34,6 +34,7 @@ export default function CreateEventCalendarPage() {
     }, [eventId, fetchEventRole]);
 
     const [formData, setFormData] = useState({
+        name: "",
         locationType: "online",
         location: "",
         meetingDate: "",
@@ -43,10 +44,9 @@ export default function CreateEventCalendarPage() {
         selectedDepartments: [],
         selectedCoreTeam: [],
         notes: "",
+        attachments: []
     });
 
-    const [files, setFiles] = useState([]);
-    const [dragActive, setDragActive] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -107,73 +107,6 @@ export default function CreateEventCalendarPage() {
         }));
     };
 
-    const handleDrag = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-
-        const droppedFiles = Array.from(e.dataTransfer.files);
-        handleFiles(droppedFiles);
-    };
-
-    const handleFileInput = (e) => {
-        const selectedFiles = Array.from(e.target.files);
-        handleFiles(selectedFiles);
-    };
-
-    const handleFiles = (newFiles) => {
-        setError("");
-        const validFiles = newFiles.filter(file => {
-            const validTypes = [
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/vnd.ms-excel',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'application/vnd.ms-powerpoint',
-                'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-            ];
-            const maxSize = 10 * 1024 * 1024; // 10MB
-
-            if (!validTypes.includes(file.type)) {
-                setError("Chỉ chấp nhận file PDF, DOC, XLS, PPT");
-                return false;
-            }
-            if (file.size > maxSize) {
-                setError("File không được vượt quá 10MB");
-                return false;
-            }
-            return true;
-        });
-
-        setFiles(prev => [...prev, ...validFiles.map(file => ({
-            id: Date.now() + Math.random(),
-            file,
-            name: file.name,
-            size: formatFileSize(file.size)
-        }))]);
-    };
-
-    const removeFile = (fileId) => {
-        setFiles(prev => prev.filter(f => f.id !== fileId));
-    };
-
-    const formatFileSize = (bytes) => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
     const calculateDuration = () => {
         if (formData.startTime && formData.endTime) {
             const [startH, startM] = formData.startTime.split(':').map(Number);
@@ -229,33 +162,30 @@ export default function CreateEventCalendarPage() {
         setLoading(true);
 
         try {
-            const submitData = new FormData();
-            submitData.append('eventId', eventId);
-            submitData.append('locationType', formData.locationType);
-            submitData.append('location', formData.location);
-            submitData.append('meetingDate', formData.meetingDate);
-            submitData.append('startTime', formData.startTime);
-            submitData.append('endTime', formData.endTime);
-            submitData.append('participantType', formData.participantType);
+            const submitData = {
+                name: formData.name,
+                eventId: eventId,
+                locationType: formData.locationType,
+                location: formData.location,
+                meetingDate: formData.meetingDate,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                participantType: formData.participantType,
+                notes: formData.notes,
+                attachments: formData.attachments.filter(link => link.trim() !== "")
+            };
 
             if (formData.participantType === "departments") {
-                submitData.append('departments', JSON.stringify(formData.selectedDepartments));
+                submitData.departments = formData.selectedDepartments;
             } else if (formData.participantType === "coreteam") {
-                submitData.append('coreTeamMembers', JSON.stringify(formData.selectedCoreTeam));
+                submitData.coreTeamMembers = formData.selectedCoreTeam;
             }
-
-            submitData.append('notes', formData.notes);
-
-            files.forEach(f => {
-                submitData.append('files', f.file);
-            });
 
             const response = await calendarService.createCalendarForEvent(eventId, submitData);
 
-            // Axios response already has data parsed
             if (response.data) {
                 toast.success('Tạo lịch thành công');
-                navigate(`/events/${eventId}/my-calendar`);
+                setTimeout(() => navigate(`/events/${eventId}/my-calendar`), 500);
             } else {
                 throw new Error('Không nhận được dữ liệu từ server');
             }
@@ -275,6 +205,7 @@ export default function CreateEventCalendarPage() {
 
     return (
         <UserLayout sidebarType={eventRole} activePage="work-timeline">
+            <ToastContainer position="top-right" autoClose={3000} />
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",
@@ -319,7 +250,7 @@ export default function CreateEventCalendarPage() {
                         {/* Grid 3 cột */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
 
-                            {/* Box 1: Địa điểm */}
+                            {/* Box 1: Tên và Địa điểm */}
                             <div style={{
                                 border: "1px solid #e5e7eb",
                                 borderRadius: "8px",
@@ -332,6 +263,34 @@ export default function CreateEventCalendarPage() {
                                     fontSize: "15px",
                                     fontWeight: "600",
                                     color: "#1a1a1a"
+                                }}>
+                                    Tên cuộc họp
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    placeholder="Nhập tên cuộc họp"
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px 12px",
+                                        fontSize: "14px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        outline: "none",
+                                        backgroundColor: "white"
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                    onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                />
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a",
+                                    paddingTop: "20px"
                                 }}>
                                     Địa điểm
                                 </label>
@@ -590,7 +549,7 @@ export default function CreateEventCalendarPage() {
                                             ) : (
                                                 coreTeamList.map(member => (
                                                     <label
-                                                        key={member._id }
+                                                        key={member._id}
                                                         style={{
                                                             display: "flex",
                                                             alignItems: "center",
@@ -606,7 +565,7 @@ export default function CreateEventCalendarPage() {
                                                             style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
                                                         />
                                                         <span style={{ fontSize: "13px", color: "#374151" }}>
-                                                            { member.userId.fullName}
+                                                            {member.userId.fullName}
                                                         </span>
                                                     </label>
                                                 ))
@@ -660,7 +619,7 @@ export default function CreateEventCalendarPage() {
                                 />
                             </div>
 
-                            {/* Box 5: Tệp đính kèm */}
+                            {/* Box 5: Attachments */}
                             <div style={{
                                 border: "1px solid #e5e7eb",
                                 borderRadius: "8px",
@@ -674,100 +633,77 @@ export default function CreateEventCalendarPage() {
                                     fontWeight: "600",
                                     color: "#1a1a1a"
                                 }}>
-                                    Tệp đính kèm (tài liệu buổi họp)
+                                    Link tài liệu cuộc họp <span style={{color:""}}>(vui lòng share quyền truy cập)</span>
                                 </label>
 
-                                <div
-                                    onDragEnter={handleDrag}
-                                    onDragLeave={handleDrag}
-                                    onDragOver={handleDrag}
-                                    onDrop={handleDrop}
-                                    style={{
-                                        border: dragActive ? "2px dashed #4285f4" : "2px dashed #d1d5db",
-                                        borderRadius: "6px",
-                                        padding: "24px 16px",
-                                        textAlign: "center",
-                                        backgroundColor: dragActive ? "#f0f9ff" : "white",
-                                        transition: "all 0.2s",
-                                        cursor: "pointer",
-                                        minHeight: "160px",
+                                {formData.attachments?.map((attachment, index) => (
+                                    <div key={index} style={{
                                         display: "flex",
-                                        flexDirection: "column",
-                                        justifyContent: "center",
-                                        alignItems: "center"
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        marginBottom: "10px"
+                                    }}>
+                                        <input
+                                            type="text"
+                                            value={attachment}
+                                            onChange={(e) => {
+                                                const newAttachments = [...formData.attachments];
+                                                newAttachments[index] = e.target.value;
+                                                setFormData(prev => ({ ...prev, attachments: newAttachments }));
+                                            }}
+                                            placeholder="Nhập link tài liệu (Google Drive, Docs, v.v.)"
+                                            style={{
+                                                flex: 1,
+                                                padding: "10px 12px",
+                                                fontSize: "14px",
+                                                border: "1px solid #d1d5db",
+                                                borderRadius: "6px",
+                                                outline: "none",
+                                                backgroundColor: "white"
+                                            }}
+                                            onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newAttachments = formData.attachments.filter((_, i) => i !== index);
+                                                setFormData(prev => ({ ...prev, attachments: newAttachments }));
+                                            }}
+                                            style={{
+                                                background: "transparent",
+                                                border: "none",
+                                                color: "#ef4444",
+                                                cursor: "pointer",
+                                                fontSize: "18px",
+                                                padding: "4px 8px"
+                                            }}
+                                        >
+                                            🗑
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({
+                                        ...prev,
+                                        attachments: [...(prev.attachments || []), ""]
+                                    }))}
+                                    style={{
+                                        marginTop: "8px",
+                                        padding: "8px 16px",
+                                        backgroundColor: "#f3f4f6",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                        fontWeight: "500"
                                     }}
                                 >
-                                    <div style={{ fontSize: "36px", marginBottom: "10px" }}>☁️</div>
-                                    <div style={{ fontSize: "13px", color: "#374151", marginBottom: "6px", fontWeight: "500" }}>
-                                        Kéo thả tập vào đây hoặc{" "}
-                                        <label style={{ color: "#4285f4", cursor: "pointer", textDecoration: "underline" }}>
-                                            Chọn tập từ máy tính
-                                            <input
-                                                type="file"
-                                                multiple
-                                                onChange={handleFileInput}
-                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                                                style={{ display: "none" }}
-                                            />
-                                        </label>
-                                    </div>
-                                    <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-                                        Hỗ trợ PDF, DOC, XLS, PPT (tối đa 10MB)
-                                    </div>
-                                </div>
-
-                                {/* File list */}
-                                {files.length > 0 && (
-                                    <div style={{ marginTop: "12px" }}>
-                                        {files.map(file => (
-                                            <div
-                                                key={file.id}
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    padding: "8px 10px",
-                                                    border: "1px solid #e5e7eb",
-                                                    borderRadius: "6px",
-                                                    marginBottom: "6px",
-                                                    backgroundColor: "white"
-                                                }}
-                                            >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                    <div style={{
-                                                        fontSize: "18px",
-                                                        color: file.name.endsWith('.pdf') ? "#ef4444" : "#4285f4"
-                                                    }}>
-                                                        {file.name.endsWith('.pdf') ? '📄' : '📘'}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontSize: "12px", color: "#1a1a1a", fontWeight: "500" }}>
-                                                            {file.name}
-                                                        </div>
-                                                        <div style={{ fontSize: "11px", color: "#6b7280" }}>
-                                                            {file.size}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeFile(file.id)}
-                                                    style={{
-                                                        background: "transparent",
-                                                        border: "none",
-                                                        color: "#ef4444",
-                                                        cursor: "pointer",
-                                                        fontSize: "16px",
-                                                        padding: "4px",
-                                                        lineHeight: 1
-                                                    }}
-                                                >
-                                                    🗑
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                    ➕ Thêm link
+                                </button>
                             </div>
                         </div>
 

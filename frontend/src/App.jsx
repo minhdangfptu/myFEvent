@@ -61,7 +61,9 @@ import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
 import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
+import CreateDepartmentCalendarPage from "./pages/Calendar/CreateDepartmentCalendarPage";
 import CalendarDetail from "./pages/Calendar/CalendarDetail";
+import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -319,10 +321,26 @@ export default function App() {
             }
           />
           <Route
+            path="/events/:eventId/departments/:departmentId/calendars/create-department-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CreateDepartmentCalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/my-calendar/:calendarId"
             element={
               <ProtectedRoute requiredRole="user">
                 <CalendarDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/my-calendar/:calendarId/edit-event-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UpdateEventCalendarPage />
               </ProtectedRoute>
             }
           />

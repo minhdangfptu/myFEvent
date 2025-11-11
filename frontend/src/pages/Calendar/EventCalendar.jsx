@@ -1,17 +1,22 @@
 import { useEffect, useState } from "react";
 import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import calendarService from "../../services/calendarService";
+import { departmentService } from "../../services/departmentService";
 
 export default function EventCalendar() {
   const navigate = useNavigate();
   const { eventId } = useParams();
   const { fetchEventRole } = useEvents();
+  const { user } = useAuth();
   const [eventRole, setEventRole] = useState("");
   const [calendars, setCalendars] = useState({});
   const [loading, setLoading] = useState(true);
+  const [hodDepartmentId, setHodDepartmentId] = useState(null);
+  const [loadingHoDDepartment, setLoadingHoDDepartment] = useState(false);
 
   useEffect(() => {
     let mounted = true
@@ -33,6 +38,37 @@ export default function EventCalendar() {
       mounted = false
     }
   }, [eventId, fetchEventRole]);
+
+  useEffect(() => {
+    const loadHoDDepartment = async () => {
+      if (!eventId || eventRole !== "HoD" || !user?.id) {
+        setHodDepartmentId(null);
+        return;
+      }
+      setLoadingHoDDepartment(true);
+      try {
+        const deptResponse = await departmentService.getDepartments(eventId);
+        if (Array.isArray(deptResponse)) {
+          const userIdCandidates = [user.id, user._id].filter(Boolean).map(v => v.toString());
+          const hodDept = deptResponse.find(dept => {
+            const leaderId = dept?.leaderId?._id || dept?.leaderId?.id || dept?.leaderId;
+            if (!leaderId) return false;
+            return userIdCandidates.includes(leaderId.toString());
+          });
+          setHodDepartmentId(hodDept?._id || hodDept?.id || null);
+        } else {
+          setHodDepartmentId(null);
+        }
+      } catch (error) {
+        console.error("Failed to load HoD department:", error);
+        setHodDepartmentId(null);
+      } finally {
+        setLoadingHoDDepartment(false);
+      }
+    };
+
+    loadHoDDepartment();
+  }, [eventId, eventRole, user]);
 
   const fetchCalendars = async () => {
     setLoading(true);
@@ -64,6 +100,23 @@ export default function EventCalendar() {
         const endHour = String(endDate.getHours()).padStart(2, '0');
         const endMinute = String(endDate.getMinutes()).padStart(2, '0');
 
+        // Get current user's participation status (robust match by id or email)
+        const userIdCandidates = [user?._id, user?.id].filter(Boolean).map(v => v?.toString());
+        const userEmail = user?.email?.toLowerCase?.();
+        const currentUserParticipant = calendar.participants?.find(p => {
+          const populatedUser = p.member?.userId;
+          const participantUserId = (typeof populatedUser === 'object' && populatedUser !== null)
+            ? (populatedUser?._id || populatedUser?.id || populatedUser)?.toString()
+            : (populatedUser)?.toString();
+          const participantEmail = (typeof populatedUser === 'object' && populatedUser !== null)
+            ? populatedUser?.email?.toLowerCase?.()
+            : undefined;
+          const idMatch = participantUserId && userIdCandidates.includes(participantUserId);
+          const emailMatch = participantEmail && userEmail && participantEmail === userEmail;
+          return Boolean(idMatch || emailMatch);
+        });
+        const userParticipateStatus = currentUserParticipant?.participateStatus || null;
+
         grouped[dateKey].push({
           _id: calendar._id,
           title: calendar.name,
@@ -75,6 +128,7 @@ export default function EventCalendar() {
           participantCount: calendar.participants.length,
           startAt: calendar.startAt,
           endAt: calendar.endAt,
+          userParticipateStatus: userParticipateStatus,
           originalData: calendar
         });
       });
@@ -166,7 +220,23 @@ export default function EventCalendar() {
   const handleCreateCalendar = () => {
     if (eventRole === "HoOC") {
       navigate(`/events/${eventId}/calendars/create-event-calendar`);
+      return;
     }
+
+    if (eventRole === "HoD") {
+      if (loadingHoDDepartment) {
+        toast.info("Đang tải thông tin ban của bạn, vui lòng chờ...");
+        return;
+      }
+      if (!hodDepartmentId) {
+        toast.error("Không tìm thấy ban bạn đang quản lý. Vui lòng kiểm tra lại quyền HoD.");
+        return;
+      }
+      navigate(`/events/${eventId}/departments/${hodDepartmentId}/calendars/create-department-calendar`);
+      return;
+    }
+
+    toast.error("Bạn không có quyền tạo lịch họp.");
   };
 
   const handleRefresh = () => {
@@ -333,30 +403,41 @@ export default function EventCalendar() {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {dayCalendars.slice(0, 3).map((calendar) => (
-                      <div
-                        key={calendar._id}
-                        onClick={() => handleCalendarClick(calendar)}
-                        style={{
-                          fontSize: "11px",
-                          padding: "3px 6px",
-                          borderRadius: "3px",
-                          cursor: "pointer",
-                          backgroundColor: calendar.type === "event" ? "#e8f0fe" : "#fef3e8",
-                          color: calendar.type === "event" ? "#1967d2" : "#f57c00",
-                          lineHeight: "1.4",
-                          transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = "0.8";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = "1";
-                        }}
-                      >
-                        <div style={{ fontWeight: "500" }}>{calendar.title} - {calendar.time}</div>
-                      </div>
-                    ))}
+                    {dayCalendars.slice(0, 3).map((calendar) => {
+                      const statusIcon = calendar.userParticipateStatus === 'confirmed' ? '✓' : 
+                                        calendar.userParticipateStatus === 'absent' ? '✖' : '';
+                      const statusColor = calendar.userParticipateStatus === 'confirmed' ? '#10b981' : 
+                                        calendar.userParticipateStatus === 'absent' ? '#dc2626' : '';
+                      
+                      return (
+                        <div
+                          key={calendar._id}
+                          onClick={() => handleCalendarClick(calendar)}
+                          style={{
+                            fontSize: "11px",
+                            padding: "3px 6px",
+                            borderRadius: "3px",
+                            cursor: "pointer",
+                            backgroundColor: calendar.type === "event" ? "#e8f0fe" : "#fef3e8",
+                            color: calendar.type === "event" ? "#1967d2" : "#f57c00",
+                            lineHeight: "1.4",
+                            transition: "all 0.2s",
+                            borderLeft: statusColor ? `3px solid ${statusColor}` : 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.8";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                          }}
+                        >
+                          <div style={{ fontWeight: "500", display: "flex", alignItems: "center", gap: "4px" }}>
+                            {statusIcon && <span style={{ color: statusColor, fontSize: "12px" }}>{statusIcon}</span>}
+                            <span>{calendar.title} - {calendar.time}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                     {dayCalendars.length > 3 && (
                       <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>
                         +{dayCalendars.length - 3} more

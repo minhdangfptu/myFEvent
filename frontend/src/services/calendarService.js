@@ -24,6 +24,14 @@ const calendarService = {
         throw error;
     }
   },
+  createCalendarForDepartment: async (eventId, departmentId, data) => {
+    try {
+        const response = await calendarApi.createCalendarForDepartment(eventId, departmentId, data);
+        return response;
+    } catch (error) {
+        throw error;
+    }
+  },
   getCalendarEventDetail: async (eventId, calendarId) => {
     try {
         const response = await calendarApi.getCalendarEventDetail(eventId, calendarId);
@@ -32,5 +40,21 @@ const calendarService = {
         throw error;
     }
   },
+  updateParticipateStatus: async (eventId, calendarId, data) => {
+    try {
+        const response = await calendarApi.updateParticipateStatus(eventId, calendarId, data);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  updateCalendar: async (eventId, calendarId, data) => {
+    try {
+        const response = await calendarApi.updateCalendar(eventId, calendarId, data);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  }
 };
 export default calendarService;

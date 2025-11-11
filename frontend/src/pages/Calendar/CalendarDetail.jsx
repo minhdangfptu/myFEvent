@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
+import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
-import { CheckCircle2Icon, Clock, FileText, MapPin, Paperclip, Users, X, XCircle } from "lucide-react";
+import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Trash, Users, X, XCircle } from "lucide-react";
+import { toast, ToastContainer } from "react-toastify";
 
 export default function CalendarDetail() {
     const navigate = useNavigate();
     const { eventId, calendarId } = useParams();
     const { fetchEventRole } = useEvents();
+    const { user } = useAuth();
     const [eventRole, setEventRole] = useState("");
     const [calendar, setCalendar] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -16,6 +19,13 @@ export default function CalendarDetail() {
 
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState(null);
+    // States cho modal thay đổi trạng thái
+    const [isChangeStatusModalOpen, setIsChangeStatusModalOpen] = useState(false);
+    const [newStatus, setNewStatus] = useState("");
+    const [absentReason, setAbsentReason] = useState("");
+    const [isQuickAbsent, setIsQuickAbsent] = useState(false);
+
+    const [isPastMeeting, setIsPastMeeting] = useState(false);
 
     useEffect(() => {
         let mounted = true
@@ -43,6 +53,11 @@ export default function CalendarDetail() {
             try {
                 const response = await calendarService.getCalendarEventDetail(eventId, calendarId);
                 setCalendar(response.data);
+                console.log(calendar);
+                const currentDate = new Date();
+                if (new Date(response?.data.endAt).getTime() < currentDate.getTime()) {
+                    setIsPastMeeting(true);
+                }
             } catch (error) {
                 console.error('Error fetching event:', error);
                 setError(error.message);
@@ -55,7 +70,7 @@ export default function CalendarDetail() {
             fetchEventDetails();
         }
     }, [eventId, calendarId]);
-
+    console.log(calendar);
     if (loading) {
         return (
             <UserLayout sidebarType={eventRole}>
@@ -143,26 +158,52 @@ export default function CalendarDetail() {
             email: p.member.userId.email
         }));
 
-    const documents = calendar.attachments?.map((att, index) => ({
-        id: index,
-        name: att.name || att.fileName,
-        icon: att.type?.includes('pdf') ? '📄' : '📊',
-        url: att.url
-    })) || [];
-
     // Handle view reason modal
     const handleViewReason = (person) => {
         setSelectedPerson(person);
         setIsReasonModalOpen(true);
     };
 
+    // Get current user's participation status
+    const getCurrentUserParticipateStatus = () => {
+        if (!user || !calendar) return null;
+        const userIdCandidates = [user?._id, user?.id].filter(Boolean).map(v => v?.toString());
+        const userEmail = user?.email?.toLowerCase?.();
+
+        const currentUserParticipant = calendar.participants.find(p => {
+            // p.member.userId may be populated object or just an id/string depending on API
+            const populatedUser = p.member?.userId;
+            const participantUserId = (typeof populatedUser === 'object' && populatedUser !== null)
+                ? (populatedUser?._id || populatedUser?.id || populatedUser)?.toString()
+                : (populatedUser)?.toString();
+            const participantEmail = (typeof populatedUser === 'object' && populatedUser !== null)
+                ? populatedUser?.email?.toLowerCase?.()
+                : undefined;
+
+            const idMatch = participantUserId && userIdCandidates.includes(participantUserId);
+            const emailMatch = participantEmail && userEmail && participantEmail === userEmail;
+            return Boolean(idMatch || emailMatch);
+        });
+        console.log('currentUserParticipant:', currentUserParticipant);
+        return currentUserParticipant?.participateStatus || null;
+    };
+
+    const currentUserStatus = getCurrentUserParticipateStatus();
+
     // Handle participate actions
-    const handleParticipate = async (status) => {
+    const handleParticipate = async (status, reason = "") => {
         try {
-            const response = await calendarService.updateParticipateStatus(eventId, calendarId, { status });
+            const payload = { participateStatus: status };
+            if (status === 'absent' && reason) {
+                payload.reasonAbsent = reason;
+            }
+
+            const response = await calendarService.updateParticipateStatus(eventId, calendarId, payload);
 
             if (response) {
-                window.location.reload();
+                const updatedResponse = await calendarService.getCalendarEventDetail(eventId, calendarId);
+                setCalendar(updatedResponse.data);
+                toast.success('Cập nhật trạng thái tham gia thành công');
             }
         } catch (error) {
             console.error('Error updating participation status:', error);
@@ -170,21 +211,61 @@ export default function CalendarDetail() {
         }
     };
 
+    // delete calendar functionality reverted
+
+    const handleOpenChangeStatus = (initialStatus = "") => {
+        setNewStatus(initialStatus || "");
+        setAbsentReason("");
+        setIsQuickAbsent(initialStatus === "absent");
+        setIsChangeStatusModalOpen(true);
+    };
+
+    const handleConfirmChangeStatus = async () => {
+        if (!newStatus) {
+            alert("Vui lòng chọn trạng thái mới");
+            return;
+        }
+
+        if (newStatus === 'absent' && !absentReason.trim()) {
+            alert("Vui lòng nhập lý do nghỉ họp");
+            return;
+        }
+
+        await handleParticipate(newStatus, absentReason);
+        setIsChangeStatusModalOpen(false);
+        setNewStatus("");
+        setAbsentReason("");
+    };
+
     return (
         <UserLayout sidebarType={eventRole}>
+            <ToastContainer position="top-right" autoClose={3000} />
             <div style={{ margin: 0, padding: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
                 <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
                     {/* Header */}
                     <div style={{ backgroundColor: 'white', padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, color: '#dc2626', fontSize: '16px', fontWeight: 600 }}>Chi tiết cuộc họp</h3>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>✏️</span> Chỉnh sửa
-                            </button>
-                            <button style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>🗑️</span> Xóa
-                            </button>
-                        </div>
+                        
+                        {!isPastMeeting && user?.id === calendar?.createdBy?.userId?._id && (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Link
+                                    to={`/events/${eventId}/my-calendar/${calendarId}/edit-event-calendar`}
+                                    style={{ textDecoration: 'none' }}>
+                                    <button style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                            <Edit size={18} color="#ffff" />
+                                            <h4 style={{ margin: -1, fontSize: '14px', fontWeight: 600, color: '#ffff' }}>Chỉnh sửa</h4>
+
+                                        </div>
+                                    </button>
+                                </Link>
+                                <button style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                        <Trash size={18} color="#ffff" />
+                                        <h4 style={{ margin: -1, fontSize: '14px', fontWeight: 600, color: '#ffff' }}>Xóa</h4>
+                                    </div>
+                                </button>
+                            </div>)}
                     </div>
 
                     {/* Main Content */}
@@ -193,7 +274,19 @@ export default function CalendarDetail() {
                         <div style={{ marginBottom: '20px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 600, color: '#1f2937' }}>{calendar.name}</h1>
-                                <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}> Chưa phản hồi</span>
+                                {currentUserStatus === 'confirmed' ? (
+                                    <span style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                        ✓ Đã xác nhận tham gia
+                                    </span>
+                                ) : currentUserStatus === 'absent' ? (
+                                    <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                        ✖ Đã từ chối
+                                    </span>
+                                ) : (
+                                    <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                        ⏳ Chưa phản hồi
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -371,12 +464,11 @@ export default function CalendarDetail() {
                                 </div>
                             </div>
                         </div>
-
                         {/* Notes and Documents */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '20px' }}>
                             <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                        <FileText size={16} color="#ffff" fill="#2563eb" />
+                                    <FileText size={16} color="#ffff" fill="#2563eb" />
                                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Ghi chú cuộc họp</h4>
                                 </div>
                                 <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: '1.6' }}>
@@ -389,15 +481,43 @@ export default function CalendarDetail() {
                                     <Paperclip size={16} color="#5b45afff " />
                                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Tài liệu cuộc họp</h4>
                                 </div>
-                                {documents.length > 0 ? (
+                                {calendar.attachments.length > 0 ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {documents.map(doc => (
-                                            <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <span style={{ fontSize: '20px' }}>{doc.icon}</span>
-                                                    <span style={{ fontSize: '14px', color: '#1f2937', fontWeight: 500 }}>{doc.name}</span>
+                                        {calendar.attachments.map((att, index) => (
+                                            <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
+                                                    <a
+                                                        href={att}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            fontSize: '14px',
+                                                            color: '#2563eb',
+                                                            textDecoration: 'none',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap'
+                                                        }}
+                                                    >
+                                                        Tài liệu {index + 1}
+                                                    </a>
                                                 </div>
-                                                <a href={doc.url} download style={{ backgroundColor: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '20px', textDecoration: 'none' }}>⬇️</a>
+                                                <a
+                                                    href={att}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={{
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        color: '#2563eb',
+                                                        cursor: 'pointer',
+                                                        fontSize: '20px',
+                                                        textDecoration: 'none',
+                                                        marginLeft: '8px'
+                                                    }}
+                                                >
+                                                    🔗
+                                                </a>
                                             </div>
                                         ))}
                                     </div>
@@ -408,25 +528,95 @@ export default function CalendarDetail() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px' }}>
-                            <button
-                                onClick={() => handleParticipate('confirmed')}
-                                style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
-                            >
-                                <span>✅</span> Tham gia
-                            </button>
-                            <button
-                                onClick={() => handleParticipate('absent')}
-                                style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
-                            >
-                                <span>✖️</span> Không tham gia
-                            </button>
-                        </div>
+                        {!isPastMeeting && (
+                            <>
+                                {currentUserStatus === 'confirmed' ? (
+                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px', alignItems: 'center' }}>
+                                        <div style={{
+                                            backgroundColor: '#d1fae5',
+                                            color: '#065f46',
+                                            border: '2px solid #10b981',
+                                            padding: '12px 32px',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <span>✓</span> Bạn đã xác nhận tham gia cuộc họp này
+                                        </div>
+                                        <button
+                                            onClick={() => handleOpenChangeStatus()}
+                                            style={{
+                                                backgroundColor: '#6b7280',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Thay đổi
+                                        </button>
+                                    </div>
+                                ) : currentUserStatus === 'absent' ? (
+                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px', alignItems: 'center' }}>
+                                        <div style={{
+                                            backgroundColor: '#fee2e2',
+                                            color: '#991b1b',
+                                            border: '2px solid #dc2626',
+                                            padding: '12px 32px',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <span>✖</span> Bạn đã từ chối tham gia
+                                        </div>
+                                        <button
+                                            onClick={() => handleOpenChangeStatus()}
+                                            style={{
+                                                backgroundColor: '#6b7280',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Thay đổi
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px' }}>
+                                        <button
+                                            onClick={() => handleParticipate('confirmed')}
+                                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                        >
+                                            <span>✓</span> Tham gia
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenChangeStatus('absent')}
+                                            style={{ backgroundColor: '#c3c4c4ff', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                        >
+                                            <span>✖</span> Không tham gia
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Modal - Embedded directly in this component */}
+            {/* Modal xem lý do nghỉ của người khác */}
             {isReasonModalOpen && selectedPerson && (
                 <div
                     style={{
@@ -564,6 +754,299 @@ export default function CalendarDetail() {
                                 }}
                             >
                                 Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal thay đổi trạng thái */}
+            {isChangeStatusModalOpen && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '20px'
+                    }}
+                    onClick={() => {
+                        setIsChangeStatusModalOpen(false);
+                        setNewStatus("");
+                        setAbsentReason("");
+                    }}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            maxWidth: '600px',
+                            width: '100%',
+                            padding: '24px',
+                            position: 'relative',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#1f2937' }}>
+                                    Thay đổi trạng thái tham gia
+                                </h2>
+                                <button
+                                    onClick={() => {
+                                        setIsChangeStatusModalOpen(false);
+                                        setNewStatus("");
+                                        setAbsentReason("");
+                                    }}
+                                    style={{
+                                        border: 'none',
+                                        background: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#6b7280',
+                                        transition: 'color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = '#1f2937'}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+                                Chọn trạng thái mới của bạn cho cuộc họp này
+                            </p>
+                        </div>
+
+                        {!isQuickAbsent && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#1f2937',
+                                    marginBottom: '12px'
+                                }}>
+                                    Chọn trạng thái <span style={{ color: '#dc2626' }}>*</span>
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {/* Tham gia */}
+                                    {currentUserStatus !== 'confirmed' && (
+                                        <div
+                                            onClick={() => setNewStatus('confirmed')}
+                                            style={{
+                                                padding: '16px',
+                                                border: newStatus === 'confirmed' ? '2px solid #10b981' : '2px solid #e5e7eb',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                backgroundColor: newStatus === 'confirmed' ? '#d1fae5' : 'white',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                border: newStatus === 'confirmed' ? '2px solid #10b981' : '2px solid #d1d5db',
+                                                backgroundColor: newStatus === 'confirmed' ? '#10b981' : 'white',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '12px',
+                                                color: 'white'
+                                            }}>
+                                                {newStatus === 'confirmed' && '✓'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937', marginBottom: '4px' }}>
+                                                    Tham gia cuộc họp
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                                                    Xác nhận rằng bạn sẽ tham gia cuộc họp này
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Không tham gia */}
+                                    {currentUserStatus !== 'absent' && (
+                                        <div
+                                            onClick={() => setNewStatus('absent')}
+                                            style={{
+                                                padding: '16px',
+                                                border: newStatus === 'absent' ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                backgroundColor: newStatus === 'absent' ? '#fee2e2' : 'white',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                border: newStatus === 'absent' ? '2px solid #dc2626' : '2px solid #d1d5db',
+                                                backgroundColor: newStatus === 'absent' ? '#dc2626' : 'white',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '12px',
+                                                color: 'white'
+                                            }}>
+                                                {newStatus === 'absent' && '✓'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937', marginBottom: '4px' }}>
+                                                    Không tham gia
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                                                    Từ chối tham gia cuộc họp này
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Chưa xác định */}
+                                    {currentUserStatus !== 'unconfirmed' && (
+                                        <div
+                                            onClick={() => setNewStatus('unconfirmed')}
+                                            style={{
+                                                padding: '16px',
+                                                border: newStatus === 'unconfirmed' ? '2px solid #f59e0b' : '2px solid #e5e7eb',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                backgroundColor: newStatus === 'unconfirmed' ? '#fef3c7' : 'white',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                border: newStatus === 'unconfirmed' ? '2px solid #f59e0b' : '2px solid #d1d5db',
+                                                backgroundColor: newStatus === 'unconfirmed' ? '#f59e0b' : 'white',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '12px',
+                                                color: 'white'
+                                            }}>
+                                                {newStatus === 'unconfirmed' && '✓'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937', marginBottom: '4px' }}>
+                                                    Chưa xác định
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                                                    Chưa quyết định có tham gia hay không
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Lý do nghỉ (chỉ hiện khi chọn absent) */}
+                        {newStatus === 'absent' && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#1f2937',
+                                    marginBottom: '8px'
+                                }}>
+                                    Lý do xin nghỉ họp <span style={{ color: '#dc2626' }}>*</span>
+                                </label>
+                                <textarea
+                                    value={absentReason}
+                                    onChange={(e) => setAbsentReason(e.target.value)}
+                                    placeholder="Vui lòng nhập lý do bạn không thể tham gia cuộc họp..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        color: '#1f2937',
+                                        minHeight: '120px',
+                                        resize: 'vertical',
+                                        fontFamily: 'inherit',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button
+                                onClick={() => {
+                                    setIsChangeStatusModalOpen(false);
+                                    setNewStatus("");
+                                    setAbsentReason("");
+                                }}
+                                style={{
+                                    backgroundColor: 'white',
+                                    color: '#1f2937',
+                                    border: '1px solid #d1d5db',
+                                    padding: '10px 24px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                                    e.currentTarget.style.borderColor = '#9ca3af';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'white';
+                                    e.currentTarget.style.borderColor = '#d1d5db';
+                                }}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleConfirmChangeStatus}
+                                style={{
+                                    backgroundColor: '#2563eb',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 24px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#2563eb';
+                                }}
+                            >
+                                Xác nhận
                             </button>
                         </div>
                     </div>

@@ -12,9 +12,13 @@ const calendarApi = {
     const url = `/api/events/${eventId}/calendars/create-calendar-for-event`;
     return axiosClient.post(url, data);
   },
-  updateCalendarEvent: (eventId, calendarId, data) => {
+  createCalendarForDepartment: (eventId, departmentId, data) => {
+    const url = `/api/events/${eventId}/departments/${departmentId}/calendars/create-calendar-for-department`;
+    return axiosClient.post(url, data);
+  },
+  updateCalendar: (eventId, calendarId, data) => {
     const url = `/api/events/${eventId}/calendars/${calendarId}`;
-    return axiosClient.patch(url, data);
+    return axiosClient.put(url, data);
   },
   deleteCalendarEvent: (eventId, calendarId) => {
     const url = `/api/events/${eventId}/calendars/${calendarId}`;
@@ -23,6 +27,11 @@ const calendarApi = {
   getMyCalendarInEvent: (eventId) => {
     const url = `/api/events/${eventId}/calendars/my-event-calendars`;
     return axiosClient.get(url);
+  },
+  updateParticipateStatus: (eventId, calendarId, data) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/participate-status`;
+    return axiosClient.patch(url, data);
   }
+
 };
 export default calendarApi;
