@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
+import calendarService from "~/services/calendarService";
+import { departmentService } from "~/services/departmentService";
+import { eventService } from "~/services/eventService";
 
-export default function CreateEventCalenderPage() {
+export default function CreateEventCalendarPage() {
     const navigate = useNavigate();
     const { eventId } = useParams();
-    const { fetchEventRole} = useEvents();
+    const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
 
     useEffect(() => {
@@ -28,52 +32,79 @@ export default function CreateEventCalenderPage() {
             mounted = false
         }
     }, [eventId, fetchEventRole]);
+
     const [formData, setFormData] = useState({
         locationType: "online",
         location: "",
         meetingDate: "",
         startTime: "",
         endTime: "",
-        departments: [{ id: 1, value: "" }],
+        participantType: "all", // "all", "departments", "coreteam"
+        selectedDepartments: [],
+        selectedCoreTeam: [],
         notes: "",
     });
+
     const [files, setFiles] = useState([]);
     const [dragActive, setDragActive] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    // Danh sách ban (mock data)
-    const departmentsList = [
-        { id: "hc", name: "Ban Hậu cần" },
-        { id: "tc", name: "Ban Tài chính" },
-        { id: "tt", name: "Ban Truyền thông" },
-        { id: "ns", name: "Ban Nhân sự" },
-        { id: "kt", name: "Ban Kỹ thuật" },
-    ];
+    const [departmentsList, setDepartmentsList] = useState([]);
+    const [coreTeamList, setCoreTeamList] = useState([]);
+    const [loadingData, setLoadingData] = useState(true);
+
+    useEffect(() => {
+        const loadParticipants = async () => {
+            if (!eventId) return;
+
+            setLoadingData(true);
+            try {
+                const deptResponse = await departmentService.getDepartments(eventId);
+                setDepartmentsList(deptResponse || []);
+
+                const coreTeamResponse = await eventService.getCoreTeamList(eventId);
+                setCoreTeamList(coreTeamResponse.data || []);
+            } catch (err) {
+                console.error("Error loading participants:", err);
+            } finally {
+                setLoadingData(false);
+            }
+        };
+
+        loadParticipants();
+    }, [eventId]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleDepartmentChange = (index, value) => {
-        const newDepartments = [...formData.departments];
-        newDepartments[index].value = value;
-        setFormData(prev => ({ ...prev, departments: newDepartments }));
-    };
-
-    const addDepartment = () => {
+    const handleParticipantTypeChange = (type) => {
         setFormData(prev => ({
             ...prev,
-            departments: [...prev.departments, { id: Date.now(), value: "" }]
+            participantType: type,
+            selectedDepartments: [],
+            selectedCoreTeam: []
         }));
     };
 
-    const removeDepartment = (index) => {
-        if (formData.departments.length > 1) {
-            const newDepartments = formData.departments.filter((_, i) => i !== index);
-            setFormData(prev => ({ ...prev, departments: newDepartments }));
-        }
+    const handleDepartmentToggle = (deptId) => {
+        setFormData(prev => ({
+            ...prev,
+            selectedDepartments: prev.selectedDepartments.includes(deptId)
+                ? prev.selectedDepartments.filter(id => id !== deptId)
+                : [...prev.selectedDepartments, deptId]
+        }));
+    };
+
+    const handleCoreTeamToggle = (memberId) => {
+        setFormData(prev => ({
+            ...prev,
+            selectedCoreTeam: prev.selectedCoreTeam.includes(memberId)
+                ? prev.selectedCoreTeam.filter(id => id !== memberId)
+                : [...prev.selectedCoreTeam, memberId]
+        }));
     };
 
     const handleDrag = (e) => {
@@ -178,6 +209,16 @@ export default function CreateEventCalenderPage() {
             return;
         }
 
+        // Validate participants
+        if (formData.participantType === "departments" && formData.selectedDepartments.length === 0) {
+            setError("Vui lòng chọn ít nhất một ban");
+            return;
+        }
+        if (formData.participantType === "coreteam" && formData.selectedCoreTeam.length === 0) {
+            setError("Vui lòng chọn ít nhất một thành viên core team");
+            return;
+        }
+
         const [startH, startM] = formData.startTime.split(':').map(Number);
         const [endH, endM] = formData.endTime.split(':').map(Number);
         if (endH * 60 + endM <= startH * 60 + startM) {
@@ -189,41 +230,35 @@ export default function CreateEventCalenderPage() {
 
         try {
             const submitData = new FormData();
+            submitData.append('eventId', eventId);
             submitData.append('locationType', formData.locationType);
             submitData.append('location', formData.location);
             submitData.append('meetingDate', formData.meetingDate);
             submitData.append('startTime', formData.startTime);
             submitData.append('endTime', formData.endTime);
-            submitData.append('departments', JSON.stringify(formData.departments.map(d => d.value).filter(v => v)));
+            submitData.append('participantType', formData.participantType);
+
+            if (formData.participantType === "departments") {
+                submitData.append('departments', JSON.stringify(formData.selectedDepartments));
+            } else if (formData.participantType === "coreteam") {
+                submitData.append('coreTeamMembers', JSON.stringify(formData.selectedCoreTeam));
+            }
+
             submitData.append('notes', formData.notes);
 
             files.forEach(f => {
                 submitData.append('files', f.file);
             });
 
-            const response = await fetch('/api/meetings/create', {
-                method: 'POST',
-                body: submitData
-            });
+            const response = await calendarService.createCalendarForEvent(eventId, submitData);
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Có lỗi xảy ra');
+            // Axios response already has data parsed
+            if (response.data) {
+                toast.success('Tạo lịch thành công');
+                navigate(`/events/${eventId}/my-calendar`);
+            } else {
+                throw new Error('Không nhận được dữ liệu từ server');
             }
-
-            alert('Tạo cuộc họp thành công!');
-
-            setFormData({
-                locationType: "online",
-                location: "",
-                meetingDate: "",
-                startTime: "",
-                endTime: "",
-                departments: [{ id: 1, value: "" }],
-                notes: "",
-            });
-            setFiles([]);
 
         } catch (err) {
             setError(err.message);
@@ -234,12 +269,12 @@ export default function CreateEventCalenderPage() {
 
     const handleCancel = () => {
         if (window.confirm('Bạn có chắc muốn hủy? Dữ liệu đã nhập sẽ bị mất.')) {
-            window.history.back();
+            navigate(`/events/${eventId}/my-calendar`);
         }
     };
 
     return (
-        <UserLayout title="Tạo cuộc họp mới" sidebarType={eventRole} activePage="work-timeline">
+        <UserLayout sidebarType={eventRole} activePage="work-timeline">
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",
@@ -281,7 +316,7 @@ export default function CreateEventCalenderPage() {
                     )}
 
                     <form onSubmit={handleSubmit}>
-                        {/* Grid 3 cột - mỗi cột là 1 box */}
+                        {/* Grid 3 cột */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
 
                             {/* Box 1: Địa điểm */}
@@ -439,91 +474,147 @@ export default function CreateEventCalenderPage() {
                             </div>
 
                             {/* Box 3: Đối tượng tham gia */}
-                            <div style={{
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                padding: "20px",
-                                backgroundColor: "white"
-                            }}>
-                                <label style={{
-                                    display: "block",
-                                    marginBottom: "16px",
-                                    fontSize: "15px",
-                                    fontWeight: "600",
-                                    color: "#1a1a1a"
+                            {eventRole === "HoOC" && (
+                                <div style={{
+                                    border: "1px solid #e5e7eb",
+                                    borderRadius: "8px",
+                                    padding: "20px",
+                                    backgroundColor: "white"
                                 }}>
-                                    Đối tượng tham gia
-                                </label>
+                                    <label style={{
+                                        display: "block",
+                                        marginBottom: "16px",
+                                        fontSize: "15px",
+                                        fontWeight: "600",
+                                        color: "#1a1a1a"
+                                    }}>
+                                        Đối tượng tham gia
+                                    </label>
 
-                                {formData.departments.map((dept, index) => (
-                                    <div key={dept.id} style={{ marginBottom: "10px", position: "relative" }}>
-                                        <select
-                                            value={dept.value}
-                                            onChange={(e) => handleDepartmentChange(index, e.target.value)}
-                                            style={{
-                                                width: "100%",
-                                                padding: "10px 12px",
-                                                fontSize: "14px",
-                                                border: "1px solid #d1d5db",
-                                                borderRadius: "6px",
-                                                outline: "none",
-                                                backgroundColor: "white",
-                                                cursor: "pointer",
-                                                appearance: "none",
-                                                backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg width='14' height='8' viewBox='0 0 14 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1 1L7 7L13 1' stroke='%23666' stroke-width='2' stroke-linecap='round'/%3e%3c/svg%3e')",
-                                                backgroundRepeat: "no-repeat",
-                                                backgroundPosition: "right 12px center",
-                                                paddingRight: "36px"
-                                            }}
-                                            onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                        >
-                                            <option value="">Chọn ban</option>
-                                            {departmentsList.map(d => (
-                                                <option key={d.id} value={d.id}>{d.name}</option>
-                                            ))}
-                                        </select>
-                                        {formData.departments.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeDepartment(index)}
-                                                style={{
-                                                    position: "absolute",
-                                                    right: "32px",
-                                                    top: "50%",
-                                                    transform: "translateY(-50%)",
-                                                    background: "transparent",
-                                                    border: "none",
-                                                    color: "#ef4444",
-                                                    cursor: "pointer",
-                                                    fontSize: "18px",
-                                                    padding: "4px",
-                                                    lineHeight: 1
-                                                }}
-                                            >
-                                                ×
-                                            </button>
-                                        )}
+                                    {/* Radio buttons cho 3 options */}
+                                    <div style={{ marginBottom: "12px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "all"}
+                                                onChange={() => handleParticipantTypeChange("all")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Toàn bộ thành viên BTC</span>
+                                        </label>
+
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "departments"}
+                                                onChange={() => handleParticipantTypeChange("departments")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Chọn ban</span>
+                                        </label>
+
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "coreteam"}
+                                                onChange={() => handleParticipantTypeChange("coreteam")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Họp riêng Core Team</span>
+                                        </label>
                                     </div>
-                                ))}
 
-                                <button
-                                    type="button"
-                                    onClick={addDepartment}
-                                    style={{
-                                        background: "transparent",
-                                        border: "none",
-                                        color: "#ef4444",
-                                        fontSize: "13px",
-                                        cursor: "pointer",
-                                        padding: "4px 0",
-                                        marginTop: "4px",
-                                        fontWeight: "500"
-                                    }}
-                                >
-                                    + Thêm ban tham gia
-                                </button>
-                            </div>
+                                    {/* Hiện danh sách ban khi chọn "Chọn ban" */}
+                                    {formData.participantType === "departments" && (
+                                        <div style={{
+                                            marginTop: "12px",
+                                            padding: "12px",
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: "6px",
+                                            maxHeight: "200px",
+                                            overflowY: "auto"
+                                        }}>
+                                            {loadingData ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Đang tải...
+                                                </div>
+                                            ) : departmentsList.length === 0 ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Không có ban nào
+                                                </div>
+                                            ) : (
+                                                departmentsList.map(dept => (
+                                                    <label
+                                                        key={dept._id || dept.id}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "8px",
+                                                            padding: "6px 0",
+                                                            cursor: "pointer"
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.selectedDepartments.includes(dept._id || dept.id)}
+                                                            onChange={() => handleDepartmentToggle(dept._id || dept.id)}
+                                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                                        />
+                                                        <span style={{ fontSize: "13px", color: "#374151" }}>
+                                                            {dept.name || dept.departmentName}
+                                                        </span>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Hiện danh sách core team khi chọn "Core Team" */}
+                                    {formData.participantType === "coreteam" && (
+                                        <div style={{
+                                            marginTop: "12px",
+                                            padding: "12px",
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: "6px",
+                                            maxHeight: "200px",
+                                            overflowY: "auto"
+                                        }}>
+                                            {loadingData ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Đang tải...
+                                                </div>
+                                            ) : coreTeamList.length === 0 ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Không có thành viên core team
+                                                </div>
+                                            ) : (
+                                                coreTeamList.map(member => (
+                                                    <label
+                                                        key={member._id }
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "8px",
+                                                            padding: "6px 0",
+                                                            cursor: "pointer"
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.selectedCoreTeam.includes(member._id || member.id)}
+                                                            onChange={() => handleCoreTeamToggle(member._id || member.id)}
+                                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                                        />
+                                                        <span style={{ fontSize: "13px", color: "#374151" }}>
+                                                            { member.userId.fullName}
+                                                        </span>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Grid 2 cột - Ghi chú và Tệp đính kèm */}
@@ -683,7 +774,7 @@ export default function CreateEventCalenderPage() {
                         {/* Buttons */}
                         <div style={{
                             display: "flex",
-                            justifyContent: "flex-end",
+                            justifyContent: "center",
                             gap: "16px",
                             paddingTop: "24px",
                             borderTop: "1px solid #e5e7eb"

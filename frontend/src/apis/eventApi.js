@@ -71,14 +71,17 @@ export const eventApi = {
     return res.data;
   },
   getUnassignedMembersByEvent: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/unassigned-members`);
+    const res = await axiosClient.get(`/api/events/${eventId}/members/unassigned`);
     return res.data;
   },
   getMemberDetail : async (eventId, memberId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
-  
+  getCoreTeamList : async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
+    return res.data;
+  }
 }
 
 

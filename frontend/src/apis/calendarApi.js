@@ -1,19 +1,19 @@
 import axiosClient from "./axiosClient";
 const calendarApi = {
   getCalendarsByEventId: (eventId) => {
-    const url = `/events/${eventId}/calendars`;
+    const url = `/api/events/${eventId}/calendars`;
     return axiosClient.get(url);
   },
   getCalendarEventDetail: (eventId, calendarId) => {
-    const url = `/events/${eventId}/calendars/${calendarId}`;
+    const url = `/api/events/${eventId}/calendars/${calendarId}`;
     return axiosClient.get(url);
   },
-  createCalendarEvent: (eventId, data) => {
-    const url = `/events/${eventId}/calendars`;
+  createCalendarForEvent: (eventId, data) => {
+    const url = `/api/events/${eventId}/calendars/create-calendar-for-event`;
     return axiosClient.post(url, data);
   },
   updateCalendarEvent: (eventId, calendarId, data) => {
-    const url = `/events/${eventId}/calendars/${calendarId}`;
+    const url = `/api/events/${eventId}/calendars/${calendarId}`;
     return axiosClient.patch(url, data);
   },
   deleteCalendarEvent: (eventId, calendarId) => {

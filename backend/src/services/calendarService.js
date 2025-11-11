@@ -15,5 +15,15 @@ export const updateCalendar = async (calendarId, updateData) => {
     return await Calendar.findByIdAndUpdate(calendarId, updateData, { new: true });
 };
 export const getCalendarById = async (calendarId) => {
-    return await Calendar.findById(calendarId);
+    return await Calendar.findById(calendarId)
+        .populate({
+            path: 'participants.member',
+            model: 'EventMember',
+            populate: {
+                path: 'userId',
+                model: 'User',
+                select: 'fullName avatarUrl email'
+            }
+        })
+        .lean();
 };

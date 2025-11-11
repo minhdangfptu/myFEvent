@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import ensureEventRole from '../utils/ensureEventRole.js';
 import {
   ensureEventExists,
@@ -55,6 +56,12 @@ export const getMemberDetail = async (req, res) => {
 		if (!eventId || !memberId) {
 			return res.status(400).json({ message: 'Event ID and Member ID are required' });
 		}
+		
+		// Validate memberId is a valid ObjectId
+		if (!mongoose.Types.ObjectId.isValid(memberId)) {
+			return res.status(400).json({ message: 'Invalid member ID format' });
+		}
+		
 		const event = await findEventById(eventId);
 		if (!event) {
 			return res.status(404).json({ message: 'Event not found' });
@@ -69,3 +76,15 @@ export const getMemberDetail = async (req, res) => {
 		return res.status(500).json({ message: 'Failed to load member detail' });
 	}
 }
+export const getCoreTeamList = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    await ensureEventExists(eventId);
+    const eventmembers = await getMembersByEventRaw(eventId);
+    const coreteam = eventmembers.filter(member =>  member.role === 'HoD');
+    return res.status(200).json({ data: coreteam });
+  } catch (error) {
+    console.error('getCoreTeamList error:', error);
+    return res.status(500).json({ message: 'Failed to load core team members' });
+  }
+};

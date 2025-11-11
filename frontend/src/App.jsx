@@ -61,6 +61,7 @@ import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
 import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
+import CalendarDetail from "./pages/Calendar/CalendarDetail";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -314,6 +315,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <CreateEventCalenderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/my-calendar/:calendarId"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CalendarDetail />
               </ProtectedRoute>
             }
           />

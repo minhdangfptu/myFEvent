@@ -4,12 +4,14 @@ import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { ToastContainer } from "react-toastify";
 import calendarService from "../../services/calendarService";
+
 export default function EventCalendar() {
   const navigate = useNavigate();
   const { eventId } = useParams();
-  const { fetchEventRole, getEventRole } = useEvents();
+  const { fetchEventRole } = useEvents();
   const [eventRole, setEventRole] = useState("");
-  const [calendars, setCalendars] = useState([]);
+  const [calendars, setCalendars] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true
@@ -31,27 +33,75 @@ export default function EventCalendar() {
       mounted = false
     }
   }, [eventId, fetchEventRole]);
-  console.log("Event Role:", eventRole);
 
   const fetchCalendars = async () => {
-    try{
+    setLoading(true);
+    try {
       const response = await calendarService.getMyCalendarInEvent(eventId);
       console.log("API Response:", response);
-      console.log("Calendars fetched:", response.data);
-      setCalendars(response);
-    }catch(error){
+
+      // Group calendars by date
+      const grouped = {};
+      const calendarArray = response.data || [];
+
+      calendarArray.forEach(calendar => {
+        const startDate = new Date(calendar.startAt);
+
+        const year = startDate.getFullYear();
+        const month = String(startDate.getMonth() + 1).padStart(2, '0');
+        const day = String(startDate.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
+
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+
+        // Format time
+        const startHour = String(startDate.getHours()).padStart(2, '0');
+        const startMinute = String(startDate.getMinutes()).padStart(2, '0');
+
+        const endDate = new Date(calendar.endAt);
+        const endHour = String(endDate.getHours()).padStart(2, '0');
+        const endMinute = String(endDate.getMinutes()).padStart(2, '0');
+
+        grouped[dateKey].push({
+          _id: calendar._id,
+          title: calendar.name,
+          time: `${startHour}:${startMinute}`,
+          timeRange: `${startHour}:${startMinute} - ${endHour}:${endMinute}`,
+          location: calendar.location,
+          type: calendar.type,
+          participants: calendar.participants,
+          participantCount: calendar.participants.length,
+          startAt: calendar.startAt,
+          endAt: calendar.endAt,
+          originalData: calendar
+        });
+      });
+
+      // Sort events by time within each day
+      Object.keys(grouped).forEach(dateKey => {
+        grouped[dateKey].sort((a, b) =>
+          new Date(a.startAt) - new Date(b.startAt)
+        );
+      });
+
+      console.log("Grouped calendars:", grouped);
+      setCalendars(grouped);
+    } catch (error) {
       console.error("Failed to fetch calendars:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Lấy ngày hiện tại
   const today = new Date();
   const todayDay = today.getDate();
   const todayMonth = today.getMonth();
   const todayYear = today.getFullYear();
 
-  const [currentMonth, setCurrentMonth] = useState(10); // November = 10
-  const [currentYear, setCurrentYear] = useState(2025);
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+  const [currentYear, setCurrentYear] = useState(todayYear);
   const [selectedCalendar, setSelectedCalendar] = useState(null);
 
   const getCalendarsForDay = (day, month, year) => {
@@ -112,19 +162,21 @@ export default function EventCalendar() {
   const handleCalendarClick = (calendar) => {
     setSelectedCalendar(calendar);
   };
-  const handleCreateCalendar = () => {
-    if(eventRole == "HoOC"){
-      navigate(`/events/${eventId}/calendars/create-event-calendar`);
-    }else if(eventRole == "HoD"){
 
+  const handleCreateCalendar = () => {
+    if (eventRole === "HoOC") {
+      navigate(`/events/${eventId}/calendars/create-event-calendar`);
     }
-  }
+  };
+
+  const handleRefresh = () => {
+    fetchCalendars();
+  };
 
   return (
     <UserLayout title="Event Calendar Page" sidebarType={eventRole} activePage="work-timeline">
       <ToastContainer position="top-right" autoClose={3000} />
       <div style={{ padding: "20px", backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
-        {/* Header */}
         <div style={{
           backgroundColor: "white",
           borderRadius: "8px",
@@ -186,40 +238,47 @@ export default function EventCalendar() {
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button  style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: "#4285f4",
-              color: "white",
-              cursor: "pointer",
-              fontSize: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "6px",
+                border: "none",
+                backgroundColor: "#4285f4",
+                color: "white",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontSize: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: loading ? 0.5 : 1
+              }}
+            >
               ⟳
             </button>
-            <button onClick={handleCreateCalendar} style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: "#ea4335",
-              color: "white",
-              cursor: "pointer",
-              fontSize: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>
+            <button
+              onClick={handleCreateCalendar}
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "6px",
+                border: "none",
+                backgroundColor: "#ea4335",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
               +
             </button>
           </div>
         </div>
 
-        {/* Calendar Grid */}
         <div style={{
           backgroundColor: "white",
           borderRadius: "8px",
@@ -227,7 +286,6 @@ export default function EventCalendar() {
           boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
           border: "1px solid #e5e7eb"
         }}>
-          {/* Week days */}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
@@ -247,15 +305,10 @@ export default function EventCalendar() {
             ))}
           </div>
 
-          {/* Calendar days */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
             {days.map((dayObj, index) => {
               const dayCalendars = getCalendarsForDay(dayObj.day, dayObj.month, dayObj.year);
-
-              const isToday = dayObj.isCurrentMonth &&
-                dayObj.day === todayDay &&
-                dayObj.month === todayMonth &&
-                dayObj.year === todayYear;
+              const isToday = dayObj.isCurrentMonth && dayObj.day === todayDay && dayObj.month === todayMonth && dayObj.year === todayYear;
 
               return (
                 <div
@@ -264,26 +317,23 @@ export default function EventCalendar() {
                     borderRight: index % 7 !== 6 ? "1px solid #e5e7eb" : "none",
                     borderBottom: index < 28 ? "1px solid #e5e7eb" : "none",
                     padding: "8px",
-                    minHeight: "200px",
+                    minHeight: "160px",
                     backgroundColor: dayObj.isCurrentMonth ? "white" : "#fafafa",
                     position: "relative",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: dayObj.isCurrentMonth ? "500" : "normal",
-                      marginBottom: "8px",
-                      color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
-                      display: "inline-block",
-                    }}
-                  >
+                  <div style={{
+                    fontSize: "13px",
+                    fontWeight: dayObj.isCurrentMonth ? "500" : "normal",
+                    marginBottom: "8px",
+                    color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
+                    display: "inline-block",
+                  }}>
                     {dayObj.day}
                   </div>
 
-                  {/* Events */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {dayCalendars.map((calendar) => (
+                    {dayCalendars.slice(0, 3).map((calendar) => (
                       <div
                         key={calendar._id}
                         onClick={() => handleCalendarClick(calendar)}
@@ -307,6 +357,11 @@ export default function EventCalendar() {
                         <div style={{ fontWeight: "500" }}>{calendar.title} - {calendar.time}</div>
                       </div>
                     ))}
+                    {dayCalendars.length > 3 && (
+                      <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>
+                        +{dayCalendars.length - 3} more
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -314,7 +369,6 @@ export default function EventCalendar() {
           </div>
         </div>
 
-        {/* Event Detail Modal */}
         {selectedCalendar && (
           <div
             onClick={() => setSelectedCalendar(null)}
@@ -398,7 +452,8 @@ export default function EventCalendar() {
                 >
                   Đóng
                 </button>
-                <button
+                <button 
+                  onClick={() => navigate(`/events/${eventId}/my-calendar/${selectedCalendar._id}`)}
                   style={{
                     flex: 1,
                     padding: "10px",

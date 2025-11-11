@@ -22,6 +22,7 @@ const CalendarSchema = new Schema({
       type: String,
       required: function () { return this.participateStatus === 'absent'; },
   }}],
+  attachments: [{ type: String }],
 }, { timestamps: true, versionKey: false });
 
 export default mongoose.model('Calendar', CalendarSchema);
