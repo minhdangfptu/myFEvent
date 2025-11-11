@@ -84,30 +84,49 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
     }
 };
 
-// Updated status calculation helper functions
-const calculateRiskSeverity = (risk) => {
-    const occurredCount = risk.occurred_risk?.length || 0;
-    const impactWeight = { low: 1, medium: 2, high: 3 };
-    const severityScore = occurredCount * (impactWeight[risk.impact] || 2);
+export const getOccurredRisksByDepartmentController = async (req, res) => {
+   try {
+       const { eventId, departmentId } = req.params;
 
-    if (severityScore >= 9) return 'critical';
-    if (severityScore >= 6) return 'high';
-    if (severityScore >= 3) return 'medium';
-    return 'low';
+       // Gọi service: không truyền filter/search gì cả
+       const result = await RiskService.getOccurredRisksByDepartment(eventId, departmentId);
+
+       if (!result || result.success === false) {
+           return res.status(400).json({
+               success: false,
+               message: result?.message || 'Failed to get occurred risks by department',
+           });
+       }
+
+       return res.status(200).json(result);
+   } catch (error) {
+       console.error('Error in getOccurredRisksByDepartmentController:', error);
+       return res.status(500).json({
+           success: false,
+           message: 'Internal server error while getting occurred risks by department',
+       });
+   }
 };
 
-const needsImmediateAttention = (risk) => {
-    const occurredCount = risk.occurred_risk?.length || 0;
-    const unResolvedOccurred = risk.occurred_risk?.filter(occ =>
-        occ.occurred_status === 'resolving'
-    ).length || 0;
+export const getAllOccurredRisksByEventController = async (req, res) => {
+    try {
+        const { eventId } = req.params;
 
-    // Needs attention if: high impact + multiple occurrences, or high impact + unresolved issues
-    return (risk.impact === 'high' && occurredCount >= 2) ||
-        (risk.impact === 'high' && unResolvedOccurred > 0) ||
-        (occurredCount >= 3); // Any risk with 3+ occurrences
+        const result = await RiskService.getAllOccurredRisksByEvent(eventId);
+
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
 };
-
 // ====== BASIC CRUD OPERATIONS ======
 
 /**
@@ -603,56 +622,6 @@ export const removeOccurredRisk = async (req, res) => {
     }
 };
 
-// ====== ANALYTICS & REPORTING ======
-
-/**
- * Get risk statistics
- * GET /api/events/:eventId/risks/statistics
- */
-export const getRiskStatistics = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: HoOC, HoD, Member đều có thể xem
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Không có quyền xem risk statistics'
-            });
-        }
-
-        const result = await RiskService.getRiskStatistics(eventId);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: result.data,
-            message: 'Risk statistics retrieved successfully'
-        });
-
-    } catch (error) {
-        console.error('Error in getRiskStatistics controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
 /**
  * Get risks by department
  * GET /api/events/:eventId/departments/:departmentId/risks
@@ -701,104 +670,6 @@ export const getRisksByDepartment = async (req, res) => {
         });
     }
 };
-
-/**
- * Get high-priority risks
- * GET /api/events/:eventId/risks/high-priority
- */
-export const getHighPriorityRisks = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: HoOC, HoD, Member đều có thể xem
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Không có quyền xem high priority risks'
-            });
-        }
-
-        const result = await RiskService.getHighPriorityRisks(eventId);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: result.data,
-            total: result.total,
-            message: 'High-priority risks retrieved successfully'
-        });
-
-    } catch (error) {
-        console.error('Error in getHighPriorityRisks controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
-/**
- * Get risk matrix
- * GET /api/events/:eventId/risks/matrix
- */
-export const getRiskMatrix = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: HoOC, HoD, Member đều có thể xem
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Không có quyền xem risk matrix'
-            });
-        }
-
-        const result = await RiskService.getRiskMatrix(eventId);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: result.data,
-            message: 'Risk matrix generated successfully'
-        });
-
-    } catch (error) {
-        console.error('Error in getRiskMatrix controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
 // ====== UTILITY ENDPOINTS ======
 
 /**
@@ -888,118 +759,6 @@ export const getRiskCategories = async (req, res) => {
         });
     }
 };
-
-/**
- * Calculate risk score
- * POST /api/risks/calculate-score
- */
-export const calculateRiskScore = async (req, res) => {
-    try {
-        const { impact, likelihood } = req.body;
-
-        if (!impact || !likelihood) {
-            return res.status(400).json({
-                success: false,
-                message: 'Both impact and likelihood are required'
-            });
-        }
-
-        const score = RiskService.calculateRiskScore(impact, likelihood);
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                impact,
-                likelihood,
-                score,
-                level: score >= 12 ? 'critical' : score >= 9 ? 'high' : score >= 6 ? 'medium' : 'low'
-            },
-            message: 'Risk score calculated successfully'
-        });
-
-    } catch (error) {
-        console.error('Error in calculateRiskScore controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
-// ====== DASHBOARD ENDPOINT ======
-
-/**
- * Get complete risk dashboard data
- * GET /api/events/:eventId/risks/dashboard
- */
-export const getRiskDashboard = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: HoOC, HoD, Member đều có thể xem
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Không có quyền xem risk dashboard'
-            });
-        }
-
-        // Execute multiple service calls in parallel for better performance
-        const [
-            statisticsResult,
-            highPriorityResult,
-            matrixResult
-        ] = await Promise.all([
-            RiskService.getRiskStatistics(eventId),
-            RiskService.getHighPriorityRisks(eventId),
-            RiskService.getRiskMatrix(eventId)
-        ]);
-
-        // Check if all calls succeeded
-        if (!statisticsResult.success || !highPriorityResult.success || !matrixResult.success) {
-            return res.status(400).json({
-                success: false,
-                message: 'Failed to generate dashboard data'
-            });
-        }
-
-        const dashboardData = {
-            statistics: statisticsResult.data,
-            highPriorityRisks: {
-                risks: highPriorityResult.data,
-                count: highPriorityResult.total
-            },
-            riskMatrix: matrixResult.data,
-            generatedAt: new Date()
-        };
-
-        return res.status(200).json({
-            success: true,
-            data: dashboardData,
-            message: 'Risk dashboard data retrieved successfully'
-        });
-
-    } catch (error) {
-        console.error('Error in getRiskDashboard controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
 // ====== AUTO-STATUS UPDATE ENDPOINTS ======
 
 /**
@@ -1142,112 +901,11 @@ export const batchUpdateRiskStatuses = async (req, res) => {
         });
     }
 };
-
 /**
- * Get risk severity analysis
- * GET /api/events/:eventId/risks/:riskId/severity
+ * Get risk statistics by category for pie charts
+ * GET /api/events/:eventId/risks/category-statistics
  */
-export const getRiskSeverityAnalysis = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId, riskId } = req.params;
-
-        // Check role: HoOC, HoD, Member đều có thể xem
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Không có quyền xem risk severity analysis'
-            });
-        }
-
-        const riskResult = await RiskService.getRiskById(eventId, riskId);
-        if (!riskResult.success) {
-            return res.status(404).json(riskResult);
-        }
-
-        const risk = riskResult.data;
-        const severity = calculateRiskSeverity(risk);
-        const needsAttention = needsImmediateAttention(risk);
-
-        // Analyze occurred risks with correct status names
-        const occurredRisks = risk.occurred_risk || [];
-        const occurredAnalysis = {
-            total: occurredRisks.length,
-            resolving: occurredRisks.filter(occ => occ.occurred_status === 'resolving').length,
-            resolved: occurredRisks.filter(occ => occ.occurred_status === 'resolved').length,
-            recent: occurredRisks.filter(occ => {
-                const occurredDate = new Date(occ.occurred_date);
-                const daysSince = (new Date() - occurredDate) / (1000 * 60 * 60 * 24);
-                return daysSince <= 7; // Within last 7 days
-            }).length
-        };
-
-        // Risk score calculation
-        const riskScore = RiskService.calculateRiskScore(risk.impact, risk.likelihood);
-
-        // Generate recommendations
-        const recommendations = [];
-
-        if (needsAttention) {
-            recommendations.push('This risk needs immediate attention from the management team');
-        }
-
-        if (occurredAnalysis.resolving > 0) {
-            recommendations.push(`${occurredAnalysis.resolving} occurred risk(s) are still being resolved`);
-        }
-
-        if (occurredAnalysis.recent > 0) {
-            recommendations.push(`${occurredAnalysis.recent} risk occurrence(s) happened in the last 7 days`);
-        }
-
-        if (severity === 'critical') {
-            recommendations.push('Consider escalating this risk to higher management');
-        }
-
-        if (occurredAnalysis.total >= 3) {
-            recommendations.push('Review and strengthen risk mitigation plans');
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                riskId: risk._id,
-                riskName: risk.name,
-                currentStatus: risk.risk_status,
-                severity,
-                needsImmediateAttention: needsAttention,
-                riskScore,
-                occurredAnalysis,
-                recommendations,
-                assessedAt: new Date()
-            },
-            message: 'Risk severity analysis completed'
-        });
-
-    } catch (error) {
-        console.error('Error in getRiskSeverityAnalysis controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
-/**
- * Get all risks that need immediate attention
- * GET /api/events/:eventId/risks/needs-attention
- */
-export const getRisksNeedingAttention = async (req, res) => {
+export const getRiskCategoryStatistics = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -1265,51 +923,30 @@ export const getRisksNeedingAttention = async (req, res) => {
         if (!member) {
             return res.status(403).json({
                 success: false,
-                message: 'Không có quyền xem risks needing attention'
+                message: 'Không có quyền xem thống kê rủi ro theo danh mục'
             });
         }
 
-        const allRisksResult = await RiskService.getAllRisksByEventWithoutPagination(eventId);
-        if (!allRisksResult.success) {
-            return res.status(400).json(allRisksResult);
-        }
+        const result = await RiskService.getRiskStatistics(eventId);
 
-        const risks = allRisksResult.data;
-        const risksNeedingAttention = risks
-            .filter(risk => needsImmediateAttention(risk))
-            .map(risk => ({
-                ...risk,
-                severity: calculateRiskSeverity(risk),
-                occurredCount: risk.occurred_risk?.length || 0,
-                resolvingOccurred: risk.occurred_risk?.filter(occ => occ.occurred_status === 'resolving').length || 0
-            }))
-            .sort((a, b) => {
-                // Sort by severity, then by occurred count
-                const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-                if (severityOrder[b.severity] !== severityOrder[a.severity]) {
-                    return severityOrder[b.severity] - severityOrder[a.severity];
-                }
-                return b.occurredCount - a.occurredCount;
-            });
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
 
         return res.status(200).json({
             success: true,
-            data: risksNeedingAttention,
-            total: risksNeedingAttention.length,
-            summary: {
-                totalRisks: risks.length,
-                needingAttention: risksNeedingAttention.length,
-                percentage: risks.length > 0 ? Math.round((risksNeedingAttention.length / risks.length) * 100) : 0
-            },
-            message: `Found ${risksNeedingAttention.length} risks needing immediate attention`
+            data: result.data,
+            message: 'Risk category statistics retrieved successfully'
         });
 
     } catch (error) {
-        console.error('Error in getRisksNeedingAttention controller:', error);
+        console.error('Error in getRiskCategoryStatistics controller:', error);
         return res.status(500).json({
             success: false,
-            message: 'Internal server error',
+            message: 'Internal server error while getting risk category statistics',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
+
+

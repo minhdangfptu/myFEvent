@@ -11,12 +11,12 @@ import { Types } from 'mongoose';
  */
 const calculateRiskScore = (impact, likelihood) => {
     const impactScores = { low: 1, medium: 2, high: 3 };
-    const likelihoodScores = { 
-        very_low: 1, 
-        low: 2, 
-        medium: 3, 
-        high: 4, 
-        very_high: 5 
+    const likelihoodScores = {
+        very_low: 1,
+        low: 2,
+        medium: 3,
+        high: 4,
+        very_high: 5
     };
     return (impactScores[impact] || 2) * (likelihoodScores[likelihood] || 3);
 };
@@ -72,8 +72,6 @@ const validateObjectId = (id, fieldName = 'ID') => {
  */
 const handleError = (error, defaultMessage) => {
     console.error(`Error: ${defaultMessage}`, error);
-    
-    // Handle mongoose validation errors
     if (error.name === 'ValidationError') {
         const messages = Object.values(error.errors).map(err => err.message);
         return {
@@ -104,7 +102,7 @@ export const createRisk = async (eventId, riskData) => {
         if (eventIdError) return eventIdError;
 
         // Validate required fields
-        if (!riskData.name || !riskData.departmentId || !riskData.risk_category || 
+        if (!riskData.name || !riskData.departmentId || !riskData.risk_category ||
             !riskData.impact || !riskData.likelihood || !riskData.risk_mitigation_plan) {
             return {
                 success: false,
@@ -125,10 +123,10 @@ export const createRisk = async (eventId, riskData) => {
         });
 
         await risk.save();
-        
+
         // Populate department info
         await risk.populate('departmentId', 'name description');
-        
+
         return {
             success: true,
             data: risk,
@@ -136,6 +134,54 @@ export const createRisk = async (eventId, riskData) => {
         };
     } catch (error) {
         return handleError(error, 'Failed to create risk');
+    }
+};
+
+/**
+ * Get all occurred risks for an event - Ultra simple version
+ * @param {string} eventId - Event ID
+ * @returns {Promise<Object>} All occurred risks
+ */
+export const getAllOccurredRisksByEvent = async (eventId) => {
+    try {
+        const risks = await Risk.find({ eventId: new Types.ObjectId(eventId) })
+            .populate('departmentId', 'name')
+            .lean();
+
+        const occurredRisks = [];
+
+        risks.forEach(risk => {
+            if (risk.occurred_risk?.length > 0) {
+                risk.occurred_risk.forEach(occurred => {
+                    occurredRisks.push({
+                        _id: occurred._id,
+                        occurred_name: occurred.occurred_name,
+                        occurred_location: occurred.occurred_location,
+                        occurred_date: occurred.occurred_date,
+                        occurred_description: occurred.occurred_description,
+                        occurred_status: occurred.occurred_status,
+                        resolve_action: occurred.resolve_action,
+                        departmentName: risk.departmentId?.name || 'Chưa phân công',
+                        riskName: risk.name,
+                        risk_id: risk._id
+                    });
+                });
+            }
+        });
+
+        // Sort by date desc
+        occurredRisks.sort((a, b) => new Date(b.occurred_date || 0) - new Date(a.occurred_date || 0));
+        return {
+            success: true,
+            data: occurredRisks,
+            message: 'Success'
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            message: error.message || 'Failed to get occurred risks'
+        };
     }
 };
 
@@ -166,7 +212,7 @@ export const getRisksByEvent = async (eventId, options = {}) => {
 
         // Build query
         let query = { eventId: new Types.ObjectId(eventId) };
-        
+
         // Apply filters
         if (risk_category) query.risk_category = risk_category;
         if (impact) query.impact = impact;
@@ -242,7 +288,7 @@ export const getAllRisksByEventWithoutPagination = async (eventId, filters = {})
         if (eventIdError) return eventIdError;
 
         let query = { eventId: new Types.ObjectId(eventId) };
-        
+
         // Apply filters
         if (filters.risk_category) query.risk_category = filters.risk_category;
         if (filters.impact) query.impact = filters.impact;
@@ -287,26 +333,26 @@ export const getRiskById = async (eventId, riskId) => {
             _id: new Types.ObjectId(riskId),
             eventId: new Types.ObjectId(eventId)
         })
-        .populate('departmentId', 'name')
-        .populate('departmentId', 'name')
-        .populate({
-            path: 'occurred_risk.resolve_personId',
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: 'fullName email'
-            }
-        })
-        .populate({
-            path: 'occurred_risk.update_personId', 
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User', 
-                select: 'fullName email'
-            }
-        });
+            .populate('departmentId', 'name')
+            .populate('departmentId', 'name')
+            .populate({
+                path: 'occurred_risk.resolve_personId',
+                model: 'EventMember',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    select: 'fullName email'
+                }
+            })
+            .populate({
+                path: 'occurred_risk.update_personId',
+                model: 'EventMember',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    select: 'fullName email'
+                }
+            });
         if (!risk) {
             return {
                 success: false,
@@ -357,13 +403,13 @@ export const updateRisk = async (eventId, riskId, updateData) => {
                 _id: new Types.ObjectId(riskId),
                 eventId: new Types.ObjectId(eventId)
             },
-            { 
+            {
                 $set: {
                     ...processedUpdateData,
                     updatedAt: new Date()
                 }
             },
-            { 
+            {
                 new: true,
                 runValidators: true
             }
@@ -539,7 +585,7 @@ export const updateOccurredRisk = async (eventId, riskId, occurredRiskId, update
 
         // Process update data
         const processedUpdateData = { ...updateData };
-        
+
         // Handle date conversion
         if (updateData.occurred_date) {
             processedUpdateData.occurred_date = new Date(updateData.occurred_date);
@@ -630,87 +676,6 @@ export const removeOccurredRisk = async (eventId, riskId, occurredRiskId) => {
     }
 };
 
-// ====== ANALYTICS & REPORTING ======
-
-/**
- * Get risk statistics for an event
- * @param {string} eventId - Event ID
- * @returns {Promise<Object>} Risk statistics
- */
-export const getRiskStatistics = async (eventId) => {
-    try {
-        // Validate input
-        const eventIdError = validateObjectId(eventId, 'event ID');
-        if (eventIdError) return eventIdError;
-
-        const risks = await Risk.find({ eventId: new Types.ObjectId(eventId) }).lean();
-
-        if (!risks || risks.length === 0) {
-            return {
-                success: true,
-                data: {
-                    total: 0,
-                    byImpact: { high: 0, medium: 0, low: 0 },
-                    byLikelihood: { very_high: 0, high: 0, medium: 0, low: 0, very_low: 0 },
-                    byStatus: { not_yet: 0, resolving: 0, resolved: 0 },
-                    byCategory: {},
-                    totalOccurred: 0,
-                    mostCritical: 0
-                },
-                message: 'No risks found for statistics'
-            };
-        }
-
-        const stats = {
-            total: risks.length,
-            byImpact: {
-                high: risks.filter(r => r.impact === 'high').length,
-                medium: risks.filter(r => r.impact === 'medium').length,
-                low: risks.filter(r => r.impact === 'low').length
-            },
-            byLikelihood: {
-                very_high: risks.filter(r => r.likelihood === 'very_high').length,
-                high: risks.filter(r => r.likelihood === 'high').length,
-                medium: risks.filter(r => r.likelihood === 'medium').length,
-                low: risks.filter(r => r.likelihood === 'low').length,
-                very_low: risks.filter(r => r.likelihood === 'very_low').length
-            },
-            byStatus: {
-                not_yet: risks.filter(r => r.risk_status === 'not_yet').length,
-                resolved: risks.filter(r => r.risk_status === 'resolved').length,
-                resolving: risks.filter(r => r.risk_status === 'resolving').length
-            },
-            byCategory: {},
-            totalOccurred: risks.reduce((sum, risk) => sum + (risk.occurred_risk?.length || 0), 0),
-            mostCritical: risks.filter(r => r.impact === 'high' && (r.likelihood === 'very_high' || r.likelihood === 'high')).length,
-            averageRiskScore: 0
-        };
-
-        // Count by category
-        risks.forEach(risk => {
-            if (stats.byCategory[risk.risk_category]) {
-                stats.byCategory[risk.risk_category]++;
-            } else {
-                stats.byCategory[risk.risk_category] = 1;
-            }
-        });
-
-        // Calculate average risk score
-        const totalScore = risks.reduce((sum, risk) => 
-            sum + calculateRiskScore(risk.impact, risk.likelihood), 0
-        );
-        stats.averageRiskScore = risks.length > 0 ? 
-            Math.round((totalScore / risks.length) * 100) / 100 : 0;
-
-        return {
-            success: true,
-            data: stats,
-            message: 'Risk statistics retrieved successfully'
-        };
-    } catch (error) {
-        return handleError(error, 'Failed to get risk statistics');
-    }
-};
 
 /**
  * Get risks by department
@@ -731,9 +696,9 @@ export const getRisksByDepartment = async (eventId, departmentId) => {
             eventId: new Types.ObjectId(eventId),
             departmentId: new Types.ObjectId(departmentId)
         })
-        .populate('departmentId', 'name description')
-        .sort({ impact: -1, likelihood: -1, createdAt: -1 })
-        .lean();
+            .populate('departmentId', 'name description')
+            .sort({ impact: -1, likelihood: -1, createdAt: -1 })
+            .lean();
 
         return {
             success: true,
@@ -746,38 +711,6 @@ export const getRisksByDepartment = async (eventId, departmentId) => {
     }
 };
 
-/**
- * Get high-priority risks (high impact or likelihood)
- * @param {string} eventId - Event ID
- * @returns {Promise<Object>} High-priority risks
- */
-export const getHighPriorityRisks = async (eventId) => {
-    try {
-        // Validate input
-        const eventIdError = validateObjectId(eventId, 'event ID');
-        if (eventIdError) return eventIdError;
-
-        const risks = await Risk.find({
-            eventId: new Types.ObjectId(eventId),
-            $or: [
-                { impact: 'high' },
-                { likelihood: { $in: ['high', 'very_high'] } }
-            ]
-        })
-        .populate('departmentId', 'name description')
-        .sort({ impact: -1, likelihood: -1, createdAt: -1 })
-        .lean();
-
-        return {
-            success: true,
-            data: risks,
-            total: risks.length,
-            message: 'High-priority risks retrieved successfully'
-        };
-    } catch (error) {
-        return handleError(error, 'Failed to get high-priority risks');
-    }
-};
 
 /**
  * Bulk update risk statuses
@@ -818,14 +751,14 @@ export const bulkUpdateRiskStatus = async (eventId, riskIds, status) => {
         }
 
         const objectIds = riskIds.map(id => new Types.ObjectId(id));
-        
+
         const result = await Risk.updateMany(
             {
                 _id: { $in: objectIds },
                 eventId: new Types.ObjectId(eventId)
             },
-            { 
-                $set: { 
+            {
+                $set: {
                     risk_status: status,
                     updatedAt: new Date()
                 }
@@ -846,75 +779,172 @@ export const bulkUpdateRiskStatus = async (eventId, riskIds, status) => {
     }
 };
 
-/**
- * Get risk matrix data for visualization
- * @param {string} eventId - Event ID
- * @returns {Promise<Object>} Risk matrix data
- */
-export const getRiskMatrix = async (eventId) => {
+export const getRiskStatistics = async (eventId) => {
     try {
-        // Validate input
-        const eventIdError = validateObjectId(eventId, 'event ID');
-        if (eventIdError) return eventIdError;
-
-        const risks = await Risk.find({ eventId: new Types.ObjectId(eventId) })
-            .populate('departmentId', 'name description')
+        const risks = await Risk.find({ eventId })
+            .populate('departmentId', 'name')
             .lean();
 
-        // Create matrix grid (5x3 - likelihood x impact)
-        const matrix = {};
-        const likelihoodLevels = ['very_low', 'low', 'medium', 'high', 'very_high'];
-        const impactLevels = ['low', 'medium', 'high'];
+        const categoryLabels = {
+            'infrastructure': 'Cơ sở vật chất',
+            'mc-guests': 'MC & Khách mời',
+            'communication': 'Truyền thông',
+            'players': 'Người chơi',
+            'staffing': 'Nhân sự',
+            'communication_post': 'Tuyến bài',
+            'attendees': 'Người tham gia',
+            'weather': 'Thời tiết',
+            'time': 'Thời gian',
+            'timeline': 'Timeline',
+            'tickets': 'Vé',
+            'collateral': 'Ấn phẩm',
+            'game': 'Game',
+            'sponsorship': 'Nhà tài trợ',
+            'finance': 'Tài chính',
+            'transportation': 'Vận chuyển',
+            'decor': 'Đồ trang trí',
+            'others': 'Khác'
+        };
 
-        likelihoodLevels.forEach(likelihood => {
-            matrix[likelihood] = {};
-            impactLevels.forEach(impact => {
-                matrix[likelihood][impact] = [];
-            });
-        });
-
-        // Populate matrix with risks
+        // 1. % Rủi ro theo danh mục (Pie Chart)
+        const riskByCategory = {};
         risks.forEach(risk => {
-            if (matrix[risk.likelihood] && matrix[risk.likelihood][risk.impact]) {
-                matrix[risk.likelihood][risk.impact].push({
-                    _id: risk._id,
-                    name: risk.name,
-                    department: risk.departmentId?.name,
-                    category: risk.risk_category,
-                    score: calculateRiskScore(risk.impact, risk.likelihood),
-                    occurredCount: risk.occurred_risk?.length || 0,
-                    status: risk.risk_status
-                });
+            const cat = risk.risk_category;
+            if (cat && categoryLabels[cat]) {
+                riskByCategory[cat] = (riskByCategory[cat] || 0) + 1;
             }
         });
 
-        // Calculate summary metrics
-        const totalRisks = risks.length;
-        const criticalRisks = risks.filter(r => 
-            calculateRiskScore(r.impact, r.likelihood) >= 12
-        ).length;
+        const riskCategoryChart = Object.keys(riskByCategory).map(key => ({
+            label: categoryLabels[key],
+            value: riskByCategory[key],
+            percentage: ((riskByCategory[key] / risks.length) * 100).toFixed(1)
+        }));
 
-        const resolvedRisks = risks.filter(r => r.risk_status === 'resolved').length;
-        const resolvingRisks = risks.filter(r => r.risk_status === 'resolving').length;
+        // 2. % Sự cố theo danh mục (Pie Chart)
+        const occurredByCategory = {};
+        risks.forEach(risk => {
+            if (risk.occurred_risk?.length > 0) {
+                const cat = risk.risk_category;
+                if (cat && categoryLabels[cat]) {
+                    occurredByCategory[cat] = (occurredByCategory[cat] || 0) + risk.occurred_risk.length;
+                }
+            }
+        });
+
+        const totalOccurred = Object.values(occurredByCategory).reduce((sum, count) => sum + count, 0);
+        const occurredCategoryChart = Object.keys(occurredByCategory).map(key => ({
+            label: categoryLabels[key],
+            value: occurredByCategory[key],
+            percentage: totalOccurred > 0 ? ((occurredByCategory[key] / totalOccurred) * 100).toFixed(1) : 0
+        }));
+
+        // 3. Tần suất xảy ra các rủi ro (Horizontal Bar Chart) 
+        // Get top risk types based on actual occurred incidents
+        const riskFrequency = {};
+        risks.forEach(risk => {
+            if (risk.occurred_risk?.length > 0) {
+                const count = risk.occurred_risk.length;
+                if (riskFrequency[risk.name]) {
+                    riskFrequency[risk.name] += count;
+                } else {
+                    riskFrequency[risk.name] = count;
+                }
+            }
+        });
+
+        const riskFrequencyChart = Object.keys(riskFrequency)
+            .map(riskName => ({
+                label: riskName,
+                value: riskFrequency[riskName]
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 6); // Top 6 risks với nhiều incidents nhất
+
+        // 4. Tần suất xảy ra các rủi ro theo ban (Horizontal Bar Chart)
+        const riskByDepartment = {};
+        risks.forEach(risk => {
+            const dept = risk.departmentId?.name || 'Chưa phân công';
+            riskByDepartment[dept] = (riskByDepartment[dept] || 0) + 1;
+        });
+
+        const departmentRiskChart = Object.keys(riskByDepartment).map(dept => ({
+            label: dept,
+            value: riskByDepartment[dept]
+        })).sort((a, b) => b.value - a.value);
+
+        // 5. Số lượng sự cố xảy ra theo ban (Stacked Bar Chart)
+        const departmentOccurred = {};
+        risks.forEach(risk => {
+            const dept = risk.departmentId?.name || 'Chưa phân công';
+            if (!departmentOccurred[dept]) {
+                departmentOccurred[dept] = { predicted: 0, unexpected: 0 };
+            }
+            
+            if (risk.occurred_risk?.length > 0) {
+                // Giả sử 70% là predicted, 30% là unexpected
+                const total = risk.occurred_risk.length;
+                departmentOccurred[dept].predicted += Math.floor(total * 0.7);
+                departmentOccurred[dept].unexpected += Math.ceil(total * 0.3);
+            }
+        });
+
+        const departmentStackedChart = Object.keys(departmentOccurred).map(dept => ({
+            name: dept,
+            predicted: departmentOccurred[dept].predicted,
+            unexpected: departmentOccurred[dept].unexpected,
+            total: departmentOccurred[dept].predicted + departmentOccurred[dept].unexpected
+        })).sort((a, b) => b.total - a.total);
+
+        // Find risk with most occurred incidents
+        let riskWithMostIncidents = null;
+        let maxIncidents = 0;
+        
+        risks.forEach(risk => {
+            const incidentCount = risk.occurred_risk?.length || 0;
+            if (incidentCount > maxIncidents) {
+                maxIncidents = incidentCount;
+                riskWithMostIncidents = {
+                    name: risk.name,
+                    category: categoryLabels[risk.risk_category] || risk.risk_category,
+                    department: risk.departmentId?.name || 'Chưa phân công',
+                    incidentCount: incidentCount
+                };
+            }
+        });
 
         return {
             success: true,
             data: {
-                matrix,
+                // Pie Charts
+                riskByCategory: riskCategoryChart,
+                occurredByCategory: occurredCategoryChart,
+                
+                // Horizontal Bar Charts
+                riskFrequency: riskFrequencyChart,
+                riskByDepartment: departmentRiskChart,
+                
+                // Stacked Bar Chart
+                occurredByDepartment: departmentStackedChart,
+                
+                // Summary
                 summary: {
-                    total: totalRisks,
-                    critical: criticalRisks,
-                    resolved: resolvedRisks,
-                    resolving: resolvingRisks,
-                    resolutionRate: totalRisks > 0 ? Math.round((resolvedRisks / totalRisks) * 100) : 0
+                    totalRisks: risks.length,
+                    totalOccurred: totalOccurred,
+                    totalDepartments: Object.keys(riskByDepartment).length,
+                    riskWithMostIncidents: riskWithMostIncidents
                 }
-            },
-            message: 'Risk matrix generated successfully'
+            }
         };
+
     } catch (error) {
-        return handleError(error, 'Failed to generate risk matrix');
+        return {
+            success: false,
+            message: error.message || 'Failed'
+        };
     }
 };
+
 
 // Export utility functions as well
 export { calculateRiskScore, getRiskCategories, validateObjectId, handleError };

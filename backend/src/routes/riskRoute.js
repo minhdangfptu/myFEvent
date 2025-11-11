@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as RiskController from '../controllers/riskController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
-import {getMemberRawForRisk} from '../controllers/eventMemberController.js';
+import { getMemberRawForRisk } from '../controllers/eventMemberController.js';
 
 const router = Router({ mergeParams: true });
 
@@ -36,27 +36,15 @@ router.put('/:riskId/occurred/:occurredRiskId', authenticateToken, RiskControlle
 // DELETE /api/events/:eventId/risks/:riskId/occurred/:occurredRiskId - Remove occurred risk
 router.delete('/:riskId/occurred/:occurredRiskId', authenticateToken, RiskController.removeOccurredRisk);
 
-// ====== ANALYTICS & REPORTING ROUTES ======
-
-// GET /api/events/:eventId/risks/statistics - Risk statistics
-router.get('/statistics', authenticateToken, RiskController.getRiskStatistics);
-
-// GET /api/events/:eventId/risks/high-priority - High priority risks
-router.get('/high-priority', authenticateToken, RiskController.getHighPriorityRisks);
-
-// GET /api/events/:eventId/risks/matrix - Risk matrix
-router.get('/matrix', authenticateToken, RiskController.getRiskMatrix);
-
-// GET /api/events/:eventId/risks/dashboard - Complete dashboard data
-router.get('/dashboard', authenticateToken, RiskController.getRiskDashboard);
-
-// GET /api/events/:eventId/risks/needs-attention - Risks needing attention
-router.get('/needs-attention', authenticateToken, RiskController.getRisksNeedingAttention);
-
 // ====== DEPARTMENT-SPECIFIC ROUTES ======
 
 // GET /api/events/:eventId/departments/:departmentId/risks - Department risks
 router.get('/departments/:departmentId/risks', authenticateToken, RiskController.getRisksByDepartment);
+
+router.get('/occurred-risks',
+    authenticateToken,
+    RiskController.getAllOccurredRisksByEventController
+);
 
 // ====== UTILITY ROUTES ======
 
@@ -74,8 +62,15 @@ router.post('/:riskId/update-status', authenticateToken, RiskController.updateRi
 // POST /api/events/:eventId/risks/batch-update-status - Batch auto-update statuses
 router.post('/batch-update-status', authenticateToken, RiskController.batchUpdateRiskStatuses);
 
-// GET /api/events/:eventId/risks/:riskId/severity - Risk severity analysis
-router.get('/:riskId/severity', authenticateToken, RiskController.getRiskSeverityAnalysis);
+/**
+ * @route   GET /api/events/:eventId/risks/category-statistics
+ * @desc    Get risk statistics by category for pie charts
+ * @access  Private (HoOC, HoD, Member)
+ */
+router.get('/statistics',
+    authenticateToken,
+    RiskController.getRiskCategoryStatistics
+);
 
 export default router;
 
@@ -84,6 +79,3 @@ export const globalRiskRouter = Router();
 
 // GET /api/risks/categories - Get risk categories
 globalRiskRouter.get('/categories', RiskController.getRiskCategories);
-
-// POST /api/risks/calculate-score - Calculate risk score
-globalRiskRouter.post('/calculate-score', RiskController.calculateRiskScore);

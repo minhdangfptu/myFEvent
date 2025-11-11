@@ -68,49 +68,14 @@ export const riskApi = {
     return res.data;
   },
 
-  // ========== ANALYTICS & REPORTING OPERATIONS ==========
-
-  // Lấy thống kê risks
-  // GET /api/events/:eventId/risks/statistics
-  getRiskStatistics: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/statistics`);
-    return res.data;
-  },
-
-  // Lấy high priority risks
-  // GET /api/events/:eventId/risks/high-priority
-  getHighPriorityRisks: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/high-priority`);
-    return res.data;
-  },
-
-  // Lấy risk matrix
-  // GET /api/events/:eventId/risks/matrix
-  getRiskMatrix: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/matrix`);
-    return res.data;
-  },
-
-  // Lấy complete dashboard data
-  // GET /api/events/:eventId/risks/dashboard
-  getRiskDashboard: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/dashboard`);
-    return res.data;
-  },
-
-  // Lấy risks cần attention ngay
-  // GET /api/events/:eventId/risks/needs-attention
-  getRisksNeedingAttention: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/needs-attention`);
-    return res.data;
-  },
-
   // Lấy risks theo department
   // GET /api/events/:eventId/departments/:departmentId/risks
   getRisksByDepartment: async (eventId, departmentId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/risks`);
     return res.data;
   },
+
+  
 
   // ========== UTILITY OPERATIONS ==========
 
@@ -150,12 +115,6 @@ export const riskApi = {
     return res.data;
   },
 
-  // Lấy risk severity analysis
-  // GET /api/events/:eventId/risks/:riskId/severity
-  getRiskSeverityAnalysis: async (eventId, riskId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/risks/${riskId}/severity`);
-    return res.data;
-  },
 
   // ========== GLOBAL OPERATIONS ==========
 
@@ -165,16 +124,6 @@ export const riskApi = {
     const res = await axiosClient.get('/api/risks/categories');
     return res.data;
   },
-
-  // Calculate risk score
-  // POST /api/risks/calculate-score
-  calculateRiskScore: async (impact, likelihood) => {
-    const res = await axiosClient.post('/api/risks/calculate-score', {
-      impact,
-      likelihood
-    });
-    return res.data;
-  }
 };
 
 // ========== HELPER FUNCTIONS ==========
@@ -287,6 +236,16 @@ export const getFullMember = async (eventId) => {
   return res.data;
 };
 
+export const getAllOccurredRisksByEvent = async (eventId) => {
+  const res = await axiosClient.get(`/api/events/${eventId}/risks/occurred-risks`);
+  return res.data;
+};
+
+export const statisticRisk = async (eventId) => {
+  const res = await axiosClient.get(`/api/events/${eventId}/risks/statistics`);
+  return res.data;
+};
+
 export const riskApiWithErrorHandling = {
   // Wrapper function for error handling
   handleApiCall: async (apiCall) => {
@@ -349,6 +308,12 @@ export const riskApiWithErrorHandling = {
     );
   },
 
+  statisticRisk: async (eventId, riskId) => {
+    return riskApiWithErrorHandling.handleApiCall(() => 
+      riskApi.statisticRisk(eventId, riskId)
+    );
+  },
+
   // ===== OCCURRED RISK WITH ERROR HANDLING =====
 
   addOccurredRisk: async (eventId, riskId, data) => {
@@ -367,38 +332,6 @@ export const riskApiWithErrorHandling = {
   removeOccurredRisk: async (eventId, riskId, occurredRiskId) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
       riskApi.removeOccurredRisk(eventId, riskId, occurredRiskId)
-    );
-  },
-
-  // ===== ANALYTICS WITH ERROR HANDLING =====
-
-  getRiskStatistics: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRiskStatistics(eventId)
-    );
-  },
-
-  getHighPriorityRisks: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getHighPriorityRisks(eventId)
-    );
-  },
-
-  getRiskMatrix: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRiskMatrix(eventId)
-    );
-  },
-
-  getRiskDashboard: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRiskDashboard(eventId)
-    );
-  },
-
-  getRisksNeedingAttention: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRisksNeedingAttention(eventId)
     );
   },
 
@@ -428,12 +361,6 @@ export const riskApiWithErrorHandling = {
     );
   },
 
-  getRiskSeverityAnalysis: async (eventId, riskId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.getRiskSeverityAnalysis(eventId, riskId)
-    );
-  },
-
   // ===== GLOBAL METHODS WITH ERROR HANDLING =====
 
   getRiskCategories: async () => {
@@ -441,12 +368,6 @@ export const riskApiWithErrorHandling = {
       riskApi.getRiskCategories()
     );
   },
-
-  calculateRiskScore: async (impact, likelihood) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.calculateRiskScore(impact, likelihood)
-    );
-  }
 };
 
 export default riskApi;

@@ -497,16 +497,70 @@ export default function RiskDetailPage() {
         }
 
         .occurred-item {
-          background: rgba(255, 0, 0, 0.03);
-          border: 1px solid rgb(0, 0, 0);
+          background: rgba(109, 97, 97, 0.03);
+          border: 1px solid #E5E7EB;
           border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 12px;
+          padding: 20px;
+          margin-bottom: 16px;
           transition: all 0.2s;
         }
 
         .occurred-item:hover {
-          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        
+        }
+
+        .info-section {
+          background: rgba(59, 130, 246, 0.04);
+          border-radius: 8px;
+          padding: 16px;
+          min-height: 160px
+        }
+
+        .resolution-section {
+          background: rgba(16, 185, 129, 0.04);
+          border-radius: 8px;
+          padding: 16px;
+          min-height: 160px
+        }
+
+        .info-item {
+          margin-bottom: 8px;
+        }
+
+        .info-label {
+          font-weight: 600;
+          color: #4B5563;
+          font-size: 0.875rem;
+          margin-right: 8px;
+          display: inline-block;
+          min-width: 90px;
+        }
+
+        .info-value {
+          color: #1F2937;
+          font-size: 0.875rem;
+          line-height: 1.4;
+        }
+
+        .resolution-info .info-value {
+          color: #059669;
+          font-weight: 500;
+        }
+
+        .resolution-pending {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+        }
+
+        .alert-sm {
+          font-size: 0.8rem;
+          border-radius: 6px;
+          border: 1px solid #FCD34D;
+          background-color: #FFFBEB;
+          color: #92400E;
         }
 
         .status-badge {
@@ -712,24 +766,24 @@ export default function RiskDetailPage() {
               ) : (
                 <>
                   <button className="btn btn-secondary" onClick={() => navigate(`/events/${eventId}/risks`)}>
-                    📊 Quay lại danh sách rủi ro
+                  <i class="bi bi-arrow-left"></i>  Quay lại danh sách rủi ro
                   </button>
                   
                   {canEdit() && (
                     <button className="btn btn-primary" onClick={() => setIsEditing(true)}>
-                      ✏️ Chỉnh sửa
+                      <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
                   )}
 
                   {canManageOccurred() && (
                     <button className="btn btn-success" onClick={() => handleShowOccurredModal()}>
-                      + Thêm sự cố
+                      <i class="bi bi-plus-circle"></i> Thêm sự cố
                     </button>
                   )}
 
                   {canDelete() && (
                     <button className="btn btn-danger" onClick={() => setShowDeleteModal(true)}>
-                      🗑️ Xóa rủi ro
+                      <i class="bi bi-archive"></i> Xóa rủi ro
                     </button>
                   )}
                 </>
@@ -750,7 +804,7 @@ export default function RiskDetailPage() {
               <div className="filter-section">
                 <div className="filter-row">
                   <div className="filter-group">
-                    <label className="form-label">Tìm kiếm</label>
+                    <label className="form-label"> Tìm kiếm</label>
                     <input
                       type="text"
                       className="form-control"
@@ -760,7 +814,7 @@ export default function RiskDetailPage() {
                     />
                   </div>
                   <div className="filter-group">
-                    <label className="form-label">Trạng thái</label>
+                    <label className="form-label"> Trạng thái</label>
                     <select
                       className="form-select"
                       value={statusFilter}
@@ -772,7 +826,7 @@ export default function RiskDetailPage() {
                     </select>
                   </div>
                   <div className="filter-group">
-                    <label className="form-label">Sắp xếp</label>
+                    <label className="form-label"> Sắp xếp</label>
                     <select
                       className="form-select"
                       value={sortBy}
@@ -810,75 +864,114 @@ export default function RiskDetailPage() {
                   <div key={occurred._id} className="occurred-item">
                     <div className="d-flex justify-content-between align-items-start">
                       <div className="flex-grow-1">
-                        <h6 className="mb-2">{occurred.occurred_name}</h6>
+                        {/* Header with title and action buttons */}
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <h5 className="mb-0 fw-bold">{occurred.occurred_name}</h5>
+                          {canManageOccurred() && (
+                            <div className="ms-3">
+                              <button
+                                className="btn btn-sm btn-outline-primary me-2"
+                                onClick={() => handleShowOccurredModal(occurred)}
+                              >
+                                <i class="bi bi-pencil"></i> Chỉnh sửa
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => {
+                                  setOccurredToDelete(occurred);
+                                  setShowDeleteOccurredModal(true);
+                                }}
+                              >
+                                <i class="bi bi-archive"></i> Xóa
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Two-column layout */}
                         <div className="row">
+                          {/* Left Column: Basic Info */}
                           <div className="col-md-6">
-                            <small className="text-muted d-block">
-                              📍 {occurred.occurred_location || "Chưa xác định"}
-                            </small>
-                            <small className="text-muted d-block">
-                              📅{" "}
-                              {occurred.occurred_date
-                                ? new Date(occurred.occurred_date).toLocaleString("vi-VN")
-                                : "Chưa xác định"}
-                            </small>
+                            <div className="info-section">
+                              <div className="info-item mb-2">
+                                <span className="info-label">📍 Địa điểm:</span>
+                                <span className="info-value">{occurred.occurred_location || "Chưa xác định"}</span>
+                              </div>
+                              <div className="info-item mb-2">
+                                <span className="info-label">📅 Thời gian:</span>
+                                <span className="info-value">
+                                  {occurred.occurred_date
+                                    ? new Date(occurred.occurred_date).toLocaleString("vi-VN")
+                                    : "Chưa xác định"}
+                                </span>
+                              </div>
+                              <div className="info-item mb-2">
+                                <span className="info-label">📝 Mô tả: </span>
+                                <span className="info-value">
+                                {occurred.occurred_description}
+                                </span>
+                              </div>
+                              <div className="info-item mb-2">
+                                <span className="info-label">👤 Người cập nhật: </span>
+                                <span className="info-value">
+                                {occurred.update_personId.userId.fullName}
+                                </span>
+                              </div>
+                            </div>
                           </div>
+
+                          {/* Right Column: Status & Resolution Info */}
                           <div className="col-md-6">
-                            <span
-                              className="status-badge"
-                              style={{
-                                ...getStatusStyle(occurred.occurred_status),
-                                background: getStatusStyle(occurred.occurred_status).bg,
-                                borderColor: getStatusStyle(occurred.occurred_status).border,
-                              }}
-                            >
-                              {occurredStatusLabels[occurred.occurred_status] || occurred.occurred_status}
-                            </span>
+                            <div className="resolution-section">
+                              {/* Status Badge */}
+                              <div className="d-flex align-items-center mb-3">
+                                <span className="info-label me-2">🏷️ Trạng thái:</span>
+                                <span
+                                  className="status-badge"
+                                  style={{
+                                    ...getStatusStyle(occurred.occurred_status),
+                                    background: getStatusStyle(occurred.occurred_status).bg,
+                                    borderColor: getStatusStyle(occurred.occurred_status).border,
+                                  }}
+                                >
+                                  {occurredStatusLabels[occurred.occurred_status] || occurred.occurred_status}
+                                </span>
+                              </div>
+
+                              {/* Resolution Info */}
+                              {occurred.occurred_status === "resolved" && (
+                                <div className="resolution-info">
+                                  {occurred.resolve_personId && (
+                                    <div className="d-flex align-items-center mb-3">
+                                      <span className="info-label me-2">👤 Người xử lý:</span>
+                                      <span className="info-value fw-bold text-success">
+                                        {occurred.resolve_personId?.userId?.fullName || 
+                                         occurred.resolve_personId?.userId?.name || 
+                                         "Không rõ"}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {occurred.resolve_action && (
+                                    <div className="info-item">
+                                      <span className="info-label me-2">🔧 Hành động xử lý: {occurred.resolve_action}</span>
+                                      
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {occurred.occurred_status === "resolving" && (
+                                <div className="resolution-pending">
+                                  <div className="alert alert-warning alert-sm py-2 px-3 mb-0">
+                                    <i className="bi bi-clock me-1"></i>
+                                    Đang chờ xử lý...
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        {occurred.occurred_description && (
-                          <p className="mt-2 mb-0 small">{occurred.occurred_description}</p>
-                        )}
-                        {occurred.occurred_status === "resolved" && occurred.resolve_personId && (
-                          <div className="pt-2">
-                            <div className="d-flex align-items-center">
-                              <strong className="text-success me-2">Người xử lý:</strong>
-                              <span className="mb-0 fw-medium small text-dark">
-                                {occurred.resolve_personId?.userId?.fullName || 
-                                 occurred.resolve_personId?.userId?.name || 
-                                 "Không rõ"}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {occurred.resolve_action && (
-                          <div className="pt-2">
-                            <div className="d-flex align-items-center">
-                              <strong className="text-success me-2">Hành động xử lý:</strong>
-                              <p className="mb-0 fw-medium small text-dark">{occurred.resolve_action}</p>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                      {canManageOccurred() && (
-                        <div className="ms-3">
-                          <button
-                            className="btn btn-sm btn-outline-primary me-2"
-                            onClick={() => handleShowOccurredModal(occurred)}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => {
-                              setOccurredToDelete(occurred);
-                              setShowDeleteOccurredModal(true);
-                            }}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))
