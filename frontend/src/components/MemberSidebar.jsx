@@ -88,13 +88,13 @@ export default function MemberSidebar({
       label: "Chi tiết sự kiện",
       path: `/member-event-detail/${eventId || ""}`,
     },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` },
   ];
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
     { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/timelines` },
     // Không có work-stats (thống kê tiến độ)
   ];
 

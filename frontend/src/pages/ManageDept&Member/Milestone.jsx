@@ -597,7 +597,12 @@ const Milestone = () => {
                 <div style={styles.detailsActions}>
                   <button
                     style={styles.btnSecondary}
-                    onClick={() => handleEditMilestone(selectedMilestone.id)}
+                    onClick={() =>
+                      navigate(
+                        `/events/${eventId}/milestone-detail/${selectedMilestone.id}/agenda`,
+                        { state: { milestoneName: selectedMilestone?.name } }
+                      )
+                    }
                     onMouseEnter={(e) => {
                       e.target.style.background = "#e5e7eb"
                     }}

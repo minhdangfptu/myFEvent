@@ -408,12 +408,12 @@
   border: 1px solid #e2e8f0;
 }
 
-/* Enhanced Tooltips */
-[title] {
+/* Enhanced Tooltips (scoped) */
+.rs-root [title] {
   position: relative;
 }
 
-[title]:hover::after {
+.rs-root [title]:hover::after {
   content: attr(title);
   position: absolute;
   bottom: 100%;
@@ -434,7 +434,7 @@
   pointer-events: none;
 }
 
-[title]:hover::before {
+.rs-root [title]:hover::before {
   content: '';
   position: absolute;
   bottom: 100%;
@@ -563,7 +563,7 @@
     font-size: 0.7rem;
   }
   
-  [title]:hover::after {
+  .rs-root [title]:hover::after {
     max-width: 200px;
     font-size: 0.7rem;
   }
@@ -584,7 +584,8 @@
   font-weight: 600;
 }
 
-/* Smooth transitions for all interactive elements */
-* {
+/* Smooth transitions for all interactive elements (scoped) */
+.rs-root * {
   transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
+

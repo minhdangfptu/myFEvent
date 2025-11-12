@@ -66,6 +66,7 @@ import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
 import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
+import AgendaPage from "./pages/Agenda/AgendaPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -165,6 +166,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MilestoneDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/milestone-detail/:milestoneId/agenda" 
+            element={
+              <ProtectedRoute>
+                <AgendaPage />
               </ProtectedRoute>
             } 
           />
