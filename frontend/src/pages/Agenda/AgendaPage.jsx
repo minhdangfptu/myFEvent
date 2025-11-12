@@ -47,6 +47,12 @@ export default function AgendaPage({ milestoneName = "" }) {
   const [newDate, setNewDate] = useState("");
   const [showAddDateModal, setShowAddDateModal] = useState(false);
   const [newDateInput, setNewDateInput] = useState("");
+  
+  // Confirm modal states
+  const [showDeleteScheduleModal, setShowDeleteScheduleModal] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState(null);
+  const [showDeleteDateModal, setShowDeleteDateModal] = useState(false);
+  const [dateToDelete, setDateToDelete] = useState(null);
 
   // Context and params
   const { fetchEventRole } = useEvents();
@@ -83,6 +89,11 @@ export default function AgendaPage({ milestoneName = "" }) {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const diffMs = end - start;
+
+    if (Number.isNaN(diffMs) || diffMs <= 0) {
+      return "0 phút";
+    }
+
     const diffMins = Math.round(diffMs / (1000 * 60));
 
     if (diffMins >= 60) {
@@ -91,6 +102,58 @@ export default function AgendaPage({ milestoneName = "" }) {
       return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
     return `${diffMins} phút`;
+  };
+
+  const buildUpdatedSchedule = (schedule, updates) => {
+    const finalStart = updates.startTime || schedule.startTime;
+    const finalEnd = updates.endTime || schedule.endTime;
+    const finalContent = updates.content ?? schedule.content;
+    const session = getSessionFromHour(new Date(finalStart).getHours());
+    return {
+      ...schedule,
+      ...updates,
+      content: finalContent,
+      startTime: finalStart,
+      endTime: finalEnd,
+      duration: calculateDuration(finalStart, finalEnd),
+      session,
+      originalStartTime: finalStart,
+      originalContent: finalContent
+    };
+  };
+
+  const applyScheduleUpdateLocally = (scheduleId, dateId, itemIndex, updates) => {
+    setSchedules((prev) =>
+      prev.map((schedule) =>
+        schedule.id === scheduleId
+          ? buildUpdatedSchedule(schedule, updates)
+          : schedule
+      )
+    );
+
+    setAgendaData((prev) => {
+      if (!prev || !Array.isArray(prev.agenda)) return prev;
+      return {
+        ...prev,
+        agenda: prev.agenda.map((dateAgenda) => {
+          const currentDateId = (dateAgenda._id || dateAgenda.id || "").toString();
+          if (currentDateId !== dateId) return dateAgenda;
+
+          const updatedItems = (dateAgenda.items || []).map((item, idx) => {
+            if (idx !== itemIndex) return item;
+            return {
+              ...item,
+              ...updates
+            };
+          });
+
+          return {
+            ...dateAgenda,
+            items: updatedItems
+          };
+        })
+      };
+    });
   };
 
   // Transform agenda data to UI format
@@ -158,7 +221,7 @@ export default function AgendaPage({ milestoneName = "" }) {
         new Date(schedule.rawDate).toDateString() === 
         new Date(selectedDate.rawDate).toDateString()
       )
-      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+      .sort((a, b) => a.itemIndex - b.itemIndex);
   };
   // API calls
   const fetchAgendaData = async () => {
@@ -206,158 +269,189 @@ export default function AgendaPage({ milestoneName = "" }) {
     }
   };
 
-  // CRUD Operations
-  const handleDeleteSchedule = async (scheduleId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch trình này?")) {
-      return;
+  // Validation functions
+  const validateTime = (startTime, endTime) => {
+    if (!startTime || !endTime) {
+      return { valid: false, message: "Vui lòng nhập đầy đủ thời gian bắt đầu và kết thúc" };
     }
 
+    const start = new Date(`2000-01-01T${startTime}:00`);
+    const end = new Date(`2000-01-01T${endTime}:00`);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return { valid: false, message: "Định dạng thời gian không hợp lệ" };
+    }
+
+    if (start >= end) {
+      return { valid: false, message: "Thời gian kết thúc phải sau thời gian bắt đầu" };
+    }
+
+    return { valid: true };
+  };
+
+  const validateDate = (dateString) => {
+    if (!dateString || !dateString.trim()) {
+      return { valid: false, message: "Vui lòng chọn ngày" };
+    }
+
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return { valid: false, message: "Định dạng ngày không hợp lệ" };
+    }
+
+    return { valid: true };
+  };
+
+  const combineDateAndTimeToISO = (dateISO, timeString) => {
+    if (!dateISO || !timeString) return null;
+    const dateTime = new Date(`${dateISO}T${timeString}:00`);
+    if (isNaN(dateTime.getTime())) return null;
+    return dateTime.toISOString();
+  };
+
+  const getLocalDateKey = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const debugLog = (...args) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[AgendaPage]", ...args);
+    }
+  };
+
+  // CRUD Operations
+  const handleDeleteScheduleClick = (scheduleId) => {
+    const schedule = schedules.find((s) => s.id === scheduleId);
+    if (schedule) {
+      setScheduleToDelete(schedule);
+      setShowDeleteScheduleModal(true);
+    }
+  };
+
+  const handleDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+
     try {
-      const schedule = schedules.find((s) => s.id === scheduleId);
-
-      if (!schedule) {
-        console.error("❌ Schedule not found for id:", scheduleId);
-        return;
-      }
-
       // Use index-based API for deleting items (since items don't have _id)
       await removeDayItem(
         eventId,
         milestoneId,
-        schedule.dateIndex,
-        schedule.itemIndex
+        scheduleToDelete.dateIndex,
+        scheduleToDelete.itemIndex
       );
 
       await fetchAgendaData(); // Refresh data
       toast.success("Xóa lịch trình thành công!");
+      setShowDeleteScheduleModal(false);
+      setScheduleToDelete(null);
     } catch (err) {
       setError(err.message || "Failed to delete schedule");
       console.error("❌ Error deleting schedule:", err);
       toast.error(err.message || "Lỗi khi xóa lịch trình");
+      setShowDeleteScheduleModal(false);
+      setScheduleToDelete(null);
     }
   };
 
   const handleAddSchedule = async () => {
-    if (
-      !newSchedule.startTime ||
-      !newSchedule.endTime ||
-      !newSchedule.content
-    ) {
-      alert("Vui lòng điền đầy đủ thông tin");
+    // Validate content
+    if (!newSchedule.content || !newSchedule.content.trim()) {
+      toast.error("Vui lòng nhập nội dung lịch trình");
       return;
     }
   
     if (!selectedDateId) {
-      alert("Vui lòng chọn ngày để thêm lịch trình");
+      toast.error("Vui lòng chọn ngày để thêm lịch trình");
+      return;
+    }
+
+    // Validate time
+    const timeValidation = validateTime(newSchedule.startTime, newSchedule.endTime);
+    if (!timeValidation.valid) {
+      toast.error(timeValidation.message);
       return;
     }
   
     try {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
-  
+ 
       if (!selectedDate || !selectedDate.dateId) {
-        alert("Không tìm thấy dateId cho ngày được chọn");
+        debugLog("Add schedule aborted: selected date missing", { selectedDateId, selectedDate });
+        toast.error("Không tìm thấy dateId cho ngày được chọn");
         return;
       }
   
-      // 👈 FIX: Use proper date construction
+      // Use proper date construction
       const selectedRawDate = selectedDate.rawDate;
-      const dateOnly = selectedRawDate.split('T')[0]; // Get YYYY-MM-DD part
-      
-      // Create proper ISO strings
-      const startTimeISO = `${dateOnly}T${newSchedule.startTime}:00.000Z`;
-      const endTimeISO = `${dateOnly}T${newSchedule.endTime}:00.000Z`;
-  
-      // Validate dates before proceeding
+      debugLog("Adding schedule", { selectedDate, selectedRawDate, newSchedule });
+      const dateOnly = selectedRawDate.split("T")[0]; // Get YYYY-MM-DD part
+
+      const startTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.startTime);
+      const endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
+
+      if (!startTimeISO || !endTimeISO) {
+        toast.error("Định dạng thời gian không hợp lệ");
+        return;
+      }
+
       const startTime = new Date(startTimeISO);
       const endTime = new Date(endTimeISO);
-      
-      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-        throw new Error('Invalid time format. Please check your time inputs.');
-      }
-  
-      if (startTime >= endTime) {
-        alert('Thời gian kết thúc phải sau thời gian bắt đầu');
+
+      if (endTime - startTime <= 0) {
+        toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
         return;
       }
-  
+
       const itemData = {
         startTime: startTimeISO,
         endTime: endTimeISO,
         duration: endTime - startTime, // milliseconds
-        content: newSchedule.content,
+        content: newSchedule.content.trim(),
       };
   
       // Use ID-based API for adding items to existing dates
-      await addItemToDateById(
+      const response = await addItemToDateById(
         eventId,
         milestoneId,
         selectedDate.dateId,
         itemData
       );
+      debugLog("Add schedule API response", response);
       setNewSchedule({ startTime: "", endTime: "", content: "" });
       await fetchAgendaData(); // Refresh data
+      toast.success("Thêm lịch trình thành công!");
     } catch (err) {
       setError(err.message || "Failed to add schedule");
       console.error("❌ Error adding schedule:", err);
-      alert(`Lỗi thêm lịch trình: ${err.message}`);
-    }
-  };
-
-  const findScheduleByContent = (scheduleId, editingContent) => {
-    // First try to find by ID
-    let schedule = schedules.find((s) => s.id === scheduleId);
-    
-    if (!schedule) {
-      console.warn("⚠️ Schedule not found by ID, trying by content match");
-      // Fallback: find by original content (before edit)
-      schedule = schedules.find((s) => s.originalContent === editingContent);
-    }
-    
-    return schedule;
-  };
-
-  const handleUpdateSchedule = async (scheduleId, updates) => {
-    try {
-      
-      // Find the schedule using enhanced logic
-      const schedule = findScheduleByContent(scheduleId, editingSchedule?.originalContent);
-      
-      if (!schedule) {
-        console.error("❌ Schedule not found for:", { scheduleId, editingSchedule });
-        throw new Error(`Schedule not found: ${scheduleId}`);
-      }
-      
-  
-      // Calculate duration if time is updated
-      const finalUpdates = { ...updates };
-      if (updates.startTime && updates.endTime) {
-        finalUpdates.duration = new Date(updates.endTime) - new Date(updates.startTime);
-      }
-      
-      // Use ORIGINAL position indices for API call
-      await updateDayItem(
-        eventId,
-        milestoneId,
-        schedule.dateIndex,
-        schedule.itemIndex,
-        finalUpdates
-      );
-  
-      setEditingSchedule(null);
-      await fetchAgendaData();
-  
-    } catch (err) {
-      setError(err.message || "Failed to update schedule");
-      console.error("❌ Error updating schedule:", err);
-      alert(`Lỗi cập nhật lịch trình: ${err.message}`);
+      debugLog("Error when adding schedule", { err, newSchedule, selectedDateId });
+      toast.error(err.message || "Lỗi khi thêm lịch trình");
     }
   };
 
   const handleAddDate = async (dateVal) => {
     const dateToAdd = dateVal || newDate;
-    if (!dateToAdd || !dateToAdd.trim()) {
-      toast.error("Vui lòng chọn ngày");
+    
+    // Validate date
+    const dateValidation = validateDate(dateToAdd);
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
+    const newDateKey = getLocalDateKey(dateToAdd);
+    debugLog("Attempting to add date", { dateToAdd, newDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
+    const isDuplicateDate = dates.some(
+      (d) => getLocalDateKey(d.rawDate) === newDateKey
+    );
+
+    if (isDuplicateDate) {
+      debugLog("Duplicate date detected", { dateToAdd, newDateKey });
+      toast.error("Ngày này đã tồn tại trong agenda");
       return;
     }
 
@@ -369,7 +463,8 @@ export default function AgendaPage({ milestoneName = "" }) {
       }
 
       // Add date to agenda using new API
-      await addDateToAgenda(eventId, milestoneId, dateToAdd);
+      const response = await addDateToAgenda(eventId, milestoneId, dateToAdd);
+      debugLog("Add date API response", response);
 
       setNewDate("");
       setNewDateInput("");
@@ -378,40 +473,45 @@ export default function AgendaPage({ milestoneName = "" }) {
     } catch (err) {
       setError(err.message || "Failed to add new date");
       console.error("❌ Error adding date:", err);
+      debugLog("Error when adding date", err);
       toast.error(err.message || "Lỗi khi thêm ngày");
     }
   };
 
-  const handleDeleteDate = async (dateId) => {
-    if (
-      !window.confirm(
-        "Bạn có chắc chắn muốn xóa ngày này và tất cả lịch trình?"
-      )
-    ) {
-      return;
+  const handleDeleteDateClick = (dateId) => {
+    const dateToDelete = dates.find((d) => d.id === dateId);
+    if (dateToDelete) {
+      setDateToDelete(dateToDelete);
+      setShowDeleteDateModal(true);
     }
+  };
+
+  const handleDeleteDate = async () => {
+    if (!dateToDelete) return;
 
     try {
-      const dateToDelete = dates.find((d) => d.id === dateId);
-
-      if (dateToDelete && dateToDelete.dateId) {
+      if (dateToDelete.dateId) {
         // Use ID-based API for deleting dates
         await removeDateById(eventId, milestoneId, dateToDelete.dateId);
         await fetchAgendaData(); // Refresh data
         toast.success("Xóa ngày thành công!");
 
         // Reset selected date if deleted
-        if (selectedDateId === dateId) {
-          const remainingDates = dates.filter((d) => d.id !== dateId);
+        if (selectedDateId === dateToDelete.id) {
+          const remainingDates = dates.filter((d) => d.id !== dateToDelete.id);
           setSelectedDateId(
             remainingDates.length > 0 ? remainingDates[0].id : null
           );
         }
       }
+      setShowDeleteDateModal(false);
+      setDateToDelete(null);
     } catch (err) {
       setError(err.message || "Failed to delete date");
       console.error("❌ Error deleting date:", err);
       toast.error(err.message || "Lỗi khi xóa ngày");
+      setShowDeleteDateModal(false);
+      setDateToDelete(null);
     }
   };
 
@@ -426,21 +526,41 @@ export default function AgendaPage({ milestoneName = "" }) {
   const handleSaveDateEdit = async () => {
     if (!editingDate) return;
 
+    // Validate date
+    const dateValidation = validateDate(editingDate.date);
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
+    const editedDateKey = getLocalDateKey(editingDate.date);
+    debugLog("Attempting to edit date", { editingDate, editedDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
+    const hasDuplicate = dates.some(
+      (d) =>
+        d.dateId !== editingDate.id &&
+        getLocalDateKey(d.rawDate) === editedDateKey
+    );
+
+    if (hasDuplicate) {
+      debugLog("Duplicate date detected on edit", { editingDate, editedDateKey });
+      toast.error("Ngày này đã tồn tại trong agenda");
+      return;
+    }
+
     try {
       const updates = {
         date: new Date(editingDate.date).toISOString(),
       };
 
-      await updateDateById(eventId, milestoneId, editingDate.id, updates);
+      const response = await updateDateById(eventId, milestoneId, editingDate.id, updates);
+      debugLog("Update date API response", response);
       setEditingDate(null);
       await fetchAgendaData();
-      if (selectedDateId === editingDate.originalId) {
-        setSelectedDateId(updates.date);
-      }
       toast.success("Cập nhật ngày thành công!");
     } catch (err) {
       setError(err.message || "Failed to update date");
       console.error("❌ Error updating date:", err);
+      debugLog("Error when updating date", err);
       toast.error(err.message || "Lỗi khi cập nhật ngày");
     }
   };
@@ -475,6 +595,9 @@ export default function AgendaPage({ milestoneName = "" }) {
       originalContent: schedule.content, // 👈 ADD: Store original for finding
       startTime: formatTimeToHHMM(schedule.startTime),
       endTime: formatTimeToHHMM(schedule.endTime),
+      dateId: schedule.dateId,
+      dateIndex: schedule.dateIndex,
+      itemIndex: schedule.itemIndex,
       // 👈 ADD: Store indices for debugging
       debugInfo: {
         dateIndex: schedule.dateIndex,
@@ -487,47 +610,102 @@ export default function AgendaPage({ milestoneName = "" }) {
 
   const handleSaveEdit = async () => {
     if (!editingSchedule) return;
+
+    // Validate content
+    if (!editingSchedule.content || !editingSchedule.content.trim()) {
+      toast.error("Vui lòng nhập nội dung lịch trình");
+      return;
+    }
   
     try {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
       if (!selectedDate) {
-        throw new Error('Selected date not found');
+        debugLog("Save edit aborted: selected date missing", { selectedDateId });
+        toast.error("Không tìm thấy ngày được chọn");
+        return;
       }
-  
-      // 👈 FIX: Use proper date construction
-      const selectedRawDate = selectedDate.rawDate;
-      const dateOnly = selectedRawDate.split('T')[0]; // Get YYYY-MM-DD part
-      
-      // Create proper ISO strings
-      const startTimeISO = `${dateOnly}T${editingSchedule.startTime}:00.000Z`;
-      const endTimeISO = `${dateOnly}T${editingSchedule.endTime}:00.000Z`;
 
-  
-      // Validate dates before proceeding
-      const startTime = new Date(startTimeISO);
-      const endTime = new Date(endTimeISO);
-      
-      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-        throw new Error('Invalid time format. Please check your time inputs.');
+      const freshScheduleMeta = schedules.find((s) => s.id === editingSchedule.id);
+      if (!freshScheduleMeta) {
+        debugLog("Save edit aborted: schedule meta not found", { editingScheduleId: editingSchedule.id });
+        toast.error("Không tìm thấy lịch trình cần cập nhật");
+        return;
       }
-  
-      if (startTime >= endTime) {
-        alert('Thời gian kết thúc phải sau thời gian bắt đầu');
+ 
+      // Validate time
+      const timeValidation = validateTime(editingSchedule.startTime, editingSchedule.endTime);
+      if (!timeValidation.valid) {
+        toast.error(timeValidation.message);
         return;
       }
   
+      // Use proper date construction
+      const selectedRawDate = selectedDate.rawDate;
+      const dateOnly = selectedRawDate.split("T")[0]; // Get YYYY-MM-DD part
+
+      const startTimeISO = combineDateAndTimeToISO(dateOnly, editingSchedule.startTime);
+      const endTimeISO = combineDateAndTimeToISO(dateOnly, editingSchedule.endTime);
+
+      if (!startTimeISO || !endTimeISO) {
+        debugLog("Invalid time detected on save", { dateOnly, editingSchedule });
+        toast.error("Định dạng thời gian không hợp lệ");
+        return;
+      }
+
+      const startTime = new Date(startTimeISO);
+      const endTime = new Date(endTimeISO);
+
+      if (endTime - startTime <= 0) {
+        toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
+        return;
+      }
+ 
       const updates = {
-        content: editingSchedule.content,
+        content: editingSchedule.content.trim(),
         startTime: startTimeISO,
         endTime: endTimeISO,
         duration: endTime - startTime
       };
   
-      await handleUpdateSchedule(editingSchedule.id, updates);
+      debugLog("Updating schedule", {
+        dateIndex: freshScheduleMeta.dateIndex,
+        itemIndex: freshScheduleMeta.itemIndex,
+        updates,
+        editingSchedule
+      });
+
+      const response = await updateDayItem(
+        eventId,
+        milestoneId,
+        freshScheduleMeta.dateIndex,
+        freshScheduleMeta.itemIndex,
+        updates
+      );
+
+      debugLog("Update schedule API response", {
+        response,
+        usedDateIndex: freshScheduleMeta.dateIndex,
+        usedItemIndex: freshScheduleMeta.itemIndex,
+        scheduleId: editingSchedule.id
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Cập nhật lịch trình thất bại");
+      }
+ 
+      setEditingSchedule(null);
+      applyScheduleUpdateLocally(
+        editingSchedule.id,
+        freshScheduleMeta.dateId,
+        freshScheduleMeta.itemIndex,
+        updates
+      );
+      toast.success("Cập nhật lịch trình thành công!");
     } catch (err) {
       setError(err.message || "Failed to save edit");
       console.error("❌ Error saving edit:", err);
-      alert(`Lỗi cập nhật: ${err.message}`);
+      debugLog("Error saving edit", { err, editingSchedule });
+      toast.error(err.message || "Lỗi khi cập nhật");
     }
   };
 
@@ -683,7 +861,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                             className="agenda-page__date-button-icon ms-1 bi bi-trash"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteDate(dateItem.id);
+                              handleDeleteDateClick(dateItem.id);
                             }}
                           ></i>
                         </>
@@ -854,7 +1032,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                                 <button
                                   className="agenda-page__action-button agenda-page__action-button--delete"
                                   onClick={() =>
-                                    handleDeleteSchedule(schedule.id)
+                                    handleDeleteScheduleClick(schedule.id)
                                   }
                                 >
                                   <i className="bi bi-trash"></i>
@@ -972,6 +1150,27 @@ export default function AgendaPage({ milestoneName = "" }) {
             </p>
           </div>
         )}
+
+        {/* Confirm Modals */}
+        <ConfirmModal
+          show={showDeleteScheduleModal}
+          onClose={() => {
+            setShowDeleteScheduleModal(false);
+            setScheduleToDelete(null);
+          }}
+          onConfirm={handleDeleteSchedule}
+          message="Bạn có chắc chắn muốn xóa lịch trình này?"
+        />
+
+        <ConfirmModal
+          show={showDeleteDateModal}
+          onClose={() => {
+            setShowDeleteDateModal(false);
+            setDateToDelete(null);
+          }}
+          onConfirm={handleDeleteDate}
+          message="Bạn có chắc chắn muốn xóa ngày này và tất cả lịch trình?"
+        />
       </div>
     </UserLayout>
   );

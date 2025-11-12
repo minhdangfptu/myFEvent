@@ -21,10 +21,6 @@ export default function HoDSideBar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // local event list for sidebar (so we can reorder / map safely)
-  const [myEvents, setMyEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [currentEventMembership, setCurrentEventMembership] = useState(null);
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
