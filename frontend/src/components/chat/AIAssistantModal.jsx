@@ -64,6 +64,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
           estimated_hours: estimateHours(t?.priority),
           complexity: t?.complexity || '',
           priority: t?.priority || '',
+          suggested_team_size: t?.suggested_team_size || t?.suggestedTeamSize || '',
         });
       });
     });
@@ -72,7 +73,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
 
   const exportCSV = () => {
     if (!tasksTable || tasksTable.length === 0) return;
-    const headers = ['task_id','name','start-date','deadline','duration_days','depends_on','estimated_hours','complexity','priority'];
+    const headers = ['task_id','name','start-date','deadline','duration_days','depends_on','estimated_hours','complexity','priority','suggested_team_size'];
     const esc = (v) => {
       const s = v == null ? '' : String(v);
       if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -258,6 +259,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
                       <th>estimated_hours</th>
                       <th>complexity</th>
                       <th>priority</th>
+                      <th>suggested_team_size</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -272,6 +274,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
                         <td>{r.estimated_hours}</td>
                         <td>{r.complexity}</td>
                         <td>{r.priority}</td>
+                        <td>{r.suggested_team_size}</td>
                       </tr>
                     ))}
                   </tbody>

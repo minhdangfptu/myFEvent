@@ -6,9 +6,11 @@ const NotificationsContext = createContext(null)
 export function NotificationsProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [enabled, setEnabled] = useState(false) // only fetch when authenticated
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
+    if (!enabled) return
     try {
       setLoading(true)
       const response = await notificationApi.getNotifications()
@@ -34,11 +36,37 @@ export function NotificationsProvider({ children }) {
   }
 
   useEffect(() => {
-    fetchNotifications()
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    // Enable fetching only if token exists
+    const hasToken = !!localStorage.getItem('access_token')
+    setEnabled(hasToken)
+
+    if (hasToken) {
+      fetchNotifications()
+    }
+
+    // Listen auth events
+    const onLogin = () => {
+      setEnabled(true)
+      fetchNotifications()
+    }
+    const onLogout = () => {
+      setEnabled(false)
+      setNotifications([])
+    }
+    window.addEventListener('auth:login', onLogin)
+    window.addEventListener('auth:logout', onLogout)
+
+    // Poll for new notifications every 30 seconds when enabled
+    const interval = setInterval(() => {
+      if (enabled) fetchNotifications()
+    }, 30000)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('auth:login', onLogin)
+      window.removeEventListener('auth:logout', onLogout)
+    }
+  }, [enabled])
 
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
 

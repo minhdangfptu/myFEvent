@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { userApi } from '../../apis/userApi';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function MemberLandingPage() {
   const { user, loading: authLoading } = useAuth();
@@ -21,6 +22,7 @@ export default function MemberLandingPage() {
   const [joinError, setJoinError] = useState('');
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState({ show: false, message: "", onConfirm: null });
 
   // --- THÊM ĐỂ NHẬN ROLE EVENT VỚI eventId ---
   const [eventRole, setEventRole] = useState('');
@@ -365,9 +367,15 @@ export default function MemberLandingPage() {
                     const res = await eventApi.create({ name: createForm.name, description: createForm.description, organizerName: createForm.organizerName, type: 'private' });
                     setShowCreateModal(false);
                     setCreateForm({ name: '', description: '', organizerName: '' });
-                    alert(`Mã tham gia: ${res.data.joinCode}`);
-                    // Redirect to event detail page
-                    navigate(`/events/${res.data.id}/hooc-event-detail`);
+                    setModal({
+                      show: true,
+                      message: `Mã tham gia: ${res.data.joinCode}`,
+                      onConfirm: () => {
+                        setModal({ show: false, message: "", onConfirm: null });
+                        // Redirect to event detail page
+                        navigate(`/events/${res.data.id}/hooc-event-detail`);
+                      }
+                    });
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -460,6 +468,14 @@ export default function MemberLandingPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        show={modal.show}
+        message={modal.message}
+        onClose={() => setModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (modal.onConfirm) modal.onConfirm();
+        }}
+      />
     </UserLayout>
   );
 }

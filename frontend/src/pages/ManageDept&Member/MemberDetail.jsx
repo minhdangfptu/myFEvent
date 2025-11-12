@@ -7,6 +7,7 @@ import { useEvents } from '../../contexts/EventContext';
 import { toast } from 'react-toastify';
 import { eventService } from '~/services/eventService';
 import { formatDate } from '~/utils/formatDate';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function MemberProfilePage() {
   const { eventId, memberId } = useParams();
@@ -108,19 +109,23 @@ export default function MemberProfilePage() {
   };
 
   // Handle remove member
+  const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
   const handleRemoveMember = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${member.name || member.fullName} khỏi sự kiện?`)) {
-      return;
-    }
-
-    try {
-      await eventApi.removeMemberFromEvent(eventId, member._id || member.id);
-      toast.success('Đã xóa thành viên khỏi sự kiện');
-      navigate(`/events/${eventId}/members`);
-    } catch (error) {
-      console.error('Error removing member:', error);
-      toast.error('Không thể xóa thành viên');
-    }
+    setConfirmModal({
+      show: true,
+      message: `Bạn có chắc chắn muốn xóa ${member?.name || member?.fullName || 'thành viên'} khỏi sự kiện?`,
+      onConfirm: async () => {
+        setConfirmModal({ show: false, message: "", onConfirm: null });
+        try {
+          await eventApi.removeMemberFromEvent(eventId, member._id || member.id);
+          toast.success('Đã xóa thành viên khỏi sự kiện');
+          navigate(`/events/${eventId}/members`);
+        } catch (error) {
+          console.error('Error removing member:', error);
+          toast.error('Không thể xóa thành viên');
+        }
+      }
+    });
   };
 
   if (loading) {
@@ -184,6 +189,14 @@ export default function MemberProfilePage() {
       sidebarType={getSidebarType()} 
       activePage="members"
     >
+      <ConfirmModal
+        show={confirmModal.show}
+        message={confirmModal.message}
+        onClose={() => setConfirmModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) confirmModal.onConfirm();
+        }}
+      />
       <style>{`
         .profile-header {
           background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);

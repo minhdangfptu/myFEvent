@@ -37,10 +37,15 @@ axiosClient.interceptors.response.use(
           { headers: { 'Content-Type': 'application/json' } }
         );
 
-        const newAccessToken = response?.data?.accessToken || response?.data?.access_token;
+        const data = response?.data ?? {};
+        const newAccessToken = data.accessToken || data.access_token;
+        const newRefreshToken = data.refreshToken || data.refresh_token;
         if (!newAccessToken) throw new Error('No access token in refresh response');
 
         localStorage.setItem('access_token', newAccessToken);
+        if (newRefreshToken) {
+          localStorage.setItem('refresh_token', newRefreshToken);
+        }
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosClient(originalRequest);
       } catch (refreshError) {

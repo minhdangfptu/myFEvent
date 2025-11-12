@@ -726,11 +726,11 @@ export default function HoOCEventDetail() {
                       <button
                         className="btn btn-sm btn-danger"
                         onClick={() => {
-                          if (
-                            window.confirm("Bạn có chắc chắn muốn xóa ảnh này?")
-                          ) {
-                            removeExistingImage(0);
-                          }
+                          setConfirmModal({
+                            show: true,
+                            message: "Bạn có chắc chắn muốn xóa ảnh này?",
+                            action: () => removeExistingImage(0),
+                          });
                         }}
                         disabled={submitting}
                         title="Xóa ảnh"
@@ -1181,11 +1181,11 @@ export default function HoOCEventDetail() {
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => {
-                            if (
-                              window.confirm("Bạn có chắc chắn muốn xóa ảnh này?")
-                            ) {
-                              removeExistingImage(0);
-                            }
+                            setConfirmModal({
+                              show: true,
+                              message: "Bạn có chắc chắn muốn xóa ảnh này?",
+                              action: () => removeExistingImage(0),
+                            });
                           }}
                           disabled={submitting}
                           title="Xóa ảnh"

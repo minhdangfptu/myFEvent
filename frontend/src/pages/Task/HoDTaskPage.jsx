@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
-import { useEvents } from "~/contexts/EventContext";
 import { useNavigate, useParams } from "react-router-dom";
 import NoDataImg from "~/assets/no-data.png";
 import { taskApi } from "~/apis/taskApi";
@@ -14,93 +13,62 @@ import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
 import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
-import { useNotifications } from "~/contexts/NotificationsContext";
-import AIChatAssistant from "~/components/AIChatAssistant";
-import WBSPreviewModal from "~/components/WBSPreviewModal";
-import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
-import { aiApi } from "~/apis/aiApi";
-import ConfirmModal from "../../components/ConfirmModal";
 
-export default function EventTaskPage() {
+export default function HoDTaskPage() {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const { eventId } = useParams();
   const [sortBy, setSortBy] = useState("Tên");
-  const [filterPriority, setFilterPriority] = useState("Tất cả");
   const [filterStatus, setFilterStatus] = useState("Tất cả");
-  const [filterDepartment, setFilterDepartment] = useState("Tất cả");
-  const [filterAssignee, setFilterAssignee] = useState("Tất cả");
-  const [showAIChat, setShowAIChat] = useState(false);
-  const [wbsData, setWbsData] = useState(null);
-  const [showWBSModal, setShowWBSModal] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTask, setNewTask] = useState({
-    name: "",
-    owner: "",
-    due: "",
-    status: "Đang làm",
-    description: "",
-  });
   const navigate = useNavigate();
 
   const [eventRole, setEventRole] = useState("");
-  const [hoDDepartmentId, setHoDDepartmentId] = useState(null);
-
-  const { fetchEventRole } = useEvents();
+  const [departmentId, setDepartmentId] = useState(null);
+  const [department, setDepartment] = useState(null);
   const { user } = useAuth();
 
+  // Load event role and departmentId
   useEffect(() => {
-    fetchEventRole(eventId).then((role) => {
-      setEventRole(role);
-    });
-    
-    // Also get full role info to get departmentId for HoD
-    if (eventId) {
-      userApi
-        .getUserRoleByEvent(eventId)
-        .then((roleResponse) => {
-          const role = roleResponse?.role || "";
-          setEventRole(role);
-          
-          if (role === "HoD" && roleResponse?.departmentId) {
-            const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
-            setHoDDepartmentId(deptId);
+    if (!eventId) return;
+    userApi
+      .getUserRoleByEvent(eventId)
+      .then((roleResponse) => {
+        const role = roleResponse?.role || "";
+        setEventRole(role);
+        
+        // Get departmentId from response if HoD
+        if (role === "HoD" && roleResponse?.departmentId) {
+          const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
+          if (deptId) {
+            setDepartmentId(deptId);
           }
-        })
-        .catch(() => {
-          // Fallback to fetchEventRole result
-        });
-    }
+        }
+      })
+      .catch(() => {
+        setEventRole("");
+        setDepartmentId(null);
+      });
   }, [eventId]);
-
-  const getSidebarType = () => {
-    if (eventRole === "HoOC") return "hooc";
-    if (eventRole === "HoD") return "HoD";
-    if (eventRole === "Member") return "member";
-    return "user";
-  };
 
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-  const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState("list");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [eventInfo, setEventInfo] = useState(null);
-  const [membersForAssignment, setMembersForAssignment] = useState([]);
-  const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
+
+  // Load department info
+  useEffect(() => {
+    if (!eventId || !departmentId) return;
+    departmentService
+      .getDepartmentDetail(eventId, departmentId)
+      .then((dept) => setDepartment(dept || null))
+      .catch(() => setDepartment(null));
+  }, [eventId, departmentId]);
 
   useEffect(() => {
     if (!eventId) return;
-    departmentService
-      .getDepartments(eventId)
-      .then((depts) => setDepartments(depts || []))
-      .catch(() => setDepartments([]));
     
     // Lấy thông tin sự kiện để validate deadline
     eventApi.getById(eventId)
@@ -114,34 +82,24 @@ export default function EventTaskPage() {
         }
       })
       .catch(() => {
-        // Nếu không lấy được thông tin event, vẫn cho phép tạo task
         setEventInfo(null);
       });
   }, [eventId]);
 
-  // Load members for assignment board when HoD role is detected
-  useEffect(() => {
-    if (!eventId || eventRole !== "HoD" || !hoDDepartmentId) {
-      setMembersForAssignment([]);
-      return;
-    }
-    
-    departmentService
-      .getMembersByDepartment(eventId, hoDDepartmentId)
-      .then((members) => setMembersForAssignment(members || []))
-      .catch(() => setMembersForAssignment([]));
-  }, [eventId, eventRole, hoDDepartmentId]);
-
   const fetchTasks = useCallback(() => {
-    if (!eventId) return;
+    if (!eventId || !departmentId) return;
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         
-        const mapped = arr.map((task) => {
+        // Filter tasks by departmentId - chỉ hiển thị tasks của ban mình
+        const deptTasks = arr.filter(task => {
+          const taskDeptId = task.departmentId?._id || task.departmentId || task.department?._id || task.department;
+          return String(taskDeptId) === String(departmentId);
+        });
+        
+        const mapped = deptTasks.map((task) => {
           return {
             id: task?._id,
             name: task?.title || "",
@@ -161,8 +119,6 @@ export default function EventTaskPage() {
                 ? "Chưa bắt đầu"
                 : task?.status === "cancelled"
                 ? "Đã huỷ"
-                : task?.status === "suggested"
-                ? "Gợi ý"
                 : "Đang làm",
             estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
             createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
@@ -173,75 +129,11 @@ export default function EventTaskPage() {
         setTasks(mapped);
       })
       .catch((err) => setTasks([]));
-  }, [eventId]);
+  }, [eventId, departmentId]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
-
-  // Clear selection when switching tabs or disabling selection mode
-  useEffect(() => {
-    if (!isSelectionMode) {
-      setSelectedTaskIds([]);
-    }
-  }, [activeTab, isSelectionMode]);
-
-  const filteredTasks = tasks
-    .filter((task) => task.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(
-      (task) =>
-        filterDepartment === "Tất cả" || task.department === filterDepartment
-    )
-    .filter(
-      (task) => filterAssignee === "Tất cả" || task.assignee === filterAssignee
-    )
-    .filter(
-      (task) => filterPriority === "Tất cả" || task.priority === filterPriority
-    )
-    .filter((task) => {
-      if (filterStatus === "Tất cả") return true;
-      if (filterStatus === "Gợi ý") return task.status === "suggested";
-      // Map Vietnamese status to backend status
-      const statusMap = {
-        "Đang làm": "in_progress",
-        "Hoàn thành": "done",
-        "Tạm hoãn": "blocked",
-      };
-      return task.status === statusMap[filterStatus] || task.status === filterStatus;
-    })
-    .sort((a, b) => {
-      const parse = (d) => {
-        const [day, month, year] = d.split("/");
-        return new Date(`${year}-${month}-${day}`);
-      };
-      if (sortBy === "DeadlineAsc") return parse(a.due) - parse(b.due);
-      if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
-      return 0;
-    });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, filterStatus, filterDepartment, filterAssignee, filterPriority, sortBy]);
-    
-  // Remove selected tasks that are no longer in filtered list
-  useEffect(() => {
-    const filteredIds = filteredTasks.map((t) => t.id);
-    setSelectedTaskIds((prev) => prev.filter((id) => filteredIds.includes(id)));
-  }, [filteredTasks]);
-
-  const handleToggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode);
-    if (isSelectionMode) {
-      setSelectedTaskIds([]);
-    }
-  };
 
   // Cập nhật thời gian mỗi giây
   useEffect(() => {
@@ -252,75 +144,55 @@ export default function EventTaskPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const priorityColor = (p) => {
-    if (p === "Cao")
-      return { bg: "#FEE2E2", color: "#DC2626", border: "#FCA5A5" };
-    if (p === "Thấp")
-      return { bg: "#DCFCE7", color: "#16A34A", border: "#86EFAC" };
-    return { bg: "#FEF3C7", color: "#D97706", border: "#FCD34D" };
-  };
-
   const statusColor = (s) => {
     if (s === "Hoàn thành") return { bg: "#DCFCE7", color: "#16A34A" };
     if (s === "Tạm hoãn") return { bg: "#FEE2E2", color: "#DC2626" };
     return { bg: "#FEF3C7", color: "#D97706" };
   };
 
+  const filteredTasks = tasks
+    .filter((task) => task.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((task) => filterStatus === "Tất cả" || task.status === filterStatus)
+    .sort((a, b) => {
+      const parse = (d) => {
+        const [day, month, year] = d.split("/");
+        return new Date(`${year}-${month}-${day}`);
+      };
+      if (sortBy === "DeadlineAsc") return parse(a.due) - parse(b.due);
+      if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
+      return 0;
+    });
+    
   const taskStats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "Hoàn thành").length,
     inProgress: tasks.filter((t) => t.status === "Đang làm").length,
     paused: tasks.filter((t) => t.status === "Tạm hoãn").length,
-    highPriority: tasks.filter((t) => t.priority === "Cao").length,
-  };
-
-  const handleAddTask = () => {
-    if (!newTask.name || !newTask.owner || !newTask.due) return;
-    const task = { id: Date.now(), ...newTask };
-    setTasks([...tasks, task]);
-    setNewTask({
-      name: "",
-      owner: "",
-      due: "",
-      status: "Đang làm",
-      priority: "Trung bình",
-      description: "",
-    });
-    setShowAddModal(false);
   };
 
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
-    // Map Vietnamese status to backend status
     const statusMapToBackend = (s) => {
       if (s === "Hoàn thành") return "done";
       if (s === "Đang làm") return "in_progress";
       if (s === "Tạm hoãn") return "blocked";
       if (s === "Đã huỷ") return "cancelled";
-      return "todo"; // "Chưa bắt đầu"
+      return "todo";
     };
 
     const backendStatus = statusMapToBackend(newStatus);
     
-    // Save current state for rollback
     const previousTasks = [...tasks];
     const previousSelectedTask = selectedTask;
     
-    // Get task info for notification
-    const task = tasks.find(t => t.id === taskId);
-    
-    // Optimistic update: update UI immediately
     const updatedTasks = tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t));
     setTasks(updatedTasks);
     setSelectedTask((st) =>
       st && st.id === taskId ? { ...st, status: newStatus } : st
     );
 
-    // Call API to update in database
     try {
       await taskApi.updateTaskProgress(eventId, taskId, backendStatus);
-      // Backend sẽ tự động tạo notification khi task hoàn thành
     } catch (error) {
-      // Rollback on error
       setTasks(previousTasks);
       setSelectedTask(previousSelectedTask);
       const errorMessage = error?.response?.data?.message || "Cập nhật trạng thái thất bại";
@@ -332,56 +204,6 @@ export default function EventTaskPage() {
   const handleDetail = (taskId) => {
     navigate(`/events/${eventId}/tasks/${taskId}`);
   };
-
-  const handleSelectTask = (taskId) => {
-    setSelectedTaskIds((prev) =>
-      prev.includes(taskId)
-        ? prev.filter((id) => id !== taskId)
-        : [...prev, taskId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedTaskIds.length === paginatedTasks.length) {
-      setSelectedTaskIds([]);
-    } else {
-      const allFilteredIds = filteredTasks.map((task) => task.id);
-      const currentPageIds = paginatedTasks.map((task) => task.id);
-      // Add all filtered tasks if all current page tasks are selected, otherwise select all filtered
-      if (currentPageIds.every(id => selectedTaskIds.includes(id))) {
-        setSelectedTaskIds(allFilteredIds);
-      } else {
-        setSelectedTaskIds([...new Set([...selectedTaskIds, ...currentPageIds])]);
-      }
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    if (selectedTaskIds.length === 0) return;
-    setConfirmModal({
-      show: true,
-      message: `Bạn có chắc chắn muốn xóa ${selectedTaskIds.length} công việc đã chọn?`,
-      onConfirm: async () => {
-        setConfirmModal({ show: false, message: "", onConfirm: null });
-        try {
-          const deletePromises = selectedTaskIds.map((taskId) =>
-            taskApi.deleteTask(eventId, taskId)
-          );
-          await Promise.all(deletePromises);
-          
-          setSelectedTaskIds([]);
-          fetchTasks();
-          toast.success(`Đã xóa ${selectedTaskIds.length} công việc thành công!`);
-        } catch (error) {
-          const errorMessage = error?.response?.data?.message || "Xóa công việc thất bại";
-          toast.error(errorMessage);
-          console.error("Error deleting tasks:", error);
-        }
-      }
-    });
-  };
-
-  const STT = 0;
 
   const [addTaskForm, setAddTaskForm] = useState({
     title: "",
@@ -401,45 +223,58 @@ export default function EventTaskPage() {
   const [parents, setParents] = useState([]);
   const [deps, setDeps] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
-  const [depFilterDepartment, setDepFilterDepartment] = useState("Tất cả");
   const [depSearch, setDepSearch] = useState("");
+
+  // Filter dependencies - chỉ hiển thị tasks của ban mình
   const filteredDeps = useMemo(() => {
     const text = (depSearch || "").toLowerCase();
     return (deps || []).filter((d) => {
-      const depName = d?.departmentId?.name || "";
-      const byDept = depFilterDepartment === "Tất cả" || depName === depFilterDepartment;
+      const taskDeptId = d.departmentId?._id || d.departmentId || d.department?._id || d.department;
+      const byDept = String(taskDeptId) === String(departmentId);
       const byText = (d?.title || "").toLowerCase().includes(text);
       return byDept && byText;
     });
-  }, [deps, depFilterDepartment, depSearch]);
+  }, [deps, departmentId, depSearch]);
 
-  const selectedDepartmentName = useMemo(() => (
-    departments.find((d) => d._id === addTaskForm.departmentId)?.name || ""
-  ), [departments, addTaskForm.departmentId]);
-
+  // Filter parents - chỉ hiển thị tasks của ban mình
   const filteredParents = useMemo(() => {
     const list = Array.isArray(parents) ? parents : [];
-    if (!addTaskForm.departmentId) return list;
-    return list.filter((p) => (p?.departmentId?.name || "") === selectedDepartmentName);
-  }, [parents, addTaskForm.departmentId, selectedDepartmentName]);
+    return list.filter((p) => {
+      const taskDeptId = p.departmentId?._id || p.departmentId || p.department?._id || p.department;
+      return String(taskDeptId) === String(departmentId);
+    });
+  }, [parents, departmentId]);
 
   useEffect(() => {
-    if (!eventId || !showAddModal) return;
+    if (!eventId || !showAddModal || !departmentId) return;
+    
+    // Set departmentId tự động khi mở modal
+    setAddTaskForm((prev) => ({ ...prev, departmentId: departmentId }));
+    
     milestoneApi
       .listMilestonesByEvent(eventId)
       .then((res) => setMilestones(res.data || []));
+    
     taskApi.getTaskByEvent(eventId).then((apiRes) => {
       const arr = apiRes?.data || [];
-      setParents(arr);
-      setDeps(arr);
+      // Filter tasks by departmentId
+      const deptTasks = arr.filter(task => {
+        const taskDeptId = task.departmentId?._id || task.departmentId || task.department?._id || task.department;
+        return String(taskDeptId) === String(departmentId);
+      });
+      setParents(deptTasks);
+      setDeps(deptTasks);
     });
-  }, [showAddModal, eventId]);
+  }, [showAddModal, eventId, departmentId]);
+
+  // Load members của ban mình
   useEffect(() => {
-    if (!addTaskForm.departmentId || !eventId) return setAssignees([]);
+    if (!departmentId || !eventId) return setAssignees([]);
     departmentService
-      .getMembersByDepartment(eventId, addTaskForm.departmentId)
-      .then((members) => setAssignees(members || []));
-  }, [addTaskForm.departmentId, eventId]);
+      .getMembersByDepartment(eventId, departmentId)
+      .then((members) => setAssignees(members || []))
+      .catch(() => setAssignees([]));
+  }, [departmentId, eventId]);
 
   const handleAddTaskInput = (field, value) => {
     setAddTaskForm((f) => ({ ...f, [field]: value }));
@@ -467,26 +302,24 @@ export default function EventTaskPage() {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
       departmentId: addTaskForm.departmentId,
-      assigneeId: orUndef(addTaskForm.assigneeId),      // chỉ gửi khi có
+      assigneeId: orUndef(addTaskForm.assigneeId),
       startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
       dueDate: toISO(addTaskForm.dueDate),
       estimate: toNum(addTaskForm.estimate),
       estimateUnit: addTaskForm.estimateUnit || "h",
-      milestoneId: orUndef(addTaskForm.milestoneId),    // bỏ "" khỏi payload
-      parentId: orUndef(addTaskForm.parentId),          // bỏ "" khỏi payload
-      dependencies: arrClean(addTaskForm.dependencies), // [] hoặc undefined
-      // status/progressPct để backend set default (vd: "todo", 0)
+      milestoneId: orUndef(addTaskForm.milestoneId),
+      parentId: orUndef(addTaskForm.parentId),
+      dependencies: arrClean(addTaskForm.dependencies),
     };
   
     try {
-      const response = await taskApi.createTask(eventId, payload);
-      const createdTask = response?.data || response;
+      await taskApi.createTask(eventId, payload);
 
       setShowAddModal(false);
       setAddTaskForm({
         title: "",
         description: "",
-        departmentId: "",
+        departmentId: departmentId, // Giữ departmentId của ban mình
         assigneeId: "",
         startDate: "",
         dueDate: "",
@@ -497,37 +330,10 @@ export default function EventTaskPage() {
         dependencies: [],
       });
 
-      taskApi.getTaskByEvent(eventId).then((apiRes) => {
-        const arr = apiRes?.data || [];
-        const mapped = arr.map((task) => ({
-          id: task._id,
-          name: task.title || "",
-          description: task.description || "",
-          department: task?.departmentId?.name || "Chưa phân công",
-          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
-          milestone: task?.milestoneId || "Chưa có",
-          parent: task?.parentId || "Chưa có",
-          due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
-          status:
-            task?.status === "done"
-              ? "Hoàn thành"
-              : task?.status === "blocked"
-              ? "Tạm hoãn"
-              : task?.status === "todo"
-              ? "Chưa bắt đầu"
-              : task?.status === "cancelled"
-              ? "Đã huỷ"
-              : "Đang làm",
-          estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
-          createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
-          updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
-          progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
-        }));
-        setTasks(mapped);
-      });
-      // Backend sẽ tự động tạo notification khi giao việc cho Member
+      // Refresh tasks
+      fetchTasks();
+      toast.success("Tạo công việc thành công!");
     } catch (err) {
-      // Hiển thị lỗi từ backend
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
       const errors = err?.response?.data?.errors || [];
       const fullError = errors.length > 0 
@@ -537,9 +343,8 @@ export default function EventTaskPage() {
       toast.error(fullError);
     }
   };
-  
 
-  // --- Group tasks trước khi truyền sang board ---
+  // Group tasks trước khi truyền sang board
   const statusGroup = tasks.reduce(
     (acc, t) => {
       if (t.status === "Đang làm") acc.inProgress.push(t);
@@ -550,21 +355,28 @@ export default function EventTaskPage() {
     { notStarted: [], inProgress: [], done: [] }
   );
 
+  if (!departmentId) {
+    return (
+      <UserLayout
+        title="Danh sách công việc"
+        activePage="work-board"
+        sidebarType="HoD"
+      >
+        <div className="alert alert-warning" style={{ margin: "20px" }}>
+          <h5>Không tìm thấy ban</h5>
+          <p>Bạn chưa được phân công vào ban nào. Vui lòng liên hệ HoOC để được phân công.</p>
+        </div>
+      </UserLayout>
+    );
+  }
+
   return (
     <>
-      <ConfirmModal
-        show={confirmModal.show}
-        message={confirmModal.message}
-        onClose={() => setConfirmModal({ show: false, message: "", onConfirm: null })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) confirmModal.onConfirm();
-        }}
-      />
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
         title={t("taskPage.title")}
-        activePage={"work" && "work-board"}
-        sidebarType={getSidebarType()}
+        activePage="work-board"
+        sidebarType="HoD"
       >
         <style>{`
         .task-header { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
@@ -576,7 +388,6 @@ export default function EventTaskPage() {
 
         .task-row { cursor: pointer; transition: background 0.2s; }
         .task-row:hover { background: #F9FAFB; }
-        .priority-badge { padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 500; border: 1px solid; }
         .status-badge { padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .status-badge:hover { opacity: 0.8; }
 
@@ -606,7 +417,6 @@ export default function EventTaskPage() {
         .tab-btn.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 9999px; background: #3B82F6; }
         .sort-inline { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-        /* ======= Đẹp webkit scrollbar cho board và bảng ======= */
         .rounded-table .table-responsive,
         .kanban-board-scroll,
         .soft-card {
@@ -653,12 +463,12 @@ export default function EventTaskPage() {
               <div className="col-md-6">
                 <h3 className="mb-2">Danh sách công việc</h3>
                 <p className="mb-0 opacity-75">
-                  Theo dõi các công việc của ban và sự kiện
+                  {department ? `Công việc của ban ${department.name}` : "Công việc của ban"}
                 </p>
               </div>
               <div className="col-md-6">
                 <div className="row g-2">
-                <div className="col-6">
+                  <div className="col-6">
                     
                   </div>
                   <div className="col-6">
@@ -678,7 +488,6 @@ export default function EventTaskPage() {
                       </div>
                     </div>
                   </div>
-                  
                 </div>
               </div>
             </div>
@@ -692,14 +501,12 @@ export default function EventTaskPage() {
               >
                 Danh sách công việc
               </button>
-              {eventRole === "HoD" && (
-                <button
-                  className={`tab-btn ${activeTab === "assignment" ? "active" : ""}`}
-                  onClick={() => setActiveTab("assignment")}
-                >
-                  Phân chia công việc
-                </button>
-              )}
+              <button
+                className={`tab-btn ${activeTab === "assignment" ? "active" : ""}`}
+                onClick={() => setActiveTab("assignment")}
+              >
+                Phân chia công việc
+              </button>
               <button
                 className={`tab-btn ${activeTab === "board" ? "active" : ""}`}
                 onClick={() => setActiveTab("board")}
@@ -728,7 +535,7 @@ export default function EventTaskPage() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t("taskPage.searchPlaceholder")}
+                  placeholder="Tìm kiếm công việc..."
                   className="form-control soft-input"
                   style={{ width: 320, paddingLeft: 16 }}
                 />
@@ -740,60 +547,18 @@ export default function EventTaskPage() {
                   onChange={(e) => setFilterStatus(e.target.value)}
                   aria-label="Lọc theo trạng thái"
                 >
-                  <option value="Tất cả">
-                    {t("taskPage.filters.allStatus")}
-                  </option>
-                  <option value="Gợi ý">Gợi ý</option>
+                  <option value="Tất cả">Tất cả</option>
                   <option value="Đang làm">Đang làm</option>
                   <option value="Hoàn thành">Hoàn thành</option>
                   <option value="Tạm hoãn">Tạm hoãn</option>
                 </select>
 
                 <div className="ms-auto d-flex align-items-center gap-2">
-                  <select
-                    className="form-select form-select-sm soft-input"
-                    style={{ width: 140, height: 40 }}
-                    value={filterDepartment}
-                    onChange={(e) => setFilterDepartment(e.target.value)}
-                    aria-label="Lọc theo ban phụ trách"
-                  >
-                    <option value="Tất cả">Tất cả ban</option>
-                    {departments.map((dept) => (
-                      <option value={dept.name} key={dept._id}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    className={`btn ${isSelectionMode ? "btn-warning" : "btn-outline-secondary"}`}
-                    onClick={handleToggleSelectionMode}
-                  >
-                    {isSelectionMode ? "✓ Đang chọn" : "☑ Tùy chọn"}
-                  </button>
-                  {isSelectionMode && selectedTaskIds.length > 0 && (
-                    <button
-                      className="btn btn-danger"
-                      onClick={handleDeleteSelected}
-                    >
-                      🗑️ Xóa ({selectedTaskIds.length})
-                    </button>
-                  )}
-
-                  {eventRole === "HoOC" && (
-                    <button
-                      className="btn btn-success me-2"
-                      onClick={() => setShowAIChat(true)}
-                      style={{ fontSize: 14 }}
-                    >
-                      🤖 AI Assistant
-                    </button>
-                  )}
                   <button
                     className="add-btn btn btn-primary"
                     onClick={() => setShowAddModal(true)}
                   >
-                    + {t("taskPage.add")}
+                    + Thêm công việc
                   </button>
                 </div>
               </div>
@@ -803,26 +568,16 @@ export default function EventTaskPage() {
                   <table className="table align-middle">
                     <thead>
                       <tr className="text-muted">
-                        {isSelectionMode && (
-                          <th className="py-3" style={{ width: "5%" }}>
-                            <input
-                              type="checkbox"
-                              checked={paginatedTasks.length > 0 && paginatedTasks.every(task => selectedTaskIds.includes(task.id))}
-                              onChange={handleSelectAll}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </th>
-                        )}
                         <th className="py-3" style={{ width: "5%" }}>
                           #
                         </th>
                         <th className="py-3 col-name" style={{ width: "15%" }}>
                           Ban phụ trách
                         </th>
-                        <th className="py-3" style={{ width: "25%" }}>
+                        <th className="py-3" style={{ width: "30%" }}>
                           Công việc
                         </th>
-                        <th className="py-3" style={{ width: "18%" }}>
+                        <th className="py-3" style={{ width: "20%" }}>
                           Người phụ trách
                         </th>
                         <th className="py-3" style={{ width: "18%" }}>
@@ -834,9 +589,9 @@ export default function EventTaskPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedTasks.length === 0 ? (
+                      {filteredTasks.length === 0 ? (
                         <tr>
-                          <td colSpan={isSelectionMode ? "7" : "6"} className="text-center py-5">
+                          <td colSpan="6" className="text-center py-5">
                             <div className="d-flex flex-column justify-content-center align-items-center py-4">
                               <img
                                 src={NoDataImg}
@@ -851,31 +606,19 @@ export default function EventTaskPage() {
                                 className="text-muted mt-3"
                                 style={{ fontSize: 16 }}
                               >
-                                Oops, bạn chưa có công việc nào hết, hãy tạo
-                                công việc đầu tiên thôi! Nếu chưa tạo cột mốc
-                                nào, hãy tạo cột mốc trước để gán các công việc
-                                theo nhé.
+                                Chưa có công việc nào trong ban. Hãy tạo công việc đầu tiên!
                               </div>
                             </div>
                           </td>
                         </tr>
                       ) : (
-                        paginatedTasks.map((task, idx) => (
+                        filteredTasks.map((task, idx) => (
                           <tr
                             key={task.id}
                             className="task-row"
-                            onClick={() => !isSelectionMode && setSelectedTask(task)}
+                            onClick={() => setSelectedTask(task)}
                           >
-                            {isSelectionMode && (
-                              <td className="py-3" onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedTaskIds.includes(task.id)}
-                                  onChange={() => handleSelectTask(task.id)}
-                                />
-                              </td>
-                            )}
-                            <td className="py-3 text-muted small">{startIndex + idx + 1}</td>
+                            <td className="py-3 text-muted small">{idx + 1}</td>
                             <td className="py-3 col-name">
                               <div className="fw-medium">{task.department}</div>
                             </td>
@@ -926,111 +669,33 @@ export default function EventTaskPage() {
                   </table>
                 </div>
               </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="d-flex justify-content-between align-items-center mt-3">
-                  <div className="text-muted small">
-                    Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredTasks.length)} trong tổng số {filteredTasks.length} công việc
-                  </div>
-                  <nav>
-                    <ul className="pagination mb-0">
-                      <li className={`page-item ${currentPage === 1 ? "disabled" : ""}`}>
-                        <button
-                          className="page-link"
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          Trước
-                        </button>
-                      </li>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                        // Show first page, last page, current page, and pages around current
-                        if (
-                          page === 1 ||
-                          page === totalPages ||
-                          (page >= currentPage - 1 && page <= currentPage + 1)
-                        ) {
-                          return (
-                            <li key={page} className={`page-item ${currentPage === page ? "active" : ""}`}>
-                              <button
-                                className="page-link"
-                                onClick={() => setCurrentPage(page)}
-                              >
-                                {page}
-                              </button>
-                            </li>
-                          );
-                        } else if (page === currentPage - 2 || page === currentPage + 2) {
-                          return (
-                            <li key={page} className="page-item disabled">
-                              <span className="page-link">...</span>
-                            </li>
-                          );
-                        }
-                        return null;
-                      })}
-                      <li className={`page-item ${currentPage === totalPages ? "disabled" : ""}`}>
-                        <button
-                          className="page-link"
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          Sau
-                        </button>
-                      </li>
-                    </ul>
-                  </nav>
-                </div>
-              )}
             </>
           )}
 
-          {activeTab === "assignment" && eventRole === "HoD" && (
+          {activeTab === "assignment" && (
             <div className="soft-card p-4">
               <div className="mb-3 text-muted small">
-                Kéo công việc từ cột bên trái vào thành viên bên phải để giao việc
+                Kéo công việc chưa phân công vào cột thành viên để giao việc
               </div>
-              {membersForAssignment.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  Đang tải danh sách thành viên...
-                </div>
-              ) : (
-                <TaskAssignmentBoard
-                  tasks={tasks.filter(task => {
-                    // Only show tasks from HoD's department
-                    const hoDDept = departments.find(d => String(d._id) === String(hoDDepartmentId));
-                    return hoDDept && task.department === hoDDept.name;
-                  })}
-                  members={membersForAssignment}
-                  eventId={eventId}
-                  departmentId={hoDDepartmentId}
-                  onTaskAssigned={fetchTasks}
-                  currentUserId={user?._id}
-                />
-              )}
+              <TaskAssignmentBoard
+                tasks={tasks}
+                members={assignees}
+                eventId={eventId}
+                departmentId={departmentId}
+                onTaskAssigned={fetchTasks}
+                currentUserId={user?._id}
+              />
             </div>
           )}
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <div style={{ display: 'flex', gap: 16 }}>
-                {eventRole === "HoD" && (
-                  <SuggestedTasksColumn
-                    eventId={eventId}
-                    departmentId={departments.find(d => d.name === filterDepartment)?._id}
-                    onTaskAssigned={fetchTasks}
-                  />
-                )}
-                <div style={{ flex: 1 }}>
-                  <KanbanBoardTask 
-                    eventId={eventId}
-                    listTask={statusGroup}
-                    onTaskMove={fetchTasks}
-                    currentUserId={user?._id}
-                  />
-                </div>
-              </div>
+              <KanbanBoardTask 
+                eventId={eventId}
+                listTask={statusGroup}
+                onTaskMove={fetchTasks}
+                currentUserId={user?._id}
+              />
             </div>
           )}
         </div>
@@ -1048,7 +713,7 @@ export default function EventTaskPage() {
                 }}
               >
                 <div className="d-flex justify-content-between align-items-start mb-4">
-                  <h5 className="mb-0">{t("taskPage.detail.title")}</h5>
+                  <h5 className="mb-0">Chi tiết công việc</h5>
                   <button
                     className="btn btn-sm btn-light rounded-circle"
                     style={{ width: 32, height: 32 }}
@@ -1061,17 +726,17 @@ export default function EventTaskPage() {
                 <div className="flex-grow-1 overflow-auto">
                   <div className="mb-4">
                     <label className="text-muted small mb-2">
-                      {t("taskPage.detail.name")}
+                      Tên công việc
                     </label>
                     <div className="fw-semibold fs-5">{selectedTask.name}</div>
                   </div>
 
                   <div className="mb-4">
                     <label className="text-muted small mb-2">
-                      {t("taskPage.detail.description")}
+                      Mô tả
                     </label>
                     <div className="text-muted">
-                      {selectedTask.description || t("taskPage.detail.noDesc")}
+                      {selectedTask.description || "Chưa có mô tả"}
                     </div>
                   </div>
 
@@ -1189,20 +854,16 @@ export default function EventTaskPage() {
                     <div className="row">
                       <div className="col-md-6 mb-3">
                         <label className="form-label">Ban phụ trách *</label>
-                        <select
-                          className="form-select"
-                          value={addTaskForm.departmentId}
-                          onChange={(e) =>
-                            handleAddTaskInput("departmentId", e.target.value)
-                          }
-                        >
-                          <option value="">Chọn ban</option>
-                          {departments.map((d) => (
-                            <option key={d._id} value={d._id}>
-                              {d.name}
-                            </option>
-                          ))}
-                        </select>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={department?.name || ""}
+                          disabled
+                          style={{ backgroundColor: "#F3F4F6", cursor: "not-allowed" }}
+                        />
+                        <div className="form-text small text-muted">
+                          Bạn chỉ có thể tạo công việc cho ban của mình
+                        </div>
                       </div>
                       <div className="col-md-6 mb-3">
                         <label className="form-label">Người phụ trách *</label>
@@ -1212,7 +873,6 @@ export default function EventTaskPage() {
                           onChange={(e) =>
                             handleAddTaskInput("assigneeId", e.target.value)
                           }
-                          disabled={!addTaskForm.departmentId}
                         >
                           <option value="">Chọn người phụ trách</option>
                           {assignees.map((m) => (
@@ -1221,7 +881,9 @@ export default function EventTaskPage() {
                             </option>
                           ))}
                         </select>
-                        {console.log('assignees', assignees)}
+                        <div className="form-text small text-muted">
+                          Chỉ hiển thị thành viên trong ban của bạn
+                        </div>
                       </div>
                     </div>
                     <div className="row">
@@ -1236,7 +898,7 @@ export default function EventTaskPage() {
                           }
                           min={(() => {
                             const now = new Date();
-                            now.setMinutes(now.getMinutes() + 1); // Thêm 1 phút để đảm bảo sau thời điểm hiện tại
+                            now.setMinutes(now.getMinutes() + 1);
                             const minDateTime = now.toISOString().slice(0, 16);
                             if (eventInfo?.eventStartDate) {
                               const eventStart = new Date(eventInfo.eventStartDate);
@@ -1265,7 +927,6 @@ export default function EventTaskPage() {
                             handleAddTaskInput("dueDate", e.target.value)
                           }
                           min={(() => {
-                            // Nếu có startDate, min phải sau startDate, nếu không thì sau thời điểm hiện tại
                             if (addTaskForm.startDate) {
                               const startDate = new Date(addTaskForm.startDate);
                               startDate.setMinutes(startDate.getMinutes() + 1);
@@ -1343,7 +1004,6 @@ export default function EventTaskPage() {
                           className="form-select"
                           value={addTaskForm.parentId}
                           onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
-                          disabled={!addTaskForm.departmentId}
                         >
                           <option value="">Không có</option>
                           {filteredParents.map((p) => (
@@ -1352,30 +1012,20 @@ export default function EventTaskPage() {
                             </option>
                           ))}
                         </select>
+                        <div className="form-text small text-muted">
+                          Chỉ hiển thị tasks của ban bạn
+                        </div>
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Task phụ thuộc</label>
-                      <div className="d-flex gap-2 mb-2">
-                        <select
-                          className="form-select form-select-sm soft-input"
-                          style={{ width: 200, height: 40 }}
-                          value={depFilterDepartment}
-                          onChange={(e) => setDepFilterDepartment(e.target.value)}
-                        >
-                          <option value="Tất cả">Tất cả ban</option>
-                          {departments.map((dept) => (
-                            <option key={dept._id} value={dept.name}>{dept.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          className="form-control soft-input"
-                          style={{ height: 40 }}
-                          placeholder="Tìm theo tên task"
-                          value={depSearch}
-                          onChange={(e) => setDepSearch(e.target.value)}
-                        />
-                      </div>
+                      <input
+                        className="form-control soft-input mb-2"
+                        style={{ height: 40 }}
+                        placeholder="Tìm theo tên task"
+                        value={depSearch}
+                        onChange={(e) => setDepSearch(e.target.value)}
+                      />
                       <select
                         multiple
                         className="form-select"
@@ -1396,7 +1046,7 @@ export default function EventTaskPage() {
                         ))}
                       </select>
                       <div className="form-text small">
-                        Bạn có thể giữ Ctrl để chọn nhiều task phụ thuộc
+                        Chỉ hiển thị tasks của ban bạn. Bạn có thể giữ Ctrl để chọn nhiều task phụ thuộc
                       </div>
                     </div>
                   </div>
@@ -1421,39 +1071,8 @@ export default function EventTaskPage() {
             </div>
           </>
         )}
-
-        {/* AI Chat Assistant for HOOC */}
-        {showAIChat && eventRole === "HoOC" && (
-          <AIChatAssistant
-            eventId={eventId}
-            onWBSGenerated={(data) => {
-              setWbsData(data);
-              setSessionId(data.data?.session_id);
-              setShowWBSModal(true);
-              setShowAIChat(false);
-            }}
-            onClose={() => setShowAIChat(false)}
-          />
-        )}
-
-        {/* WBS Preview Modal */}
-        {showWBSModal && wbsData && (
-          <WBSPreviewModal
-            eventId={eventId}
-            wbsData={wbsData}
-            sessionId={sessionId}
-            onClose={() => {
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-            onApplied={() => {
-              fetchTasks();
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-          />
-        )}
       </UserLayout>
     </>
   );
 }
+

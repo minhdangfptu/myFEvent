@@ -116,7 +116,8 @@ export const createTask = async (req, res) => {
 
         const {
             title, description, departmentId, assigneeId,
-            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId, dependencies
+            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId, dependencies,
+            suggestedTeamSize
         } = req.body;
 
         if (!departmentId) return res.status(400).json({ message: 'Thiếu departmentId' });
@@ -241,7 +242,8 @@ export const createTask = async (req, res) => {
             estimateUnit,
             milestoneId: milestoneId || undefined,
             parentId: parentId || undefined,
-            dependencies: dependencies
+            dependencies: dependencies,
+            suggestedTeamSize: suggestedTeamSize || undefined
         });
 
         // Thông báo khi giao việc cho Member

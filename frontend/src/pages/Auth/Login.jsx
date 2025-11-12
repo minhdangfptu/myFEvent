@@ -28,7 +28,6 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await login(email, password);
       await login(email, password);
       navigate("/home-page", {
         replace: true,
@@ -236,7 +235,7 @@ export default function LoginPage() {
                   onSuccess={handleGoogleSuccess}
                   onError={handleGoogleError}
                   useOneTap={false}
-                  width="100%"
+                  width={350}
                   text="signin_with"
                   shape="rectangular"
                   theme="outline"
