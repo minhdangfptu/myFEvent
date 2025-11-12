@@ -8,6 +8,7 @@ const corsOptions = {
         
         const allowedOrigins = [
             config.FRONTEND_URL,
+            config.FRONTEND_URL1,
             config.CORS_ORIGIN,
             'http://localhost:3000',
             'http://localhost:3001',

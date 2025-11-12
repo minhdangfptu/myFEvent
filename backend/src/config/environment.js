@@ -26,7 +26,8 @@ export const config = {
     BCRYPT_SALT_ROUNDS: Number(process.env.BCRYPT_SALT_ROUNDS || 10),
     
     // Frontend
-    FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+    FRONTEND_URL: process.env.FRONTEND_URL,
+    FRONTEND_URL1: process.env.FRONTEND_URL1,
     
     // CORS
     CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000'
