@@ -13,7 +13,9 @@ const CalendarSchema = new Schema({
   },
   startAt: { type: Date, required: true },
   endAt: { type: Date, required: true },
+  locationType: { type: String, enum: ['online', 'offline'], required: true },
   location: { type: String, required: true },
+  notes: { type: String, default: '' },
   participants: [{
     member: { type: Schema.Types.ObjectId, ref: 'EventMember' },
     participateStatus: { type: String, enum: ['confirmed', 'absent', 'unconfirmed'], default: 'unconfirmed' },
@@ -21,6 +23,8 @@ const CalendarSchema = new Schema({
       type: String,
       required: function () { return this.participateStatus === 'absent'; },
   }}],
+  attachments: [{ type: String }],
+  createdBy: { type: Types.ObjectId, ref: 'EventMember', required: true },
 }, { timestamps: true, versionKey: false });
 
 export default mongoose.model('Calendar', CalendarSchema);

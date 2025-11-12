@@ -288,12 +288,12 @@ export default function HoOCSidebar({
               className={`btn-nav ${
                 activePage === "calendar" ? "active" : ""
               }`}
-              onClick={() => navigate("/task")}
-              title="Lịch cá nhân"
+              onClick={() => navigate("/events/" + (eventId || '') + "/my-calendar")}
+              title="Lịch sự kiện"
             >
               <div className="d-flex align-items-center">
                 <i className="bi bi-calendar me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Lịch cá nhân</span>}
+                {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
 
