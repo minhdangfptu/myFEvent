@@ -62,7 +62,6 @@ app.use('*', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    
     // Khởi động scheduled task để tự động cập nhật trạng thái task
     const { startTaskAutoStatusScheduler } = await import('./src/services/taskAutoStatusService.js');
     startTaskAutoStatusScheduler();
