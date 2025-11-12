@@ -2,39 +2,51 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
-import { useParams } from "react-router-dom";
-import riskApi from "~/apis/riskApi"; // Import API
-import {departmentApi} from "~/apis/departmentApi"; // Import Department API
-import { toast } from "react-toastify"; // For notifications
+import { useParams, useNavigate } from "react-router-dom";
+import { riskApiWithErrorHandling } from "~/apis/riskApi";
+import { departmentApi } from "~/apis/departmentApi";
+import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
 
 export default function ListRiskPage() {
   const { t } = useTranslation();
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("Tên");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortOrder, setSortOrder] = useState("asc");
   const [filterLevel, setFilterLevel] = useState("Tất cả");
+  const [filterLikelihood, setFilterLikelihood] = useState("Tất cả");
   const [filterCategory, setFilterCategory] = useState("Tất cả");
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
-  const [eventRole, setEventRole] = useState('');
+  const [eventRole, setEventRole] = useState("");
   const { fetchEventRole } = useEvents();
-  
+
   // ====== Pagination States ======
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
-  
+
   // ====== API States ======
+  const [allRisks, setAllRisks] = useState([]);
   const [risks, setRisks] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    total: 1,
+    hasNext: false,
+    hasPrev: false,
+    totalCount: 0,
+    limit: 10,
+  });
   const [statistics, setStatistics] = useState({
     total: 0,
     high: 0,
-    resolved: 0
+    resolved: 0,
   });
 
-  // ====== Modal thêm ======
+  // ====== Modal states ======
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newRisk, setNewRisk] = useState({
@@ -42,159 +54,251 @@ export default function ListRiskPage() {
     departmentId: "",
     risk_category: "others",
     impact: "medium",
+    likelihood: "medium",
     risk_mitigation_plan: "",
     risk_response_plan: "",
   });
 
-  // ====== Detail Modal & Edit States ======
-  const [selectedRisk, setSelectedRisk] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({});
-  const [savingChanges, setSavingChanges] = useState(false);
-  
   // ====== Delete Confirmation Modal ======
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [riskToDelete, setRiskToDelete] = useState(null);
 
   // ====== Risk Category Mappings ======
   const categoryLabels = {
-    'infrastructure': 'Cơ sở vật chất',
-    'mc-guests': 'MC & Khách mời',
-    'communication': 'Truyền thông',
-    'players': 'Người chơi',
-    'staffing': 'Nhân sự',
-    'communication_post': 'Tuyến bài',
-    'attendees': 'Người tham gia',
-    'weather': 'Thời tiết',
-    'time': 'Thời gian',
-    'timeline': 'Timeline',
-    'tickets': 'Vé',
-    'collateral': 'Ấn phẩm',
-    'game': 'Game',
-    'sponsorship': 'Nhà tài trợ',
-    'finance': 'Tài chính',
-    'transportation': 'Vận chuyển',
-    'decor': 'Đồ trang trí',
-    'others': 'Khác'
+    infrastructure: "Cơ sở vật chất",
+    "mc-guests": "MC & Khách mời",
+    communication: "Truyền thông",
+    players: "Người chơi",
+    staffing: "Nhân sự",
+    communication_post: "Tuyến bài",
+    attendees: "Người tham gia",
+    weather: "Thời tiết",
+    time: "Thời gian",
+    timeline: "Timeline",
+    tickets: "Vé",
+    collateral: "Ấn phẩm",
+    game: "Game",
+    sponsorship: "Nhà tài trợ",
+    finance: "Tài chính",
+    transportation: "Vận chuyển",
+    decor: "Đồ trang trí",
+    others: "Khác",
+  };
+
+  const impactLabels = {
+    high: "Cao",
+    medium: "Trung bình",
+    low: "Thấp",
+  };
+
+  const likelihoodLabels = {
+    very_high: "Rất cao",
+    high: "Cao",
+    medium: "Trung bình",
+    low: "Thấp",
+    very_low: "Rất thấp",
+  };
+
+  const statusLabels = {
+    not_yet: "Chưa xảy ra",
+    resolved: "Đã xử lý",
+    resolving: "Đang xử lý",
   };
 
   // ====== Helper Functions ======
-  
-  const mapImpactToLevel = (impact) => {
-    switch (impact) {
-      case 'high': return 'Cao';
-      case 'medium': return 'Trung bình';
-      case 'low': return 'Thấp';
-      default: return 'Trung bình';
-    }
-  };
 
-  const mapLevelToImpact = (level) => {
-    switch (level) {
-      case 'Cao': return 'high';
-      case 'Trung bình': return 'medium';
-      case 'Thấp': return 'low';
-      default: return 'medium';
-    }
+  const mapImpactToLevel = (impact) => {
+    return impactLabels[impact] || "Trung bình";
   };
 
   const getDisplayStatus = (apiRisk) => {
-    return "Đang theo dõi";
+    return statusLabels[apiRisk.risk_status] || "Chưa xảy ra";
   };
 
   const transformApiRiskToComponent = (apiRisk) => ({
     id: apiRisk._id,
     name: apiRisk.name,
-    owner: apiRisk.departmentId?.name || "Unknown Department",
+    owner: apiRisk.departmentId?.name || "Chưa phân công",
     ownerId: apiRisk.departmentId?._id,
     status: getDisplayStatus(apiRisk),
+    statusKey: apiRisk.risk_status,
     level: mapImpactToLevel(apiRisk.impact),
+    impact: apiRisk.impact,
+    likelihood: apiRisk.likelihood,
+    likelihoodLabel: likelihoodLabels[apiRisk.likelihood] || "Trung bình",
     description: apiRisk.risk_mitigation_plan,
     mitigation: apiRisk.risk_response_plan,
     category: categoryLabels[apiRisk.risk_category] || apiRisk.risk_category,
     categoryKey: apiRisk.risk_category,
-    originalData: apiRisk
+    occurredCount: apiRisk.occurred_risk?.length || 0,
+    hasOccurred: (apiRisk.occurred_risk?.length || 0) > 0,
+    pendingOccurred:
+      apiRisk.occurred_risk?.filter((occ) => occ.occurred_status === "pending")
+        .length || 0,
+    originalData: apiRisk,
   });
 
   const calculateStats = (riskList) => {
     setStatistics({
       total: riskList.length,
-      high: riskList.filter(r => r.level === "Cao").length,
-      resolved: riskList.filter(r => r.status === "Đã xử lý").length,
+      high: riskList.filter((r) => r.impact === "high").length,
+      resolved: riskList.filter((r) => r.statusKey === "resolved").length,
     });
   };
 
   // Get unique departments and categories for filters
   const uniqueDepartments = useMemo(() => {
-    const departments = [...new Set(risks.map(r => r.owner))].filter(Boolean);
+    const departments = [...new Set(allRisks.map((r) => r.owner))].filter(
+      (dept) => dept && dept !== "Chưa phân công"
+    );
     return departments.sort();
-  }, [risks]);
+  }, [allRisks]);
 
   const uniqueCategories = useMemo(() => {
-    const categories = [...new Set(risks.map(r => r.category))].filter(Boolean);
+    const categories = [...new Set(allRisks.map((r) => r.category))].filter(
+      Boolean
+    );
     return categories.sort();
-  }, [risks]);
+  }, [allRisks]);
 
-  // ====== Pagination Logic ======
-  
+  // Filter và search ở frontend
   const filteredRisks = useMemo(() => {
-    return risks
-      .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
-      .filter((r) => filterLevel === "Tất cả" || r.level === filterLevel)
-      .filter((r) => filterCategory === "Tất cả" || r.category === filterCategory)
-      .filter((r) => filterDepartment === "Tất cả" || r.owner === filterDepartment)
-      .sort((a, b) => {
-        const priorityOrder = { Cao: 3, "Trung bình": 2, Thấp: 1 };
-        if (sortBy === "Tên") return a.name.localeCompare(b.name);
-        if (sortBy === "Mức độ")
-          return priorityOrder[b.level] - priorityOrder[a.level];
-        if (sortBy === "Danh mục") return a.category.localeCompare(b.category);
-        if (sortBy === "Ban") return a.owner.localeCompare(b.owner);
-        return 0;
-      });
-  }, [risks, search, filterLevel, filterCategory, filterDepartment, sortBy]);
+    let filtered = [...allRisks];
 
-  const totalPages = Math.ceil(filteredRisks.length / itemsPerPage);
-  
+    // Search filter
+    if (search && search.trim()) {
+      const searchLower = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.name?.toLowerCase().includes(searchLower) ||
+          r.description?.toLowerCase().includes(searchLower) ||
+          r.mitigation?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Impact filter
+    if (filterLevel !== "Tất cả") {
+      filtered = filtered.filter((r) => r.level === filterLevel);
+    }
+
+    // Category filter
+    if (filterCategory !== "Tất cả") {
+      filtered = filtered.filter((r) => r.category === filterCategory);
+    }
+
+    // Department filter
+    if (filterDepartment !== "Tất cả") {
+      filtered = filtered.filter((r) => r.owner === filterDepartment);
+    }
+
+    // Likelihood filter
+    if (filterLikelihood !== "Tất cả") {
+      filtered = filtered.filter((r) => r.likelihood === filterLikelihood);
+    }
+
+    return filtered;
+  }, [
+    allRisks,
+    search,
+    filterLevel,
+    filterCategory,
+    filterDepartment,
+    filterLikelihood,
+  ]);
+
+  // Sort risks ở frontend
+  const sortedRisks = useMemo(() => {
+    const sorted = [...filteredRisks];
+
+    sorted.sort((a, b) => {
+      let aValue, bValue;
+
+      switch (sortBy) {
+        case "name":
+          aValue = a.name?.toLowerCase() || "";
+          bValue = b.name?.toLowerCase() || "";
+          break;
+        case "owner":
+          aValue = a.owner?.toLowerCase() || "";
+          bValue = b.owner?.toLowerCase() || "";
+          break;
+        case "impact":
+          const impactOrder = { high: 3, medium: 2, low: 1 };
+          aValue = impactOrder[a.impact] || 0;
+          bValue = impactOrder[b.impact] || 0;
+          break;
+        case "likelihood":
+          const likelihoodOrder = {
+            very_high: 5,
+            high: 4,
+            medium: 3,
+            low: 2,
+            very_low: 1,
+          };
+          aValue = likelihoodOrder[a.likelihood] || 0;
+          bValue = likelihoodOrder[b.likelihood] || 0;
+          break;
+        default:
+          aValue = a.name?.toLowerCase() || "";
+          bValue = b.name?.toLowerCase() || "";
+      }
+
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  }, [filteredRisks, sortBy, sortOrder]);
+
+  // Pagination ở frontend
   const paginatedRisks = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return filteredRisks.slice(startIndex, endIndex);
-  }, [filteredRisks, currentPage, itemsPerPage]);
+    return sortedRisks.slice(startIndex, endIndex);
+  }, [sortedRisks, currentPage, itemsPerPage]);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-    document.querySelector('.rounded-table')?.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'start' 
-    });
-  };
-
-  // Reset to page 1 when filters change
+  // Cập nhật risks và pagination state
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, filterLevel, filterCategory, filterDepartment]);
+    const totalPages = Math.ceil(sortedRisks.length / itemsPerPage);
+    setPagination({
+      current: currentPage,
+      total: totalPages || 1,
+      hasNext: currentPage < totalPages,
+      hasPrev: currentPage > 1,
+      totalCount: sortedRisks.length,
+      limit: itemsPerPage,
+    });
+    setRisks(paginatedRisks);
+    calculateStats(sortedRisks);
+  }, [sortedRisks, currentPage, itemsPerPage, paginatedRisks]);
 
   // ====== API Calls ======
-  
+
   const fetchRisks = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await riskApi.listRisksByEvent(eventId);
-      
+
+      const response = await riskApiWithErrorHandling.getAllRisksByEvent(
+        eventId,
+        {}
+      );
+
       if (response.success) {
         const apiRisks = response.data || [];
         const transformedRisks = apiRisks.map(transformApiRiskToComponent);
-        setRisks(transformedRisks);
-        calculateStats(transformedRisks);
+        setAllRisks(transformedRisks);
       } else {
-        console.error('Failed to fetch risks:', response.message);
-        toast.error('Không thể tải danh sách rủi ro');
+        console.error("Failed to fetch risks:", response.error);
+        toast.error("Không thể tải danh sách rủi ro");
+        setAllRisks([]);
       }
     } catch (error) {
-      console.error('Error fetching risks:', error);
-      toast.error('Lỗi khi tải dữ liệu');
+      console.error("Error fetching risks:", error);
+      toast.error("Lỗi khi tải dữ liệu");
+      setAllRisks([]);
     } finally {
       setLoading(false);
     }
@@ -204,16 +308,19 @@ export default function ListRiskPage() {
     try {
       setLoadingDepartments(true);
       const response = await departmentApi.getDepartments(eventId);
-      
+
       const departmentsList = response?.data || [];
       setDepartments(departmentsList);
-      
+
       if (departmentsList.length > 0) {
-        setNewRisk(prev => ({ ...prev, departmentId: departmentsList[0]._id }));
+        setNewRisk((prev) => ({
+          ...prev,
+          departmentId: departmentsList[0]._id,
+        }));
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
-      toast.error('Lỗi khi tải dữ liệu ban');
+      console.error("Error fetching departments:", error);
+      toast.error("Lỗi khi tải dữ liệu ban");
       setDepartments([]);
     } finally {
       setLoadingDepartments(false);
@@ -221,33 +328,41 @@ export default function ListRiskPage() {
   }, [eventId]);
 
   const createRisk = async () => {
-    if (!newRisk.name || !newRisk.risk_mitigation_plan || !newRisk.departmentId) {
-      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+    if (
+      !newRisk.name ||
+      !newRisk.risk_mitigation_plan ||
+      !newRisk.departmentId
+    ) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
 
     try {
       setSubmitting(true);
-      const response = await riskApi.createRisk(eventId, newRisk);
+      const response = await riskApiWithErrorHandling.createRisk(
+        eventId,
+        newRisk
+      );
 
       if (response.success) {
-        toast.success('Thêm rủi ro thành công!');
+        toast.success("Thêm rủi ro thành công!");
         setShowAddModal(false);
         setNewRisk({
           name: "",
           departmentId: departments.length > 0 ? departments[0]._id : "",
           risk_category: "others",
           impact: "medium",
+          likelihood: "medium",
           risk_mitigation_plan: "",
           risk_response_plan: "",
         });
         fetchRisks();
       } else {
-        toast.error(response.message || 'Không thể tạo rủi ro');
+        toast.error(response.error || "Không thể tạo rủi ro");
       }
     } catch (error) {
-      console.error('Error creating risk:', error);
-      toast.error('Lỗi khi tạo rủi ro');
+      console.error("Error creating risk:", error);
+      toast.error("Lỗi khi tạo rủi ro");
     } finally {
       setSubmitting(false);
     }
@@ -262,111 +377,37 @@ export default function ListRiskPage() {
     if (!riskToDelete) return;
 
     try {
-      const response = await riskApi.deleteRisk(eventId, riskToDelete.originalData._id);
+      const response = await riskApiWithErrorHandling.deleteRisk(
+        eventId,
+        riskToDelete.originalData._id
+      );
       if (response.success) {
-        toast.success('Xóa rủi ro thành công!');
-        setSelectedRisk(null);
-        setShowDetailModal(false);
+        toast.success("Xóa rủi ro thành công!");
         setShowDeleteModal(false);
         setRiskToDelete(null);
         fetchRisks();
       } else {
-        toast.error('Không thể xóa rủi ro');
+        toast.error(response.error || "Không thể xóa rủi ro");
       }
     } catch (error) {
-      console.error('Error deleting risk:', error);
-      toast.error('Lỗi khi xóa rủi ro');
+      console.error("Error deleting risk:", error);
+      toast.error("Lỗi khi xóa rủi ro");
     }
   };
 
   // ====== Event Handlers ======
-  
+
   const handleRiskClick = (risk) => {
-    setSelectedRisk(risk);
-    setIsEditing(false);
-    setEditForm({
-      name: risk.name,
-      description: risk.description || "",
-      mitigation: risk.mitigation || "",
-      level: risk.level
+    // Navigate to detail page
+    navigate(`/events/${eventId}/risks/detail/${risk.id}`);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    document.querySelector(".rounded-table")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
     });
-    setShowDetailModal(true);
-  };
-
-  const handleCloseDetail = () => {
-    setSelectedRisk(null);
-    setShowDetailModal(false);
-    setIsEditing(false);
-    setEditForm({});
-    setSavingChanges(false);
-  };
-
-  const handleStartEdit = () => {
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditForm({
-      name: selectedRisk.name,
-      description: selectedRisk.description || "",
-      mitigation: selectedRisk.mitigation || "",
-      level: selectedRisk.level
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editForm.name.trim()) {
-      toast.error('Tên rủi ro không được để trống');
-      return;
-    }
-
-    try {
-      setSavingChanges(true);
-      const updateData = {
-        name: editForm.name,
-        risk_mitigation_plan: editForm.description,
-        risk_response_plan: editForm.mitigation,
-        impact: mapLevelToImpact(editForm.level)
-      };
-
-      const response = await riskApi.updateRisk(eventId, selectedRisk.originalData._id, updateData);
-      
-      if (response.success) {
-        toast.success('Cập nhật thành công!');
-        
-        // Update local state
-        setRisks(prev => prev.map(r => 
-          r.id === selectedRisk.id 
-            ? { 
-                ...r, 
-                name: editForm.name,
-                description: editForm.description,
-                mitigation: editForm.mitigation,
-                level: editForm.level
-              } 
-            : r
-        ));
-        
-        // Update selected risk
-        setSelectedRisk(prev => ({
-          ...prev,
-          name: editForm.name,
-          description: editForm.description,
-          mitigation: editForm.mitigation,
-          level: editForm.level
-        }));
-        
-        setIsEditing(false);
-      } else {
-        toast.error(response.message || 'Không thể cập nhật');
-      }
-    } catch (error) {
-      console.error('Error updating risk:', error);
-      toast.error('Lỗi khi cập nhật');
-    } finally {
-      setSavingChanges(false);
-    }
   };
 
   const handleShowAddModal = () => {
@@ -383,60 +424,77 @@ export default function ListRiskPage() {
       departmentId: departments.length > 0 ? departments[0]._id : "",
       risk_category: "others",
       impact: "medium",
+      likelihood: "medium",
       risk_mitigation_plan: "",
       risk_response_plan: "",
     });
   };
 
-  const handleDepartmentFilterChange = (value) => {
-    setFilterDepartment(value);
-  };
-
-  const handleCategoryFilterChange = (value) => {
-    setFilterCategory(value);
+  const handleSortChange = (newSortBy) => {
+    if (sortBy === newSortBy) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1);
   };
 
   // ====== Effects ======
-  
-  useEffect(() => {
-    if (eventId) {
-      fetchRisks();
-      fetchDepartments();
-    }
-  }, [eventId, fetchRisks, fetchDepartments]);
 
   useEffect(() => {
-    fetchEventRole(eventId).then(role => {
+    if (eventId) {
+      fetchDepartments();
+    }
+  }, [eventId, fetchDepartments]);
+
+  useEffect(() => {
+    if (eventId && departments.length > 0) {
+      fetchRisks();
+    }
+  }, [eventId, departments.length, fetchRisks]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterLevel, filterCategory, filterDepartment, filterLikelihood]);
+
+  useEffect(() => {
+    fetchEventRole(eventId).then((role) => {
       setEventRole(role);
     });
   }, [eventId, fetchEventRole]);
 
   // ====== UI Logic ======
-  
-  const levelChipStyle = (lv) => {
-    if (lv === "Cao")
-      return { bg: "#FEF2F2", color: "#B91C1C", border: "#DC2626" };
-    if (lv === "Thấp")
-      return { bg: "#F0FDF4", color: "#15803D", border: "#16A34A" };
-    return { bg: "#FFFBEB", color: "#D97706", border: "#F59E0B" };
+
+  const getLevelStyleAndIcon = (level) => {
+    if (["Cao", "high", "Rất cao", "very_high"].includes(level)) {
+      return { color: "#B91C1C", icon: "↑" };
+    }
+    if (["Thấp", "low", "Rất thấp", "very_low"].includes(level)) {
+      return { color: "#666", icon: "↓" };
+    }
+    return { color: "#D97706", icon: "≈" };
   };
 
   const getSidebarType = () => {
-    if (eventRole === 'HoOC') return 'HoOC';
-    if (eventRole === 'HoD') return 'HoD';
-    if (eventRole === 'Member') return 'Member';
-    return 'user';
+    if (eventRole === "HoOC") return "HoOC";
+    if (eventRole === "HoD") return "HoD";
+    if (eventRole === "Member") return "Member";
+    return "user";
   };
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    if (pagination.total <= 1) return null;
 
     const pages = [];
     const maxVisiblePages = 5;
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
+
+    let startPage = Math.max(
+      1,
+      pagination.current - Math.floor(maxVisiblePages / 2)
+    );
+    let endPage = Math.min(pagination.total, startPage + maxVisiblePages - 1);
+
     if (endPage - startPage < maxVisiblePages - 1) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
@@ -445,10 +503,12 @@ export default function ListRiskPage() {
     pages.push(
       <button
         key="prev"
-        className={`btn btn-sm ${currentPage === 1 ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        style={{ margin: '0 2px' }}
+        className={`btn btn-sm ${
+          !pagination.hasPrev ? "btn-outline-secondary" : "btn-outline-primary"
+        }`}
+        onClick={() => handlePageChange(pagination.current - 1)}
+        disabled={!pagination.hasPrev}
+        style={{ margin: "0 2px" }}
       >
         «
       </button>
@@ -459,15 +519,21 @@ export default function ListRiskPage() {
       pages.push(
         <button
           key={1}
-          className={`btn btn-sm ${currentPage === 1 ? 'btn-primary' : 'btn-outline-primary'}`}
+          className={`btn btn-sm ${
+            pagination.current === 1 ? "btn-primary" : "btn-outline-primary"
+          }`}
           onClick={() => handlePageChange(1)}
-          style={{ margin: '0 2px' }}
+          style={{ margin: "0 2px" }}
         >
           1
         </button>
       );
       if (startPage > 2) {
-        pages.push(<span key="ellipsis1" style={{ margin: '0 8px' }}>…</span>);
+        pages.push(
+          <span key="ellipsis1" style={{ margin: "0 8px" }}>
+            …
+          </span>
+        );
       }
     }
 
@@ -476,9 +542,11 @@ export default function ListRiskPage() {
       pages.push(
         <button
           key={i}
-          className={`btn btn-sm ${currentPage === i ? 'btn-primary' : 'btn-outline-primary'}`}
+          className={`btn btn-sm ${
+            pagination.current === i ? "btn-primary" : "btn-outline-primary"
+          }`}
           onClick={() => handlePageChange(i)}
-          style={{ margin: '0 2px' }}
+          style={{ margin: "0 2px" }}
         >
           {i}
         </button>
@@ -486,18 +554,26 @@ export default function ListRiskPage() {
     }
 
     // Last page
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push(<span key="ellipsis2" style={{ margin: '0 8px' }}>…</span>);
+    if (endPage < pagination.total) {
+      if (endPage < pagination.total - 1) {
+        pages.push(
+          <span key="ellipsis2" style={{ margin: "0 8px" }}>
+            …
+          </span>
+        );
       }
       pages.push(
         <button
-          key={totalPages}
-          className={`btn btn-sm ${currentPage === totalPages ? 'btn-primary' : 'btn-outline-primary'}`}
-          onClick={() => handlePageChange(totalPages)}
-          style={{ margin: '0 2px' }}
+          key={pagination.total}
+          className={`btn btn-sm ${
+            pagination.current === pagination.total
+              ? "btn-primary"
+              : "btn-outline-primary"
+          }`}
+          onClick={() => handlePageChange(pagination.total)}
+          style={{ margin: "0 2px" }}
         >
-          {totalPages}
+          {pagination.total}
         </button>
       );
     }
@@ -506,25 +582,28 @@ export default function ListRiskPage() {
     pages.push(
       <button
         key="next"
-        className={`btn btn-sm ${currentPage === totalPages ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        style={{ margin: '0 2px' }}
+        className={`btn btn-sm ${
+          !pagination.hasNext ? "btn-outline-secondary" : "btn-outline-primary"
+        }`}
+        onClick={() => handlePageChange(pagination.current + 1)}
+        disabled={!pagination.hasNext}
+        style={{ margin: "0 2px" }}
       >
         »
       </button>
     );
 
     return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
+      <div className="d-flex justify-content-between align-items-center">
         <small className="text-muted">
-          Hiển thị {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredRisks.length)} 
-          {' '}trong {filteredRisks.length} rủi ro
-          {filteredRisks.length !== risks.length && ` (lọc từ ${risks.length} tổng)`}
+          Hiển thị {(pagination.current - 1) * pagination.limit + 1} -{" "}
+          {Math.min(
+            pagination.current * pagination.limit,
+            pagination.totalCount
+          )}{" "}
+          trong {pagination.totalCount} rủi ro
         </small>
-        <div className="d-flex align-items-center">
-          {pages}
-        </div>
+        <div className="d-flex align-items-center">{pages}</div>
       </div>
     );
   };
@@ -533,7 +612,8 @@ export default function ListRiskPage() {
     <UserLayout
       title={t("riskPage.title")}
       activePage={"risk" && "risk-list"}
-      sidebarType={getSidebarType()}>
+      sidebarType={getSidebarType()}
+    >
       <style>{`
         .task-header { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
         .stat-card { background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; transition: all 0.2s; }
@@ -544,28 +624,12 @@ export default function ListRiskPage() {
 
         .risk-row { cursor: pointer; transition: background 0.2s; }
         .risk-row:hover { background: #F9FAFB; }
-        .chip { 
-          padding: 6px 8px; 
-          border-radius: 20px; 
-          font-size: 12px; 
-          font-weight: 600; 
-          text-transform: uppercase; 
-          letter-spacing: 0.5px; 
-          border: 2px solid; 
-          display: inline-flex; 
-          align-items: center; 
-          justify-content: center;
-          min-width: 110px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .chip-level { 
-          border: 2px solid; 
-        }
 
         .rounded-table { border-radius: 16px; overflow: hidden; }
         .rounded-table table { margin-bottom: 0; }
         .rounded-table thead { background: #F9FAFB; }
-        .rounded-table thead th { border-bottom: 2px solid #E5E7EB !important; }
+        .rounded-table thead th { border-bottom: 2px solid #E5E7EB !important; cursor: pointer; user-select: none; }
+        .rounded-table thead th:hover { background: #F3F4F6; }
         .rounded-table tbody tr:not(:last-child) td { border-bottom: 1px solid #EEF2F7; }
 
         .col-name { padding-left: 20px !important; }
@@ -616,6 +680,21 @@ export default function ListRiskPage() {
           border-radius: 0 0 16px 16px;
         }
 
+        .sort-icon {
+          margin-left: 4px;
+          font-size: 12px;
+          opacity: 0.6;
+        }
+
+        .occurred-badge {
+          background: #EF4444;
+          color: white;
+          font-size: 10px;
+          padding: 2px 6px;
+          border-radius: 12px;
+          margin-left: 8px;
+        }
+
         @media (max-width: 768px) {
           .filters-row {
             flex-direction: column;
@@ -637,7 +716,9 @@ export default function ListRiskPage() {
           <div className="row align-items-center">
             <div className="col-md-6">
               <h3 className="mb-2">Quản lý rủi ro</h3>
-              <p className="mb-0 opacity-75">Theo dõi và quản lý các rủi ro trong sự kiện</p>
+              <p className="mb-0 opacity-75">
+                Theo dõi và quản lý các rủi ro trong sự kiện
+              </p>
             </div>
             <div className="col-md-6">
               <div className="row g-2">
@@ -651,7 +732,9 @@ export default function ListRiskPage() {
                     }}
                   >
                     <div className="fs-4 fw-bold">
-                      {loading ? '...' : `${statistics.high}/${statistics.total}`}
+                      {loading
+                        ? "..."
+                        : `${statistics.high}/${statistics.total}`}
                     </div>
                     <div className="small">Rủi ro mức cao</div>
                   </div>
@@ -666,9 +749,9 @@ export default function ListRiskPage() {
                     }}
                   >
                     <div className="fs-4 fw-bold">
-                      {loading ? '...' : filteredRisks.length}
+                      {loading ? "..." : pagination.totalCount}
                     </div>
-                    <div className="small">Rủi ro</div>
+                    <div className="small">Tổng rủi ro</div>
                   </div>
                 </div>
               </div>
@@ -686,24 +769,25 @@ export default function ListRiskPage() {
             style={{ width: 400, paddingLeft: 16 }}
             disabled={loading}
           />
-          
-          <div className="ms-auto">
-            <button
-              className="add-btn"
-              onClick={handleShowAddModal}
-              disabled={loading}
-              style={{
-                background: loading ? "#ccc" : "#EF4444",
-                color: "#fff",
-                border: "none",
-                padding: "10px 20px",
-                borderRadius: 8,
-                fontWeight: 500,
-              }}
-            >
-              + Thêm rủi ro
-            </button>
-          </div>
+          {eventRole !== "Member" && (
+            <div className="ms-auto">
+              <button
+                className="add-btn"
+                onClick={handleShowAddModal}
+                disabled={loading}
+                style={{
+                  background: loading ? "#ccc" : "#EF4444",
+                  color: "#fff",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  fontWeight: 500,
+                }}
+              >
+                + Thêm rủi ro
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filters Row */}
@@ -723,6 +807,23 @@ export default function ListRiskPage() {
               <option value="Thấp">Thấp</option>
             </select>
           </div>
+          <div className="filter-group">
+            <div className="filter-label">Khả năng xảy ra</div>
+            <select
+              className="form-select form-select-sm soft-input"
+              style={{ width: 160, height: 40 }}
+              value={filterLikelihood}
+              onChange={(e) => setFilterLikelihood(e.target.value)}
+              disabled={loading}
+            >
+              <option value="Tất cả">Tất cả khả năng</option>
+              <option value="very_high">Rất cao</option>
+              <option value="high">Cao</option>
+              <option value="medium">Trung bình</option>
+              <option value="low">Thấp</option>
+              <option value="very_low">Rất thấp</option>
+            </select>
+          </div>
 
           <div className="filter-group">
             <div className="filter-label">Danh mục</div>
@@ -730,12 +831,14 @@ export default function ListRiskPage() {
               className="form-select form-select-sm soft-input"
               style={{ width: 180, height: 40 }}
               value={filterCategory}
-              onChange={(e) => handleCategoryFilterChange(e.target.value)}
+              onChange={(e) => setFilterCategory(e.target.value)}
               disabled={loading}
             >
               <option value="Tất cả">Tất cả danh mục</option>
-              {uniqueCategories.map(category => (
-                <option key={category} value={category}>{category}</option>
+              {uniqueCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
             </select>
           </div>
@@ -746,34 +849,24 @@ export default function ListRiskPage() {
               className="form-select form-select-sm soft-input"
               style={{ width: 180, height: 40 }}
               value={filterDepartment}
-              onChange={(e) => handleDepartmentFilterChange(e.target.value)}
+              onChange={(e) => setFilterDepartment(e.target.value)}
               disabled={loading}
             >
               <option value="Tất cả">Tất cả ban</option>
-              {uniqueDepartments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
+              {uniqueDepartments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
               ))}
             </select>
           </div>
 
-          <div className="filter-group">
-            <div className="filter-label">Sắp xếp theo</div>
-            <select
-              className="form-select form-select-sm soft-input"
-              style={{ width: 140, height: 40 }}
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              disabled={loading}
-            >
-              <option value="Tên">Tên A-Z</option>
-              <option value="Mức độ">Mức độ</option>
-              <option value="Danh mục">Danh mục</option>
-              <option value="Ban">Ban phụ trách</option>
-            </select>
-          </div>
-
           {/* Clear filters button */}
-          {(filterLevel !== "Tất cả" || filterCategory !== "Tất cả" || filterDepartment !== "Tất cả" || search) && (
+          {(filterLevel !== "Tất cả" ||
+            filterLikelihood !== "Tất cả" ||
+            filterCategory !== "Tất cả" ||
+            filterDepartment !== "Tất cả" ||
+            search) && (
             <div className="filter-group">
               <div className="filter-label">&nbsp;</div>
               <button
@@ -781,6 +874,7 @@ export default function ListRiskPage() {
                 style={{ height: 40, padding: "8px 16px" }}
                 onClick={() => {
                   setFilterLevel("Tất cả");
+                  setFilterLikelihood("Tất cả");
                   setFilterCategory("Tất cả");
                   setFilterDepartment("Tất cả");
                   setSearch("");
@@ -799,43 +893,104 @@ export default function ListRiskPage() {
             <table className="table align-middle">
               <thead>
                 <tr className="text-muted">
-                  <th className="py-3 col-name" style={{ width: "50%" }}>
-                    Tên rủi ro
-                  </th>
-                  <th className="py-3" style={{ width: "20%" }}>
-                    Ban phụ trách
-                  </th>
-                  <th className="py-3" style={{ width: "15%" }}>
+                  <th
+                    className="py-3"
+                    style={{ width: "13%", paddingLeft: 16 }}
+                  >
                     Danh mục
                   </th>
-                  <th className="py-3" style={{ width: "15%" }}>
+                  <th
+                    className="py-3 col-name"
+                    style={{ width: "35%" }}
+                    onClick={() => handleSortChange("name")}
+                  >
+                    Tên rủi ro
+                    <span className="sort-icon">
+                      {sortBy === "name"
+                        ? sortOrder === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </th>
+                  <th
+                    className="py-3"
+                    style={{ width: "13%" }}
+                    onClick={() => handleSortChange("owner")}
+                  >
+                    Ban phụ trách
+                    <span className="sort-icon">
+                      {sortBy === "owner"
+                        ? sortOrder === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </th>
+
+                  <th
+                    className="py-3"
+                    style={{ width: "15%" }}
+                    onClick={() => handleSortChange("impact")}
+                  >
                     Mức độ ảnh hưởng
+                    <span className="sort-icon">
+                      {sortBy === "impact"
+                        ? sortOrder === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </th>
+                  <th
+                    className="py-3"
+                    style={{ width: "15%" }}
+                    onClick={() => handleSortChange("likelihood")}
+                  >
+                    Khả năng xảy ra
+                    <span className="sort-icon">
+                      {sortBy === "likelihood"
+                        ? sortOrder === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </th>
+                  <th
+                    className="py-3"
+                    style={{ width: "9%", paddingRight: 14 }}
+                  >
+                    Trạng thái
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="4" className="text-center py-5">
+                    <td colSpan="6" className="text-center py-5">
                       <div className="loading-spinner"></div>
                       <div className="mt-2 text-muted">Đang tải...</div>
                     </td>
                   </tr>
-                ) : paginatedRisks.length === 0 ? (
+                ) : risks.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="text-center py-5 text-muted">
+                    <td colSpan="6" className="text-center py-5 text-muted">
                       <div style={{ fontSize: 48 }}>🫙</div>
                       <div className="mt-2">
-                        {risks.length === 0 
-                          ? 'Chưa có rủi ro nào' 
-                          : 'Không tìm thấy rủi ro phù hợp với bộ lọc'
-                        }
+                        {pagination.totalCount === 0
+                          ? "Chưa có rủi ro nào"
+                          : "Không tìm thấy rủi ro phù hợp với bộ lọc"}
                       </div>
-                      {(filterLevel !== "Tất cả" || filterCategory !== "Tất cả" || filterDepartment !== "Tất cả" || search) && (
+                      {(filterLevel !== "Tất cả" ||
+                        filterLikelihood !== "Tất cả" ||
+                        filterCategory !== "Tất cả" ||
+                        filterDepartment !== "Tất cả" ||
+                        search) && (
                         <button
                           className="btn btn-link btn-sm mt-2"
                           onClick={() => {
                             setFilterLevel("Tất cả");
+                            setFilterLikelihood("Tất cả");
                             setFilterCategory("Tất cả");
                             setFilterDepartment("Tất cả");
                             setSearch("");
@@ -847,35 +1002,87 @@ export default function ListRiskPage() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedRisks.map((r) => (
+                  risks.map((r) => (
                     <tr
                       key={r.id}
                       className="risk-row"
                       onClick={() => handleRiskClick(r)}
                     >
+                      <td className="py-3" style={{ paddingLeft: 16 }}>
+                        <span className="small text-muted">{r.category}</span>
+                      </td>
                       <td className="py-3 col-name">
-                        <div className="fw-medium">{r.name}</div>
-                        <div style={{fontSize:"12px"}} className="small text-muted">
-                          {r.description?.substring(0, 80)}
-                          {r.description?.length > 80 ? '...' : ''}
+                        <div className="fw-medium d-flex align-items-center">
+                          {r.name}
+                          {r.hasOccurred && (
+                            <span className="occurred-badge">
+                              {r.occurredCount} Sự cố
+                            </span>
+                          )}
+                          {r.pendingOccurred > 0 && (
+                            <span
+                              className="occurred-badge"
+                              style={{ background: "#F59E0B" }}
+                            >
+                              {r.pendingOccurred} Chờ xử lý
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{ fontSize: "10px" }}
+                          className="small text-muted"
+                        >
+                          {r.description?.substring(0, 60)}
+                          {r.description?.length > 60 ? "..." : ""}
                         </div>
                       </td>
                       <td className="py-3">
-                        <span className="small fw-medium text-muted">{r.owner}</span>
+                        <span className="small fw-medium text-muted">
+                          {r.owner}
+                        </span>
                       </td>
-                      <td className="py-3">
-                        <span className="small text-muted">{r.category}</span>
+
+                      <td className="py-3 ">
+                        {(() => {
+                          const { color, icon } = getLevelStyleAndIcon(r.level);
+                          return (
+                            <span
+                              style={{ color, fontWeight: 500, fontSize: 14 }}
+                            >
+                              <span style={{ marginRight: 2 }}>{icon}</span>{" "}
+                              {r.level}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="py-3 ">
+                        {(() => {
+                          const { color, icon } = getLevelStyleAndIcon(
+                            r.likelihoodLabel
+                          );
+                          return (
+                            <span
+                              style={{ color, fontWeight: 500, fontSize: 14 }}
+                            >
+                              <span style={{ marginRight: 2 }}>{icon}</span>{" "}
+                              {r.likelihoodLabel}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3">
                         <span
-                          className="chip chip-level"
+                          className="small fw-medium"
                           style={{
-                            background: levelChipStyle(r.level).bg,
-                            color: levelChipStyle(r.level).color,
-                            borderColor: levelChipStyle(r.level).border,
+                            color:
+                              r.statusKey === "resolved"
+                                ? "#16A34A"
+                                : r.statusKey === "resolving"
+                                ? "#D97706"
+                                : "#6B7280",
                           }}
                         >
-                          {r.level}
+                          {r.status}
                         </span>
                       </td>
                     </tr>
@@ -886,292 +1093,55 @@ export default function ListRiskPage() {
           </div>
 
           {/* Pagination */}
-          {!loading && filteredRisks.length > 0 && (
-            <div className="pagination-info">
-              {renderPagination()}
-            </div>
+          {!loading && risks.length > 0 && (
+            <div className="pagination-info">{renderPagination()}</div>
           )}
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedRisk && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 3000,
-          background: 'rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: 16,
-            width: '90%',
-            maxWidth: 700,
-            maxHeight: '90vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <h5 style={{ margin: 0, fontWeight: 600 }}>
-                {isEditing ? '✏️ Chỉnh sửa rủi ro' : 'Chi tiết rủi ro'}
-              </h5>
-              <button
-                className="btn btn-sm btn-light rounded-circle"
-                style={{ width: 32, height: 32, border: 'none' }}
-                onClick={handleCloseDetail}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{
-              padding: 24,
-              flex: 1,
-              overflow: 'auto'
-            }}>
-              <div className="form-group">
-                <label>Tên rủi ro {isEditing && '*'}</label>
-                {isEditing ? (
-                  <input
-                    className="form-control"
-                    value={editForm.name || ''}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Nhập tên rủi ro..."
-                  />
-                ) : (
-                  <div style={{ 
-                    padding: '8px 12px', 
-                    background: '#F9FAFB', 
-                    border: '1px solid #E5E7EB', 
-                    borderRadius: 6,
-                    fontWeight: 500 
-                  }}>
-                    {selectedRisk.name}
-                  </div>
-                )}
-              </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label>Danh mục</label>
-                    <div style={{ 
-                      padding: '8px 12px', 
-                      background: '#F9FAFB', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: 6,
-                      fontWeight: 500 
-                    }}>
-                      {selectedRisk.category}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label>Ban phụ trách</label>
-                    <div style={{ 
-                      padding: '8px 12px', 
-                      background: '#F9FAFB', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: 6,
-                      fontWeight: 500 
-                    }}>
-                      {selectedRisk.owner}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Kế hoạch giảm thiểu {isEditing && '*'}</label>
-                {isEditing ? (
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={editForm.description || ''}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Mô tả kế hoạch giảm thiểu rủi ro…"
-                  />
-                ) : (
-                  <div style={{ 
-                    padding: '8px 12px', 
-                    background: '#F9FAFB', 
-                    border: '1px solid #E5E7EB', 
-                    borderRadius: 6,
-                    minHeight: 100,
-                    whiteSpace: 'pre-wrap'
-                  }}>
-                    {selectedRisk.description || 'Chưa có mô tả'}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Kế hoạch ứng phó</label>
-                {isEditing ? (
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={editForm.mitigation || ''}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, mitigation: e.target.value }))}
-                    placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
-                  />
-                ) : (
-                  <div style={{ 
-                    padding: '8px 12px', 
-                    background: '#F9FAFB', 
-                    border: '1px solid #E5E7EB', 
-                    borderRadius: 6,
-                    minHeight: 100,
-                    whiteSpace: 'pre-wrap'
-                  }}>
-                    {selectedRisk.mitigation || 'Chưa có kế hoạch'}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Mức độ tác động</label>
-                {isEditing ? (
-                  <select
-                    className="form-select"
-                    value={editForm.level || 'Trung bình'}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, level: e.target.value }))}
-                  >
-                    <option value="Cao">Cao</option>
-                    <option value="Trung bình">Trung bình</option>
-                    <option value="Thấp">Thấp</option>
-                  </select>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span
-                      className="chip chip-level"
-                      style={{
-                        background: levelChipStyle(selectedRisk.level).bg,
-                        color: levelChipStyle(selectedRisk.level).color,
-                        borderColor: levelChipStyle(selectedRisk.level).border,
-                      }}
-                    >
-                      {selectedRisk.level}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                {!isEditing && (
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => handleDeleteClick(selectedRisk)}
-                  >
-                    🗑️ Xóa rủi ro
-                  </button>
-                )}
-              </div>
-              
-              <div style={{ display: 'flex', gap: 12 }}>
-                {isEditing ? (
-                  <>
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={handleCancelEdit}
-                      disabled={savingChanges}
-                    >
-                      Hủy
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleSaveEdit}
-                      disabled={savingChanges}
-                    >
-                      {savingChanges ? (
-                        <>
-                          <div className="loading-spinner me-2"></div>
-                          Đang lưu...
-                        </>
-                      ) : (
-                        '💾 Lưu thay đổi'
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={handleCloseDetail}
-                    >
-                      Đóng
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleStartEdit}
-                    >
-                      ✏️ Chỉnh sửa
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Create Risk Modal */}
       {showAddModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 3000,
-          background: 'rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: 16,
-            width: '90%',
-            maxWidth: 700,
-            maxHeight: '90vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
-          }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 3000,
+            background: "rgba(0, 0, 0, 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 16,
+              width: "90%",
+              maxWidth: 700,
+              maxHeight: "90vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+            }}
+          >
             {/* Modal Header */}
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <h5 style={{ margin: 0, fontWeight: 600 }}>➕ Thêm rủi ro mới</h5>
               <button
                 className="btn btn-sm btn-light rounded-circle"
-                style={{ width: 32, height: 32, border: 'none' }}
+                style={{ width: 32, height: 32, border: "none" }}
                 onClick={handleCloseAddModal}
               >
                 ×
@@ -1179,11 +1149,13 @@ export default function ListRiskPage() {
             </div>
 
             {/* Modal Body */}
-            <div style={{
-              padding: 24,
-              flex: 1,
-              overflow: 'auto'
-            }}>
+            <div
+              style={{
+                padding: 24,
+                flex: 1,
+                overflow: "auto",
+              }}
+            >
               <div className="form-group">
                 <label>Tên rủi ro *</label>
                 <input
@@ -1196,7 +1168,7 @@ export default function ListRiskPage() {
                   placeholder="Nhập tên rủi ro…"
                 />
               </div>
-              
+
               <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
@@ -1210,12 +1182,16 @@ export default function ListRiskPage() {
                       disabled={loadingDepartments}
                     >
                       <option value="">Chọn ban phụ trách</option>
-                      {departments.map(dept => (
-                        <option key={dept._id} value={dept._id}>{dept.name}</option>
+                      {departments.map((dept) => (
+                        <option key={dept._id} value={dept._id}>
+                          {dept.name}
+                        </option>
                       ))}
                     </select>
                     {loadingDepartments && (
-                      <small className="text-muted">Đang tải danh sách ban...</small>
+                      <small className="text-muted">
+                        Đang tải danh sách ban...
+                      </small>
                     )}
                   </div>
                 </div>
@@ -1226,32 +1202,59 @@ export default function ListRiskPage() {
                       className="form-select"
                       value={newRisk.risk_category}
                       onChange={(e) =>
-                        setNewRisk({ ...newRisk, risk_category: e.target.value })
+                        setNewRisk({
+                          ...newRisk,
+                          risk_category: e.target.value,
+                        })
                       }
                     >
                       {Object.entries(categoryLabels).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Mức độ tác động</label>
-                <select
-                  className="form-select"
-                  value={newRisk.impact}
-                  onChange={(e) =>
-                    setNewRisk({ ...newRisk, impact: e.target.value })
-                  }
-                >
-                  <option value="high">Cao</option>
-                  <option value="medium">Trung bình</option>
-                  <option value="low">Thấp</option>
-                </select>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Mức độ tác động</label>
+                    <select
+                      className="form-select"
+                      value={newRisk.impact}
+                      onChange={(e) =>
+                        setNewRisk({ ...newRisk, impact: e.target.value })
+                      }
+                    >
+                      <option value="high">Cao</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="low">Thấp</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Khả năng xảy ra</label>
+                    <select
+                      className="form-select"
+                      value={newRisk.likelihood}
+                      onChange={(e) =>
+                        setNewRisk({ ...newRisk, likelihood: e.target.value })
+                      }
+                    >
+                      <option value="very_high">Rất cao</option>
+                      <option value="high">Cao</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="low">Thấp</option>
+                      <option value="very_low">Rất thấp</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              
+
               <div className="form-group">
                 <label>Kế hoạch giảm thiểu *</label>
                 <textarea
@@ -1259,12 +1262,15 @@ export default function ListRiskPage() {
                   rows={4}
                   value={newRisk.risk_mitigation_plan}
                   onChange={(e) =>
-                    setNewRisk({ ...newRisk, risk_mitigation_plan: e.target.value })
+                    setNewRisk({
+                      ...newRisk,
+                      risk_mitigation_plan: e.target.value,
+                    })
                   }
                   placeholder="Mô tả kế hoạch giảm thiểu rủi ro…"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Kế hoạch ứng phó</label>
                 <textarea
@@ -1272,7 +1278,10 @@ export default function ListRiskPage() {
                   rows={4}
                   value={newRisk.risk_response_plan}
                   onChange={(e) =>
-                    setNewRisk({ ...newRisk, risk_response_plan: e.target.value })
+                    setNewRisk({
+                      ...newRisk,
+                      risk_response_plan: e.target.value,
+                    })
                   }
                   placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
                 />
@@ -1280,13 +1289,15 @@ export default function ListRiskPage() {
             </div>
 
             {/* Modal Footer */}
-            <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 12
-            }}>
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+              }}
+            >
               <button
                 className="btn btn-outline-secondary"
                 onClick={handleCloseAddModal}
@@ -1305,7 +1316,7 @@ export default function ListRiskPage() {
                     Đang thêm...
                   </>
                 ) : (
-                  'Thêm rủi ro'
+                  "Thêm rủi ro"
                 )}
               </button>
             </div>

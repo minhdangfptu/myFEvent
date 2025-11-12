@@ -1,0 +1,333 @@
+/* Updated to use specific BEM-style class names */
+
+.agenda-page__container {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  
+  .agenda-page__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #e74c3c;
+    margin-bottom: 32px;
+  }
+  
+  .agenda-page__section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 12px;
+  }
+  
+  /* Date Management Section */
+  .agenda-page__date-management {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 32px;
+  }
+  
+  .agenda-page__date-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .agenda-page__date-button {
+    background-color: white;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: #2c3e50;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .agenda-page__date-button--active {
+    background-color: #e74c3c;
+    color: white;
+    border-color: #e74c3c;
+    font-weight: 500;
+  }
+  
+  .agenda-page__date-button-icon {
+    cursor: pointer;
+  }
+  
+  .agenda-page__add-date-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .agenda-page__add-date-button:hover {
+    background-color: #c0392b;
+  }
+  
+  /* Schedule Details Section */
+  .agenda-page__schedule-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+  }
+  
+  .agenda-page__schedule-table-wrapper {
+    overflow-x: auto;
+    margin-top: 20px;
+  }
+  
+  .agenda-page__schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  
+  .agenda-page__schedule-table-head {
+    background-color: #f5f5f5;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  
+  .agenda-page__schedule-table-header-row {
+    background-color: #f5f5f5;
+  }
+  
+  .agenda-page__schedule-table-header-cell {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+  
+  .agenda-page__schedule-table-body {
+    /* existing code */
+  }
+  
+  .agenda-page__schedule-table-row {
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .agenda-page__schedule-table-row--editing {
+    background-color: #ffe6e6;
+  }
+  
+  .agenda-page__schedule-table-cell {
+    padding: 12px 16px;
+    color: #555;
+  }
+  
+  .agenda-page__schedule-session-cell {
+    font-weight: 500;
+    color: #2c3e50;
+    min-width: 60px;
+  }
+  
+  .agenda-page__schedule-time-cell {
+    min-width: 140px;
+  }
+  
+  .agenda-page__schedule-content-cell {
+    flex-grow: 1;
+    min-width: 200px;
+  }
+  
+  .agenda-page__schedule-duration-cell {
+    text-align: left;
+    min-width: 80px;
+  }
+  
+  .agenda-page__schedule-actions-cell {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .agenda-page__time-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .agenda-page__time-separator {
+    color: #999;
+  }
+  
+  .agenda-page__time-input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  .agenda-page__content-input {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  .agenda-page__action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .agenda-page__action-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+    color: #2c3e50;
+  }
+  
+  .agenda-page__action-button--confirm {
+    color: #27ae60;
+  }
+  
+  .agenda-page__action-button--confirm:hover {
+    color: #229954;
+  }
+  
+  .agenda-page__action-button--delete {
+    color: #e74c3c;
+  }
+  
+  .agenda-page__action-button--delete:hover {
+    color: #c0392b;
+  }
+  
+  /* Add Schedule Section */
+  .agenda-page__add-schedule-section {
+    background-color: #fff5f5;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #fcc;
+    margin-top: 20px;
+  }
+  
+  .agenda-page__add-schedule-inputs {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .agenda-page__session-select {
+    max-width: 100px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  .agenda-page__time-input-sm {
+    max-width: 100px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  .agenda-page__time-separator-sm {
+    color: #999;
+  }
+  
+  .agenda-page__content-input-lg {
+    flex-grow: 1;
+    min-width: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  .agenda-page__duration-input-sm {
+    max-width: 80px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  
+  /* Add Activity Button */
+  .agenda-page__add-activity-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    margin-top: 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .agenda-page__add-activity-button:hover {
+    background-color: #c0392b;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .agenda-page__date-buttons {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  
+    .agenda-page__date-button,
+    .agenda-page__add-date-button {
+      width: 100%;
+      justify-content: center;
+    }
+  
+    .agenda-page__schedule-table-header-cell,
+    .agenda-page__schedule-table-cell {
+      padding: 10px 8px;
+      font-size: 12px;
+    }
+  }
+
+  .agenda-page__date-item {
+    display: inline-block;
+  }
+  
+  .agenda-page__date-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    background-color: #ffe6e6;
+  }
+  
+  .agenda-page__date-input {
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  
+  .agenda-page__date-edit-actions {
+    display: flex;
+    gap: 5px;
+  }
+  

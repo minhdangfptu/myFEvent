@@ -8,6 +8,7 @@ import {
   updateMilestoneDoc,
   softDeleteMilestoneIfNoTasks
 } from '../services/milestoneService.js';
+import * as agendaService from '../services/agendaService.js';
 
 // POST /api/events/:eventId/milestones
 export const createMilestone = async (req, res) => {
@@ -23,8 +24,42 @@ export const createMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    // 1. Create milestone first
     const milestone = await createMilestoneDoc({ eventId, name, description, targetDate, status });
-    return res.status(201).json({ data: milestone });
+    
+    // 2. Create agenda document for this milestone
+    try {
+      const agendaPayload = {
+        milestoneId: milestone._id
+      };
+      
+      const agenda = await agendaService.createAgendaDoc(agendaPayload);
+      
+      console.log(`✅ Created agenda for milestone ${milestone._id}:`, agenda._id);
+      
+      // Return milestone with agenda info
+      return res.status(201).json({ 
+        data: milestone,
+        agenda: {
+          _id: agenda._id,
+          milestoneId: agenda.milestoneId,
+          created: true
+        },
+        message: 'Milestone and agenda created successfully'
+      });
+      
+    } catch (agendaError) {
+      console.warn(`⚠️ Failed to create agenda for milestone ${milestone._id}:`, agendaError.message);
+      return res.status(201).json({ 
+        data: milestone,
+        agenda: {
+          created: false,
+          error: agendaError.message
+        },
+        message: 'Milestone created successfully, but agenda creation failed'
+      });
+    }
+    
   } catch (error) {
     console.error('createMilestone error:', error.message);
     return res.status(500).json({ message: 'Failed to create milestone' });

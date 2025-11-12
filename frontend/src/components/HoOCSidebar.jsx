@@ -14,6 +14,7 @@ export default function HoOCSidebar({
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [risksOpen, setRisksOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
@@ -29,13 +30,13 @@ export default function HoOCSidebar({
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hooc-dashboard?eventId=${eventId}` },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` },
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
     { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${eventId || ''}/milestones` },
     { id: "work-statitics", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
@@ -43,6 +44,10 @@ export default function HoOCSidebar({
     { id: "expenses", label: "Chi tiêu", path: "/task" },
     { id: "income", label: "Thu nhập", path: "/task" },
     { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+  ];
+  const risksSubItems = [
+    { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
+    { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
 
   // Hover handlers giữ nguyên
@@ -404,27 +409,59 @@ export default function HoOCSidebar({
                 </div>
 
                 {/* Rủi ro */}
-                <button
-                  className={`btn-nav ${activePage === "risk" || activePage === "risk-list" ? "active" : ""}`}
-                  onClick={() => navigate(`/events/${eventId || ''}/risks`)}
-                  title="Rủi ro"
+                <div
+                  className="menu-item-hover"
+                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
+                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
                 >
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-bug me-3" style={{ width: 20 }} />
-                    {sidebarOpen && <span>Rủi ro</span>}
-                  </div>
-                </button>
+                  <button
+                    className={`btn-nav${activePage.startsWith("risk") ? " active" : ""}`}
+                    onClick={() => sidebarOpen && setRisksOpen((prev) => !prev)}
+                    style={{ cursor: "pointer", background: hoveredMenu === "risk" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    title="Rủi ro"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-bug me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Rủi ro</span>}
+                    </div>
+                    {sidebarOpen && (
+                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    )}
+                  </button>
 
-                <button
-                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
-                  title="Phản hồi"
-                >
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
-                    {sidebarOpen && <span>Phản hồi</span>}
-                  </div>
-                </button>
+                  {!sidebarOpen && hoveredMenu === "risk" && (
+                    <div
+                      className="hover-submenu"
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      onMouseEnter={handlePopupMouseEnter}
+                      onMouseLeave={handlePopupMouseLeave}
+                    >
+                      {risksSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {risksOpen && sidebarOpen && (
+                    <div className="ms-2">
+                      {risksSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>

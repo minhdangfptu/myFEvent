@@ -1,10 +1,20 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-const AgendaSchema = new Schema({
-    milestoneId: { type: Types.ObjectId, ref: 'Milestone', required: true },
+const AgendaItemSchema = new Schema({
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
-    name: { type: String, required: true },
-    description: { type: String },
-}, { timestamps: true, versionKey: false });
-export default mongoose.model('Agenda', AgendaSchema);
+    duration: { type: Number, required: true },
+    content: { type: String, required: true },
+}, { _id: false }); 
+
+const AgendaSchema = new Schema({
+    date: { type: Date, required: true },
+    items: [AgendaItemSchema],
+}); 
+
+const AgendaAndMileStoneSchema = new Schema({
+    milestoneId: { type: Types.ObjectId, ref: 'Milestone', required: true },
+    agenda: [AgendaSchema], 
+}, { timestamps: true, versionKey: false, collection: 'agendas' });
+
+export default mongoose.model('Agenda', AgendaAndMileStoneSchema);

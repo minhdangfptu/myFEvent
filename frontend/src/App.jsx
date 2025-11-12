@@ -67,6 +67,9 @@ import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
 import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
 import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+import RiskStatistics from "./pages/Risk/RiskStatistics";
+import RiskDetailPage from "./pages/Risk/RiskDetailPage";
+import AgendaPage from "./pages/Agenda/AgendaPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -178,6 +181,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/milestone-detail/:milestoneId/agenda" 
+            element={
+              <ProtectedRoute>
+                <AgendaPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/events/:eventId/hooc-edit-milestone/:id" 
             element={
               <ProtectedRoute>
@@ -279,6 +290,22 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <RiskListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/risks/analysis"  
+            element={
+              <ProtectedRoute requiredRole="user">
+                <RiskStatistics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/risks/detail/:riskId"  
+            element={
+              <ProtectedRoute requiredRole="user">
+                <RiskDetailPage />
               </ProtectedRoute>
             } 
           />

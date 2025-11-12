@@ -13,7 +13,7 @@ export const config = {
     // JWT
     JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key',
-    JWT_EXPIRE: process.env.JWT_EXPIRE || '15m',
+    JWT_EXPIRE: process.env.JWT_EXPIRE || '60m',
     JWT_REFRESH_EXPIRE: process.env.JWT_REFRESH_EXPIRE || '7d',
     JWT_REFRESH_SALT_ROUNDS: process.env.JWT_REFRESH_SALT_ROUNDS || 10,
     

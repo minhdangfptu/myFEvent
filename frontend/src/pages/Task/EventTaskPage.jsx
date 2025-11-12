@@ -106,10 +106,10 @@ export default function EventTaskPage() {
     eventApi.getById(eventId)
       .then((res) => {
         const event = res?.data?.event || res?.data;
+        console.log(event)
         if (event) {
           setEventInfo({
-            eventStartDate: event.eventStartDate,
-            eventEndDate: event.eventEndDate,
+            createdAt: event.createdAt,
           });
         }
       })
@@ -1238,20 +1238,18 @@ export default function EventTaskPage() {
                             const now = new Date();
                             now.setMinutes(now.getMinutes() + 1); // Thêm 1 phút để đảm bảo sau thời điểm hiện tại
                             const minDateTime = now.toISOString().slice(0, 16);
-                            if (eventInfo?.eventStartDate) {
-                              const eventStart = new Date(eventInfo.eventStartDate);
-                              const eventStartStr = eventStart.toISOString().slice(0, 16);
-                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            if (eventInfo?.createdAt) {
+                              const eventCreatedAt = new Date(eventInfo.createdAt);
+                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
+                              return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
                             }
                             return minDateTime;
                           })()}
-                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
-                            Thời gian bắt đầu phải sau thời điểm hiện tại
-                            {eventInfo.eventStartDate && ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
-                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                            Lưu ý: Thời gian bắt đầu phải sau thời điểm
+                            {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
                           </div>
                         )}
                       </div>
@@ -1265,30 +1263,37 @@ export default function EventTaskPage() {
                             handleAddTaskInput("dueDate", e.target.value)
                           }
                           min={(() => {
-                            // Nếu có startDate, min phải sau startDate, nếu không thì sau thời điểm hiện tại
+                            // Deadline phải sau createdAt và startDate (nếu có)
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1);
+                            let minDateTime = now.toISOString().slice(0, 16);
+                            
+                            // Đảm bảo sau createdAt
+                            if (eventInfo?.createdAt) {
+                              const eventCreatedAt = new Date(eventInfo.createdAt);
+                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
+                              if (eventCreatedAtStr > minDateTime) {
+                                minDateTime = eventCreatedAtStr;
+                              }
+                            }
+                            
+                            // Nếu có startDate, deadline phải sau startDate
                             if (addTaskForm.startDate) {
                               const startDate = new Date(addTaskForm.startDate);
                               startDate.setMinutes(startDate.getMinutes() + 1);
-                              return startDate.toISOString().slice(0, 16);
+                              const startDateStr = startDate.toISOString().slice(0, 16);
+                              if (startDateStr > minDateTime) {
+                                minDateTime = startDateStr;
+                              }
                             }
-                            const now = new Date();
-                            now.setMinutes(now.getMinutes() + 1);
-                            const minDateTime = now.toISOString().slice(0, 16);
-                            if (eventInfo?.eventStartDate) {
-                              const eventStart = new Date(eventInfo.eventStartDate);
-                              const eventStartStr = eventStart.toISOString().slice(0, 16);
-                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
-                            }
+                            
                             return minDateTime;
                           })()}
-                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
-                            Deadline phải sau thời điểm hiện tại
-                            {addTaskForm.startDate && " và sau thời gian bắt đầu"}
-                            {eventInfo.eventStartDate && `, sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
-                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                            Lưu ý: Deadline phải sau thời điểm {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                            {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
                           </div>
                         )}
                       </div>
