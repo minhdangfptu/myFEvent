@@ -8,6 +8,7 @@ export const getUserRoleByEvent = async (req, res) => {
     const membership = await EventMember.findOne({ userId, eventId })
       .populate('userId', 'fullName')
       .populate('eventId', 'name')
+      .populate('departmentId', 'name')
       .lean();
 
     if (!membership) {
@@ -16,7 +17,8 @@ export const getUserRoleByEvent = async (req, res) => {
     return res.json({
       user: membership.userId,
       event: membership.eventId,
-      role: membership.role
+      role: membership.role,
+      departmentId: membership.departmentId?._id || membership.departmentId || null
     });
   } catch (err) {
     return res.status(500).json({ message: 'Lỗi máy chủ', error: err.message });

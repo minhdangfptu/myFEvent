@@ -1,360 +1,932 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useParams, useLocation } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
+import { eventApi } from "../../apis/eventApi"
+import { milestoneService } from "../../services/milestoneService"
+import { departmentService } from "../../services/departmentService"
+import Loading from "../../components/Loading"
+import { formatDate } from "../../utils/formatDate"
+import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
+import { useEvents } from "../../contexts/EventContext"
 
-// Task Completion Chart Data
-const taskCompletionData = [
-  { name: "T2", "Lý thuyết": 50, "Thực tế": 50 },
-  { name: "T3", "Lý thuyết": 45, "Thực tế": 48 },
-  { name: "T4", "Lý thuyết": 40, "Thực tế": 42 },
-  { name: "T5", "Lý thuyết": 35, "Thực tế": 38 },
-  { name: "T6", "Lý thuyết": 30, "Thực tế": 32 },
-  { name: "T7", "Lý thuyết": 25, "Thực tế": 28 },
-  { name: "CN", "Lý thuyết": 15, "Thực tế": 18 },
-]
+// Helper function to generate calendar days
+function generateCalendarDays() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const daysInMonth = lastDay.getDate()
+  
+  const days = []
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push({
+      day: i,
+      today: i === today.getDate(),
+      highlight: false
+    })
+  }
+  
+  return days
+}
 
-// Budget Chart Data
-const budgetData = [
-  { name: "Tuần 1", "Ngân sách": 25, "Chi tiêu": 20 },
-  { name: "Tuần 2", "Ngân sách": 30, "Chi tiêu": 25 },
-  { name: "Tuần 3", "Ngân sách": 35, "Chi tiêu": 30 },
-  { name: "Tuần 4", "Ngân sách": 40, "Chi tiêu": 38 },
-]
+const unwrapApiData = (payload) => {
+  let current = payload
+  while (
+    current &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    (current.data !== undefined || current.result !== undefined || current.payload !== undefined)
+  ) {
+    current = current.data ?? current.result ?? current.payload
+  }
+  return current
+}
 
-// Recent Activities Data
-const activities = [
-  {
-    name: "Nguyễn Minh Anh",
-    action: 'đã hoàn thành task "Thiết kế poster"',
-    time: "2 giờ trước",
-    color: "#00897b",
-  },
-  {
-    name: "Trần Văn B",
-    action: 'đã tạo sự kiện mới "Workshop React"',
-    time: "4 giờ trước",
-    color: "#f57c00",
-  },
-  {
-    name: "Lê Thị C",
-    action: 'đã cập nhật ngân sách cho sự kiện "FPT Techday"',
-    time: "6 giờ trước",
-    color: "#f9a825",
-  },
-]
+const dedupeMembers = (members = []) => {
+  const seen = new Set()
+  return members.filter((member) => {
+    const id = [
+      member?.id,
+      member?._id,
+      member?.userId,
+      member?.userId?._id,
+      member?.user?.id,
+      member?.user?._id,
+      member?.user?.userId
+    ].find(Boolean)
 
-// Upcoming Tasks Data
-const tasks = [
-  {
-    title: "Hoàn thiện kế hoạch marketing",
-    date: "Hôm nay, 18:00",
-    status: "Khẩn cấp",
-    statusColor: "#e63946",
-    statusBgColor: "#ffe0e0",
-  },
-  {
-    title: "Review nội dung workshop",
-    date: "Mai, 10:00",
-    status: "Cấp",
-    statusColor: "#f9a825",
-    statusBgColor: "#fff9e6",
-  },
-  {
-    title: "Chuẩn bị tài liệu hướng dẫn",
-    date: "25/10/2024",
-    status: "Thường",
-    statusColor: "#666",
-    statusBgColor: "#f0f0f0",
-  },
-]
+    if (!id) return true
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
+
+const normalizeMembers = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return dedupeMembers(data)
+  if (Array.isArray(data.members)) return dedupeMembers(data.members)
+  if (Array.isArray(data.list)) return dedupeMembers(data.list)
+  if (Array.isArray(data.items)) return dedupeMembers(data.items)
+  if (Array.isArray(data.results)) return dedupeMembers(data.results)
+  if (typeof data === "object") {
+    const aggregated = Object.values(data).reduce((acc, value) => {
+      if (Array.isArray(value)) acc.push(...value)
+      else if (Array.isArray(value?.members)) acc.push(...value.members)
+      return acc
+    }, [])
+    return dedupeMembers(aggregated)
+  }
+  return []
+}
+
+const normalizeMilestones = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.milestones)) return data.milestones
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  if (Array.isArray(data.results)) return data.results
+  return []
+}
+
+const normalizeDepartments = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.departments)) return data.departments
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  if (Array.isArray(data.results)) return data.results
+  return []
+}
+
+const parseMilestoneDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date
+  return null
+}
+
+const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
+
+const isCompletedStatus = (status) => {
+  const normalized = normalizeStatus(status)
+  return (
+    normalized === "completed" ||
+    normalized === "done" ||
+    normalized === "đã hoàn thành" ||
+    normalized === "hoàn thành" ||
+    normalized === "da hoan thanh"
+  )
+}
 
 export default function HoOCDashBoard() {
-  const [taskPeriod, setTaskPeriod] = useState("7days")
-  const [budgetPeriod, setBudgetPeriod] = useState("month")
+  const location = useLocation()
+  const { eventId: paramEventId } = useParams()
+  const { fetchEventRole } = useEvents()
+  
+  // State
+  const [loading, setLoading] = useState(true)
+  const [eventData, setEventData] = useState(null)
+  const [members, setMembers] = useState([])
+  const [milestones, setMilestones] = useState([])
+  const [departments, setDepartments] = useState([])
+  const [eventRole, setEventRole] = useState("")
+  const [hoveredDay, setHoveredDay] = useState(null)
+  
+  // Get event ID from URL
+  const eventId = paramEventId || getEventIdFromUrl(location.pathname, location.search)
 
-  const cardStyle = { boxShadow: "0 1px 3px rgba(0,0,0,0.08)", border: "1px solid #e0e0e0" }
+  // Load event role for sidebar
+  useEffect(() => {
+    let mounted = true
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("")
+        return
+      }
+      try {
+        const role = await fetchEventRole(eventId)
+        if (mounted) setEventRole(role)
+      } catch (_) {
+        if (mounted) setEventRole("")
+      }
+    }
+    loadRole()
+    return () => {
+      mounted = false
+    }
+  }, [eventId, fetchEventRole])
 
-  const StatCard = ({ icon, iconBg, value, label, trend, trendColor }) => (
-    <div className="card" style={cardStyle}>
-      <div className="card-body">
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div
-            className="d-flex align-items-center justify-content-center"
-            style={{
-              backgroundColor: iconBg,
-              width: "40px",
-              height: "40px",
-              borderRadius: "4px",
-              fontSize: "20px",
-            }}
-          >
-            {icon}
-          </div>
-          <span style={{ color: trendColor, fontWeight: 600, fontSize: "14px" }}>{trend}</span>
-        </div>
-        <h5 className="fw-bold mb-2">{value}</h5>
-        <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-          {label}
-        </p>
-      </div>
-    </div>
+  // Fetch all data
+  useEffect(() => {
+    if (!eventId) return
+
+    let cancelled = false
+
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+
+        const [eventResponse, membersResponse, milestonesResponse, departmentsResponse] = await Promise.all([
+          eventApi.getById(eventId),
+          eventApi.getMembersByEvent(eventId),
+          milestoneService.listMilestones(eventId, {
+            sortBy: "targetDate",
+            sortDir: "asc"
+          }),
+          departmentService.getDepartments(eventId)
+        ])
+
+        if (cancelled) return
+
+        const eventPayload = unwrapApiData(eventResponse)
+        setEventData(eventPayload?.event ?? eventPayload ?? null)
+
+        setMembers(normalizeMembers(membersResponse))
+
+        const milestoneList = normalizeMilestones(milestonesResponse)
+        const sortedMilestones = milestoneList
+          .slice()
+          .sort((a, b) => {
+            const da = parseMilestoneDate(a?.targetDate) || new Date(8640000000000000)
+            const db = parseMilestoneDate(b?.targetDate) || new Date(8640000000000000)
+            return da.getTime() - db.getTime()
+          })
+        setMilestones(sortedMilestones)
+
+        setDepartments(normalizeDepartments(departmentsResponse))
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error fetching dashboard data:", error)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [eventId])
+
+  // Add smooth animations on load
+  useEffect(() => {
+    if (loading) return
+
+    const progressFills = document.querySelectorAll(".progress-fill")
+    progressFills.forEach((fill) => {
+      const width = fill.style.width
+      fill.style.width = "0%"
+      setTimeout(() => {
+        fill.style.width = width
+      }, 100)
+    })
+
+    const bars = document.querySelectorAll(".chart-bar")
+    bars.forEach((bar, index) => {
+      const height = bar.style.height
+      bar.style.height = "0px"
+      setTimeout(() => {
+        bar.style.height = height
+      }, 200 + index * 50)
+    })
+  }, [loading])
+
+  // Calculate stats
+  const totalMilestones = milestones.length
+  const completedMilestones = useMemo(
+    () => milestones.filter((m) => isCompletedStatus(m?.status)).length,
+    [milestones]
+  )
+  const milestoneCompletionPercent = totalMilestones > 0
+    ? Math.round((completedMilestones / totalMilestones) * 100)
+    : 0
+  const milestoneProgressRatio = totalMilestones > 0
+    ? Math.min(100, Math.max(0, (completedMilestones / totalMilestones) * 100))
+    : 0
+  const totalMembers = members.length
+  const totalDepartments = departments.length
+
+  const budgetStats = useMemo(() => {
+    let allocated = 0
+    let spent = 0
+    const items = []
+
+    departments.forEach((dept) => {
+      const name = dept?.name || "Ban chưa đặt tên"
+
+      const budgetValue = Number(
+        dept?.budget ??
+        dept?.allocatedBudget ??
+        dept?.budgetAllocated ??
+        dept?.budgetEstimate ??
+        dept?.totalBudget ??
+        dept?.planBudget ??
+        0
+      ) || 0
+
+      const spendingValue = Number(
+        dept?.spent ??
+        dept?.budgetSpent ??
+        dept?.actualBudget ??
+        dept?.actualSpending ??
+        dept?.actualCost ??
+        dept?.spending ??
+        0
+      ) || 0
+
+      if (budgetValue > 0 || spendingValue > 0) {
+        items.push({
+          category: name,
+          budget: Math.max(0, Math.round(budgetValue)),
+          spending: Math.max(0, Math.round(spendingValue))
+        })
+      }
+
+      allocated += Math.max(0, budgetValue)
+      spent += Math.max(0, spendingValue)
+    })
+
+    const percent = allocated > 0
+      ? Math.max(0, Math.min(100, Math.round((spent / allocated) * 100)))
+      : null
+
+    return {
+      items,
+      percent,
+      allocated,
+      spent
+    }
+  }, [departments])
+
+  const { items: budgetItems, percent: budgetUsagePercent } = budgetStats
+  const totalBudgetAllocated = budgetStats.allocated
+  const totalBudgetSpent = budgetStats.spent
+  const budgetUsageDisplay = budgetUsagePercent != null ? `${budgetUsagePercent}%` : "—"
+  const budgetSummaryLabel = totalBudgetAllocated > 0
+    ? `${totalBudgetSpent.toLocaleString("vi-VN")} / ${totalBudgetAllocated.toLocaleString("vi-VN")}`
+    : "Chưa có dữ liệu"
+  const budgetSpendingData = useMemo(() => budgetItems.slice(0, 4), [budgetItems])
+  const budgetChartScale = useMemo(() => {
+    if (!budgetSpendingData.length) return 1
+    const maxValue = budgetSpendingData.reduce(
+      (max, item) => Math.max(max, item.budget, item.spending),
+      0
+    )
+    return maxValue > 0 ? 160 / maxValue : 1
+  }, [budgetSpendingData])
+
+  const majorTasks = useMemo(() => {
+    return departments.slice(0, 2).map((dept) => {
+      const progressSources = [
+        dept?.progress,
+        dept?.progressPercent,
+        dept?.progressPercentage,
+        dept?.completionRate,
+        dept?.performance?.progress
+      ]
+      const progressValue = progressSources.find((value) => typeof value === "number") ?? 0
+      const normalizedProgress = Math.max(0, Math.min(100, Math.round(progressValue)))
+
+      const deadlineSource =
+        dept?.deadline ||
+        dept?.dueDate ||
+        dept?.plannedEndDate ||
+        dept?.expectedCompletionDate
+
+      return {
+        title: dept?.name || "Ban chưa đặt tên",
+        progress: normalizedProgress,
+        deadline: deadlineSource ? formatDate(deadlineSource) : "Đang cập nhật"
+      }
+    })
+  }, [departments])
+
+  // Prepare timeline data from milestones (max 5)
+  const eventTimeline = useMemo(
+    () =>
+      milestones.slice(0, 5).map((milestone) => ({
+        name: milestone?.name || "Cột mốc",
+        date: formatDate(milestone?.targetDate || milestone?.dueDate),
+        completed: isCompletedStatus(milestone?.status)
+      })),
+    [milestones]
   )
 
+  // Calendar data (current month)
+  const calendarDays = generateCalendarDays()
+
+  // Get events for a specific day
+  const getEventsForDay = useMemo(() => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    
+    return (day) => {
+      if (!day) return []
+      const targetDate = new Date(year, month, day)
+      
+      return milestones.filter((milestone) => {
+        const milestoneDate = parseMilestoneDate(milestone?.targetDate || milestone?.dueDate)
+        if (!milestoneDate) return false
+        
+        // Compare only year, month, day (ignore time)
+        return (
+          milestoneDate.getFullYear() === targetDate.getFullYear() &&
+          milestoneDate.getMonth() === targetDate.getMonth() &&
+          milestoneDate.getDate() === targetDate.getDate()
+        )
+      })
+    }
+  }, [milestones])
+
+  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc'
+
+  if (loading) {
+    return (
+      <UserLayout
+        title="Dashboard tổng"
+        sidebarType={sidebarType}
+        activePage="overview-dashboard"
+        eventId={eventId}
+      >
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(255,255,255,1)",
+            zIndex: 2000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Loading size={80} />
+        </div>
+      </UserLayout>
+    )
+  }
+
+  if (!eventData) {
+    return (
+      <UserLayout
+        title="Dashboard tổng"
+        sidebarType={sidebarType}
+        activePage="overview-dashboard"
+        eventId={eventId}
+      >
+        <div className="alert alert-danger">Không tìm thấy sự kiện</div>
+      </UserLayout>
+    )
+  }
+
   return (
-    <UserLayout title="Dashboard tổng" sidebarType="hooc" activePage="overview-dashboard">
-      <div className="bg-light min-vh-100 py-4">
-        <div className="container-lg">
+    <UserLayout title="Dashboard tổng" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+      <div className="bg-light" style={{ minHeight: "100vh", padding: "20px" }}>
+        <div className="container-fluid px-0" style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
-          <h1 className="text-danger fw-bold mb-4" style={{ fontSize: "28px" }}>
-            Halloween 2024 - Dashboard tổng
+          <h1 className="mb-4" style={{ color: "#ff5757", fontSize: "24px", fontWeight: 600 }}>
+            {eventData.name} - Dashboard tổng
           </h1>
 
-          {/* KPI Cards */}
+          {/* Stats Cards */}
           <div className="row g-3 mb-4">
-            <div className="col-12 col-sm-6 col-md-3">
-              <StatCard icon="📋" iconBg="#fce4ec" value="24" label="Cót mục sự kiện" trend="+12%" trendColor="#4caf50" />
-            </div>
-            <div className="col-12 col-sm-6 col-md-3">
-              <StatCard
-                icon="✓"
-                iconBg="#e0f2f1"
-                value="186"
-                label="Công việc hoàn thành"
-                trend="+8%"
-                trendColor="#4caf50"
-              />
-            </div>
-            <div className="col-12 col-sm-6 col-md-3">
-              <StatCard
-                icon="👥"
-                iconBg="#ffe0b2"
-                value="142"
-                label="Thành viên tham gia"
-                trend="+5%"
-                trendColor="#4caf50"
-              />
-            </div>
-            <div className="col-12 col-sm-6 col-md-3">
-              <StatCard
-                icon="$"
-                iconBg="#fff9c4"
-                value="68%"
-                label="Ngân sách đã sử dụng"
-                trend="-3%"
-                trendColor="#e63946"
-              />
-            </div>
-          </div>
-
-          {/* Charts Section */}
-          <div className="row g-3 mb-4">
-            {/* Task Completion Chart */}
-            <div className="col-12 col-md-6">
-              <div className="card" style={cardStyle}>
-                <div className="card-body">
+            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="fw-semibold mb-0">Tiến độ hoàn thành công việc</h6>
-                    <select
-                      value={taskPeriod}
-                      onChange={(e) => setTaskPeriod(e.target.value)}
-                      className="form-select"
-                      style={{ width: "120px" }}
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-2"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#ffe5e5",
+                        fontSize: "20px",
+                      }}
                     >
-                      <option value="7days">7 ngày qua</option>
-                      <option value="30days">30 ngày qua</option>
-                    </select>
+                      📅
+                    </div>
                   </div>
-                  <div style={{ height: "300px", overflowY: "auto" }}>
-                    <table className="table table-sm mb-0">
-                      <thead>
-                        <tr style={{ borderBottom: "2px solid #e0e0e0" }}>
-                          <th style={{ fontSize: "12px", fontWeight: 600, color: "#666" }}>Ngày</th>
-                          <th style={{ fontSize: "12px", fontWeight: 600, color: "#666" }}>Lý thuyết</th>
-                          <th style={{ fontSize: "12px", fontWeight: 600, color: "#666" }}>Thực tế</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {taskCompletionData.map((item, index) => (
-                          <tr key={index} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                            <td style={{ fontSize: "13px", fontWeight: 600, width: "30px" }}>{item.name}</td>
-                            <td>
-                              <div className="progress" style={{ height: "20px", backgroundColor: "#f0f0f0" }}>
-                                <div
-                                  className="progress-bar"
-                                  style={{
-                                    width: `${item["Lý thuyết"]}%`,
-                                    backgroundColor: "#ccc",
-                                    fontSize: "11px",
-                                    lineHeight: "20px",
-                                  }}
-                                >
-                                  {item["Lý thuyết"]}%
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="progress" style={{ height: "20px", backgroundColor: "#f0f0f0" }}>
-                                <div
-                                  className="progress-bar"
-                                  style={{
-                                    width: `${item["Thực tế"]}%`,
-                                    backgroundColor: "#e63946",
-                                    fontSize: "11px",
-                                    lineHeight: "20px",
-                                  }}
-                                >
-                                  {item["Thực tế"]}%
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
+                    {totalMilestones}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                    Cột mốc sự kiện
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Budget Chart */}
-            <div className="col-12 col-md-6">
-              <div className="card" style={cardStyle}>
-                <div className="card-body">
+            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="fw-semibold mb-0">Ngân sách vs Chi tiêu</h6>
-                    <select
-                      value={budgetPeriod}
-                      onChange={(e) => setBudgetPeriod(e.target.value)}
-                      className="form-select"
-                      style={{ width: "120px" }}
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-2"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#d4f4dd",
+                        fontSize: "20px",
+                      }}
                     >
-                      <option value="month">Tháng này</option>
-                      <option value="quarter">Quý này</option>
-                    </select>
+                      ✓
+                    </div>
                   </div>
-                  <div
-                    style={{ height: "300px", display: "flex", flexDirection: "column", justifyContent: "space-around" }}
-                  >
-                    {budgetData.map((item, index) => (
-                      <div key={index}>
-                        <div className="d-flex justify-content-between mb-2">
-                          <span style={{ fontSize: "13px", fontWeight: 600 }}>{item.name}</span>
-                          <span style={{ fontSize: "12px", color: "#666" }}>
-                            Ngân sách: {item["Ngân sách"]} | Chi tiêu: {item["Chi tiêu"]}
+                  <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
+                    {totalDepartments}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                    Ban tổ chức
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-2"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#fff4d6",
+                        fontSize: "20px",
+                      }}
+                    >
+                      👥
+                    </div>
+                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
+                    {totalMembers}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                    Thành viên tham gia
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-2"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#ffe8d6",
+                        fontSize: "20px",
+                      }}
+                    >
+                      💰
+                    </div>
+                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
+                    {budgetUsageDisplay}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                    Ngân sách đã sử dụng
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Section */}
+          <div className="row g-3 mb-4">
+            {/* Progress Section */}
+            <div className="col-12 col-lg-6">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
+                    Công việc lớn của các ban
+                  </h6>
+
+                  {majorTasks.length > 0 ? (
+                    majorTasks.map((task, index) => (
+                      <div key={index} className={index !== majorTasks.length - 1 ? "mb-4" : ""}>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div className="d-flex align-items-center">
+                            <span
+                              className="rounded-circle me-2"
+                              style={{
+                                width: "8px",
+                                height: "8px",
+                                backgroundColor: "#fbbf24",
+                              }}
+                            ></span>
+                            <span style={{ fontSize: "14px", color: "#374151" }}>{task.title}</span>
+                          </div>
+                          <span className="text-muted" style={{ fontSize: "12px" }}>
+                            Deadline: {task.deadline}
                           </span>
                         </div>
-                        <div className="d-flex gap-2">
-                          <div className="flex-grow-1">
-                            <div className="progress" style={{ height: "24px", backgroundColor: "#f0f0f0" }}>
-                              <div
-                                className="progress-bar"
-                                style={{
-                                  width: `${(item["Ngân sách"] / 50) * 100}%`,
-                                  backgroundColor: "#f8a5c0",
-                                  fontSize: "11px",
-                                  lineHeight: "24px",
-                                }}
-                              >
-                                {item["Ngân sách"]}
-                              </div>
-                            </div>
+                        <div className="d-flex align-items-center">
+                          <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                            <div
+                              className="progress-fill rounded"
+                              style={{
+                                width: `${task.progress}%`,
+                                height: "100%",
+                                backgroundColor: "#fbbf24",
+                                transition: "width 0.3s ease"
+                              }}
+                            ></div>
                           </div>
-                          <div className="flex-grow-1">
-                            <div className="progress" style={{ height: "24px", backgroundColor: "#f0f0f0" }}>
-                              <div
-                                className="progress-bar"
-                                style={{
-                                  width: `${(item["Chi tiêu"] / 50) * 100}%`,
-                                  backgroundColor: "#c41e3a",
-                                  fontSize: "11px",
-                                  lineHeight: "24px",
-                                }}
-                              >
-                                {item["Chi tiêu"]}
-                              </div>
-                            </div>
-                          </div>
+                          <span className="text-muted ms-2" style={{ fontSize: "12px" }}>
+                            {task.progress}%
+                          </span>
                         </div>
                       </div>
-                    ))}
+                    ))
+                  ) : (
+                    <div className="text-center text-muted py-4">
+                      Chưa có dữ liệu công việc
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Chart Section */}
+            <div className="col-12 col-lg-6">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
+                      Ngân sách vs Chi tiêu
+                    </h6>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="d-flex gap-3">
+                        <div className="d-flex align-items-center gap-1">
+                          <span
+                            className="rounded-circle"
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              backgroundColor: "#ef4444",
+                            }}
+                          ></span>
+                          <span className="text-muted" style={{ fontSize: "13px" }}>
+                            Ngân sách
+                          </span>
+                        </div>
+                        <div className="d-flex align-items-center gap-1">
+                          <span
+                            className="rounded-circle"
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              backgroundColor: "#991b1b",
+                            }}
+                          ></span>
+                          <span className="text-muted" style={{ fontSize: "13px" }}>
+                            Chi tiêu
+                          </span>
+                        </div>
+                      </div>
+                      <select className="form-select form-select-sm" style={{ fontSize: "13px", width: "auto" }}>
+                        <option>Tháng này</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {budgetSpendingData.length > 0 ? (
+                    <div className="d-flex align-items-end justify-content-around" style={{ height: "200px", marginTop: "20px" }}>
+                      {budgetSpendingData.map((item, index) => (
+                        <div key={index} className="d-flex flex-column align-items-center" style={{ flex: 1 }}>
+                          <div className="d-flex gap-1 align-items-end" style={{ height: "160px" }}>
+                            <div
+                              className="chart-bar rounded-top"
+                              style={{
+                                width: "32px",
+                                height: `${Math.max(4, Math.round(item.budget * budgetChartScale))}px`,
+                                backgroundColor: "#ef4444",
+                                transition: "height 0.5s ease"
+                              }}
+                            ></div>
+                            <div
+                              className="chart-bar rounded-top"
+                              style={{
+                                width: "32px",
+                                height: `${Math.max(4, Math.round(item.spending * budgetChartScale))}px`,
+                                backgroundColor: "#991b1b",
+                                transition: "height 0.5s ease"
+                              }}
+                            ></div>
+                          </div>
+                          <div className="text-muted mt-2" style={{ fontSize: "12px" }}>
+                            {item.category}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted py-4">
+                      Chưa có dữ liệu ngân sách
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Activity and Tasks Section */}
+          {/* Bottom Section */}
           <div className="row g-3">
-            {/* Recent Activity */}
-            <div className="col-12 col-md-6">
-              <div className="card" style={cardStyle}>
-                <div className="card-body">
-                  <h6 className="fw-semibold mb-3">Hoạt động gần đây</h6>
-                  <div className="d-flex flex-column gap-3">
-                    {activities.map((activity, index) => (
-                      <div key={index} className="d-flex gap-2">
-                        <div
-                          style={{
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: activity.color,
-                            flexShrink: 0,
-                            marginTop: "4px",
-                          }}
-                        />
-                        <div>
-                          <p className="mb-1" style={{ fontSize: "14px", fontWeight: 600 }}>
-                            {activity.name} {activity.action}
-                          </p>
-                          <p className="text-muted mb-0" style={{ fontSize: "12px" }}>
-                            {activity.time}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+            {/* Calendar */}
+            <div className="col-12 col-lg-6">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
+                      Lịch họp sắp tới
+                    </h6>
+                    <span className="text-muted" style={{ fontSize: "14px" }}>
+                      Tháng {new Date().getMonth() + 1}
+                    </span>
                   </div>
+
+                  <table className="table table-borderless mb-0" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => (
+                          <th
+                            key={day}
+                            className="text-center text-muted"
+                            style={{ fontSize: "11px", fontWeight: 500, padding: "8px 4px" }}
+                          >
+                            {day}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => (
+                        <tr key={weekIndex}>
+                          {Array.from({ length: 7 }, (_, dayIndex) => {
+                            const dayData = calendarDays[weekIndex * 7 + dayIndex]
+                            const isHovered = hoveredDay === dayData?.day
+                            const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
+                            
+                            return (
+                              <td
+                                key={dayIndex}
+                                className={`text-center ${
+                                  dayData?.today ? "text-white rounded" : dayData?.highlight ? "fw-semibold" : ""
+                                }`}
+                                style={{
+                                  fontSize: "13px",
+                                  backgroundColor: dayData?.today
+                                    ? "#dc2626"
+                                    : isHovered
+                                    ? "#fee2e2"
+                                    : dayData?.highlight
+                                    ? "#fee2e2"
+                                    : "transparent",
+                                  color: dayData?.today 
+                                    ? "white" 
+                                    : isHovered 
+                                    ? "#dc2626" 
+                                    : dayData?.highlight 
+                                    ? "#dc2626" 
+                                    : "#374151",
+                                  padding: "8px 4px",
+                                  cursor: dayData?.day ? "pointer" : "default",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={() => dayData?.day && setHoveredDay(dayData.day)}
+                                onMouseLeave={() => setHoveredDay(null)}
+                              >
+                                {dayData?.day || ""}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {hoveredDay && getEventsForDay(hoveredDay).length > 0 ? (
+                    <div className="mt-4 pt-3 border-top">
+                      {getEventsForDay(hoveredDay).map((event, index) => {
+                        const eventDate = parseMilestoneDate(event?.targetDate || event?.dueDate)
+                        const timeStr = eventDate ? eventDate.toLocaleTimeString('vi-VN', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        }) : ''
+                        
+                        return (
+                          <div key={index} className={index > 0 ? "mt-3" : ""}>
+                            <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                              {event?.name || "Cột mốc"}
+                            </div>
+                            {timeStr && (
+                              <div className="text-muted" style={{ fontSize: "13px" }}>
+                                {timeStr}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : hoveredDay ? (
+                    <div className="mt-4 pt-3 border-top">
+                      <div className="text-muted" style={{ fontSize: "13px" }}>
+                        Không có sự kiện
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
 
-            {/* Upcoming Tasks */}
-            <div className="col-12 col-md-6">
-              <div className="card" style={cardStyle}>
-                <div className="card-body">
-                  <h6 className="fw-semibold mb-3">Công việc sắp tới hạn</h6>
-                  <div className="d-flex flex-column gap-2">
-                    {tasks.map((task, index) => (
-                      <div
-                        key={index}
-                        className="d-flex justify-content-between align-items-center p-2"
-                        style={{ backgroundColor: "#f8f9fa", borderRadius: "4px" }}
-                      >
-                        <div>
-                          <p className="mb-1" style={{ fontSize: "14px", fontWeight: 600 }}>
-                            {task.title}
-                          </p>
-                          <p className="text-muted mb-0" style={{ fontSize: "12px" }}>
-                            Hạn: {task.date}
-                          </p>
-                        </div>
-                        <span
-                          className="badge"
-                          style={{
-                            backgroundColor: task.statusBgColor,
-                            color: task.statusColor,
-                            fontWeight: 600,
-                            fontSize: "12px",
-                            whiteSpace: "nowrap",
-                            marginLeft: "10px",
-                          }}
-                        >
-                          {task.status}
-                        </span>
-                      </div>
-                    ))}
+            {/* Event Card with Horizontal Timeline */}
+            <div className="col-12 col-lg-6">
+              <div className="card shadow-sm border-0 rounded-3">
+                <div className="card-body p-4">
+                  {/* Event Header */}
+                  <div className="d-flex align-items-center gap-3 mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#fff4d6",
+                        fontSize: "20px",
+                      }}
+                    >
+                      🎃
+                    </div>
+                    <h6 className="fw-bold mb-0 flex-grow-1" style={{ fontSize: "18px", color: "#1f2937" }}>
+                      {eventData.name}
+                    </h6>
+                    <button className="btn btn-danger btn-sm d-flex align-items-center gap-1" style={{ fontSize: "13px" }}>
+                      Xem chi tiết →
+                    </button>
                   </div>
+
+                  {/* Progress Dots and Status */}
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <div style={{ fontSize: "13px", color: "#6b7280" }}>Tiến độ</div>
+                    <div className="d-flex gap-1">
+                      {eventTimeline.map((_, index) => (
+                        <span
+                          key={index}
+                          className="rounded-circle"
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            backgroundColor: eventTimeline[index]?.completed ? "#dc2626" : "#e5e7eb",
+                          }}
+                        ></span>
+                      ))}
+                    </div>
+                    <span className="fw-semibold" style={{ fontSize: "13px", color: "#dc2626" }}>
+                      {completedMilestones}/{totalMilestones} hoàn thành
+                    </span>
+                  </div>
+
+                  {/* Next Milestone */}
+                  {eventTimeline.length > 0 && (
+                    <div
+                      className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
+                      style={{ backgroundColor: "#fef2f2" }}
+                    >
+                      <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                      <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
+                        Tiếp theo: {eventTimeline.find(m => !m.completed)?.name || eventTimeline[0]?.name}
+                      </span>
+                      <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                        ({eventTimeline.find(m => !m.completed)?.date || eventTimeline[0]?.date})
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Horizontal Timeline */}
+                  {eventTimeline.length > 0 && (
+                    <div style={{ position: "relative", padding: "20px 0" }}>
+                      {/* Timeline Line */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "28px",
+                          left: "0",
+                          right: "0",
+                          height: "3px",
+                          backgroundColor: "#e5e7eb",
+                        }}
+                      >
+                        {/* Progress Line */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "0",
+                            left: "0",
+                            height: "100%",
+                            width: `${milestoneProgressRatio}%`,
+                            backgroundColor: "#dc2626",
+                            transition: "width 0.5s ease",
+                          }}
+                        ></div>
+                      </div>
+
+                      {/* Timeline Steps */}
+                      <div className="d-flex justify-content-between" style={{ position: "relative", zIndex: 1 }}>
+                        {eventTimeline.map((step, index) => (
+                          <div key={index} className="d-flex flex-column align-items-center" style={{ gap: "8px" }}>
+                            {/* Step Dot */}
+                            <div
+                              className="rounded-circle"
+                              style={{
+                                width: "16px",
+                                height: "16px",
+                                backgroundColor: step.completed ? "#dc2626" : "white",
+                                border: `3px solid ${step.completed ? "#dc2626" : "#e5e7eb"}`,
+                                transition: "all 0.3s ease",
+                              }}
+                            ></div>
+                            {/* Step Label */}
+                            <div
+                              className="text-center"
+                              style={{
+                                fontSize: "12px",
+                                color: "#374151",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {step.name}
+                            </div>
+                            {/* Step Date */}
+                            <div
+                              className="text-center"
+                              style={{
+                                fontSize: "11px",
+                                color: "#9ca3af",
+                              }}
+                            >
+                              {step.date}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

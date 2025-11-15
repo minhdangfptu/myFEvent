@@ -5,9 +5,11 @@ import {toast } from "react-toastify";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function UserHomePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [modal, setModal] = useState({ show: false, message: "", onConfirm: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -24,10 +26,18 @@ export default function UserHomePage() {
 
   // Kiểm tra sự kiện của user và redirect
   useEffect(() => {
-    checkUserEvents();
-  }, []);
+    // Đợi authLoading xong trước khi check events
+    if (!authLoading) {
+      checkUserEvents();
+    }
+  }, [authLoading]);
 
   const checkUserEvents = async () => {
+    // Đợi authLoading xong và có user trước khi fetch
+    if (authLoading || !user) {
+      setLoading(true);
+      return;
+    }
     try {
       setLoading(true);
       const response = await eventApi.listMyEvents();
@@ -390,9 +400,15 @@ export default function UserHomePage() {
                     const res = await eventApi.create({ name: createForm.name, description: createForm.description, organizerName: createForm.organizerName, type: 'private' });
                     setShowCreateModal(false);
                     setCreateForm({ name: '', description: '', organizerName: '' });
-                    alert(`Mã tham gia: ${res.data.joinCode}`);
-                    // Redirect to event detail page
-                    navigate(`/events/${res.data.id}/hooc-event-detail`);
+                    setModal({
+                      show: true,
+                      message: `Mã tham gia: ${res.data.joinCode}`,
+                      onConfirm: () => {
+                        setModal({ show: false, message: "", onConfirm: null });
+                        // Redirect to event detail page
+                        navigate(`/events/${res.data.id}/hooc-event-detail`);
+                      }
+                    });
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -501,6 +517,14 @@ export default function UserHomePage() {
         </div>
       )}
 
+      <ConfirmModal
+        show={modal.show}
+        message={modal.message}
+        onClose={() => setModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (modal.onConfirm) modal.onConfirm();
+        }}
+      />
     </UserLayout>
   );
 }

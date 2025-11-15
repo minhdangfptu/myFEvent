@@ -6,17 +6,20 @@ import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
 
-/** ===== Custom Gantt Chart Component ===== */
+/** 
+ * CustomGanttChart Component - FIXED VERSION
+ * Dùng position: absolute/relative thay vì sticky để đảm bảo 100% hoạt động
+ */
 const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
   const timelineRef = useRef(null);
-  const nameColumnRef = useRef(null);
+  const nameBodyRef = useRef(null);
+  const headerScrollRef = useRef(null);
 
   // Tính toán ngày bắt đầu và kết thúc
   const getDatesRange = () => {
     const year = new Date().getFullYear();
     const startDate = new Date(year, 0, 1);
     const endDate = new Date(year, 11, 31);
-    
     return { startDate, endDate };
   };
 
@@ -60,7 +63,7 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
   const columnWidth = viewMode === "day" ? 50 : viewMode === "week" ? 100 : 150;
   const totalTimelineWidth = timeColumns.length * columnWidth;
 
-  // Tính vị trí task trên timeline
+  // Vị trí task trên timeline
   const getTaskPosition = (task) => {
     const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
     const taskStart = (task.start - startDate) / (1000 * 60 * 60 * 24);
@@ -68,117 +71,144 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
 
     const left = (taskStart / totalDays) * totalTimelineWidth;
     const width = Math.max((taskDuration / totalDays) * totalTimelineWidth, 30);
-
     return { left, width };
   };
 
-  // Đồng bộ scroll dọc giữa Name và Timeline
-  const syncVerticalScroll = (source) => {
-    if (source === "name" && timelineRef.current && nameColumnRef.current) {
-      timelineRef.current.scrollTop = nameColumnRef.current.scrollTop;
-    } else if (source === "timeline" && timelineRef.current && nameColumnRef.current) {
-      nameColumnRef.current.scrollTop = timelineRef.current.scrollTop;
+  // Xử lý scroll
+  const handleTimelineScroll = () => {
+    if (!timelineRef.current) return;
+
+    // Đồng bộ scroll dọc
+    if (nameBodyRef.current) {
+      nameBodyRef.current.scrollTop = timelineRef.current.scrollTop;
+    }
+
+    // Đồng bộ scroll ngang cho header
+    if (headerScrollRef.current) {
+      window.requestAnimationFrame(() => {
+        if (headerScrollRef.current && timelineRef.current) {
+          headerScrollRef.current.style.transform = 
+            `translateX(-${timelineRef.current.scrollLeft}px)`;
+        }
+      });
+    }
+  };
+
+  // Wheel trên name body
+  const handleNameWheel = (e) => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop += e.deltaY;
+      e.preventDefault();
     }
   };
 
   return (
-    <div className="custom-gantt-container">
+    <div className="gantt-chart-fixed">
       <style>{customGanttCSS}</style>
-      
-      {/* Container chính */}
-      <div className="gantt-main">
-        {/* Cột Name - Cố định bên trái */}
-        <div className="gantt-name-column">
-          {/* Header */}
+
+      <div className="gantt-chart-container">
+        {/* CỘT 1: NAME - ABSOLUTE POSITIONED */}
+        <div className="gantt-name-section">
           <div className="gantt-name-header">
-            <div className="header-cell">Tên Task</div>
+            <div className="name-header-cell">Tên Task</div>
           </div>
-          
-          {/* Body - Có scroll dọc */}
+
           <div 
             className="gantt-name-body"
-            ref={nameColumnRef}
-            onScroll={() => syncVerticalScroll("name")}
+            ref={nameBodyRef}
+            onWheel={handleNameWheel}
           >
-            {tasks.filter(t => t.id !== "__year_range__").map((task) => (
-              <div
-                key={task.id}
-                className="name-row"
-                onClick={() => onTaskClick && onTaskClick(task)}
-              >
-                <div className="name-cell" title={task.name}>
-                  {task.name}
+            {tasks
+              .filter((t) => t.id !== "__year_range__")
+              .map((task) => (
+                <div
+                  key={task.id}
+                  className="gantt-name-row"
+                  onClick={() => onTaskClick && onTaskClick(task)}
+                >
+                  <div className="gantt-name-cell" title={task.name}>
+                    {task.name}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
 
-        {/* Timeline - Cuộn ngang */}
-        <div 
-          className="gantt-timeline"
-          ref={timelineRef}
-          onScroll={() => syncVerticalScroll("timeline")}
-        >
-          {/* Header với các cột thời gian */}
+        {/* CỘT 2: TIMELINE - WITH MARGIN LEFT */}
+        <div className="gantt-timeline-section">
+          {/* Header */}
           <div className="gantt-timeline-header">
-            {timeColumns.map((col, idx) => (
-              <div
-                key={idx}
-                className="timeline-header-cell"
-                style={{ width: columnWidth, minWidth: columnWidth, flexShrink: 0 }}
-              >
-                {col.label}
-              </div>
-            ))}
+            <div
+              ref={headerScrollRef}
+              className="gantt-timeline-header-content"
+              style={{ width: totalTimelineWidth, minWidth: totalTimelineWidth }}
+            >
+              {timeColumns.map((col, idx) => (
+                <div
+                  key={idx}
+                  className="gantt-timeline-header-cell"
+                  style={{ width: columnWidth, minWidth: columnWidth }}
+                >
+                  {col.label}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Body với các thanh task */}
-          <div className="gantt-timeline-body">
-            <div className="gantt-timeline-content" style={{ width: totalTimelineWidth, minWidth: totalTimelineWidth }}>
-              {/* Grid lines */}
+          {/* Body */}
+          <div
+            ref={timelineRef}
+            className="gantt-timeline-body"
+            onScroll={handleTimelineScroll}
+          >
+            <div
+              className="gantt-timeline-content"
+              style={{ width: totalTimelineWidth, minWidth: totalTimelineWidth }}
+            >
+              {/* Grid */}
               <div className="gantt-grid">
                 {timeColumns.map((_, idx) => (
                   <div
                     key={idx}
-                    className="grid-column"
+                    className="gantt-grid-column"
                     style={{ width: columnWidth, left: idx * columnWidth }}
                   />
                 ))}
               </div>
 
-              {/* Task rows */}
-              {tasks.filter(t => t.id !== "__year_range__").map((task) => {
-                const { left, width } = getTaskPosition(task);
-                return (
-                  <div key={task.id} className="timeline-row">
-                    <div
-                      className="task-bar"
-                      style={{
-                        left: `${left}px`,
-                        width: `${width}px`,
-                        backgroundColor: task.styles?.backgroundColor || "#5b6ef5",
-                      }}
-                      onClick={() => onTaskClick && onTaskClick(task)}
-                      title={`${task.name} (${Math.round(task.progress)}%)`}
-                    >
-                      {/* Progress bar */}
+              {/* Tasks */}
+              {tasks
+                .filter((t) => t.id !== "__year_range__")
+                .map((task) => {
+                  const { left, width } = getTaskPosition(task);
+                  return (
+                    <div key={task.id} className="gantt-task-row">
                       <div
-                        className="task-progress"
+                        className="gantt-task-bar"
                         style={{
-                          width: `${task.progress}%`,
-                          backgroundColor: task.styles?.progressColor || "#3b4edf",
+                          left: `${left}px`,
+                          width: `${width}px`,
+                          backgroundColor: task.styles?.backgroundColor || "#5b6ef5",
                         }}
-                      />
+                        onClick={() => onTaskClick && onTaskClick(task)}
+                        title={`${task.name} (${Math.round(task.progress)}%)`}
+                      >
+                        <div
+                          className="gantt-task-progress"
+                          style={{
+                            width: `${task.progress}%`,
+                            backgroundColor: task.styles?.progressColor || "#3b4edf",
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
               {/* Today line */}
-              <TodayLine 
-                startDate={startDate} 
-                endDate={endDate} 
+              <TodayLine
+                startDate={startDate}
+                endDate={endDate}
                 totalWidth={totalTimelineWidth}
               />
             </div>
@@ -189,7 +219,7 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
   );
 };
 
-/** ===== Today Line Component ===== */
+/** Today Line Component */
 const TodayLine = ({ startDate, endDate, totalWidth }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -200,15 +230,231 @@ const TodayLine = ({ startDate, endDate, totalWidth }) => {
   const daysFromStart = (today - startDate) / (1000 * 60 * 60 * 24);
   const left = (daysFromStart / totalDays) * totalWidth;
 
-  return (
-    <div
-      className="today-line"
-      style={{ left: `${left}px` }}
-    />
-  );
+  return <div className="gantt-today-line" style={{ left: `${left}px` }} />;
 };
 
-/** ===== Main Page Component ===== */
+/** CSS - FIXED LAYOUT */
+const customGanttCSS = `
+/* Container */
+.gantt-chart-fixed {
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.gantt-chart-container {
+  position: relative;
+  height: 600px;
+  overflow: hidden;
+}
+
+/* NAME SECTION - ABSOLUTE POSITIONED, CỐ ĐỊNH */
+.gantt-name-section {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300px;
+  height: 100%;
+  background: #fff;
+  border-right: 2px solid #e5e7eb;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-name-header {
+  height: 50px;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.name-header-cell {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.gantt-name-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.gantt-name-row {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.gantt-name-row:hover {
+  background: #f9fafb;
+}
+
+.gantt-name-cell {
+  font-size: 14px;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* TIMELINE SECTION - WITH MARGIN LEFT */
+.gantt-timeline-section {
+  position: absolute;
+  left: 300px;
+  top: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-timeline-header {
+  height: 50px;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.gantt-timeline-header-content {
+  display: flex;
+  will-change: transform;
+}
+
+.gantt-timeline-header-cell {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #e5e7eb;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.gantt-timeline-body {
+  flex: 1;
+  overflow: auto;
+}
+
+.gantt-timeline-content {
+  position: relative;
+  min-height: 100%;
+}
+
+/* Scrollbar */
+.gantt-timeline-body::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+  background: #f9fafb;
+}
+
+.gantt-timeline-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 6px;
+  border: 2px solid #f9fafb;
+}
+
+.gantt-timeline-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Grid */
+.gantt-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.gantt-grid-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px solid #f3f4f6;
+}
+
+/* Task rows */
+.gantt-task-row {
+  height: 50px;
+  position: relative;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.gantt-task-row:hover {
+  background: #f9fafb;
+}
+
+/* Task bars */
+.gantt-task-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.gantt-task-bar:hover {
+  transform: translateY(-50%) scale(1.02);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.gantt-task-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  border-radius: 6px 0 0 6px;
+  opacity: 0.7;
+  transition: width 0.3s;
+}
+
+/* Today line */
+.gantt-today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #dc2626;
+  box-shadow: 0 0 6px rgba(220, 38, 38, 0.6);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.gantt-today-line::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid #dc2626;
+}
+`;
+
+/** Main Page Component - UNCHANGED */
 export default function GanttChartTaskPage() {
   const { t } = useTranslation();
   const { eventId } = useParams();
@@ -315,7 +561,9 @@ export default function GanttChartTaskPage() {
       };
       const st = map[filterStatus];
       if (st) {
-        const ids = new Set(rawTasks.filter((t) => t.status === st).map((t) => t._id));
+        const ids = new Set(
+          rawTasks.filter((t) => t.status === st).map((t) => t._id)
+        );
         filtered = filtered.filter((t) => ids.has(t.id));
       }
     }
@@ -481,7 +729,7 @@ export default function GanttChartTaskPage() {
           />
         )}
 
-        {/* Quick view mode */}
+        {/* View mode buttons */}
         <div
           className="position-fixed"
           style={{ bottom: 24, right: 24, zIndex: 1000 }}
@@ -540,239 +788,3 @@ export default function GanttChartTaskPage() {
     </UserLayout>
   );
 }
-
-/** ===== CSS ===== */
-const customGanttCSS = `
-.custom-gantt-container {
-  width: 100%;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  overflow: hidden;
-}
-
-.gantt-main {
-  display: flex;
-  height: 600px;
-  width: 100%;
-  overflow: hidden;
-}
-
-/* ===== CỘT NAME - CỐ ĐỊNH ===== */
-.gantt-name-column {
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
-  flex-shrink: 0;
-  border-right: 2px solid #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  z-index: 10;
-}
-
-.gantt-name-header {
-  height: 50px;
-  background: #f9fafb;
-  border-bottom: 2px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  font-weight: 600;
-  font-size: 14px;
-  color: #374151;
-  padding: 0 16px;
-  flex-shrink: 0;
-}
-
-.gantt-name-body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.gantt-name-body::-webkit-scrollbar {
-  width: 8px;
-  background: #f9fafb;
-}
-
-.gantt-name-body::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-}
-
-.gantt-name-body::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-.name-row {
-  height: 50px;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid #f3f4f6;
-  padding: 0 16px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.name-row:hover {
-  background-color: #f9fafb;
-}
-
-.name-cell {
-  font-size: 14px;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
-}
-
-/* ===== TIMELINE - CUỘN NGANG ===== */
-.gantt-timeline {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-  position: relative;
-  min-width: 0;
-}
-
-.gantt-timeline-header {
-  height: 50px;
-  background: #f9fafb;
-  border-bottom: 2px solid #e5e7eb;
-  flex-shrink: 0;
-  overflow-x: hidden;
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  min-width: 100%;
-}
-
-.timeline-header-cell {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px solid #e5e7eb;
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.gantt-timeline-body {
-  flex: 1;
-  overflow: visible;
-  position: relative;
-}
-
-.gantt-timeline-content {
-  position: relative;
-  min-height: 100%;
-}
-
-.gantt-timeline::-webkit-scrollbar {
-  height: 12px;
-  width: 12px;
-  background: #f9fafb;
-}
-
-.gantt-timeline::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 6px;
-  border: 2px solid #f9fafb;
-}
-
-.gantt-timeline::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-.gantt-timeline::-webkit-scrollbar-corner {
-  background: #f9fafb;
-}
-
-/* Grid */
-.gantt-grid {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.grid-column {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-right: 1px solid #f3f4f6;
-}
-
-/* Task rows */
-.timeline-row {
-  height: 50px;
-  position: relative;
-  border-bottom: 1px solid #f3f4f6;
-  z-index: 1;
-}
-
-.timeline-row:hover {
-  background-color: #f9fafb;
-}
-
-/* Task bars */
-.task-bar {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 30px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.task-bar:hover {
-  transform: translateY(-50%) scale(1.02);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  z-index: 10;
-}
-
-.task-progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  border-radius: 6px 0 0 6px;
-  opacity: 0.7;
-  transition: width 0.3s;
-}
-
-/* Today line */
-.today-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background-color: #dc2626;
-  z-index: 100;
-  pointer-events: none;
-  box-shadow: 0 0 6px rgba(220, 38, 38, 0.6);
-}
-
-.today-line::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 10px solid #dc2626;
-}
-`;

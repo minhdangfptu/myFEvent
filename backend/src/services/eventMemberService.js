@@ -39,8 +39,14 @@ export const groupMembersByDepartment = (members) => {
 };
 
 export const getUnassignedMembersRaw = async (eventId) => {
-  return await EventMember.find({ eventId, departmentId: null, role: 'Member' })
-    .populate('userId', 'fullName email')
+  // Trả về tất cả thành viên chưa có ban (departmentId: null), không phân biệt role
+  // Loại trừ HoOC vì HoOC không thuộc ban nào
+  return await EventMember.find({ 
+    eventId, 
+    departmentId: null, 
+    role: { $ne: 'HoOC' } // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
+  })
+    .populate('userId', 'fullName email avatarUrl')
     .lean();
 };
 
@@ -74,7 +80,7 @@ export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
 };
 export const getEventMemberProfileById = async (memberId) => {
   return await EventMember.findOne({ _id: memberId })
-    .populate('userId', 'fullName email avatarUrl phone status')
+    .populate('userId', 'fullName email avatarUrl phone status bio highlight tags verified')
     .populate('departmentId', 'name')
     .lean();
 };

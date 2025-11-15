@@ -5,9 +5,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { userApi } from '../../apis/userApi';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function MemberLandingPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
@@ -21,6 +22,7 @@ export default function MemberLandingPage() {
   const [joinError, setJoinError] = useState('');
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState({ show: false, message: "", onConfirm: null });
 
   // --- THÊM ĐỂ NHẬN ROLE EVENT VỚI eventId ---
   const [eventRole, setEventRole] = useState('');
@@ -35,8 +37,8 @@ export default function MemberLandingPage() {
     setRoleLoading(true);
     userApi.getUserRoleByEvent(eventId).then(res => {
       if (res.role !== 'Member') {
-        if (res.role === 'HoOC') navigate(`/hooc-landing-page?eventId=${eventId}`);
-        else if (res.role === 'HoD') navigate(`/hod-landing-page?eventId=${eventId}`);
+        if (res.role === 'HoOC') navigate(`/hooc-dashboard?eventId=${eventId}`);
+        else if (res.role === 'HoD') navigate(`/hod-dashboard?eventId=${eventId}`);
         else navigate('/');
       } else {
         setEventRole('Member');
@@ -46,8 +48,11 @@ export default function MemberLandingPage() {
   }, [location.search, navigate]);
 
   useEffect(() => {
-    fetchMyEvents();
-  }, []);
+    // Đợi authLoading xong trước khi fetch events
+    if (!authLoading) {
+      fetchMyEvents();
+    }
+  }, [authLoading]);
 
   // ====== FILTERS / SORT ======
   const STATUS_OPTIONS = [t('home.statuses.all'), t('home.statuses.upcoming'), t('home.statuses.ongoing'), t('home.statuses.past')];
@@ -72,6 +77,11 @@ export default function MemberLandingPage() {
   }, []);
 
   const fetchMyEvents = async () => {
+    // Đợi authLoading xong và có user trước khi fetch
+    if (authLoading || !user) {
+      setLoading(true);
+      return;
+    }
     try {
       setLoading(true);
       const response = await eventApi.listMyEvents();
@@ -357,9 +367,15 @@ export default function MemberLandingPage() {
                     const res = await eventApi.create({ name: createForm.name, description: createForm.description, organizerName: createForm.organizerName, type: 'private' });
                     setShowCreateModal(false);
                     setCreateForm({ name: '', description: '', organizerName: '' });
-                    alert(`Mã tham gia: ${res.data.joinCode}`);
-                    // Redirect to event detail page
-                    navigate(`/events/${res.data.id}/hooc-event-detail`);
+                    setModal({
+                      show: true,
+                      message: `Mã tham gia: ${res.data.joinCode}`,
+                      onConfirm: () => {
+                        setModal({ show: false, message: "", onConfirm: null });
+                        // Redirect to event detail page
+                        navigate(`/events/${res.data.id}/hooc-event-detail`);
+                      }
+                    });
                   } finally {
                     setCreateSubmitting(false);
                   }
@@ -452,6 +468,14 @@ export default function MemberLandingPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        show={modal.show}
+        message={modal.message}
+        onClose={() => setModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (modal.onConfirm) modal.onConfirm();
+        }}
+      />
     </UserLayout>
   );
 }

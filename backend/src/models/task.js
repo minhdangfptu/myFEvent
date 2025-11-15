@@ -5,11 +5,13 @@ const TaskSchema = new Schema({
   title: { type: String, required: true },
   description: String,
 
-  status: { type: String, enum: ['todo','in_progress','blocked','done','cancelled'], default: 'todo' },
+  status: { type: String, enum: ['suggested','todo','in_progress','blocked','done','cancelled'], default: 'todo' },
   progressPct: { type: Number, min: 0, max: 100, default: 0 },
 
   estimate: Number,
   estimateUnit: { type: String, enum: ['h','d','w'], default: 'h' },
+
+  suggestedTeamSize: { type: Number, min: 1, max: 5 },
 
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },

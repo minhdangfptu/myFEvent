@@ -7,6 +7,7 @@ import { useEvents } from '../../contexts/EventContext';
 import { toast } from 'react-toastify';
 import { eventService } from '~/services/eventService';
 import { formatDate } from '~/utils/formatDate';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function MemberProfilePage() {
   const { eventId, memberId } = useParams();
@@ -55,10 +56,23 @@ export default function MemberProfilePage() {
         const response = await eventService.getMemberDetail(eventId, memberId);
         console.log('Member profile response:', response);
         
-        if (response.data) {
-          setMember(response.data.member || response.data);
-          if (response.data.stats) {
-            setMemberStats(response.data.stats);
+        // eventService đã unwrap response, nên response có thể là member trực tiếp hoặc có data wrapper
+        if (response) {
+          // Nếu response có data wrapper
+          if (response.data) {
+            setMember(response.data.member || response.data);
+            if (response.data.stats) {
+              setMemberStats(response.data.stats);
+            }
+          } 
+          // Nếu response là member trực tiếp (sau khi unwrap)
+          else if (response._id || response.id) {
+            setMember(response);
+            if (response.stats) {
+              setMemberStats(response.stats);
+            }
+          } else {
+            setError('Không tìm thấy thông tin thành viên');
           }
         } else {
           setError('Không tìm thấy thông tin thành viên');
@@ -95,19 +109,23 @@ export default function MemberProfilePage() {
   };
 
   // Handle remove member
+  const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
   const handleRemoveMember = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${member.name || member.fullName} khỏi sự kiện?`)) {
-      return;
-    }
-
-    try {
-      await eventApi.removeMemberFromEvent(eventId, member._id || member.id);
-      toast.success('Đã xóa thành viên khỏi sự kiện');
-      navigate(`/events/${eventId}/members`);
-    } catch (error) {
-      console.error('Error removing member:', error);
-      toast.error('Không thể xóa thành viên');
-    }
+    setConfirmModal({
+      show: true,
+      message: `Bạn có chắc chắn muốn xóa ${member?.name || member?.fullName || 'thành viên'} khỏi sự kiện?`,
+      onConfirm: async () => {
+        setConfirmModal({ show: false, message: "", onConfirm: null });
+        try {
+          await eventApi.removeMemberFromEvent(eventId, member._id || member.id);
+          toast.success('Đã xóa thành viên khỏi sự kiện');
+          navigate(`/events/${eventId}/members`);
+        } catch (error) {
+          console.error('Error removing member:', error);
+          toast.error('Không thể xóa thành viên');
+        }
+      }
+    });
   };
 
   if (loading) {
@@ -153,12 +171,14 @@ export default function MemberProfilePage() {
   const memberEmail = member.email || member.userId?.email || '';
   const memberAvatar = member.avatar || member.avatarUrl || member.userId?.avatarUrl || `https://i.pravatar.cc/120?u=${memberEmail}`;
   const memberRole = member.role || 'Member';
-  const memberDepartment = member.department || member.departmentName || member.dept || 'Chưa có ban';
-  const memberPhone = member.userId.phone;
+  const memberDepartment = member.department || member.departmentName || member.dept || member.departmentId?.name || 'Chưa có ban';
+  const memberPhone = member.userId?.phone || '';
   const memberStudentId = member.studentId || member.userId?.studentId || '';
   const memberBio = member.bio || member.userId?.bio || '';
-  const memberStatus = member.userId?.status || 'active';
-  const memberJoinedAt =  member.createdAt || '';
+  const memberHighlight = member.highlight || member.userId?.highlight || '';
+  const memberTags = member.tags || member.userId?.tags || [];
+  const memberVerified = member.userId?.verified || false;
+  const memberJoinedAt = member.createdAt || '';
 
   // Check if current user can manage this member
   const canManage = eventRole === 'HoOC' || eventRole === 'HoD';
@@ -169,6 +189,14 @@ export default function MemberProfilePage() {
       sidebarType={getSidebarType()} 
       activePage="members"
     >
+      <ConfirmModal
+        show={confirmModal.show}
+        message={confirmModal.message}
+        onClose={() => setConfirmModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) confirmModal.onConfirm();
+        }}
+      />
       <style>{`
         .profile-header {
           background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
@@ -298,20 +326,6 @@ export default function MemberProfilePage() {
         .action-btn-danger:hover {
           background: #fecaca;
         }
-        .badge-status {
-          padding: 0.375rem 0.75rem;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-        .badge-active {
-          background: #d1fae5;
-          color: #065f46;
-        }
-        .badge-verified {
-          background: #dbeafe;
-          color: #1e40af;
-        }
       `}</style>
 
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
@@ -343,14 +357,6 @@ export default function MemberProfilePage() {
                    memberRole === 'HoD' ? 'Trưởng Ban' :
                    'Thành viên'}
                 </span>
-                <span className="badge-status badge-active">
-                  <i className="bi bi-check-circle me-1"></i>
-                  Hậu cần
-                </span>
-                <span className="badge-status badge-verified">
-                  <i className="bi bi-patch-check me-1"></i>
-                  Văn hoá
-                </span>
               </div>
             </div>
           </div>
@@ -379,11 +385,6 @@ export default function MemberProfilePage() {
               </div>
 
               <div className="info-row">
-                <div className="info-label">Sinh viên</div>
-                <div className="info-value">{memberStudentId || 'Chưa cập nhật'}</div>
-              </div>
-
-              <div className="info-row">
                 <div className="info-label">Email</div>
                 <div className="info-value">{memberEmail}</div>
               </div>
@@ -394,15 +395,13 @@ export default function MemberProfilePage() {
               </div>
             </div>
 
-            {memberBio && (
-              <div className="profile-card">
-                <h5 className="fw-bold mb-3">
-                  <i className="bi bi-file-text me-2 text-danger"></i>
-                  Bio
-                </h5>
-                <p className="text-muted mb-0">{memberBio}</p>
-              </div>
-            )}
+            <div className="profile-card">
+              <h5 className="fw-bold mb-3">
+                <i className="bi bi-file-text me-2 text-danger"></i>
+                Bio
+              </h5>
+              <p className="text-muted mb-0">{memberBio || 'Chưa có thông tin'}</p>
+            </div>
           </div>
 
           {/* Right Column - Actions & Stats */}
@@ -436,6 +435,34 @@ export default function MemberProfilePage() {
 
             
 
+            {/* Thông tin chi tiết */}
+            {memberHighlight && (
+              <div className="profile-card">
+                <h5 className="fw-bold mb-3">
+                  <i className="bi bi-star me-2 text-danger"></i>
+                  Thông tin chi tiết
+                </h5>
+                <p className="text-muted small mb-0">{memberHighlight}</p>
+              </div>
+            )}
+
+            {/* Tags */}
+            {memberTags && memberTags.length > 0 && (
+              <div className="profile-card">
+                <h5 className="fw-bold mb-3">
+                  <i className="bi bi-tags me-2 text-danger"></i>
+                  Ban đã tham gia
+                </h5>
+                <div className="d-flex flex-wrap gap-2">
+                  {memberTags.map((tag, idx) => (
+                    <span key={idx} className="badge bg-light text-dark px-3 py-2">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Thông tin khác */}
             <div className="profile-card">
               <h5 className="fw-bold mb-3">
@@ -444,8 +471,10 @@ export default function MemberProfilePage() {
               </h5>
               
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Trạng thái tài khoản</span>
-                <span className="badge bg-success">{memberStatus}</span>
+                <span className="text-muted">Xác thực tài khoản</span>
+                <span className={`badge ${memberVerified ? 'bg-success' : 'bg-secondary'}`}>
+                  {memberVerified ? '✓ Đã xác thực' : '⏳ Chưa xác thực'}
+                </span>
               </div>
               
               <div className="d-flex justify-content-between">

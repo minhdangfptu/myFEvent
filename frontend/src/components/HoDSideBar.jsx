@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { eventApi } from "../apis/eventApi";
-import { userApi } from "../apis/userApi";
 import { useEvents } from "~/contexts/EventContext";
+import Loading from "./Loading";
 
 export default function HoDSideBar({
   sidebarOpen,
@@ -12,8 +11,8 @@ export default function HoDSideBar({
 }) {
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
-  const [risksOpen, setRisksOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
+  const [risksOpen, setRisksOpen] = useState(false);
   const [theme, setTheme] = useState("light");
 
   // Hover popup (khi sidebar đóng)
@@ -22,74 +21,45 @@ export default function HoDSideBar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // local event list for sidebar (so we can reorder / map safely)
-  const [myEvents, setMyEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
-  const [currentEventMembership, setCurrentEventMembership] = useState(null);
-
+  const risksSubItems = [
+    { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
+    { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
+  ];
   // get context events (if needed) and loading flag
   const { events: ctxEvents, loading: ctxLoading } = useEvents();
-
-  const hasEvents = myEvents && myEvents.length > 0;
   const location = useLocation();
   const navigate = useNavigate();
 
-  // allow using passed eventId as the "eventIdFromUrl"
-  const eventIdFromUrl = eventId;
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await eventApi.listMyEvents();
-        const list = Array.isArray(res?.data) ? res.data : [];
-
-        // If there's an eventId in props/URL, prefer that event first
-        let sortedList = list.slice();
-        if (eventIdFromUrl) {
-          const idx = sortedList.findIndex((e) => (e._id || e.id) === eventIdFromUrl);
-          if (idx !== -1) {
-            const [currentEvent] = sortedList.splice(idx, 1);
-            sortedList = [currentEvent, ...sortedList];
-          }
-        }
-
-        const mapped = sortedList.map(e => ({
-          id: e._id || e.id,
-          name: e.name,
-          icon: "bi-calendar-event",
-          membership: e.membership,
-        }));
-
-        if (mounted) {
-          setMyEvents(mapped);
-          if (eventIdFromUrl) {
-            const evt = mapped.find((ev) => ev.id === eventIdFromUrl);
-            if (evt) {
-              setSelectedEvent(evt.id);
-              setCurrentEventMembership(evt.membership);
-            } else if (mapped.length) {
-              setSelectedEvent(mapped[0].id);
-              setCurrentEventMembership(mapped[0].membership);
-            }
-          } else if (mapped.length && !selectedEvent) {
-            setSelectedEvent(mapped[0].id);
-            setCurrentEventMembership(mapped[0].membership);
-          }
-        }
-      } catch (error) {
-        console.error('HoD: Error fetching events for sidebar:', error);
+  // Process events from context
+  const myEvents = useMemo(() => {
+    if (!ctxEvents || ctxEvents.length === 0) return [];
+    
+    // If there's an eventId in props/URL, prefer that event first
+    let sortedList = [...ctxEvents];
+    if (eventId) {
+      const idx = sortedList.findIndex((e) => (e._id || e.id) === eventId);
+      if (idx !== -1) {
+        const [currentEvent] = sortedList.splice(idx, 1);
+        sortedList = [currentEvent, ...sortedList];
       }
-    })();
-    return () => { mounted = false };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventIdFromUrl]);
+    }
+
+    return sortedList.map(e => ({
+      id: e._id || e.id,
+      name: e.name,
+      icon: "bi-calendar-event",
+      membership: e.membership,
+    }));
+  }, [ctxEvents, eventId]);
+
+  const selectedEvent = eventId || (myEvents.length > 0 ? myEvents[0].id : "");
+  const currentEventMembership = myEvents.find(e => e.id === selectedEvent)?.membership || null;
+  const hasEvents = myEvents && myEvents.length > 0;
 
   useEffect(() => {
     if (!sidebarOpen) {
       setWorkOpen(false);
       setFinanceOpen(false);
-      setRisksOpen(false);
       setOverviewOpen(false);
     }
   }, [sidebarOpen]);
@@ -119,14 +89,14 @@ export default function HoDSideBar({
   const handlePopupMouseEnter = () => { if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); } };
   const handlePopupMouseLeave = () => { setHoveredMenu(null); };
 
-  // Submenu Tổng quan - HoOC có đầy đủ quyền
+  // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hooc-landing-page" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hooc-event-detail` }
+    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hod-dashboard" },
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` }
   ];
 
   const workSubItems = [
-    { id: "work-board", label: "Danh sách công việc", path: `events/${eventId || ''}/tasks` },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/hod-tasks` },
     { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
     { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
@@ -136,11 +106,6 @@ export default function HoDSideBar({
     { id: "expenses", label: "Chi tiêu", path: "/task" },
     { id: "income", label: "Thu nhập", path: "/task" },
     { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
-  ];
-  const risksSubItems = [
-    { id: "risk-list", label: "Danh sách rủi ro", path: "/risk" },
-    { id: "risk-analysis", label: "Phân tích rủi ro", path: "/risk" },
-    { id: "risk-mitigation", label: "Giảm thiểu rủi ro", path: "/risk" },
   ];
 
   // find the event object (from myEvents)
@@ -263,17 +228,33 @@ export default function HoDSideBar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        <div className="mb-4">
-          {sidebarOpen && <div style={{ marginTop: "0px" }} className="group-title">ĐIỀU HƯỚNG</div>}
-          <div className="d-flex flex-column gap-1">
-            <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-list me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Trang chủ</span>}
-              </div>
-            </button>
+        {ctxLoading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,0.75)",
+              zIndex: 2000,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Loading size={40} />
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              {sidebarOpen && <div style={{ marginTop: "0px" }} className="group-title">ĐIỀU HƯỚNG</div>}
+              <div className="d-flex flex-column gap-1">
+                <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Trang chủ</span>}
+                  </div>
+                </button>
+              </div>
+            </div>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">CHỨC NĂNG CHÍNH</div>}
 
@@ -485,6 +466,7 @@ export default function HoDSideBar({
                   )}
                 </div>
 
+                {/* Rủi ro */}
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
@@ -538,17 +520,6 @@ export default function HoDSideBar({
                     </div>
                   )}
                 </div>
-
-                <button
-                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                  onClick={() => navigate("/task")}
-                  title="Phản hồi"
-                >
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
-                    {sidebarOpen && <span>Phản hồi</span>}
-                  </div>
-                </button>
               </>
             )}
           </div>
@@ -572,6 +543,8 @@ export default function HoDSideBar({
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Theme toggle hoặc Expand button */}

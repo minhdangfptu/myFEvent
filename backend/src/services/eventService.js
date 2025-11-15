@@ -110,17 +110,23 @@ export const eventService = {
       throw err;
     }
 
-    const startdate = eventStartDate ? new Date(eventStartDate) : new Date();
-    const endDate = eventEndDate ? new Date(eventEndDate) : new Date();
+    const startdate = new Date(eventStartDate);
+    const endDate =  new Date(eventEndDate);
     if (endDate < startdate) {
-      const err = new Error('End date must be after start date');
+      const err = new Error('Ngày kết thúc phải ở sau ngày bắt đầu');
       err.status = 400;
       throw err;
     }
 
+    // So sánh chỉ ngày (không tính giờ/phút) để tránh lỗi timezone
     const nowDate = new Date();
-    if (startdate < nowDate || endDate < nowDate) {
-      const err = new Error('Start date and end date must be in the future');
+    const nowDateOnly = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const startDateOnly = new Date(startdate.getFullYear(), startdate.getMonth(), startdate.getDate());
+    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    // Cho phép ngày hôm nay hoặc ngày trong tương lai
+    if (startDateOnly < nowDateOnly || endDateOnly < nowDateOnly) {
+      const err = new Error('Ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai');
       err.status = 400;
       throw err;
     }
@@ -172,6 +178,21 @@ export const eventService = {
       throw err;
     }
 
+    // Kiểm tra event đã kết thúc chưa
+    const eventWithStatus = await ensureAutoStatusForDoc(event, { persist: false });
+    if (eventWithStatus.status === 'completed') {
+      const err = new Error('Sự kiện đã kết thúc, không thể tham gia');
+      err.status = 400;
+      throw err;
+    }
+
+    // Kiểm tra event đã bị hủy
+    if (event.status === 'cancelled') {
+      const err = new Error('Sự kiện đã bị hủy');
+      err.status = 400;
+      throw err;
+    }
+
     const exists = await EventMember.findOne({ eventId: event._id, userId }).lean();
     if (!exists) {
       await EventMember.create({ eventId: event._id, userId, role: 'Member' });
@@ -200,24 +221,55 @@ export const eventService = {
 
   // GET /api/events/me/list
   async listMyEvents({ userId }) {
+    // Tối ưu: Bỏ populate userId vì không cần thiết, chỉ cần role và eventId
     const memberships = await EventMember.find({ userId })
-      .populate('userId', 'fullName')
+      .select('eventId role _id')
       .sort({ createdAt: -1 })
       .lean();
 
+    if (memberships.length === 0) {
+      return { data: [] };
+    }
+
     const eventIds = memberships.map((m) => m.eventId);
+    
+    // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
       .select('name status eventStartDate eventEndDate joinCode image type description location organizerName')
       .lean();
 
-    const eventsFixed = await ensureAutoStatusForDocs(events);
+    // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
+    const now = new Date();
+    const eventsFixed = events.map(event => {
+      if (event.status === 'cancelled') return event;
+      const start = new Date(event.eventStartDate);
+      const end = new Date(event.eventEndDate);
+      let computedStatus = event.status;
+      if (now > end) computedStatus = 'completed';
+      else if (now >= start && now <= end) computedStatus = 'ongoing';
+      else computedStatus = 'scheduled';
+      
+      if (event.status !== computedStatus && event._id) {
+        // Update async, không chờ
+        Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
+          .catch(err => console.error('autoStatus persist error:', err));
+        event.status = computedStatus;
+      }
+      return event;
+    });
+
+    // Tạo map để tìm nhanh hơn thay vì find trong loop
+    const membershipMap = new Map();
+    memberships.forEach(m => {
+      membershipMap.set(m.eventId.toString(), m);
+    });
 
     const eventsWithMembership = eventsFixed.map((event) => {
-      const membership = memberships.find((m) => m.eventId.toString() === event._id.toString());
+      const membership = membershipMap.get(event._id.toString());
       return {
         ...event,
         eventMember: membership
-          ? { role: membership.role, userId: membership.userId, _id: membership._id }
+          ? { role: membership.role, userId: userId.toString(), _id: membership._id }
           : null
       };
     });

@@ -11,12 +11,15 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Loading from "~/components/Loading";
 import ConfirmModal from "~/components/ConfirmModal";
+import { useNotifications } from "~/contexts/NotificationsContext";
+import { useAuth } from "~/contexts/AuthContext";
 
 export default function EventTaskDetailPage() {
   const { t } = useTranslation();
   const { eventId, taskId } = useParams();
   const navigate = useNavigate();
   const { fetchEventRole } = useEvents();
+  const { user } = useAuth();
   const [eventRole, setEventRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -246,8 +249,8 @@ export default function EventTaskDetailPage() {
         status: backendStatus,
       });
       setForm((f) => ({ ...f, status: value }));
-      toast.success("Đã cập nhật trạng thái");
       setIsEditing(false);
+      // Backend sẽ tự động tạo notification khi task hoàn thành
     } catch (err) {
       const msg = err?.response?.data?.message;
       toast.error(msg || "Cập nhật trạng thái thất bại");
@@ -260,7 +263,6 @@ export default function EventTaskDetailPage() {
         await taskApi.unassignTask(eventId, taskId);
         setForm((f) => ({ ...f, assigneeId: "" }));
         setAssigneeFallbackName("");
-        toast.success("Đã huỷ gán người thực hiện");
         setIsEditing(false);
       } else {
         const member = assignees.find(
@@ -273,8 +275,8 @@ export default function EventTaskDetailPage() {
         setForm((f) => ({ ...f, assigneeId: String(membershipId) }));
         const a = member;
         setAssigneeFallbackName(a?.userId?.fullName || a?.fullName || "");
-        toast.success("Đã gán người thực hiện");
         setIsEditing(false);
+        // Backend sẽ tự động tạo notification khi giao việc cho Member
       }
     } catch {
       toast.error("Cập nhật người thực hiện thất bại");

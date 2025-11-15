@@ -11,7 +11,7 @@ export default function UserHeader({
   onSearch,
   onEventAction,
 }) {
-  const { user, logout } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const { t } = useTranslation();
   const { notifications, unreadCount, markAllRead } = useNotifications();
   const unread = notifications.filter((n) => n.unread).slice(0, 5);

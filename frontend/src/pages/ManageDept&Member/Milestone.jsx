@@ -449,7 +449,7 @@ const Milestone = () => {
 
   const handleViewDetails = (milestoneId) => {
     setLoading(true)
-    navigate(`/events/${eventId}/hooc-milestone-detail/${milestoneId}`)
+    navigate(`/events/${eventId}/milestone-detail/${milestoneId}`)
   }
 
   const handleCreateMilestone = () => {
@@ -494,7 +494,7 @@ const Milestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole} activePage= "work-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
+    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
       <style>{animationStyles}</style>
       <ToastContainer position="top-right" autoClose={3000} />
 
@@ -593,6 +593,23 @@ const Milestone = () => {
                 </div>
 
                 <div style={styles.detailsActions}>
+                  <button
+                    style={styles.btnSecondary}
+                    onClick={() =>
+                      navigate(
+                        `/events/${eventId}/milestone-detail/${selectedMilestone.id}/agenda`,
+                        { state: { milestoneName: selectedMilestone?.name } }
+                      )
+                    }
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "#e5e7eb"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "#f3f4f6"
+                    }}
+                  >
+                    Xem Agenda
+                  </button>
                   <button
                     style={styles.btnSecondary}
                     onClick={() => handleEditMilestone(selectedMilestone.id)}

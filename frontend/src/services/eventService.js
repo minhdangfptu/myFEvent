@@ -1,9 +1,26 @@
 import { eventApi } from "~/apis/eventApi";
+
+const unwrapResponse = (payload) => {
+    let current = payload;
+    const visited = new Set();
+    while (
+        current &&
+        typeof current === "object" &&
+        !Array.isArray(current) &&
+        !visited.has(current) &&
+        (current.data !== undefined || current.result !== undefined || current.payload !== undefined)
+    ) {
+        visited.add(current);
+        current = current.data ?? current.result ?? current.payload;
+    }
+    return current;
+};
+
 export const eventService = {
     fetchAllPublicEvents: async () => {
         try {
             const response = await eventApi.getAllPublicEvents();
-            return response;
+            return unwrapResponse(response);
         } catch (error) {
             throw error;
         }
@@ -11,7 +28,7 @@ export const eventService = {
     fetchEventById: async (eventId) => {
         try {
             const response = await eventApi.getEventById(eventId);
-            return response;
+            return unwrapResponse(response);
         } catch (error) {
             throw error;
         }
@@ -19,7 +36,7 @@ export const eventService = {
     listMyEvents: async () => {
         try {
             const response = await eventApi.listMyEvents();
-            return response;
+            return unwrapResponse(response);
         } catch (error) {
             throw error;
         }
@@ -27,7 +44,7 @@ export const eventService = {
     getUnassignedMembersByEvent: async (eventId) => {
         try {
             const response = await eventApi.getUnassignedMembersByEvent(eventId);
-            return response;
+            return unwrapResponse(response);
         } catch (error) {
             throw error;
         }
@@ -35,7 +52,7 @@ export const eventService = {
     getMemberDetail: async (eventId, memberId) => {
         try {
             const response = await eventApi.getMemberDetail(eventId, memberId);
-            return response;
+            return unwrapResponse(response);
         } catch (error) {
             throw error;
         }

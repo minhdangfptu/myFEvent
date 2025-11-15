@@ -4,15 +4,16 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../contexts/AuthContext";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
+import { userApi } from "../../apis/userApi";
 import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
-import { formatDate, formatDateForInput } from '../../utils/formatDate';
+import { formatDate, formatDateForInput } from "../../utils/formatDate";
 
 function toDMY(value) {
   const d = new Date(value);
-  if (isNaN(d)) return '';
-  return d.toLocaleDateString('vi-VN').replace(/\//g, '-');
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString("vi-VN").replace(/\//g, "-");
 }
 
 export default function HoOCEventDetail() {
@@ -94,7 +95,9 @@ export default function HoOCEventDetail() {
       }
     };
     loadRole();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [eventId, fetchEventRole]);
 
   const fetchEventDetails = async () => {
@@ -160,35 +163,56 @@ export default function HoOCEventDetail() {
     }
   };
 
+  const handleCancelEvent = async () => {
+    handleOpenConfirm(async () => {
+      try {
+        await eventApi.updateEvent(eventId, {
+          status: "cancelled",
+        });
+        await fetchEventDetails();
+        toast.success("Đã hủy thành công!");
+      } catch (error) {
+        console.error("Update event error:", error);
+        setError(error.response?.data?.message || "Hủy sự kiện thất bại");
+      } finally {
+        setSubmitting(false);
+      }
+    }, "Bạn có chắc chắn muốn hủy sự kiện này? Hành động này sẽ chuyển trạng thái sự kiện về 'Đã hủy'.");
+  };
+
   // Validate event data trước khi public
   const validateEventDataForPublic = (eventData) => {
     const missingFields = [];
-    
+
     if (!eventData.name || !eventData.name.trim()) {
-      missingFields.push('Tên sự kiện');
+      missingFields.push("Tên sự kiện");
     }
     if (!eventData.description || !eventData.description.trim()) {
-      missingFields.push('Mô tả');
+      missingFields.push("Mô tả");
     }
     if (!eventData.organizerName || !eventData.organizerName.trim()) {
-      missingFields.push('Người tổ chức');
+      missingFields.push("Người tổ chức");
     }
     if (!eventData.eventStartDate) {
-      missingFields.push('Ngày bắt đầu');
+      missingFields.push("Ngày bắt đầu");
     }
     if (!eventData.eventEndDate) {
-      missingFields.push('Ngày kết thúc');
+      missingFields.push("Ngày kết thúc");
     }
     if (!eventData.location || !eventData.location.trim()) {
-      missingFields.push('Địa điểm');
+      missingFields.push("Địa điểm");
     }
-    if (!eventData.image || !Array.isArray(eventData.image) || eventData.image.length === 0) {
-      missingFields.push('Hình ảnh sự kiện');
+    if (
+      !eventData.image ||
+      !Array.isArray(eventData.image) ||
+      eventData.image.length === 0
+    ) {
+      missingFields.push("Hình ảnh sự kiện");
     }
-    
+
     return {
       isValid: missingFields.length === 0,
-      missingFields
+      missingFields,
     };
   };
 
@@ -196,16 +220,16 @@ export default function HoOCEventDetail() {
   const handleChangeType = async () => {
     // Kiểm tra dữ liệu trước khi public
     if (!event) return;
-    
+
     const validation = validateEventDataForPublic(event);
     if (!validation.isValid) {
       setValidationModal({
         show: true,
-        missingFields: validation.missingFields
+        missingFields: validation.missingFields,
       });
       return;
     }
-    
+
     handleOpenConfirm(async () => {
       try {
         await eventApi.updateEvent(eventId, { type: "public" });
@@ -217,7 +241,7 @@ export default function HoOCEventDetail() {
         if (error.response?.data?.missingFields) {
           setValidationModal({
             show: true,
-            missingFields: error.response.data.missingFields
+            missingFields: error.response.data.missingFields,
           });
         } else {
           toast.error(
@@ -239,7 +263,8 @@ export default function HoOCEventDetail() {
   const doDeleteEvent = async () => {
     try {
       await eventApi.deleteEvent(eventId);
-      navigate(
+      toast.success("Xoá sự kiện thành công!");
+      window.location.replace(
         "/home-page",
         {
           replace: true,
@@ -290,9 +315,35 @@ export default function HoOCEventDetail() {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.info("Đã sao chép!");
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Đã copy!", {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        toast.success("Đã copy!", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+      } catch (e) {
+        toast.error("Không thể sao chép", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   const getImageSrc = (image) => {
@@ -489,8 +540,9 @@ export default function HoOCEventDetail() {
     }
   };
 
-  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
-  const isMember = eventRole === 'Member';
+  const sidebarType =
+    eventRole === "Member" ? "member" : eventRole === "HoD" ? "hod" : "hooc";
+  const isMember = eventRole === "Member";
   if (loading) {
     return (
       <UserLayout
@@ -535,6 +587,8 @@ export default function HoOCEventDetail() {
       </UserLayout>
     );
   }
+
+  const canEditImages = event.status !== "completed" && event.status !== "cancelled";
 
   return (
     <UserLayout
@@ -597,7 +651,10 @@ export default function HoOCEventDetail() {
           <div className="stat-item">
             <i className="bi bi-clock"></i>
             <span>
-              D-Day: {formatDate(event?.eventStartDate) + " - " +  formatDate(event?.eventEndDate) || "Chưa có thông tin"}
+              D-Day:{" "}
+              {formatDate(event?.eventStartDate) +
+                " - " +
+                formatDate(event?.eventEndDate) || "Chưa có thông tin"}
             </span>
           </div>
         </div>
@@ -651,10 +708,7 @@ export default function HoOCEventDetail() {
                         e.target.src = "/default-events.jpg";
                       }}
                       onLoad={() => {
-                        console.log(
-                          "Event image loaded successfully:",
-                          
-                        );
+                        console.log("Event image loaded successfully:");
                       }}
                     />
                     {/* Image count indicator nếu có nhiều ảnh */}
@@ -672,11 +726,11 @@ export default function HoOCEventDetail() {
                       <button
                         className="btn btn-sm btn-danger"
                         onClick={() => {
-                          if (
-                            window.confirm("Bạn có chắc chắn muốn xóa ảnh này?")
-                          ) {
-                            removeExistingImage(0);
-                          }
+                          setConfirmModal({
+                            show: true,
+                            message: "Bạn có chắc chắn muốn xóa ảnh này?",
+                            action: () => removeExistingImage(0),
+                          });
                         }}
                         disabled={submitting}
                         title="Xóa ảnh"
@@ -695,10 +749,7 @@ export default function HoOCEventDetail() {
                       e.target.src = "/default-events.jpg";
                     }}
                     onLoad={() => {
-                      console.log(
-                        "Event image loaded successfully:",
-                       
-                      );
+                      console.log("Event image loaded successfully:");
                     }}
                   />
                 )}
@@ -739,10 +790,11 @@ export default function HoOCEventDetail() {
               </div>
               <div className="mb-3">
                 <strong>Ngày diễn ra:</strong>
-                {(event.eventStartDate || event.eventEndDate) ? (
+                {event.eventStartDate || event.eventEndDate ? (
                   <span className="event-chip chip-date ms-2">
                     <i className="bi bi-calendar-event me-1" />
-                    {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
+                    {formatDate(event.eventStartDate)} -{" "}
+                    {formatDate(event.eventEndDate)}
                   </span>
                 ) : (
                   <span className="text-muted ms-2">Chưa có data</span>
@@ -827,18 +879,24 @@ export default function HoOCEventDetail() {
             {/* Event Details */}
             <div className="info-card">
               <div className="d-flex justify-content-between align-items-center mb-3">
-              <div>
+                <div>
                   <h5 className="mb-1">Chi tiết sự kiện</h5>
-                  {event?.status === 'completed' && (
-                    <p className="text-danger small mb-0">Sự kiện đã kết thúc, không thể chỉnh sửa thông tin.</p>
+                  {event?.status === "completed" && (
+                    <p className="text-danger small mb-0">
+                      Sự kiện đã kết thúc, không thể chỉnh sửa thông tin.
+                    </p>
                   )}
                 </div>
                 {!editing && !isMember && (
                   <button
                     className="btn btn-outline-primary btn-sm"
                     onClick={() => setEditing(true)}
-                    disabled={event?.status === 'completed'}
-                    title={event?.status === 'completed' ? 'Sự kiện đã kết thúc - không thể chỉnh sửa' : undefined}
+                    disabled={event?.status === "completed"}
+                    title={
+                      event?.status === "completed"
+                        ? "Sự kiện đã kết thúc - không thể chỉnh sửa"
+                        : undefined
+                    }
                   >
                     <i className="bi bi-pencil me-1"></i>Chỉnh sửa
                   </button>
@@ -885,12 +943,21 @@ export default function HoOCEventDetail() {
                 <input
                   type="date"
                   className="form-control"
-                  value={editing ? formatDateForInput(editForm.eventStartDate) : formatDateForInput(event.eventStartDate)}
-                  onChange={e => setEditForm({...editForm, eventStartDate: e.target.value})}
+                  value={
+                    editing
+                      ? formatDateForInput(editForm.eventStartDate)
+                      : formatDateForInput(event.eventStartDate)
+                  }
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, eventStartDate: e.target.value })
+                  }
                   disabled={!editing}
                 />
                 <div className="form-text mt-1">
-                  Hiển thị dạng dd-mm-yyyy: {toDMY(editing ? editForm.eventStartDate : event.eventStartDate) || "Chưa có thông tin"}
+                  Hiển thị dạng dd-mm-yyyy:{" "}
+                  {toDMY(
+                    editing ? editForm.eventStartDate : event.eventStartDate
+                  ) || "Chưa có thông tin"}
                 </div>
               </div>
               <div className="mb-3">
@@ -898,12 +965,21 @@ export default function HoOCEventDetail() {
                 <input
                   type="date"
                   className="form-control"
-                  value={editing ? formatDateForInput(editForm.eventEndDate) : formatDateForInput(event.eventEndDate)}
-                  onChange={e => setEditForm({...editForm, eventEndDate: e.target.value})}
+                  value={
+                    editing
+                      ? formatDateForInput(editForm.eventEndDate)
+                      : formatDateForInput(event.eventEndDate)
+                  }
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, eventEndDate: e.target.value })
+                  }
                   disabled={!editing}
                 />
                 <div className="form-text mt-1">
-                  Hiển thị dạng dd-mm-yyyy: {toDMY(editing ? editForm.eventEndDate : event.eventEndDate) || "Chưa có thông tin"}
+                  Hiển thị dạng dd-mm-yyyy:{" "}
+                  {toDMY(
+                    editing ? editForm.eventEndDate : event.eventEndDate
+                  ) || "Chưa có thông tin"}
                 </div>
               </div>
               <div className="mb-3">
@@ -920,20 +996,16 @@ export default function HoOCEventDetail() {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label fw-semibold">Trạng thái</label>
-                <select
-                  className="form-control"
-                  value={editing ? editForm.status : event.status}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, status: e.target.value })
-                  }
-                  disabled={!editing}
-                >
-                  <option value="scheduled">Sắp diễn ra</option>
-                  <option value="ongoing">Đang diễn ra</option>
-                  <option value="completed">Đã kết thúc</option>
-                  <option value="cancelled">Đã hủy</option>
-                </select>
+                <label className="form-label fw-semibold">
+                  Trạng thái:{" "}
+                  {event.status === "scheduled"
+                    ? "Sắp diễn ra"
+                    : event.status === "ongoing"
+                    ? "Đang diễn ra"
+                    : event.status === "completed"
+                    ? "Đã kết thúc"
+                    : "Đã hủy"}
+                </label>
               </div>
               {editing && (
                 <div>
@@ -977,35 +1049,56 @@ export default function HoOCEventDetail() {
 
             {/* Event Actions */}
             {!isMember && (
-            <div className="info-card">
-              <h5>Hành động sự kiện</h5>
-              <div className="d-flex gap-2 flex-wrap">
-                {event.type === "public" && event.status ==="cancelled" ? (
+              <div className="info-card">
+                <h5>Hành động sự kiện</h5>
+                <div className="d-flex gap-2 flex-wrap">
+                  {(event.type === "public" && event.status === "cancelled") ||
+                  event.status === "completed" ? (
+                    <button
+                      disabled
+                      className="btn btn-outline-success"
+                      onClick={handleChangeType}
+                    >
+                      <i className="bi bi-eye me-2"></i>Công khai sự kiện
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-outline-success"
+                      onClick={handleChangeType}
+                    >
+                      <i className="bi bi-eye me-2"></i>Công khai sự kiện
+                    </button>
+                  )}
+                  {event.status === "completed"  || event.status === "cancelled" ? (
+                    <button
+                      disabled
+                      className="btn btn-outline-warning"
+                      onClick={handleCancelEvent}
+                    >
+                      <i className="bi bi-x-octagon me-2"></i>Hủy sự kiện
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-outline-warning"
+                      onClick={handleCancelEvent}
+                    >
+                      <i className="bi bi-x-octagon me-2"></i>Hủy sự kiện
+                    </button>
+                  )}
+
                   <button
-                    disabled
-                    className="btn btn-warning"
-                    onClick={handleChangeType}
+                    className="btn btn-outline-danger"
+                    onClick={handleDelete}
                   >
-                    <i className="bi bi-eye me-2"></i>Công khai sự kiện
+                    <i className="bi bi-trash me-2"></i>Xóa sự kiện
                   </button>
-                ) : (
-                  <button
-                    className="btn btn-warning"
-                    onClick={handleChangeType}
-                  >
-                    <i className="bi bi-eye me-2"></i>Công khai sự kiện
-                  </button>
-                )}
-                <button className="btn btn-danger" onClick={handleDelete}>
-                  <i className="bi bi-trash me-2"></i>Xóa sự kiện
-                </button>
+                </div>
+                <p className="text-muted small mt-3 mb-0">
+                  <i className="bi bi-exclamation-triangle me-1"></i>
+                  LƯU Ý: Các hành động này sẽ ảnh hưởng tới sự kiện cũng như
+                  toàn bộ thành viên và không thể hoàn tác.
+                </p>
               </div>
-              <p className="text-muted small mt-3 mb-0">
-                <i className="bi bi-exclamation-triangle me-1"></i>
-                LƯU Ý: Các hành động này sẽ ảnh hưởng tới sự kiện cũng như toàn
-                bộ thành viên và không thể hoàn tác.
-              </p>
-            </div>
             )}
           </div>
           <div className="col-lg-4">
@@ -1070,10 +1163,7 @@ export default function HoOCEventDetail() {
                         e.target.src = "/default-events.jpg";
                       }}
                       onLoad={() => {
-                        console.log(
-                          "Event image loaded successfully:",
-                          
-                        );
+                        console.log("Event image loaded successfully:");
                       }}
                     />
                     {/* Image count indicator nếu có nhiều ảnh */}
@@ -1085,24 +1175,25 @@ export default function HoOCEventDetail() {
                         </span>
                       </div>
                     )}
-                    {/* Nút xóa ảnh */}
-
-                    <div className="position-absolute top-0 start-0 m-2">
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => {
-                          if (
-                            window.confirm("Bạn có chắc chắn muốn xóa ảnh này?")
-                          ) {
-                            removeExistingImage(0);
-                          }
-                        }}
-                        disabled={submitting || event?.status === 'completed'}
-                        title={event?.status === 'completed' ? 'Sự kiện đã kết thúc - không thể xóa ảnh' : 'Xóa ảnh'}
-                      >
-                        <i className="bi bi-trash"></i>
-                      </button>
-                    </div>
+                    {/* Nút xóa ảnh: chỉ hiển thị khi có quyền chỉnh sửa ảnh */}
+                    {canEditImages && (
+                      <div className="position-absolute top-0 start-0 m-2">
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            setConfirmModal({
+                              show: true,
+                              message: "Bạn có chắc chắn muốn xóa ảnh này?",
+                              action: () => removeExistingImage(0),
+                            });
+                          }}
+                          disabled={submitting}
+                          title="Xóa ảnh"
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <img
@@ -1114,154 +1205,149 @@ export default function HoOCEventDetail() {
                       e.target.src = "/default-events.jpg";
                     }}
                     onLoad={() => {
-                      console.log(
-                        "Event image loaded successfully:",
-                          
-                      );
+                      console.log("Event image loaded successfully:");
                     }}
                   />
                 )}
-              </div>
-              <div className="mb-2">
-                <label className="form-label fw-semibold">
-                  Tải lên hình ảnh mới
-                </label>
-
-                {/* Image Input Type Toggle */}
-                <div className="d-flex gap-2 mb-3">
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${
-                      imageInputType === "url"
-                        ? "btn-primary"
-                        : "btn-outline-primary"
-                    }`}
-                    onClick={() => setImageInputType("url")}
-                    disabled={submitting}
-                  >
-                    <i className="bi bi-link-45deg me-1"></i>
-                    URL
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${
-                      imageInputType === "file"
-                        ? "btn-primary"
-                        : "btn-outline-primary"
-                    }`}
-                    onClick={() => setImageInputType("file")}
-                    disabled={submitting}
-                  >
-                    <i className="bi bi-upload me-1"></i>
-                    Upload File
-                  </button>
-                </div>
-
-                {/* URL Input */}
-                {imageInputType === "url" && (
-                  <div className="d-flex gap-2 mb-3">
-                    <input
-                      type="url"
-                      className="form-control"
-                      placeholder="Nhập URL hình ảnh..."
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      disabled={submitting}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary"
-                      onClick={handleUrlAdd}
-                      disabled={submitting || !imageUrl.trim()}
-                    >
-                      <i className="bi bi-plus"></i>
-                    </button>
-                  </div>
-                )}
-
-                {/* File Upload */}
-                {imageInputType === "file" && (
-                  <div className="mb-3">
-                    <input
-                      type="file"
-                      className="form-control"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      disabled={submitting}
-                    />
-                    <small className="text-muted">
-                      Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
-                    </small>
-                  </div>
-                )}
-
-                {/* Image Preview */}
-                {imagePreviews.length > 0 && (
-                  <div className="mt-3">
-                    <label className="form-label fw-semibold">
-                      Hình ảnh đã chọn:
-                    </label>
-                    <div className="row g-2">
-                      {imagePreviews.map((img, index) => (
-                        <div key={index} className="col-md-3">
-                          <div className="position-relative">
-                            <img
-                              src={img}
-                              alt={`Preview ${index + 1}`}
-                              className="img-fluid rounded"
-                              style={{
-                                width: "100%",
-                                height: "105px",
-                                objectFit: "cover",
-                              }}
-                              onError={(e) => {
-                                e.target.src = "/default-events.jpg";
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
-                              onClick={() => removeImage(index)}
-                              disabled={submitting}
-                              style={{
-                                width: "24px",
-                                height: "24px",
-                                padding: "0",
-                              }}
-                            >
-                              <i
-                                className="bi bi-x"
-                                style={{ fontSize: "12px" }}
-                              ></i>
-                            </button>
+                {/* Toàn bộ control dưới chỉ hiển thị nếu event chưa complete/hủy */}
+                {canEditImages && (
+                  <>
+                    <div className="mb-2">
+                      <label className="form-label fw-semibold">Tải lên hình ảnh mới</label>
+                      {/* Image Input Type Toggle */}
+                      <div className="d-flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${
+                            imageInputType === "url"
+                              ? "btn-primary"
+                              : "btn-outline-primary"
+                          }`}
+                          onClick={() => setImageInputType("url")}
+                          disabled={submitting}
+                        >
+                          <i className="bi bi-link-45deg me-1"></i>
+                          URL
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${
+                            imageInputType === "file"
+                              ? "btn-primary"
+                              : "btn-outline-primary"
+                          }`}
+                          onClick={() => setImageInputType("file")}
+                          disabled={submitting}
+                        >
+                          <i className="bi bi-upload me-1"></i>
+                          Upload File
+                        </button>
+                      </div>
+                      {/* URL Input */}
+                      {imageInputType === "url" && (
+                        <div className="d-flex gap-2 mb-3">
+                          <input
+                            type="url"
+                            className="form-control"
+                            placeholder="Nhập URL hình ảnh..."
+                            value={imageUrl}
+                            onChange={(e) => setImageUrl(e.target.value)}
+                            disabled={submitting}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline-primary"
+                            onClick={handleUrlAdd}
+                            disabled={submitting || !imageUrl.trim()}
+                          >
+                            <i className="bi bi-plus"></i>
+                          </button>
+                        </div>
+                      )}
+                      {/* File Upload */}
+                      {imageInputType === "file" && (
+                        <div className="mb-3">
+                          <input
+                            type="file"
+                            className="form-control"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            disabled={submitting}
+                          />
+                          <small className="text-muted">
+                            Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
+                          </small>
+                        </div>
+                      )}
+                      {/* Image Preview */}
+                      {imagePreviews.length > 0 && (
+                        <div className="mt-3">
+                          <label className="form-label fw-semibold">
+                            Hình ảnh đã chọn:
+                          </label>
+                          <div className="row g-2">
+                            {imagePreviews.map((img, index) => (
+                              <div key={index} className="col-md-3">
+                                <div className="position-relative">
+                                  <img
+                                    src={img}
+                                    alt={`Preview ${index + 1}`}
+                                    className="img-fluid rounded"
+                                    style={{
+                                      width: "100%",
+                                      height: "105px",
+                                      objectFit: "cover",
+                                    }}
+                                    onError={(e) => {
+                                      e.target.src = "/default-events.jpg";
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                                    onClick={() => removeImage(index)}
+                                    disabled={submitting}
+                                    style={{
+                                      width: "24px",
+                                      height: "24px",
+                                      padding: "0",
+                                    }}
+                                  >
+                                    <i
+                                      className="bi bi-x"
+                                      style={{ fontSize: "12px" }}
+                                    ></i>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      )}
+                      {imagePreviews.length > 0 && (
+                        <div className="d-flex gap-2 mt-3">
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={handleImageUpload}
+                            disabled={submitting}
+                          >
+                            {submitting ? "Đang tải lên..." : "Tải lên ảnh"}
+                          </button>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={() => {
+                              setImageFiles([]);
+                              setImagePreviews([]);
+                              setImageUrl("");
+                              setError("");
+                            }}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-
-                {imagePreviews.length > 0 && (
-                  <div className="d-flex gap-2 mt-3">
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={handleImageUpload}
-                      disabled={submitting}
-                    >
-                      {submitting ? "Đang tải lên..." : "Tải lên ảnh"}
-                    </button>
-                    <button
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => {
-                        setImageFiles([]);
-                        setImagePreviews([]);
-                        setImageUrl("");
-                        setError("");
-                      }}
-                    >
-                      Hủy
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1546,7 +1632,8 @@ export default function HoOCEventDetail() {
                 Không thể công khai sự kiện
               </h5>
               <p className="mb-3">
-                Để công khai sự kiện, vui lòng cập nhật đầy đủ các thông tin sau:
+                Để công khai sự kiện, vui lòng cập nhật đầy đủ các thông tin
+                sau:
               </p>
               <ul className="list-group">
                 {validationModal.missingFields.map((field, index) => (
@@ -1587,3 +1674,4 @@ export default function HoOCEventDetail() {
     </UserLayout>
   );
 }
+

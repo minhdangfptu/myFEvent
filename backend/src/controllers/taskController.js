@@ -4,6 +4,11 @@ import ensureEventRole from '../utils/ensureEventRole.js';
 import Department from '../models/department.js'
 import Milestone from '../models/milestone.js'
 import Event from '../models/event.js';
+import {
+  notifyTaskAssigned,
+  notifyTaskCompleted,
+  notifyMajorTaskStatus,
+} from '../services/notificationService.js';
 // GET /api/tasks/:eventId?departmentId=...: (HoOC/HoD/Mem)
 //http://localhost:8080/api/tasks/68fd264703c943724fa8cbff?departmentId=6500000000000000000000a1
 export const listTasksByEventOrDepartment = async (req, res) => {
@@ -111,7 +116,8 @@ export const createTask = async (req, res) => {
 
         const {
             title, description, departmentId, assigneeId,
-            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId, dependencies
+            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId, dependencies,
+            suggestedTeamSize
         } = req.body;
 
         if (!departmentId) return res.status(400).json({ message: 'Thiếu departmentId' });
@@ -236,8 +242,19 @@ export const createTask = async (req, res) => {
             estimateUnit,
             milestoneId: milestoneId || undefined,
             parentId: parentId || undefined,
-            dependencies: dependencies
+            dependencies: dependencies,
+            suggestedTeamSize: suggestedTeamSize || undefined
         });
+
+        // Thông báo khi giao việc cho Member
+        if (assigneeId) {
+            try {
+                await notifyTaskAssigned(eventId, t._id, assigneeId);
+            } catch (notifyErr) {
+                console.error('Error sending notification:', notifyErr);
+                // Không fail request nếu notification lỗi
+            }
+        }
 
         return res.status(201).json({ data: t });
     } catch (err) {
@@ -515,6 +532,21 @@ export const updateTaskProgress = async (req, res) => {
         const recalcParentsUpward = (await import('../utils/recalcParentTask.js')).default;
         await recalcParentsUpward(task.parentId, eventId);
 
+        // 8) Thông báo khi task hoàn thành
+        if (status === 'done') {
+            try {
+                await notifyTaskCompleted(eventId, taskId);
+                
+                // Kiểm tra nếu là task lớn (không có parentId)
+                if (!task.parentId) {
+                    await notifyMajorTaskStatus(eventId, taskId, true);
+                }
+            } catch (notifyErr) {
+                console.error('Error sending notification:', notifyErr);
+                // Không fail request nếu notification lỗi
+            }
+        }
+
         return res.status(200).json({ message: "Update Task progress successfully", data: task });
     } catch (err) {
         return res.status(500).json({ message: 'Cập nhật progress thất bại' });
@@ -540,6 +572,15 @@ export const assignTask = async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
         task.assigneeId = assigneeId;
         await task.save();
+        
+        // Thông báo cho Member được giao việc
+        try {
+            await notifyTaskAssigned(eventId, taskId, assigneeId);
+        } catch (notifyErr) {
+            console.error('Error sending notification:', notifyErr);
+            // Không fail request nếu notification lỗi
+        }
+        
         return res.status(200).json({ data: task });
     } catch (err) { return res.status(500).json({ message: 'Gán task thất bại' }); }
 };

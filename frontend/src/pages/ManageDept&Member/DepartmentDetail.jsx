@@ -297,10 +297,14 @@ const DepartmentDetail = () => {
     try {
       setLoadingMembers(true);
       const response = await eventService.getUnassignedMembersByEvent(eventId);
-      setUnassignedMembers(response.data || []);
+      // eventService đã unwrap response, nên response có thể là array trực tiếp hoặc có data wrapper
+      const members = Array.isArray(response) ? response : (response?.data || []);
+      console.log('Unassigned members loaded:', members);
+      setUnassignedMembers(members);
     } catch (error) {
       console.error("Error loading unassigned members:", error);
       toast.error("Không thể tải danh sách thành viên");
+      setUnassignedMembers([]);
     } finally {
       setLoadingMembers(false);
     }
@@ -1095,14 +1099,16 @@ const DepartmentDetail = () => {
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-2">
-                  {filteredUnassignedMembers.map((member) => (
+                  {filteredUnassignedMembers.map((member) => {
+                    const memberId = member._id || member.id;
+                    return (
                     <div
-                      key={member._id}
-                      className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(member._id)
+                      key={memberId}
+                      className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(memberId)
                         ? "bg-light border-primary"
                         : "border-light"
                         }`}
-                      onClick={() => handleMemberSelect(member._id)}
+                      onClick={() => handleMemberSelect(memberId)}
                       style={{
                         cursor: "pointer",
                         transition: "all 0.2s ease",
@@ -1111,8 +1117,8 @@ const DepartmentDetail = () => {
                       <input
                         type="checkbox"
                         className="form-check-input me-3"
-                        checked={selectedMembers.includes(member._id)}
-                        onChange={() => handleMemberSelect(member._id)}
+                        checked={selectedMembers.includes(memberId)}
+                        onChange={() => handleMemberSelect(memberId)}
                       />
                       <div className="flex-grow-1">
                         <div className="d-flex align-items-center">
@@ -1146,7 +1152,8 @@ const DepartmentDetail = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

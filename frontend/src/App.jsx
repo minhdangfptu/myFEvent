@@ -34,13 +34,14 @@ import DepartmentDetail from './pages/ManageDept&Member/DepartmentDetail';
 import UserProfile from './pages/User/UserProfile';
 import Settings from './pages/User/Settings';
 import Dashboard from './pages/User/Dashboard';
-import Risk from './pages/User/Risk';
+import RiskListPage from './pages/Risk/ListRiskPage';
 import Notifications from './pages/User/Notifications';
 import HomePage from "./pages/User/HomePage";
 
 // Member Pages
 import MemberLandingPage from "./pages/Member/MemberLandingPage";
 import MemberEventDetail from "./pages/Member/MemberEventDetail";
+import MemberDashBoard from "./pages/Member/MemberDashBoard";
 
 // Error Pages
 import ErrorPage404 from "./pages/Errors/ErrorPage404";
@@ -49,7 +50,8 @@ import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
-import HoDLandingPage from "./pages/HoD/HoDLandingPage";
+import HoDDashBoard from "./pages/HoD/HoDDashBoard";
+import HoDEventDetail from "./pages/HoD/HoDEventDetail";
 import HoOCDashBoard from "./pages/HoOC/HoOCDashBoard";
 import HoOCManageMember from "./pages/HoOC/HoOCManageMember";
 import { EventProvider } from "./contexts/EventContext";
@@ -57,6 +59,7 @@ import MemberPage from "./pages/ManageDept&Member/MemberEvent";
 import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
+import HoDTaskPage from "./pages/Task/HoDTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
@@ -64,6 +67,14 @@ import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
 import CreateDepartmentCalendarPage from "./pages/Calendar/CreateDepartmentCalendarPage";
 import CalendarDetail from "./pages/Calendar/CalendarDetail";
 import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
+
+// Feedback Pages
+import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
+import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
+import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+import RiskStatistics from "./pages/Risk/RiskStatistics";
+import RiskDetailPage from "./pages/Risk/RiskDetailPage";
+import AgendaPage from "./pages/Agenda/AgendaPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -119,14 +130,6 @@ export default function App() {
             } 
           />
           <Route 
-            path="/hod-landing-page" 
-            element={
-              <ProtectedRoute>
-                <HoDLandingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/events/:eventId/hooc-event-detail" 
             element={
               <ProtectedRoute >
@@ -139,6 +142,22 @@ export default function App() {
             element={
               <ProtectedRoute >
                 <HoOCDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hod-dashboard" 
+            element={
+              <ProtectedRoute >
+                <HoDDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/hod-event-detail" 
+            element={
+              <ProtectedRoute >
+                <HoDEventDetail />
               </ProtectedRoute>
             } 
           />
@@ -163,6 +182,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MilestoneDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/milestone-detail/:milestoneId/agenda" 
+            element={
+              <ProtectedRoute>
+                <AgendaPage />
               </ProtectedRoute>
             } 
           />
@@ -215,6 +242,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/member-dashboard" 
+            element={
+              <ProtectedRoute>
+                <MemberDashBoard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/user-profile" 
             element={
               <ProtectedRoute requiredRole="user">
@@ -256,10 +291,26 @@ export default function App() {
             } 
           />
           <Route 
-            path="/risk" 
+            path="/events/:eventId/risks"  
             element={
               <ProtectedRoute requiredRole="user">
-                <Risk />
+                <RiskListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/risks/analysis"  
+            element={
+              <ProtectedRoute requiredRole="user">
+                <RiskStatistics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/risks/detail/:riskId"  
+            element={
+              <ProtectedRoute requiredRole="user">
+                <RiskDetailPage />
               </ProtectedRoute>
             } 
           />
@@ -268,6 +319,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <EventTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/hod-tasks" 
+            element={
+              <ProtectedRoute>
+                <HoDTaskPage />
               </ProtectedRoute>
             } 
           />
@@ -358,6 +417,40 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <EventDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Feedback Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/feedback" 
+            element={
+              <ProtectedRoute>
+                <ManageFeedbackEventPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/create" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateFeedbackForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/:formId/summary" 
+            element={
+              <ProtectedRoute>
+                <FeedbackSummary />
               </ProtectedRoute>
             } 
           />

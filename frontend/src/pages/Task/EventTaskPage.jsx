@@ -8,10 +8,18 @@ import { taskApi } from "~/apis/taskApi";
 import { departmentService } from "~/services/departmentService";
 import { milestoneApi } from "~/apis/milestoneApi";
 import { eventApi } from "~/apis/eventApi";
+import { userApi } from "~/apis/userApi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
+import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
+import { useNotifications } from "~/contexts/NotificationsContext";
+import AIChatAssistant from "~/components/AIChatAssistant";
+import WBSPreviewModal from "~/components/WBSPreviewModal";
+import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
+import { aiApi } from "~/apis/aiApi";
+import ConfirmModal from "../../components/ConfirmModal";
 
 export default function EventTaskPage() {
   const { t } = useTranslation();
@@ -20,6 +28,12 @@ export default function EventTaskPage() {
   const [sortBy, setSortBy] = useState("Tên");
   const [filterPriority, setFilterPriority] = useState("Tất cả");
   const [filterStatus, setFilterStatus] = useState("Tất cả");
+  const [filterDepartment, setFilterDepartment] = useState("Tất cả");
+  const [filterAssignee, setFilterAssignee] = useState("Tất cả");
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [wbsData, setWbsData] = useState(null);
+  const [showWBSModal, setShowWBSModal] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTask, setNewTask] = useState({
     name: "",
@@ -31,13 +45,33 @@ export default function EventTaskPage() {
   const navigate = useNavigate();
 
   const [eventRole, setEventRole] = useState("");
+  const [hoDDepartmentId, setHoDDepartmentId] = useState(null);
 
   const { fetchEventRole } = useEvents();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchEventRole(eventId).then((role) => {
       setEventRole(role);
     });
+    
+    // Also get full role info to get departmentId for HoD
+    if (eventId) {
+      userApi
+        .getUserRoleByEvent(eventId)
+        .then((roleResponse) => {
+          const role = roleResponse?.role || "";
+          setEventRole(role);
+          
+          if (role === "HoD" && roleResponse?.departmentId) {
+            const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
+            setHoDDepartmentId(deptId);
+          }
+        })
+        .catch(() => {
+          // Fallback to fetchEventRole result
+        });
+    }
   }, [eventId]);
 
   const getSidebarType = () => {
@@ -50,10 +84,16 @@ export default function EventTaskPage() {
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState("list");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [eventInfo, setEventInfo] = useState(null);
+  const [membersForAssignment, setMembersForAssignment] = useState([]);
+  const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
 
   useEffect(() => {
     if (!eventId) return;
@@ -66,10 +106,10 @@ export default function EventTaskPage() {
     eventApi.getById(eventId)
       .then((res) => {
         const event = res?.data?.event || res?.data;
+        console.log(event)
         if (event) {
           setEventInfo({
-            eventStartDate: event.eventStartDate,
-            eventEndDate: event.eventEndDate,
+            createdAt: event.createdAt,
           });
         }
       })
@@ -79,36 +119,57 @@ export default function EventTaskPage() {
       });
   }, [eventId]);
 
+  // Load members for assignment board when HoD role is detected
+  useEffect(() => {
+    if (!eventId || eventRole !== "HoD" || !hoDDepartmentId) {
+      setMembersForAssignment([]);
+      return;
+    }
+    
+    departmentService
+      .getMembersByDepartment(eventId, hoDDepartmentId)
+      .then((members) => setMembersForAssignment(members || []))
+      .catch(() => setMembersForAssignment([]));
+  }, [eventId, eventRole, hoDDepartmentId]);
+
   const fetchTasks = useCallback(() => {
     if (!eventId) return;
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
-        const mapped = arr.map((task) => ({
-          id: task?._id,
-          name: task?.title || "",
-          description: task?.description || "",
-          department: task?.departmentId?.name || "Chưa phân công",
-          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
-          milestone: task?.milestoneId || "Chưa có",
-          parent: task?.parentId || "Chưa có",
-          due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
-          status:
-            task?.status === "done"
-              ? "Hoàn thành"
-              : task?.status === "blocked"
-              ? "Tạm hoãn"
-              : task?.status === "todo"
-              ? "Chưa bắt đầu"
-              : task?.status === "cancelled"
-              ? "Đã huỷ"
-              : "Đang làm",
-          estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
-          createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
-          updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
-          progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
-        }));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const mapped = arr.map((task) => {
+          return {
+            id: task?._id,
+            name: task?.title || "",
+            description: task?.description || "",
+            department: task?.departmentId?.name || "Chưa phân công",
+            assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+            assigneeId: task?.assigneeId?._id || task?.assigneeId || null, // Keep assigneeId for assignment board
+            milestone: task?.milestoneId || "Chưa có",
+            parent: task?.parentId || "Chưa có",
+            due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
+            status:
+              task?.status === "done"
+                ? "Hoàn thành"
+                : task?.status === "blocked"
+                ? "Tạm hoãn"
+                : task?.status === "todo"
+                ? "Chưa bắt đầu"
+                : task?.status === "cancelled"
+                ? "Đã huỷ"
+                : task?.status === "suggested"
+                ? "Gợi ý"
+                : "Đang làm",
+            estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
+            createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
+            updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
+            progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
+          };
+        });
         setTasks(mapped);
       })
       .catch((err) => setTasks([]));
@@ -117,6 +178,70 @@ export default function EventTaskPage() {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  // Clear selection when switching tabs or disabling selection mode
+  useEffect(() => {
+    if (!isSelectionMode) {
+      setSelectedTaskIds([]);
+    }
+  }, [activeTab, isSelectionMode]);
+
+  const filteredTasks = tasks
+    .filter((task) => task.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(
+      (task) =>
+        filterDepartment === "Tất cả" || task.department === filterDepartment
+    )
+    .filter(
+      (task) => filterAssignee === "Tất cả" || task.assignee === filterAssignee
+    )
+    .filter(
+      (task) => filterPriority === "Tất cả" || task.priority === filterPriority
+    )
+    .filter((task) => {
+      if (filterStatus === "Tất cả") return true;
+      if (filterStatus === "Gợi ý") return task.status === "suggested";
+      // Map Vietnamese status to backend status
+      const statusMap = {
+        "Đang làm": "in_progress",
+        "Hoàn thành": "done",
+        "Tạm hoãn": "blocked",
+      };
+      return task.status === statusMap[filterStatus] || task.status === filterStatus;
+    })
+    .sort((a, b) => {
+      const parse = (d) => {
+        const [day, month, year] = d.split("/");
+        return new Date(`${year}-${month}-${day}`);
+      };
+      if (sortBy === "DeadlineAsc") return parse(a.due) - parse(b.due);
+      if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
+      return 0;
+    });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus, filterDepartment, filterAssignee, filterPriority, sortBy]);
+    
+  // Remove selected tasks that are no longer in filtered list
+  useEffect(() => {
+    const filteredIds = filteredTasks.map((t) => t.id);
+    setSelectedTaskIds((prev) => prev.filter((id) => filteredIds.includes(id)));
+  }, [filteredTasks]);
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    if (isSelectionMode) {
+      setSelectedTaskIds([]);
+    }
+  };
 
   // Cập nhật thời gian mỗi giây
   useEffect(() => {
@@ -141,32 +266,6 @@ export default function EventTaskPage() {
     return { bg: "#FEF3C7", color: "#D97706" };
   };
 
-  const [filterDepartment, setFilterDepartment] = useState("Tất cả");
-  const [filterAssignee, setFilterAssignee] = useState("Tất cả");
-
-  const filteredTasks = tasks
-    .filter((task) => task.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(
-      (task) =>
-        filterDepartment === "Tất cả" || task.department === filterDepartment
-    )
-    .filter(
-      (task) => filterAssignee === "Tất cả" || task.assignee === filterAssignee
-    )
-    .filter(
-      (task) => filterPriority === "Tất cả" || task.priority === filterPriority
-    )
-    .filter((task) => filterStatus === "Tất cả" || task.status === filterStatus)
-    .sort((a, b) => {
-      const parse = (d) => {
-        const [day, month, year] = d.split("/");
-        return new Date(`${year}-${month}-${day}`);
-      };
-      if (sortBy === "DeadlineAsc") return parse(a.due) - parse(b.due);
-      if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
-      return 0;
-    });
-    
   const taskStats = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "Hoàn thành").length,
@@ -190,18 +289,98 @@ export default function EventTaskPage() {
     setShowAddModal(false);
   };
 
-  const handleUpdateTaskStatus = (taskId, newStatus) => {
-    setTasks(
-      tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    // Map Vietnamese status to backend status
+    const statusMapToBackend = (s) => {
+      if (s === "Hoàn thành") return "done";
+      if (s === "Đang làm") return "in_progress";
+      if (s === "Tạm hoãn") return "blocked";
+      if (s === "Đã huỷ") return "cancelled";
+      return "todo"; // "Chưa bắt đầu"
+    };
+
+    const backendStatus = statusMapToBackend(newStatus);
+    
+    // Save current state for rollback
+    const previousTasks = [...tasks];
+    const previousSelectedTask = selectedTask;
+    
+    // Get task info for notification
+    const task = tasks.find(t => t.id === taskId);
+    
+    // Optimistic update: update UI immediately
+    const updatedTasks = tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t));
+    setTasks(updatedTasks);
     setSelectedTask((st) =>
       st && st.id === taskId ? { ...st, status: newStatus } : st
     );
+
+    // Call API to update in database
+    try {
+      await taskApi.updateTaskProgress(eventId, taskId, backendStatus);
+      // Backend sẽ tự động tạo notification khi task hoàn thành
+    } catch (error) {
+      // Rollback on error
+      setTasks(previousTasks);
+      setSelectedTask(previousSelectedTask);
+      const errorMessage = error?.response?.data?.message || "Cập nhật trạng thái thất bại";
+      toast.error(errorMessage);
+      console.error("Error updating task status:", error);
+    }
   };
 
   const handleDetail = (taskId) => {
     navigate(`/events/${eventId}/tasks/${taskId}`);
   };
+
+  const handleSelectTask = (taskId) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskId)
+        ? prev.filter((id) => id !== taskId)
+        : [...prev, taskId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTaskIds.length === paginatedTasks.length) {
+      setSelectedTaskIds([]);
+    } else {
+      const allFilteredIds = filteredTasks.map((task) => task.id);
+      const currentPageIds = paginatedTasks.map((task) => task.id);
+      // Add all filtered tasks if all current page tasks are selected, otherwise select all filtered
+      if (currentPageIds.every(id => selectedTaskIds.includes(id))) {
+        setSelectedTaskIds(allFilteredIds);
+      } else {
+        setSelectedTaskIds([...new Set([...selectedTaskIds, ...currentPageIds])]);
+      }
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedTaskIds.length === 0) return;
+    setConfirmModal({
+      show: true,
+      message: `Bạn có chắc chắn muốn xóa ${selectedTaskIds.length} công việc đã chọn?`,
+      onConfirm: async () => {
+        setConfirmModal({ show: false, message: "", onConfirm: null });
+        try {
+          const deletePromises = selectedTaskIds.map((taskId) =>
+            taskApi.deleteTask(eventId, taskId)
+          );
+          await Promise.all(deletePromises);
+          
+          setSelectedTaskIds([]);
+          fetchTasks();
+          toast.success(`Đã xóa ${selectedTaskIds.length} công việc thành công!`);
+        } catch (error) {
+          const errorMessage = error?.response?.data?.message || "Xóa công việc thất bại";
+          toast.error(errorMessage);
+          console.error("Error deleting tasks:", error);
+        }
+      }
+    });
+  };
+
   const STT = 0;
 
   const [addTaskForm, setAddTaskForm] = useState({
@@ -300,8 +479,9 @@ export default function EventTaskPage() {
     };
   
     try {
-      await taskApi.createTask(eventId, payload);
-  
+      const response = await taskApi.createTask(eventId, payload);
+      const createdTask = response?.data || response;
+
       setShowAddModal(false);
       setAddTaskForm({
         title: "",
@@ -316,7 +496,7 @@ export default function EventTaskPage() {
         parentId: "",
         dependencies: [],
       });
-  
+
       taskApi.getTaskByEvent(eventId).then((apiRes) => {
         const arr = apiRes?.data || [];
         const mapped = arr.map((task) => ({
@@ -345,8 +525,7 @@ export default function EventTaskPage() {
         }));
         setTasks(mapped);
       });
-  
-      toast.success("Tạo công việc thành công!");
+      // Backend sẽ tự động tạo notification khi giao việc cho Member
     } catch (err) {
       // Hiển thị lỗi từ backend
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
@@ -371,10 +550,16 @@ export default function EventTaskPage() {
     { notStarted: [], inProgress: [], done: [] }
   );
 
-  const { user } = useAuth();
-
   return (
     <>
+      <ConfirmModal
+        show={confirmModal.show}
+        message={confirmModal.message}
+        onClose={() => setConfirmModal({ show: false, message: "", onConfirm: null })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) confirmModal.onConfirm();
+        }}
+      />
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
         title={t("taskPage.title")}
@@ -507,6 +692,14 @@ export default function EventTaskPage() {
               >
                 Danh sách công việc
               </button>
+              {eventRole === "HoD" && (
+                <button
+                  className={`tab-btn ${activeTab === "assignment" ? "active" : ""}`}
+                  onClick={() => setActiveTab("assignment")}
+                >
+                  Phân chia công việc
+                </button>
+              )}
               <button
                 className={`tab-btn ${activeTab === "board" ? "active" : ""}`}
                 onClick={() => setActiveTab("board")}
@@ -550,6 +743,7 @@ export default function EventTaskPage() {
                   <option value="Tất cả">
                     {t("taskPage.filters.allStatus")}
                   </option>
+                  <option value="Gợi ý">Gợi ý</option>
                   <option value="Đang làm">Đang làm</option>
                   <option value="Hoàn thành">Hoàn thành</option>
                   <option value="Tạm hoãn">Tạm hoãn</option>
@@ -572,6 +766,30 @@ export default function EventTaskPage() {
                   </select>
 
                   <button
+                    className={`btn ${isSelectionMode ? "btn-warning" : "btn-outline-secondary"}`}
+                    onClick={handleToggleSelectionMode}
+                  >
+                    {isSelectionMode ? "✓ Đang chọn" : "☑ Tùy chọn"}
+                  </button>
+                  {isSelectionMode && selectedTaskIds.length > 0 && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleDeleteSelected}
+                    >
+                      🗑️ Xóa ({selectedTaskIds.length})
+                    </button>
+                  )}
+
+                  {eventRole === "HoOC" && (
+                    <button
+                      className="btn btn-success me-2"
+                      onClick={() => setShowAIChat(true)}
+                      style={{ fontSize: 14 }}
+                    >
+                      🤖 AI Assistant
+                    </button>
+                  )}
+                  <button
                     className="add-btn btn btn-primary"
                     onClick={() => setShowAddModal(true)}
                   >
@@ -585,6 +803,16 @@ export default function EventTaskPage() {
                   <table className="table align-middle">
                     <thead>
                       <tr className="text-muted">
+                        {isSelectionMode && (
+                          <th className="py-3" style={{ width: "5%" }}>
+                            <input
+                              type="checkbox"
+                              checked={paginatedTasks.length > 0 && paginatedTasks.every(task => selectedTaskIds.includes(task.id))}
+                              onChange={handleSelectAll}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </th>
+                        )}
                         <th className="py-3" style={{ width: "5%" }}>
                           #
                         </th>
@@ -606,9 +834,9 @@ export default function EventTaskPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredTasks.length === 0 ? (
+                      {paginatedTasks.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="text-center py-5">
+                          <td colSpan={isSelectionMode ? "7" : "6"} className="text-center py-5">
                             <div className="d-flex flex-column justify-content-center align-items-center py-4">
                               <img
                                 src={NoDataImg}
@@ -632,13 +860,22 @@ export default function EventTaskPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredTasks.map((task, idx) => (
+                        paginatedTasks.map((task, idx) => (
                           <tr
                             key={task.id}
                             className="task-row"
-                            onClick={() => setSelectedTask(task)}
+                            onClick={() => !isSelectionMode && setSelectedTask(task)}
                           >
-                            <td className="py-3 text-muted small">{idx + 1}</td>
+                            {isSelectionMode && (
+                              <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTaskIds.includes(task.id)}
+                                  onChange={() => handleSelectTask(task.id)}
+                                />
+                              </td>
+                            )}
+                            <td className="py-3 text-muted small">{startIndex + idx + 1}</td>
                             <td className="py-3 col-name">
                               <div className="fw-medium">{task.department}</div>
                             </td>
@@ -689,17 +926,111 @@ export default function EventTaskPage() {
                   </table>
                 </div>
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="d-flex justify-content-between align-items-center mt-3">
+                  <div className="text-muted small">
+                    Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredTasks.length)} trong tổng số {filteredTasks.length} công việc
+                  </div>
+                  <nav>
+                    <ul className="pagination mb-0">
+                      <li className={`page-item ${currentPage === 1 ? "disabled" : ""}`}>
+                        <button
+                          className="page-link"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Trước
+                        </button>
+                      </li>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show first page, last page, current page, and pages around current
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <li key={page} className={`page-item ${currentPage === page ? "active" : ""}`}>
+                              <button
+                                className="page-link"
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </button>
+                            </li>
+                          );
+                        } else if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <li key={page} className="page-item disabled">
+                              <span className="page-link">...</span>
+                            </li>
+                          );
+                        }
+                        return null;
+                      })}
+                      <li className={`page-item ${currentPage === totalPages ? "disabled" : ""}`}>
+                        <button
+                          className="page-link"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Sau
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              )}
             </>
+          )}
+
+          {activeTab === "assignment" && eventRole === "HoD" && (
+            <div className="soft-card p-4">
+              <div className="mb-3 text-muted small">
+                Kéo công việc từ cột bên trái vào thành viên bên phải để giao việc
+              </div>
+              {membersForAssignment.length === 0 ? (
+                <div className="text-center py-5 text-muted">
+                  Đang tải danh sách thành viên...
+                </div>
+              ) : (
+                <TaskAssignmentBoard
+                  tasks={tasks.filter(task => {
+                    // Only show tasks from HoD's department
+                    const hoDDept = departments.find(d => String(d._id) === String(hoDDepartmentId));
+                    return hoDDept && task.department === hoDDept.name;
+                  })}
+                  members={membersForAssignment}
+                  eventId={eventId}
+                  departmentId={hoDDepartmentId}
+                  onTaskAssigned={fetchTasks}
+                  currentUserId={user?._id}
+                />
+              )}
+            </div>
           )}
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <KanbanBoardTask 
-                eventId={eventId}
-                listTask={statusGroup}
-                onTaskMove={fetchTasks}
-                currentUserId={user?._id}
-              />
+              <div style={{ display: 'flex', gap: 16 }}>
+                {eventRole === "HoD" && (
+                  <SuggestedTasksColumn
+                    eventId={eventId}
+                    departmentId={departments.find(d => d.name === filterDepartment)?._id}
+                    onTaskAssigned={fetchTasks}
+                  />
+                )}
+                <div style={{ flex: 1 }}>
+                  <KanbanBoardTask 
+                    eventId={eventId}
+                    listTask={statusGroup}
+                    onTaskMove={fetchTasks}
+                    currentUserId={user?._id}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -907,20 +1238,18 @@ export default function EventTaskPage() {
                             const now = new Date();
                             now.setMinutes(now.getMinutes() + 1); // Thêm 1 phút để đảm bảo sau thời điểm hiện tại
                             const minDateTime = now.toISOString().slice(0, 16);
-                            if (eventInfo?.eventStartDate) {
-                              const eventStart = new Date(eventInfo.eventStartDate);
-                              const eventStartStr = eventStart.toISOString().slice(0, 16);
-                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+                            if (eventInfo?.createdAt) {
+                              const eventCreatedAt = new Date(eventInfo.createdAt);
+                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
+                              return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
                             }
                             return minDateTime;
                           })()}
-                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
-                            Thời gian bắt đầu phải sau thời điểm hiện tại
-                            {eventInfo.eventStartDate && ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
-                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                            Lưu ý: Thời gian bắt đầu phải sau thời điểm
+                            {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
                           </div>
                         )}
                       </div>
@@ -934,30 +1263,37 @@ export default function EventTaskPage() {
                             handleAddTaskInput("dueDate", e.target.value)
                           }
                           min={(() => {
-                            // Nếu có startDate, min phải sau startDate, nếu không thì sau thời điểm hiện tại
+                            // Deadline phải sau createdAt và startDate (nếu có)
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1);
+                            let minDateTime = now.toISOString().slice(0, 16);
+                            
+                            // Đảm bảo sau createdAt
+                            if (eventInfo?.createdAt) {
+                              const eventCreatedAt = new Date(eventInfo.createdAt);
+                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
+                              if (eventCreatedAtStr > minDateTime) {
+                                minDateTime = eventCreatedAtStr;
+                              }
+                            }
+                            
+                            // Nếu có startDate, deadline phải sau startDate
                             if (addTaskForm.startDate) {
                               const startDate = new Date(addTaskForm.startDate);
                               startDate.setMinutes(startDate.getMinutes() + 1);
-                              return startDate.toISOString().slice(0, 16);
+                              const startDateStr = startDate.toISOString().slice(0, 16);
+                              if (startDateStr > minDateTime) {
+                                minDateTime = startDateStr;
+                              }
                             }
-                            const now = new Date();
-                            now.setMinutes(now.getMinutes() + 1);
-                            const minDateTime = now.toISOString().slice(0, 16);
-                            if (eventInfo?.eventStartDate) {
-                              const eventStart = new Date(eventInfo.eventStartDate);
-                              const eventStartStr = eventStart.toISOString().slice(0, 16);
-                              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
-                            }
+                            
                             return minDateTime;
                           })()}
-                          max={eventInfo?.eventEndDate ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16) : undefined}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
-                            Deadline phải sau thời điểm hiện tại
-                            {addTaskForm.startDate && " và sau thời gian bắt đầu"}
-                            {eventInfo.eventStartDate && `, sau ${new Date(eventInfo.eventStartDate).toLocaleString('vi-VN')}`}
-                            {eventInfo.eventEndDate && `, trước ${new Date(eventInfo.eventEndDate).toLocaleString('vi-VN')}`}
+                            Lưu ý: Deadline phải sau thời điểm {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                            {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
                           </div>
                         )}
                       </div>
@@ -1089,6 +1425,38 @@ export default function EventTaskPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* AI Chat Assistant for HOOC */}
+        {showAIChat && eventRole === "HoOC" && (
+          <AIChatAssistant
+            eventId={eventId}
+            onWBSGenerated={(data) => {
+              setWbsData(data);
+              setSessionId(data.data?.session_id);
+              setShowWBSModal(true);
+              setShowAIChat(false);
+            }}
+            onClose={() => setShowAIChat(false)}
+          />
+        )}
+
+        {/* WBS Preview Modal */}
+        {showWBSModal && wbsData && (
+          <WBSPreviewModal
+            eventId={eventId}
+            wbsData={wbsData}
+            sessionId={sessionId}
+            onClose={() => {
+              setShowWBSModal(false);
+              setWbsData(null);
+            }}
+            onApplied={() => {
+              fetchTasks();
+              setShowWBSModal(false);
+              setWbsData(null);
+            }}
+          />
         )}
       </UserLayout>
     </>
