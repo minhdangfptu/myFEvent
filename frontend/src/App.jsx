@@ -75,6 +75,7 @@ import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
+import AdminDashboard from "./pages/Admin/AdminDashBoard";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -457,10 +458,10 @@ export default function App() {
           
           {/* Admin Routes */}
           <Route
-            path="/admin"
+            path="/admin-dashboard"
             element={
               <ProtectedRoute requiredRole="admin">
-                <div>Admin Page (Replace with your component)</div>
+                <AdminDashboard/>
               </ProtectedRoute>
             }
           />
