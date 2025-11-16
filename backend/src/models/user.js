@@ -12,8 +12,8 @@ const UserSchema = new Schema({
     type: String,
     required: function () { return this.authProvider === 'local'; }
   },
-  fullName: { 
-    type: String, 
+  fullName: {
+    type: String,
     trim: true,
     required: true
   },
@@ -41,8 +41,12 @@ const UserSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  banReason: {
+    type: String,
+    required: function () { return this.status === 'banned'; },
+  }
 }, { timestamps: true });
-UserSchema.index({ phone: 1 },    { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
+UserSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 UserSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: "string" } } });
 
 export default mongoose.model('User', UserSchema);

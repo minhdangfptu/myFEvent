@@ -173,10 +173,21 @@ export default function AdminSidebar({
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">QUẢN LÝ HỆ THỐNG</div>}
           <div className="d-flex flex-column gap-1">
+            {/* Nút Trang chủ */}
+            <button
+              className={`btn-nav ${activePage === "dashboard" ? "active" : ""}`}
+              onClick={() => navigate("/admin/dashboard")}
+              title="Tổng quan"
+            >
+              <div className="d-flex align-items-center">
+                <i className="bi bi-grid me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Tổng quan</span>}
+              </div>
+            </button>
             {/* Nút Quản lý Sự kiện */}
             <button
               className={`btn-nav ${activePage === "events" ? "active" : ""}`}
-              onClick={() => navigate("/admin/events")}
+              onClick={() => navigate("/admin/event-management")}
               title="Quản lý sự kiện"
             >
               <div className="d-flex align-items-center">
@@ -188,7 +199,7 @@ export default function AdminSidebar({
             {/* Nút Quản lý Người dùng */}
             <button
               className={`btn-nav ${activePage === "users" ? "active" : ""}`}
-              onClick={() => navigate("/admin/users")}
+              onClick={() => navigate("/admin/user-management")}
               title="Quản lý người dùng"
             >
               <div className="d-flex align-items-center">

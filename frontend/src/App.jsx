@@ -76,6 +76,11 @@ import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
 import AdminDashboard from "./pages/Admin/AdminDashBoard";
+import { User } from "lucide-react";
+import UserManagement from "./pages/Admin/UserManagement";
+import EventDetailManagement from "./pages/Admin/EventDetailManagement";
+import UserDetailManagement from "./pages/Admin/UserDetailManagement";
+import EventManagement from "./pages/Admin/EventManagement";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -458,10 +463,42 @@ export default function App() {
           
           {/* Admin Routes */}
           <Route
-            path="/admin-dashboard"
+            path="/admin/dashboard"
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminDashboard/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/event-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/event-management/:eventId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventDetailManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management/:userId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserDetailManagement/>
               </ProtectedRoute>
             }
           />

@@ -29,10 +29,14 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/home-page", {
-        replace: true,
-        state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-      });
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/home-page", {
+          replace: true,
+          state: { toast: { type: "success", message: "Đăng nhập thành công" } },
+        });
+      }
     } catch (error) {
       console.error("Login error:", error);
       if (error?.response?.status === 403) {
@@ -41,7 +45,7 @@ export default function LoginPage() {
       }
       setError(
         error.response?.data?.message ||
-          "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+        "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
     } finally {
       setLoading(false);
@@ -95,8 +99,8 @@ export default function LoginPage() {
       console.error("Google login error:", err);
       setError(
         err?.response?.data?.message ||
-          err?.message ||
-          "Đăng nhập Google thất bại."
+        err?.message ||
+        "Đăng nhập Google thất bại."
       );
     } finally {
       setLoading(false);

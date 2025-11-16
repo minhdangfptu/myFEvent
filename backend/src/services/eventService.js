@@ -111,7 +111,7 @@ export const eventService = {
     }
 
     const startdate = new Date(eventStartDate);
-    const endDate =  new Date(eventEndDate);
+    const endDate = new Date(eventEndDate);
     if (endDate < startdate) {
       const err = new Error('Ngày kết thúc phải ở sau ngày bắt đầu');
       err.status = 400;
@@ -123,7 +123,7 @@ export const eventService = {
     const nowDateOnly = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
     const startDateOnly = new Date(startdate.getFullYear(), startdate.getMonth(), startdate.getDate());
     const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-    
+
     // Cho phép ngày hôm nay hoặc ngày trong tương lai
     if (startDateOnly < nowDateOnly || endDateOnly < nowDateOnly) {
       const err = new Error('Ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai');
@@ -232,7 +232,7 @@ export const eventService = {
     }
 
     const eventIds = memberships.map((m) => m.eventId);
-    
+
     // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
       .select('name status eventStartDate eventEndDate joinCode image type description location organizerName')
@@ -248,7 +248,7 @@ export const eventService = {
       if (now > end) computedStatus = 'completed';
       else if (now >= start && now <= end) computedStatus = 'ongoing';
       else computedStatus = 'scheduled';
-      
+
       if (event.status !== computedStatus && event._id) {
         // Update async, không chờ
         Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
@@ -473,6 +473,99 @@ export const findEventById = async (id, select = null) => {
   if (select) q.select(select);
   return await q.lean();
 };
+export const getPaginatedEvents = async (page, limit, search, status, eventDate) => {
+  const filter = {};
+
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { organizerName: { $regex: search, $options: 'i' } }
+    ];
+  }
+  if (status && status !== "all") {
+    filter.status = status;     
+  }
+  if(eventDate){
+    const date = new Date(eventDate);
+    filter.eventStartDate = { $lte: date };
+    filter.eventEndDate = { $gte: date };
+  }
+
+  const skip = (page - 1) * limit;
+
+  const data = await Event.find(filter)
+    .select('name organizerName eventStartDate eventEndDate status banInfo')
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: -1 });
+
+  const total = await Event.countDocuments(filter);
+
+  return {
+    page,
+    total,
+    totalPages: Math.ceil(total / limit),
+    data
+  };
+};
+export const updateEventByAdmin = async (eventId, banInfo) => {
+  const updatedEvent = await Event.findByIdAndUpdate(
+    eventId,
+    { $set: { banInfo } },
+    { new: true }
+  );
+  return updatedEvent;
+};
+
+export const getEventById = async (eventId) => {
+  const event = (await Event.findById(eventId));
+  return event;
+}
+
+// Lấy event detail cho admin, kèm thông tin HoD và HoOC
+export const getEventByIdForAdmin = async (eventId) => {
+  // Lấy thông tin event
+  const event = await Event.findById(eventId).lean();
+  
+  if (!event) {
+    const err = new Error('Event not found');
+    err.status = 404;
+    throw err;
+  }
+
+  // Lấy các thành viên có role là HoD hoặc HoOC
+  const leaders = await EventMember.find({
+    eventId: eventId,
+    role: { $in: ['HoD', 'HoOC'] }
+  })
+    .populate('userId', 'fullName email')
+    .populate('departmentId', 'name')
+    .select('userId role departmentId')
+    .lean();
+
+  const leadersData = leaders.map(leader => ({
+    userId: leader.userId?._id || null,
+    fullName: leader.userId?.fullName || '',
+    email: leader.userId?.email || '',
+    role: leader.role,
+    departmentId: leader.departmentId?._id || null,
+    departmentName: leader.departmentId?.name || null
+  }));
+
+  // Tách HoOC và HoD
+  const hooc = leadersData.filter(l => l.role === 'HoOC');
+  const hod = leadersData.filter(l => l.role === 'HoD');
+
+  return {
+    ...event,
+    leaders: {
+      hooc: hooc,
+      hod: hod
+    }
+  };
+}
+
+
 
 
 
