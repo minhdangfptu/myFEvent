@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
+import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import calendarService from "~/services/calendarService";
@@ -12,6 +13,7 @@ export default function CreateEventCalendarPage() {
     const { eventId } = useParams();
     const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
     useEffect(() => {
         let mounted = true
@@ -216,14 +218,13 @@ export default function CreateEventCalendarPage() {
     };
 
     const handleCancel = () => {
-        if (window.confirm('Bạn có chắc muốn hủy? Dữ liệu đã nhập sẽ bị mất.')) {
-            navigate(`/events/${eventId}/my-calendar`);
-        }
+        setIsCancelModalOpen(true);
     };
-
+    const confirmCancel = () => {
+        navigate(`/events/${eventId}/my-calendar`);
+    };
     return (
         <UserLayout sidebarType={eventRole} activePage="work-timeline">
-            <ToastContainer position="top-right" autoClose={3000} />
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",
@@ -773,6 +774,13 @@ export default function CreateEventCalendarPage() {
                     </form>
                 </div>
             </div>
+            <CancelConfirmModal
+                isOpen={isCancelModalOpen}
+                onClose={() => setIsCancelModalOpen(false)}
+                onConfirm={confirmCancel}
+                title="Hủy chỉnh sửa"
+                message="Bạn có chắc chắn muốn hủy? Các thay đổi sẽ không được lưu."
+            />
         </UserLayout>
     );
 }

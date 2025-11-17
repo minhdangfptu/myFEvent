@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import calendarService from "~/services/calendarService";
@@ -13,6 +14,8 @@ export default function UpdateEventCalendarPage() {
     const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
     const [loadingCalendar, setLoadingCalendar] = useState(true);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
 
     useEffect(() => {
         let mounted = true
@@ -176,13 +179,13 @@ export default function UpdateEventCalendarPage() {
             const [endH, endM] = formData.endTime.split(':').map(Number);
             let startMinutes = startH * 60 + startM;
             let endMinutes = endH * 60 + endM;
-            
+
             // Nếu endTime < startTime, nghĩa là sang ngày hôm sau
             const isOvernight = endH < startH || (endH === startH && endM < startM);
             if (isOvernight) {
                 endMinutes += 24 * 60; // Cộng thêm 24 giờ
             }
-            
+
             const duration = endMinutes - startMinutes;
 
             if (duration > 0) {
@@ -227,7 +230,6 @@ export default function UpdateEventCalendarPage() {
                 return;
             }
         } else {
-            // Department calendar: participantType "all" or "members"
             if (formData.participantType !== "all" && formData.selectedCoreTeam.length === 0 && formData.selectedDepartments.length === 0) {
                 setError("Vui lòng chọn ít nhất một thành viên ban");
                 return;
@@ -236,12 +238,12 @@ export default function UpdateEventCalendarPage() {
 
         const [startH, startM] = formData.startTime.split(':').map(Number);
         const [endH, endM] = formData.endTime.split(':').map(Number);
-        
+
         // KIỂM TRA THỜI GIAN
         const now = new Date();
         const selectedStartDateTime = new Date(formData.meetingDate + 'T' + formData.startTime + ':00');
         const selectedEndDateTime = new Date(formData.meetingDate + 'T' + formData.endTime + ':00');
-        
+
         // Nếu giờ kết thúc < giờ bắt đầu, nghĩa là sang ngày hôm sau
         if (endH < startH || (endH === startH && endM < startM)) {
             selectedEndDateTime.setDate(selectedEndDateTime.getDate() + 1);
@@ -256,7 +258,8 @@ export default function UpdateEventCalendarPage() {
         setLoading(true);
 
         try {
-            const submitData = {
+            // TẠO updateData OBJECT
+            const updateData = {
                 name: formData.name,
                 locationType: formData.locationType,
                 location: formData.location,
@@ -269,23 +272,28 @@ export default function UpdateEventCalendarPage() {
 
             if (!isDepartmentCalendar) {
                 if (formData.participantType === "departments") {
-                    submitData.departments = formData.selectedDepartments;
+                    updateData.departments = formData.selectedDepartments;
                 } else if (formData.participantType === "coreteam") {
-                    submitData.coreTeamMembers = formData.selectedCoreTeam;
+                    updateData.coreTeamMembers = formData.selectedCoreTeam;
                 }
             } else {
-                // Department calendar: use members list when manual selection
                 if (formData.participantType !== "all") {
                     const selectedMembers = formData.selectedCoreTeam.length > 0 ? formData.selectedCoreTeam : formData.selectedDepartments;
-                    submitData.members = selectedMembers;
+                    updateData.members = selectedMembers;
                 }
             }
 
+            // WRAP updateData TRONG OBJECT
+            const submitData = {
+                updateData: updateData
+            };
+
             const response = await calendarService.updateCalendar(eventId, calendarId, submitData);
 
-            if (response.data) {
+            if (response) {
                 toast.success('Cập nhật lịch thành công');
-                navigate(`/events/${eventId}/calendar/${calendarId}`);
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                navigate(`/events/${eventId}/my-calendar/${calendarId}`);
             } else {
                 throw new Error('Không nhận được dữ liệu từ server');
             }
@@ -300,9 +308,11 @@ export default function UpdateEventCalendarPage() {
     };
 
     const handleCancel = () => {
-        if (window.confirm('Bạn có chắc muốn hủy? Các thay đổi sẽ không được lưu.')) {
-            navigate(`/events/${eventId}/calendar/${calendarId}`);
-        }
+        setIsCancelModalOpen(true);
+    };
+
+    const confirmCancel = () => {
+        navigate(`/events/${eventId}/my-calendar/${calendarId}`);
     };
 
     if (loadingCalendar) {
@@ -320,6 +330,7 @@ export default function UpdateEventCalendarPage() {
 
     return (
         <UserLayout sidebarType={eventRole} activePage="work-timeline">
+            <ToastContainer position="top-right" autoClose={3000} />
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",
@@ -960,6 +971,14 @@ export default function UpdateEventCalendarPage() {
                     </form>
                 </div>
             </div>
+
+            <CancelConfirmModal
+                isOpen={isCancelModalOpen}
+                onClose={() => setIsCancelModalOpen(false)}
+                onConfirm={confirmCancel}
+                title="Hủy chỉnh sửa"
+                message="Bạn có chắc chắn muốn hủy? Các thay đổi sẽ không được lưu."
+            />
         </UserLayout>
     );
 }

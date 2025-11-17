@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
@@ -245,7 +245,7 @@ export default function CalendarDetail() {
                     {/* Header */}
                     <div style={{ backgroundColor: 'white', padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, color: '#dc2626', fontSize: '16px', fontWeight: 600 }}>Chi tiết cuộc họp</h3>
-                        
+
                         {!isPastMeeting && user?.id === calendar?.createdBy?.userId?._id && (
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <Link
