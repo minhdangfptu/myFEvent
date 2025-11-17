@@ -287,7 +287,7 @@ export default function RiskDetailPage() {
       }
 
       if (response.success) {
-        toast.success(editingOccurred ? "Cập nhật sự cố thành công!" : "Thêm sự cố thành công!");
+        toast.success(editingOccurred ? "Cập nhật sự cố thành công!" : "Báo cáo sự cố thành công!");
         setShowOccurredModal(false);
         setEditingOccurred(null);
         setOccurredForm({
@@ -777,7 +777,7 @@ export default function RiskDetailPage() {
 
                   {canManageOccurred() && (
                     <button className="btn btn-success" onClick={() => handleShowOccurredModal()}>
-                      <i class="bi bi-plus-circle"></i> Thêm sự cố
+                      <i class="bi bi-plus-circle"></i> Báo cáo sự cố
                     </button>
                   )}
 
@@ -1177,7 +1177,7 @@ export default function RiskDetailPage() {
                 ) : editingOccurred ? (
                   "Cập nhật"
                 ) : (
-                  "Thêm sự cố"
+                  "Báo cáo sự cố"
                 )}
               </button>
             </div>

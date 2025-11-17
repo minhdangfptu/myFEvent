@@ -9,11 +9,15 @@ import {
   assignTask,
   unassignTask,
   getTaskByDepartment,
-  getEventTaskProgressChart
+  getEventTaskProgressChart,
+  getTaskStatisticsByMilestone,
 } from '../controllers/taskController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
+
+// Thống kê task theo milestone
+router.get('/:eventId/statistics/:milestoneId', authenticateToken, getTaskStatisticsByMilestone);
 
 router.get('/:eventId/', authenticateToken, listTasksByEventOrDepartment);
 // Lấy chi tiết 1 task
@@ -32,6 +36,7 @@ router.patch('/:eventId/:taskId/progress', authenticateToken, updateTaskProgress
 router.patch('/:eventId/:taskId/assign', authenticateToken, assignTask);
 // Huỷ gán
 router.patch('/:eventId/:taskId/unassign', authenticateToken, unassignTask);
+
 // Thống kê tiến độ/burnup chart
 router.get('/:eventId/:taskId/progress', authenticateToken, getEventTaskProgressChart);
 
