@@ -9,6 +9,7 @@ import {
   notifyTaskCompleted,
   notifyMajorTaskStatus,
 } from '../services/notificationService.js';
+import mongoose from 'mongoose';
 // GET /api/tasks/:eventId?departmentId=...: (HoOC/HoD/Mem)
 //http://localhost:8080/api/tasks/68fd264703c943724fa8cbff?departmentId=6500000000000000000000a1
 export const listTasksByEventOrDepartment = async (req, res) => {
@@ -584,4 +585,428 @@ export const getEventTaskProgressChart = async (req, res) => {
         ]);
         return res.status(200).json({ data: stats });
     } catch (err) { return res.status(500).json({ message: 'Lỗi lấy chart tiến độ' }); }
+};
+
+// GET /api/tasks/:eventId/statistics/:milestoneId (HoOC/HoD)
+export const getTaskStatisticsByMilestone = async (req, res) => {
+    try {
+        const { eventId, milestoneId } = req.params;
+        
+        console.log('=== DEBUG STATISTICS API ===');
+        console.log('eventId:', eventId);
+        console.log('milestoneId:', milestoneId);
+        
+        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
+        if (!member) {
+            return res.status(403).json({ message: 'Chỉ HoOC hoặc HoD được xem thống kê.' });
+        }
+        
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ message: 'eventId không hợp lệ' });
+        }
+        
+        if (milestoneId && !mongoose.Types.ObjectId.isValid(milestoneId)) {
+            return res.status(400).json({ message: 'milestoneId không hợp lệ' });
+        }
+
+        // Convert to ObjectId
+        const eventObjectId = new mongoose.Types.ObjectId(eventId);
+        const milestoneObjectId = milestoneId ? new mongoose.Types.ObjectId(milestoneId) : null;
+        
+        let milestoneInfo = null;
+        if (milestoneId) {
+            milestoneInfo = await Milestone.findOne({ 
+                _id: milestoneObjectId, 
+                eventId: eventObjectId  
+            }).lean();
+            
+            if (!milestoneInfo) {
+                console.log(`❌ Milestone ${milestoneId} not found in event ${eventId}`);
+                return res.status(404).json({ message: 'Milestone không tồn tại trong event này.' });
+            }
+        }
+
+        // Build filter with ObjectId
+        const filter = { eventId: eventObjectId };
+        if (milestoneObjectId) {
+            filter.milestoneId = milestoneObjectId;
+        }
+        const statisticsAggregation = await Task.aggregate([
+            { $match: filter },
+            {
+                $facet: {
+                    // Thống kê tổng quan
+                    overall: [
+                        {
+                            $group: {
+                                _id: null,
+                                totalTasks: { $sum: 1 },
+                                // Major tasks (không có assigneeId)
+                                totalMajorTasks: {
+                                    $sum: { 
+                                        $cond: [
+                                            { 
+                                                $or: [
+                                                    { $eq: ['$assigneeId', null] },
+                                                    { $eq: [{ $type: '$assigneeId' }, 'missing'] }
+                                                ]
+                                            }, 
+                                            1, 
+                                            0 
+                                        ] 
+                                    }
+                                },
+                                // Assigned tasks (có assigneeId)
+                                totalAssignedTasks: {
+                                    $sum: { 
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { $ne: ['$assigneeId', null] },
+                                                    { $ne: [{ $type: '$assigneeId' }, 'missing'] }
+                                                ]
+                                            }, 
+                                            1, 
+                                            0 
+                                        ] 
+                                    }
+                                },
+                                completedTasks: {
+                                    $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] }
+                                },
+                                // Major tasks đã hoàn thành
+                                completedMajorTasks: {
+                                    $sum: {
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { 
+                                                        $or: [
+                                                            { $eq: ['$assigneeId', null] },
+                                                            { $eq: [{ $type: '$assigneeId' }, 'missing'] }
+                                                        ]
+                                                    }, 
+                                                    { $eq: ['$status', 'done'] }
+                                                ] 
+                                            },
+                                            1,
+                                            0
+                                        ]
+                                    }
+                                },
+                                // Assigned tasks đã hoàn thành
+                                completedAssignedTasks: {
+                                    $sum: {
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { 
+                                                        $and: [
+                                                            { $ne: ['$assigneeId', null] },
+                                                            { $ne: [{ $type: '$assigneeId' }, 'missing'] }
+                                                        ]
+                                                    }, 
+                                                    { $eq: ['$status', 'done'] }
+                                                ] 
+                                            },
+                                            1,
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    // Thống kê theo ban
+                    byDepartment: [
+                        {
+                            $match: {
+                                departmentId: { $ne: null }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: '$departmentId',
+                                // Major tasks
+                                totalMajorTasks: {
+                                    $sum: { 
+                                        $cond: [
+                                            { 
+                                                $or: [
+                                                    { $eq: ['$assigneeId', null] },
+                                                    { $eq: [{ $type: '$assigneeId' }, 'missing'] }
+                                                ]
+                                            }, 
+                                            1, 
+                                            0 
+                                        ] 
+                                    }
+                                },
+                                completedMajorTasks: {
+                                    $sum: {
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { 
+                                                        $or: [
+                                                            { $eq: ['$assigneeId', null] },
+                                                            { $eq: [{ $type: '$assigneeId' }, 'missing'] }
+                                                        ]
+                                                    }, 
+                                                    { $eq: ['$status', 'done'] }
+                                                ] 
+                                            },
+                                            1,
+                                            0
+                                        ]
+                                    }
+                                },
+                                // ✅ NEW: Assigned tasks
+                                totalAssignedTasks: {
+                                    $sum: { 
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { $ne: ['$assigneeId', null] },
+                                                    { $ne: [{ $type: '$assigneeId' }, 'missing'] }
+                                                ]
+                                            }, 
+                                            1, 
+                                            0 
+                                        ] 
+                                    }
+                                },
+                                completedAssignedTasks: {
+                                    $sum: {
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { 
+                                                        $and: [
+                                                            { $ne: ['$assigneeId', null] },
+                                                            { $ne: [{ $type: '$assigneeId' }, 'missing'] }
+                                                        ]
+                                                    }, 
+                                                    { $eq: ['$status', 'done'] }
+                                                ] 
+                                            },
+                                            1,
+                                            0
+                                        ]
+                                    }
+                                },
+                                remainingAssignedTasks: {
+                                    $sum: {
+                                        $cond: [
+                                            { 
+                                                $and: [
+                                                    { 
+                                                        $and: [
+                                                            { $ne: ['$assigneeId', null] },
+                                                            { $ne: [{ $type: '$assigneeId' }, 'missing'] }
+                                                        ]
+                                                    }, 
+                                                    { $ne: ['$status', 'done'] }
+                                                ] 
+                                            },
+                                            1,
+                                            0
+                                        ]
+                                    }
+                                },
+                                totalTasks: { $sum: 1 },
+                                completedTasks: {
+                                    $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] }
+                                },
+                                // Major task IDs (for child task lookup if needed later)
+                                majorTaskIds: {
+                                    $push: {
+                                        $cond: [
+                                            { 
+                                                $or: [
+                                                    { $eq: ['$assigneeId', null] },
+                                                    { $eq: [{ $type: '$assigneeId' }, 'missing'] }
+                                                ]
+                                            },
+                                            '$_id',
+                                            null
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ]);
+        const [aggregationResult] = statisticsAggregation;
+        const overallStats = aggregationResult.overall[0] || {
+            totalTasks: 0,
+            totalMajorTasks: 0,
+            totalAssignedTasks: 0,
+            completedTasks: 0,
+            completedMajorTasks: 0,
+            completedAssignedTasks: 0
+        };
+        const departmentStats = aggregationResult.byDepartment || [];
+
+        // Batch fetch departments
+        const departmentIds = departmentStats.map(stat => stat._id).filter(Boolean);
+        
+        const departments = await Department.find({
+            _id: { $in: departmentIds },
+            eventId: eventObjectId
+        }).select('_id name').lean();
+
+        const departmentMap = new Map(
+            departments.map(dept => [dept._id.toString(), dept.name])
+        );
+
+        // ✅ OPTION 2: Child tasks (hierarchy-based) - vẫn giữ cho tương lai
+        const allMajorTaskIds = departmentStats.flatMap(stat => 
+            stat.majorTaskIds.filter(id => id !== null)
+        );
+
+        let childTasksStats = [];
+        if (allMajorTaskIds.length > 0) {
+            const childFilter = {
+                eventId: eventObjectId,
+                parentId: { $in: allMajorTaskIds } // True parent-child relationship
+            };
+            if (milestoneObjectId) {
+                childFilter.milestoneId = milestoneObjectId;
+            }
+
+            console.log('Child filter (parent-child):', childFilter);
+
+            childTasksStats = await Task.aggregate([
+                { $match: childFilter },
+                {
+                    $group: {
+                        _id: '$departmentId',
+                        totalChildTasks: { $sum: 1 },
+                        remainingChildTasks: {
+                            $sum: { $cond: [{ $ne: ['$status', 'done'] }, 1, 0] }
+                        }
+                    }
+                }
+            ]);
+        }
+
+        console.log('Child tasks stats (parent-child):', childTasksStats);
+
+        const childTasksMap = new Map(
+            childTasksStats.map(stat => [
+                stat._id?.toString() || 'null', 
+                {
+                    total: stat.totalChildTasks,
+                    remaining: stat.remainingChildTasks
+                }
+            ])
+        );
+
+        // ✅ NEW: Xây dựng kết quả department details với assigned tasks
+        const departmentDetails = departmentStats.map(stat => {
+            const departmentName = departmentMap.get(stat._id.toString());
+            if (!departmentName) {
+                console.log(`⚠️ Department name not found for ID: ${stat._id}`);
+                return null;
+            }
+
+            const childStats = childTasksMap.get(stat._id.toString()) || { total: 0, remaining: 0 };
+            
+            // Progress dựa trên major tasks
+            const majorProgress = stat.totalMajorTasks > 0
+                ? (stat.completedMajorTasks / stat.totalMajorTasks) * 100
+                : 0;
+
+            // Progress dựa trên assigned tasks  
+            const assignedProgress = stat.totalAssignedTasks > 0
+                ? (stat.completedAssignedTasks / stat.totalAssignedTasks) * 100
+                : 0;
+
+            // Overall progress cho department
+            const overallProgress = stat.totalTasks > 0
+                ? (stat.completedTasks / stat.totalTasks) * 100
+                : 0;
+
+            return {
+                departmentId: stat._id,
+                departmentName,
+                
+                // Major tasks
+                majorTasksCompleted: stat.completedMajorTasks,
+                majorTasksTotal: stat.totalMajorTasks,
+                majorTasksProgress: Math.round(majorProgress * 10) / 10,
+                
+                // ✅ NEW: Assigned tasks (independent tasks với assigneeId)
+                assignedTasksCompleted: stat.completedAssignedTasks,
+                assignedTasksTotal: stat.totalAssignedTasks,
+                remainingAssignedTasks: stat.remainingAssignedTasks,
+                assignedTasksProgress: Math.round(assignedProgress * 10) / 10,
+                
+                // Child tasks (true parent-child hierarchy)
+                childTasksCompleted: childStats.total - childStats.remaining,
+                childTasksTotal: childStats.total,
+                remainingChildTasks: childStats.remaining,
+                
+                // Overall department progress
+                overallProgress: Math.round(overallProgress * 10) / 10
+            };
+        }).filter(Boolean);
+
+        // Tính tiến độ tổng
+        const overallProgress = overallStats.totalMajorTasks > 0
+            ? (overallStats.completedMajorTasks / overallStats.totalMajorTasks) * 100
+            : 0;
+
+        // Tính remaining days
+        let remainingDays = null;
+        if (milestoneInfo?.targetDate) {
+            const targetDate = new Date(milestoneInfo.targetDate);
+            const now = new Date();
+            targetDate.setHours(23, 59, 59, 999);
+            now.setHours(0, 0, 0, 0);
+            
+            const diffTime = targetDate - now;
+            remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            remainingDays = Math.max(0, remainingDays);
+        }
+
+        const completedMajorTasksPercentage = overallStats.totalMajorTasks > 0
+            ? Math.round((overallStats.completedMajorTasks / overallStats.totalMajorTasks) * 1000) / 10
+            : 0;
+        return res.status(200).json({
+            data: {
+                summary: {
+                    totalTasks: overallStats.totalTasks,
+                    totalMajorTasks: overallStats.totalMajorTasks,
+                    totalAssignedTasks: overallStats.totalAssignedTasks, // ✅ NEW
+                    completedTasks: overallStats.completedTasks,
+                    completedMajorTasks: overallStats.completedMajorTasks,
+                    completedAssignedTasks: overallStats.completedAssignedTasks, // ✅ NEW
+                    completedMajorTasksPercentage,
+                    completedAssignedTasksPercentage: overallStats.totalAssignedTasks > 0 // ✅ NEW
+                        ? Math.round((overallStats.completedAssignedTasks / overallStats.totalAssignedTasks) * 1000) / 10
+                        : 0
+                },
+                milestone: milestoneInfo ? {
+                    id: milestoneInfo._id,
+                    name: milestoneInfo.name,
+                    startDate: milestoneInfo.startDate,
+                    targetDate: milestoneInfo.targetDate,
+                    remainingDays,
+                    overallProgress: Math.round(overallProgress * 10) / 10
+                } : null,
+                departmentProgress: departmentDetails
+            }
+        });
+
+    } catch (err) {
+        console.error('Error getting task statistics:', err);
+        return res.status(500).json({ 
+            message: 'Lỗi lấy thống kê task', 
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+    }
 };
