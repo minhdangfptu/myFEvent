@@ -85,6 +85,10 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
+  getCoreTeamList: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
+    return res.data;
+  }
   
 }
 

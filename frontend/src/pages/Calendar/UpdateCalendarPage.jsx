@@ -174,14 +174,21 @@ export default function UpdateEventCalendarPage() {
         if (formData.startTime && formData.endTime) {
             const [startH, startM] = formData.startTime.split(':').map(Number);
             const [endH, endM] = formData.endTime.split(':').map(Number);
-            const startMinutes = startH * 60 + startM;
-            const endMinutes = endH * 60 + endM;
+            let startMinutes = startH * 60 + startM;
+            let endMinutes = endH * 60 + endM;
+            
+            // Nếu endTime < startTime, nghĩa là sang ngày hôm sau
+            const isOvernight = endH < startH || (endH === startH && endM < startM);
+            if (isOvernight) {
+                endMinutes += 24 * 60; // Cộng thêm 24 giờ
+            }
+            
             const duration = endMinutes - startMinutes;
 
             if (duration > 0) {
                 const hours = Math.floor(duration / 60);
                 const minutes = duration % 60;
-                return `${hours} tiếng${minutes > 0 ? ' ' + minutes + ' phút' : ''}`;
+                return `${hours} tiếng${minutes > 0 ? ' ' + minutes + ' phút' : ''}${isOvernight ? ' (qua đêm)' : ''}`;
             }
         }
         return "";
@@ -222,7 +229,6 @@ export default function UpdateEventCalendarPage() {
         } else {
             // Department calendar: participantType "all" or "members"
             if (formData.participantType !== "all" && formData.selectedCoreTeam.length === 0 && formData.selectedDepartments.length === 0) {
-                // We'll reuse selectedCoreTeam to hold selected members in department scope
                 setError("Vui lòng chọn ít nhất một thành viên ban");
                 return;
             }
@@ -230,8 +236,20 @@ export default function UpdateEventCalendarPage() {
 
         const [startH, startM] = formData.startTime.split(':').map(Number);
         const [endH, endM] = formData.endTime.split(':').map(Number);
-        if (endH * 60 + endM <= startH * 60 + startM) {
-            setError("Thời gian kết thúc phải sau thời gian bắt đầu");
+        
+        // KIỂM TRA THỜI GIAN
+        const now = new Date();
+        const selectedStartDateTime = new Date(formData.meetingDate + 'T' + formData.startTime + ':00');
+        const selectedEndDateTime = new Date(formData.meetingDate + 'T' + formData.endTime + ':00');
+        
+        // Nếu giờ kết thúc < giờ bắt đầu, nghĩa là sang ngày hôm sau
+        if (endH < startH || (endH === startH && endM < startM)) {
+            selectedEndDateTime.setDate(selectedEndDateTime.getDate() + 1);
+        }
+
+        // Kiểm tra thời gian bắt đầu có trong quá khứ không
+        if (selectedStartDateTime < now) {
+            setError("Không thể tạo cuộc họp với thời gian trong quá khứ");
             return;
         }
 
@@ -242,9 +260,8 @@ export default function UpdateEventCalendarPage() {
                 name: formData.name,
                 locationType: formData.locationType,
                 location: formData.location,
-                meetingDate: formData.meetingDate,
-                startTime: formData.startTime,
-                endTime: formData.endTime,
+                startAt: selectedStartDateTime.toISOString(),
+                endAt: selectedEndDateTime.toISOString(),
                 participantType: formData.participantType,
                 notes: formData.notes,
                 attachments: formData.attachments.filter(link => link.trim() !== "")
@@ -259,8 +276,6 @@ export default function UpdateEventCalendarPage() {
             } else {
                 // Department calendar: use members list when manual selection
                 if (formData.participantType !== "all") {
-                    // reuse selectedCoreTeam array to store selected memberIds in UI or introduce separate state;
-                    // here, prefer selectedCoreTeam if populated, fallback to selectedDepartments
                     const selectedMembers = formData.selectedCoreTeam.length > 0 ? formData.selectedCoreTeam : formData.selectedDepartments;
                     submitData.members = selectedMembers;
                 }
