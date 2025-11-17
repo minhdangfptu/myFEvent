@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 export const getDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     // Ensure event exists
     await ensureEventExists(eventId);
@@ -99,7 +99,7 @@ export const getDepartmentBudget = async (req, res) => {
 export const createDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     const { items, status = 'draft' } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -165,7 +165,7 @@ export const createDepartmentBudget = async (req, res) => {
 export const updateDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     const { items, status } = req.body;
 
     // Ensure event exists
@@ -244,7 +244,7 @@ export const updateDepartmentBudget = async (req, res) => {
 export const submitBudget = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     console.log('submitBudget called:', { eventId, departmentId, budgetId, userId });
 
@@ -504,7 +504,7 @@ export const submitBudget = async (req, res) => {
 export const recallBudget = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     // Ensure event exists
     await ensureEventExists(eventId);
@@ -599,7 +599,7 @@ export const deleteDepartmentBudget = async (req, res) => {
 export const saveReviewDraft = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     const { items } = req.body;
 
     // Ensure event exists
@@ -681,7 +681,7 @@ export const saveReviewDraft = async (req, res) => {
 export const completeReview = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     const { items } = req.body;
 
     // Ensure event exists
@@ -1067,7 +1067,7 @@ export const getBudgetStatistics = async (req, res) => {
 export const sendBudgetToMembers = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     await ensureEventExists(eventId);
     const department = await ensureDepartmentInEvent(eventId, departmentId);
@@ -1122,7 +1122,7 @@ export const sendBudgetToMembers = async (req, res) => {
 export const reportExpense = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId, itemId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
     const { actualAmount, evidence, memberNote, isPaid } = req.body;
 
     await ensureEventExists(eventId);
@@ -1514,7 +1514,7 @@ export const assignItem = async (req, res) => {
 export const submitExpense = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId, itemId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     await ensureEventExists(eventId);
     const department = await ensureDepartmentInEvent(eventId, departmentId);
@@ -1618,7 +1618,7 @@ export const submitExpense = async (req, res) => {
 export const undoSubmitExpense = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId, itemId } = req.params;
-    const userId = req.user?.userId || req.user?._id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     await ensureEventExists(eventId);
     const department = await ensureDepartmentInEvent(eventId, departmentId);
