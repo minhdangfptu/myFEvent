@@ -239,4 +239,47 @@ describe('authController.loginWithGoogle', () => {
       expect.objectContaining({ message: 'Fail to login with Google!' })
     );
   });
+
+  it('[Abnormal] TC08 - should block banned accounts from logging in', async () => {
+    const UserMock = (await import('../../models/user.js')).default;
+    const jwtMock = (await import('jsonwebtoken')).default;
+    const req = {
+      body: { credential: 'cred' },
+      cookies: {},
+      headers: {},
+      get: vi.fn().mockReturnValue('Mozilla'),
+      ip: '127.0.0.1',
+    };
+    const res = mockRes();
+
+    mockVerifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-banned',
+        email: 'banned@example.com',
+        email_verified: true,
+        iss: 'accounts.google.com',
+        name: 'Banned User',
+      }),
+    });
+
+    UserMock.findOne.mockResolvedValue({
+      _id: 'userBan',
+      email: 'banned@example.com',
+      fullName: 'Banned User',
+      authProvider: 'google',
+      status: 'banned',
+      save: vi.fn(),
+    });
+
+    await authController.loginWithGoogle(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+        code: 'ACCOUNT_BANNED',
+      }),
+    );
+    expect(jwtMock.sign).not.toHaveBeenCalled();
+  });
 });

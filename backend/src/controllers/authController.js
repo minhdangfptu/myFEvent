@@ -131,11 +131,17 @@ export const login = async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
 
-    if ( user.status == 'pending') {
-      return res.status(403).json({ message: 'Account is not active' });
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Account is not active',
+        code: 'ACCOUNT_PENDING'
+      });
     }
-    if ( user.status == 'banned') {
-      return res.status(403).json({ message: 'Account is banned' });
+    if (user.status === 'banned') {
+      return res.status(403).json({
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+        code: 'ACCOUNT_BANNED'
+      });
     }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
@@ -222,6 +228,20 @@ export const loginWithGoogle = async (req, res) => {
         if (!user.fullName && name) user.fullName = name;
         if (!user.avatarUrl && picture) user.avatarUrl = picture;
         await user.save();
+      }
+
+      if (user.status === 'pending') {
+        return res.status(403).json({
+          message: 'Account is not active',
+          code: 'ACCOUNT_PENDING'
+        });
+      }
+
+      if (user.status === 'banned') {
+        return res.status(403).json({
+          message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+          code: 'ACCOUNT_BANNED'
+        });
       }
 
        const accessToken = jwt.sign(

@@ -39,12 +39,13 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login error:", error);
-      if (error?.response?.status === 403) {
+      const errorCode = error?.response?.data?.code;
+      if (error?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
         return;
       }
       setError(
-        error.response?.data?.message ||
+        error?.response?.data?.message ||
         "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
     } finally {
@@ -97,6 +98,11 @@ export default function LoginPage() {
       });
     } catch (err) {
       console.error("Google login error:", err);
+      const errorCode = err?.response?.data?.code;
+      if (err?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
+        navigate("/email-confirmation", { state: { email } });
+        return;
+      }
       setError(
         err?.response?.data?.message ||
         err?.message ||

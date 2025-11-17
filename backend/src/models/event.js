@@ -4,17 +4,24 @@ const EventSchema = new Schema({
     type: { type: String, enum: ['public', 'private'], required: true },
     description: { type: String },
     eventStartDate: { type: Date },
-    eventEndDate: { type: Date},
+    eventEndDate: { type: Date },
     location: { type: String },
     organizerName: { type: String, required: true },
     image: [{ type: String, required: true }],
     status: { type: String, enum: ['cancelled', 'completed', 'ongoing', 'scheduled'], default: 'scheduled' },
     joinCode: { type: String, unique: true, index: true },
-    banInfo:{
+    banInfo: {
         isBanned: { type: Boolean, default: false },
         banReason: { type: String },
         bannedAt: { type: Date }
     }
-}, { timestamps: true, versionKey: false });
-
+}, {
+    timestamps: true, versionKey: false, toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+EventSchema.virtual("members", {
+    ref: "EventMember",
+    localField: "_id",
+    foreignField: "eventId"
+});
 export default mongoose.model('Event', EventSchema);

@@ -20,6 +20,18 @@ const adminApi = {
     getPaginatedEvents: async (page, limit, search, status, eventDate) => {
         const response = await axiosClient.get(`/api/admin/events?page=${page}&limit=${limit}&search=${search}&status=${status}&eventDate=${eventDate}`);
         return response.data;
+    },
+    getEventDetails: async (eventId) => {
+        const response = await axiosClient.get(`/api/admin/events/${eventId}`);
+        return response.data;
+    },
+    banEvent: async (eventId, banReason) => {
+        const response = await axiosClient.put(`/api/admin/events/${eventId}/ban`, { banReason });
+        return response.data;
+    },
+    unbanEvent: async (eventId) => {
+        const response = await axiosClient.put(`/api/admin/events/${eventId}/unban`);
+        return response.data;
     }
 };
 

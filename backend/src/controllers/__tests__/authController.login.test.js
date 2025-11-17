@@ -148,7 +148,10 @@ describe('authController.login', () => {
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Account is not active' }),
+      expect.objectContaining({
+        message: 'Account is not active',
+        code: 'ACCOUNT_PENDING',
+      }),
     );
   });
 
@@ -164,7 +167,10 @@ describe('authController.login', () => {
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Account is banned' }),
+      expect.objectContaining({
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+        code: 'ACCOUNT_BANNED',
+      }),
     );
   });
 
