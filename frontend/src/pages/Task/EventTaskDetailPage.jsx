@@ -54,6 +54,7 @@ export default function EventTaskDetailPage() {
     parent: null, // { id, title }
     dependencies: [], // [{ id, title }]
   });
+  const [tasksAll, setTasksAll] = useState([]);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
@@ -213,6 +214,11 @@ export default function EventTaskDetailPage() {
       .getMembersByDepartment(eventId, form.departmentId)
       .then((members) => setAssignees(members || []));
   }, [form.departmentId, eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    taskApi.getTaskByEvent(eventId).then(res => setTasksAll(res?.data || []));
+  }, [eventId, isEditing]);
 
   const statusMapToBackend = (s) =>
     s === "Đã xong"
@@ -625,29 +631,59 @@ export default function EventTaskDetailPage() {
           </div>
         </div>
         <div className="col-md-6 mb-3">
-          <label className="form-label">Công việc cha (parentId)</label>
-          <input
-            type="text"
-            className="form-control"
-            value={form.parentId}
-            onChange={(e) => handleChange("parentId", e.target.value)}
-            placeholder="Nhập ID công việc cha"
-            disabled={!canEdit}
-          />
+          <label className="form-label">Công việc lớn</label>
+          {isEditing ? (
+            <select
+              className="form-select"
+              value={form.parentId}
+              onChange={e => handleChange('parentId', e.target.value)}
+              disabled={!canEdit}
+            >
+              <option value="">Không có</option>
+              {tasksAll.filter(
+                t => (!t.assigneeId) && String(t._id) !== String(taskId)
+              ).map(t => (
+                <option key={t._id} value={t._id}>{t.title}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              className="form-control"
+              value={form.parentId}
+              disabled
+            />
+          )}
         </div>
       </div>
       <div className="mb-3">
         <label className="form-label">
-          Phụ thuộc (dependencies, phân tách dấu phẩy)
+          Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})
         </label>
-        <input
-          type="text"
-          className="form-control"
-          value={form.dependenciesText}
-          onChange={(e) => handleChange("dependenciesText", e.target.value)}
-          placeholder="id1,id2,id3"
-          disabled={!canEdit}
-        />
+        {isEditing ? (
+          <select
+            multiple
+            className="form-select"
+            value={form.dependenciesText.split(',').filter(Boolean)}
+            onChange={e => handleChange('dependenciesText', Array.from(e.target.selectedOptions, o => o.value).join(','))}
+            disabled={!canEdit}
+            size={6}
+            style={{ minHeight: 160 }}
+          >
+            {tasksAll.filter(
+              t => t.assigneeId && String(t._id) !== String(taskId)
+            ).map(t => (
+              <option key={t._id} value={t._id}>{t.title}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            className="form-control"
+            value={form.dependenciesText}
+            disabled
+          />
+        )}
       </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
@@ -955,7 +991,7 @@ export default function EventTaskDetailPage() {
           )}
         </div>
         <div>
-          <div className="text-muted small mb-1">Công việc trước</div>
+          <div className="text-muted small mb-1">Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})</div>
           {relatedTasks.dependencies.length > 0 ? (
             <div className="fw-medium">
               {relatedTasks.dependencies.map((dep, idx) => (

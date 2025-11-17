@@ -30,6 +30,7 @@ export default function EventTaskPage() {
   const [filterStatus, setFilterStatus] = useState("Tất cả");
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
   const [filterAssignee, setFilterAssignee] = useState("Tất cả");
+  const [filterType, setFilterType] = useState("Tất cả");
   const [showAIChat, setShowAIChat] = useState(false);
   const [wbsData, setWbsData] = useState(null);
   const [showWBSModal, setShowWBSModal] = useState(false);
@@ -146,8 +147,8 @@ export default function EventTaskPage() {
             id: task?._id,
             name: task?.title || "",
             description: task?.description || "",
-            department: task?.departmentId?.name || "Chưa phân công",
-            assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+            department: task?.departmentId?.name || "----",
+            assignee: task?.assigneeId?.userId?.fullName || "----",
             assigneeId: task?.assigneeId?._id || task?.assigneeId || null, // Keep assigneeId for assignment board
             milestone: task?.milestoneId || "Chưa có",
             parent: task?.parentId || "Chưa có",
@@ -209,6 +210,12 @@ export default function EventTaskPage() {
       };
       return task.status === statusMap[filterStatus] || task.status === filterStatus;
     })
+    .filter((task) => {
+      if (filterType === "Tất cả") return true;
+      if (filterType === "Lớn") return !task.assignee || task.assignee === "----";
+      if (filterType === "Thường") return task.assignee && task.assignee !== "----";
+      return true;
+    })
     .sort((a, b) => {
       const parse = (d) => {
         const [day, month, year] = d.split("/");
@@ -230,10 +237,17 @@ export default function EventTaskPage() {
     setCurrentPage(1);
   }, [search, filterStatus, filterDepartment, filterAssignee, filterPriority, sortBy]);
     
-  // Remove selected tasks that are no longer in filtered list
+  // Remove selected tasks that are no longer in filtered list (SỬA LỖI LẶP VÔ TẬN)
   useEffect(() => {
     const filteredIds = filteredTasks.map((t) => t.id);
-    setSelectedTaskIds((prev) => prev.filter((id) => filteredIds.includes(id)));
+    setSelectedTaskIds((prev) => {
+      const newSelected = prev.filter((id) => filteredIds.includes(id));
+      // Nếu mảng sau giống mảng trước, không set lại tránh lặp vô tận
+      if (prev.length === newSelected.length && prev.every((v, i) => v === newSelected[i])) {
+        return prev;
+      }
+      return newSelected;
+    });
   }, [filteredTasks]);
 
   const handleToggleSelectionMode = () => {
@@ -405,12 +419,14 @@ export default function EventTaskPage() {
   const [depSearch, setDepSearch] = useState("");
   const filteredDeps = useMemo(() => {
     const text = (depSearch || "").toLowerCase();
-    return (deps || []).filter((d) => {
-      const depName = d?.departmentId?.name || "";
-      const byDept = depFilterDepartment === "Tất cả" || depName === depFilterDepartment;
-      const byText = (d?.title || "").toLowerCase().includes(text);
-      return byDept && byText;
-    });
+    return (deps || [])
+      .filter((d) => d.assigneeId) // chỉ công việc con
+      .filter((d) => {
+        const depName = d?.departmentId?.name || "";
+        const byDept = depFilterDepartment === "Tất cả" || depName === depFilterDepartment;
+        const byText = (d?.title || "").toLowerCase().includes(text);
+        return byDept && byText;
+      });
   }, [deps, depFilterDepartment, depSearch]);
 
   const selectedDepartmentName = useMemo(() => (
@@ -419,8 +435,12 @@ export default function EventTaskPage() {
 
   const filteredParents = useMemo(() => {
     const list = Array.isArray(parents) ? parents : [];
-    if (!addTaskForm.departmentId) return list;
-    return list.filter((p) => (p?.departmentId?.name || "") === selectedDepartmentName);
+    if (!addTaskForm.departmentId) return list.filter((p) => !p.assigneeId);
+    return list.filter((p) => {
+      const isSameDept = (p?.departmentId?.name || "") === selectedDepartmentName;
+      const isMajorTask = !p.assigneeId;
+      return isSameDept && isMajorTask;
+    });
   }, [parents, addTaskForm.departmentId, selectedDepartmentName]);
 
   useEffect(() => {
@@ -453,6 +473,7 @@ export default function EventTaskPage() {
   const handleCreateTask = async () => {
     setAddTaskError("");
   
+    // Chỉ kiểm tra các trường: title, departmentId, dueDate, estimate (KHÔNG kiểm tra assigneeId)
     if (!addTaskForm.title || !addTaskForm.departmentId || !addTaskForm.dueDate || !addTaskForm.estimate) {
       setAddTaskError("Vui lòng nhập đầy đủ các trường * bắt buộc!");
       return;
@@ -482,6 +503,8 @@ export default function EventTaskPage() {
       const response = await taskApi.createTask(eventId, payload);
       const createdTask = response?.data || response;
 
+      toast.success("Tạo công việc thành công!");
+
       setShowAddModal(false);
       setAddTaskForm({
         title: "",
@@ -503,8 +526,8 @@ export default function EventTaskPage() {
           id: task._id,
           name: task.title || "",
           description: task.description || "",
-          department: task?.departmentId?.name || "Chưa phân công",
-          assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
+          department: task?.departmentId?.name || "----",
+          assignee: task?.assigneeId?.userId?.fullName || "----",
           milestone: task?.milestoneId || "Chưa có",
           parent: task?.parentId || "Chưa có",
           due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
@@ -589,7 +612,7 @@ export default function EventTaskPage() {
 
         .col-name { padding-left: 20px !important; }
 
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 999; }
+        .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.04); z-index: 999; }
         .task-detail-panel {
           position: fixed; right: 0; top: 0; bottom: 0;
           width: 420px; max-width: 92vw; background: #fff;
@@ -730,9 +753,21 @@ export default function EventTaskPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t("taskPage.searchPlaceholder")}
                   className="form-control soft-input"
-                  style={{ width: 320, paddingLeft: 16 }}
+                  style={{ width: 250, paddingLeft: 16 }}
                 />
 
+                <select
+                  className="form-select form-select-sm soft-input"
+                  style={{ width: 140, height: 40 }}
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  aria-label="Lọc theo loại công việc"
+                >
+                  <option value="Tất cả">Tất cả loại</option>
+                  <option value="Lớn">Công việc lớn</option>
+                  <option value="Thường">Công việc thường</option>
+                </select>
+                {/* Các filter khác giữ nguyên */}
                 <select
                   className="form-select form-select-sm soft-input"
                   style={{ width: 160, height: 40 }}
@@ -819,13 +854,16 @@ export default function EventTaskPage() {
                         <th className="py-3 col-name" style={{ width: "15%" }}>
                           Ban phụ trách
                         </th>
-                        <th className="py-3" style={{ width: "25%" }}>
+                        <th className="py-3" style={{ width: "23%" }}>
                           Công việc
+                        </th>
+                        <th className="py-3" style={{ width: "18%" }}>
+                          Loại công việc
                         </th>
                         <th className="py-3" style={{ width: "18%" }}>
                           Người phụ trách
                         </th>
-                        <th className="py-3" style={{ width: "18%" }}>
+                        <th className="py-3" style={{ width: "12%" }}>
                           Trạng thái
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
@@ -882,11 +920,15 @@ export default function EventTaskPage() {
                             <td className="py-3 text-muted small">
                               {task.name}
                             </td>
+                            <td className="py-3 text-muted small">
+                              {task.assignee === "----" || !task.assignee ? "Lớn" : "Thường"}
+                            </td>
                             <td className="py-3">
                               <span className="small text-muted">
                                 {task.assignee}
                               </span>
                             </td>
+                            
                             <td className="py-3">
                               <span
                                 className="status-badge"
@@ -1091,6 +1133,7 @@ export default function EventTaskPage() {
                     <div className="d-flex align-items-center gap-2">
                       <span style={{ fontSize: 20 }}>👤</span>
                       <span>{selectedTask.assignee}</span>
+                      
                     </div>
                   </div>
 
@@ -1205,7 +1248,7 @@ export default function EventTaskPage() {
                         </select>
                       </div>
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Người phụ trách *</label>
+                        <label className="form-label">Người phụ trách</label>
                         <select
                           className="form-select"
                           value={addTaskForm.assigneeId}
@@ -1221,7 +1264,10 @@ export default function EventTaskPage() {
                             </option>
                           ))}
                         </select>
-                        {console.log('assignees', assignees)}
+                        {/* {console.log('assignees', assignees)} */}
+                        <div className="form-text small text-muted">
+                            Lưu ý: Nếu đây là công việc lớn, <strong style={{color: 'red'}}>KHÔNG CHỌN</strong> người phụ trách
+                          </div>
                       </div>
                     </div>
                     <div className="row">
@@ -1343,7 +1389,7 @@ export default function EventTaskPage() {
                         </select>
                       </div>
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Task cha</label>
+                        <label className="form-label">Thuộc công việc lớn</label>
                         <select
                           className="form-select"
                           value={addTaskForm.parentId}
@@ -1360,7 +1406,7 @@ export default function EventTaskPage() {
                       </div>
                     </div>
                     <div className="mb-3">
-                      <label className="form-label">Task phụ thuộc</label>
+                      <label className="form-label">Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {addTaskForm.title})</label>
                       <div className="d-flex gap-2 mb-2">
                         <select
                           className="form-select form-select-sm soft-input"

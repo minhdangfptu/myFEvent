@@ -57,4 +57,12 @@ export const eventService = {
             throw error;
         }
     },
+    getCoreTeamList: async (eventId) => {
+        try {
+            const response = await eventApi.getCoreTeamList(eventId);
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
 };

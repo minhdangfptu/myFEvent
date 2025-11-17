@@ -85,7 +85,7 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
-
+  
 }
 
 

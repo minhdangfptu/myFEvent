@@ -62,6 +62,11 @@ import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import HoDTaskPage from "./pages/Task/HoDTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
+import EventCalendar from "./pages/Calendar/EventCalendar";
+import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
+import CreateDepartmentCalendarPage from "./pages/Calendar/CreateDepartmentCalendarPage";
+import CalendarDetail from "./pages/Calendar/CalendarDetail";
+import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
 
 // Feedback Pages
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
@@ -78,6 +83,8 @@ import DepartmentBudgetsListPage from "./pages/Budget/DepartmentBudgetsListPage"
 import ViewDeptBudgetDetailHoOC from "./pages/Budget/ViewDeptBudgetDetailHoOC";
 import BudgetStatistics from "./pages/Budget/BudgetStatistics";
 import MemberExpensePage from "./pages/Budget/MemberExpensePage";
+import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
+import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -341,12 +348,27 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          
+          <Route 
+            path="events/:eventId/tasks/hod-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoDTaskStatisticPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="events/:eventId/tasks/gantt" 
             element={
               <ProtectedRoute requiredRole="user">
                 <GanttChartTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/tasks/hooc-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoOCTaskStatisticPage />
               </ProtectedRoute>
             } 
           />
@@ -365,6 +387,46 @@ export default function App() {
                 <MemberProfilePage/>
               </ProtectedRoute>
             } 
+          />
+          <Route
+            path="/events/:eventId/my-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <EventCalendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/calendars/create-event-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CreateEventCalenderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/departments/:departmentId/calendars/create-department-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CreateDepartmentCalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/my-calendar/:calendarId"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <CalendarDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/my-calendar/:calendarId/edit-event-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UpdateEventCalendarPage />
+              </ProtectedRoute>
+            }
           />
           <Route 
             path="/home-page" 

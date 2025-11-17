@@ -11,9 +11,13 @@ export default function HoDSideBar({
   activePage = "home",
   eventId, // Nhận eventId qua props
 }) {
+  const STORAGE_KEY = 'sidebar_state_hod';
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize state với giá trị mặc định
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
-  const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
   const [theme, setTheme] = useState("light");
 
@@ -22,6 +26,57 @@ export default function HoDSideBar({
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
+
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
 
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
@@ -100,9 +155,9 @@ export default function HoDSideBar({
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/hod-tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
+    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
     { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-stats", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hod-statistic` },
   ];
   // Helper function để lấy userId từ user object hoặc localStorage
   const getUserId = () => {
@@ -459,12 +514,12 @@ export default function HoDSideBar({
             <button
               className={`btn-nav ${activePage === "calendar" ? "active" : ""
                 }`}
-              onClick={() => navigate("/task")}
-              title="Lịch cá nhân"
+              onClick={() => navigate(`/events/${eventId || ''}/my-calendar`)}
+              title="Lịch sự kiện"
             >
               <div className="d-flex align-items-center">
                 <i className="bi bi-calendar me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Lịch cá nhân</span>}
+                {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
 
