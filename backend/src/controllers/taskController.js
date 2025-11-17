@@ -130,64 +130,25 @@ export const createTask = async (req, res) => {
             errors.push('parentId không được xuất hiện trong dependencies');
         }
 
-        // Lấy thông tin sự kiện để kiểm tra khoảng thời gian
-        const event = await Event.findById(eventId).select('eventStartDate eventEndDate').lean();
-        
-        // Validation startDate: phải sau ngày hiện tại và trong khoảng thời gian sự kiện
-        if (startDate) {
-            const now = new Date();
-            
+        // Lấy thông tin sự kiện để kiểm tra validate thời gian
+        const event = await Event.findById(eventId).select('createdAt').lean();
+        // Validation startDate phải sau hoặc bằng ngày tạo sự kiện
+        if (startDate && event?.createdAt) {
             const taskStartDate = new Date(startDate);
-
-            // Kiểm tra startDate phải sau thời điểm hiện tại
-            if (taskStartDate <= now) {
-                errors.push('Thời gian bắt đầu phải sau thời điểm hiện tại');
-            }
-
-            if (event) {
-                if (event.eventStartDate) {
-                    const eventStart = new Date(event.eventStartDate);
-                    if (taskStartDate < eventStart) {
-                        errors.push(`Thời gian bắt đầu phải sau hoặc bằng thời gian bắt đầu sự kiện (${eventStart.toLocaleString('vi-VN')})`);
-                    }
-                }
-                if (event.eventEndDate) {
-                    const eventEnd = new Date(event.eventEndDate);
-                    if (taskStartDate > eventEnd) {
-                        errors.push(`Thời gian bắt đầu phải trước hoặc bằng thời gian kết thúc sự kiện (${event.eventEndDate.toLocaleString('vi-VN')})`);
-                    }
-                }
+            const createdAt = new Date(event.createdAt);
+            if (taskStartDate < createdAt) {
+                errors.push(`Thời gian bắt đầu phải sau hoặc bằng thời gian tạo sự kiện (${createdAt.toLocaleString('vi-VN')})`);
             }
         }
-
-        // Validation dueDate: phải sau ngày hiện tại và trong khoảng thời gian sự kiện
-        if (dueDate) {
-            const now = new Date();
-            
+        // Validation dueDate phải sau hoặc bằng ngày tạo sự kiện
+        if (dueDate && event?.createdAt) {
             const taskDueDate = new Date(dueDate);
-
-            // Kiểm tra dueDate phải sau thời điểm hiện tại
-            if (taskDueDate <= now) {
-                errors.push('Deadline phải sau thời điểm hiện tại');
-            }
-
-            if (event) {
-                if (event.eventStartDate) {
-                    const eventStart = new Date(event.eventStartDate);
-                    if (taskDueDate < eventStart) {
-                        errors.push(`Deadline phải sau hoặc bằng thời gian bắt đầu sự kiện (${eventStart.toLocaleString('vi-VN')})`);
-                    }
-                }
-                if (event.eventEndDate) {
-                    const eventEnd = new Date(event.eventEndDate);
-                    if (taskDueDate > eventEnd) {
-                        errors.push(`Deadline phải trước hoặc bằng thời gian kết thúc sự kiện (${event.eventEndDate.toLocaleString('vi-VN')})`);
-                    }
-                }
+            const createdAt = new Date(event.createdAt);
+            if (taskDueDate < createdAt) {
+                errors.push(`Deadline phải sau hoặc bằng thời gian tạo sự kiện (${createdAt.toLocaleString('vi-VN')})`);
             }
         }
-
-        // Kiểm tra startDate < dueDate
+        // Kiểm tra startDate < dueDate như cũ
         if (startDate && dueDate) {
             const taskStartDate = new Date(startDate);
             const taskDueDate = new Date(dueDate);
@@ -461,7 +422,7 @@ export const updateTaskProgress = async (req, res) => {
 
         // 2) Parent task (assigneeId = null) không cho chỉnh trực tiếp
         if (!task.assigneeId) {
-            return res.status(403).json({ message: 'Task giao cho ban (parent) không được chỉnh trực tiếp. Trạng thái/tiến độ tự tính theo task con.' });
+            return res.status(403).json({ message: 'Task giao cho ban không được chỉnh trực tiếp. Trạng thái/tiến độ tự tính theo task con.' });
         }
 
         // 3) Quyền - CHỈ assignee mới được cập nhật trạng thái task

@@ -75,6 +75,8 @@ import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
+import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
+import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -338,12 +340,27 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          
+          <Route 
+            path="events/:eventId/tasks/hod-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoDTaskStatisticPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="events/:eventId/tasks/gantt" 
             element={
               <ProtectedRoute requiredRole="user">
                 <GanttChartTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/tasks/hooc-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoOCTaskStatisticPage />
               </ProtectedRoute>
             } 
           />
