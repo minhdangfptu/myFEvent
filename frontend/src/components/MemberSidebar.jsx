@@ -79,6 +79,7 @@ export default function MemberSidebar({
   const { events, loading } = useEvents();
   const event = events.find(e => (e._id || e.id) === eventId);
   const hasEvents = !!event;
+  const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
@@ -451,6 +452,19 @@ export default function MemberSidebar({
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
+
+            {hasEvents && isEventCompleted && (
+              <button
+                className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                title="Phản hồi sự kiện"
+              >
+                <div className="d-flex align-items-center">
+                  <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                  {sidebarOpen && <span>Feedback</span>}
+                </div>
+              </button>
+            )}
 
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
+import { feedbackApi } from "../apis/feedbackApi";
+import { toast } from "react-toastify";
 
 export default function HoOCSidebar({
   sidebarOpen,
@@ -79,13 +81,42 @@ export default function HoOCSidebar({
   const { events, loading } = useEvents();
   const event = events.find(e => (e._id || e.id) === eventId);
   const hasEvent = !!event;
+  const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
+
+  const handleFeedbackOverviewClick = async () => {
+    try {
+      if (!eventId) {
+        toast.error("Không tìm thấy sự kiện để xem feedback");
+        return;
+      }
+      const res = await feedbackApi.listFormsByEvent(eventId, 1, 10);
+      const forms = res?.data || res?.forms || res || [];
+      if (!forms.length) {
+        toast.info("Chưa có biểu mẫu feedback nào cho sự kiện này");
+        return;
+      }
+      const firstForm = forms[0];
+      const formId = firstForm._id || firstForm.id;
+      if (!formId) {
+        toast.error("Không lấy được mã biểu mẫu feedback");
+        return;
+      }
+      navigate(`/events/${eventId}/feedback/${formId}/summary`);
+    } catch (error) {
+      console.error("Error navigating to feedback summary:", error);
+      toast.error("Không thể mở tổng quan feedback");
+    }
+  };
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hooc-dashboard?eventId=${eventId}` },
     { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` },
     { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` },
+    ...(isEventCompleted
+      ? [{ id: "overview-feedback", label: "Tổng quan feedback", path: null, onClick: handleFeedbackOverviewClick }]
+      : [])
   ];
 
   const workSubItems = [
@@ -285,7 +316,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -299,7 +330,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -354,6 +385,19 @@ export default function HoOCSidebar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvent && (
               <>
+                {isEventCompleted && (
+                  <button
+                    className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                    onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                    title="Phản hồi sự kiện"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Feedback</span>}
+                    </div>
+                  </button>
+                )}
+
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}

@@ -105,6 +105,7 @@ export default function HoDSideBar({
     return sortedList.map(e => ({
       id: e._id || e.id,
       name: e.name,
+      status: e.status,
       icon: "bi-calendar-event",
       membership: e.membership,
     }));
@@ -279,6 +280,7 @@ export default function HoDSideBar({
   // find the event object (from myEvents)
   const currentEvent = myEvents.find(e => e.id === (eventId || selectedEvent));
   const hasEvent = !!currentEvent;
+  const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((currentEvent?.status || '').toLowerCase());
 
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
@@ -526,6 +528,19 @@ export default function HoDSideBar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <>
+                {isEventCompleted && (
+                  <button
+                    className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                    onClick={() => navigate(`/events/${eventId || selectedEvent || ''}/feedback`)}
+                    title="Phản hồi sự kiện"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Feedback</span>}
+                    </div>
+                  </button>
+                )}
+
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
