@@ -7,6 +7,7 @@ import UserHeader from './UserHeader';
 import UserFooter from './UserFooter';
 import HoDSideBar from './HoDSideBar';
 import { getEventIdFromUrl } from '../utils/getEventIdFromUrl';
+import AdminSidebar from './AdminSideBar';
 
 export default function UserLayout({
   title,
@@ -60,6 +61,12 @@ export default function UserLayout({
             setSidebarOpen={setSidebarOpen}
             activePage={activePage}
             eventId={currentEventId}
+          />
+        ) : normalizedSidebarType === 'admin'? (
+          <AdminSidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            activePage={activePage}
           />
         ) : (
           <UserSidebar
