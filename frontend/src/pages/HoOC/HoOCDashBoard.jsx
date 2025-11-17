@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useLocation } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"

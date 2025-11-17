@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import "./AgendaPage.css";
 import { toast, ToastContainer } from "react-toastify";

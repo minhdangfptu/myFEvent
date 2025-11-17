@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "~/contexts/EventContext";
+import { useAuth } from "~/contexts/AuthContext";
+import { toast } from "react-toastify";
 import Loading from "./Loading";
 
 export default function HoDSideBar({
@@ -27,6 +29,7 @@ export default function HoDSideBar({
   ];
   // get context events (if needed) and loading flag
   const { events: ctxEvents, loading: ctxLoading } = useEvents();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -101,11 +104,121 @@ export default function HoDSideBar({
     { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
   ];
+  // Helper function để lấy userId từ user object hoặc localStorage
+  const getUserId = () => {
+    // Thử từ context trước
+    const userId = user?._id || user?.id || user?.userId?._id || user?.userId?.id;
+    if (userId) return userId;
+    
+    // Nếu không có trong context, thử từ localStorage
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        return parsedUser?._id || parsedUser?.id;
+      }
+    } catch (e) {
+      console.error("Error reading user from localStorage:", e);
+    }
+    
+    return null;
+  };
+
+  // Helper function để tìm department của user
+  const findUserDepartment = async (currentEventId, userId) => {
+    try {
+      const { departmentService } = await import("~/services/departmentService");
+      const departments = await departmentService.getDepartments(currentEventId);
+      
+      // Đảm bảo departments là array (service đã unwrap response)
+      const departmentsArray = Array.isArray(departments) ? departments : [];
+      
+      if (departmentsArray.length === 0) {
+        console.warn("No departments found for event:", currentEventId);
+        return null;
+      }
+      
+      // Tìm department mà user là HoD (leader)
+      let userDepartment = departmentsArray.find(dept => {
+        const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+        return leaderId === userId || leaderId?.toString() === userId?.toString();
+      });
+      
+      // Nếu không tìm thấy theo leader, tìm theo member
+      if (!userDepartment) {
+        for (const dept of departmentsArray) {
+          try {
+            const members = await departmentService.getMembersByDepartment(currentEventId, dept._id || dept.id);
+            // Service đã unwrap, nên members là array
+            const membersArray = Array.isArray(members) ? members : [];
+            const isMember = membersArray.some(member => {
+              const memberUserId = member.userId?._id || member.userId || member._id;
+              return memberUserId === userId || memberUserId?.toString() === userId?.toString();
+            });
+            if (isMember) {
+              userDepartment = dept;
+              break;
+            }
+          } catch (err) {
+            // Skip nếu không lấy được members
+            continue;
+          }
+        }
+      }
+      
+      return userDepartment;
+    } catch (error) {
+      console.error("Error in findUserDepartment:", error);
+      return null;
+    }
+  };
+
+  // Helper function để navigate đến budget của department hiện tại
+  const handleBudgetClick = async () => {
+    const currentEventId = eventId || selectedEvent;
+    if (!currentEventId) {
+      toast.error("Vui lòng chọn sự kiện trước");
+      return;
+    }
+    
+    // Đợi auth loading xong
+    if (authLoading) {
+      toast.info("Đang kiểm tra đăng nhập...");
+      return;
+    }
+    
+    // Lấy userId
+    const userId = getUserId();
+    if (!userId) {
+      console.warn("User not found or not logged in. User object:", user);
+      toast.error("Vui lòng đăng nhập để xem budget");
+      return;
+    }
+    
+    try {
+      // Tìm department của user
+      const userDepartment = await findUserDepartment(currentEventId, userId);
+      
+      if (userDepartment?._id || userDepartment?.id) {
+        navigate(`/events/${currentEventId}/budgets/departments`);
+      } else {
+        // Nếu không tìm thấy, điều hướng đến trang departments
+        navigate(`/events/${currentEventId}/departments`);
+        toast.info("Vui lòng chọn ban để xem budget");
+      }
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      // Fallback: điều hướng đến trang departments
+      navigate(`/events/${currentEventId}/departments`);
+      toast.error("Không thể tải thông tin ban. Vui lòng chọn ban từ danh sách.");
+    }
+  };
+
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
+    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
     { id: "expenses", label: "Chi tiêu", path: "/task" },
     { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || selectedEvent || ''}/budgets/statistics` },
   ];
 
   // find the event object (from myEvents)
@@ -443,7 +556,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
+                          onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -457,7 +570,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
+                          onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                         >
                           {item.label}
                         </button>

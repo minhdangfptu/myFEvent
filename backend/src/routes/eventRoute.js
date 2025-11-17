@@ -6,8 +6,14 @@ import departmentRoute from './departmentRoute.js';
 import eventMemberRoute from './eventMemberRoute.js';
 import riskRoute from './riskRoute.js';
 import aiRoute from './aiRoute.js';
+import { getAllBudgetsForEvent, getBudgetStatistics } from '../controllers/budgetController.js';
 
 const router = express.Router();
+
+// HoOC: Get all budgets for event - Phải đặt trước route /:id để tránh conflict
+router.get('/:eventId/budgets', authenticateToken, getAllBudgetsForEvent);
+// Get budget statistics
+router.get('/:eventId/budgets/statistics', authenticateToken, getBudgetStatistics);
 
 router.use('/:eventId/milestones',milestoneRoute);
 router.use('/:eventId/departments',departmentRoute);

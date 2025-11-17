@@ -82,6 +82,21 @@ export const createAgenda = async (req, res) => {
         
         const agenda = await agendaService.createAgendaDoc(payload);
         
+        // Thông báo khi tạo lịch họp
+        try {
+            // Lấy eventId từ milestone
+            const Milestone = (await import('../models/milestone.js')).default;
+            const milestone = await Milestone.findById(milestoneId).select('eventId').lean();
+            
+            if (milestone && milestone.eventId) {
+                const { notifyAgendaCreated } = await import('../services/notificationService.js');
+                await notifyAgendaCreated(milestone.eventId, agenda._id, milestoneId);
+            }
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+            // Không throw error, chỉ log
+        }
+        
         res.status(201).json({
             success: true,
             data: agenda,

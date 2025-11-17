@@ -40,10 +40,10 @@ export default function HoOCSidebar({
     { id: "work-statitics", label: "Thống kê tiến độ", path: "/task" },
   ];
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
+    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
     { id: "expenses", label: "Chi tiêu", path: "/task" },
     { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/statistics` },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },

@@ -70,6 +70,14 @@ import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
+import DepartmentBudgetEmpty from "./pages/Budget/DepartmentBudgetEmpty";
+import CreateDepartmentBudget from "./pages/Budget/CreateDepartmentBudget";
+import ViewDepartmentBudget from "./pages/Budget/ViewDepartmentBudget";
+import ListBudgetsPage from "./pages/Budget/ListBudgetsPage";
+import DepartmentBudgetsListPage from "./pages/Budget/DepartmentBudgetsListPage";
+import ViewDeptBudgetDetailHoOC from "./pages/Budget/ViewDeptBudgetDetailHoOC";
+import BudgetStatistics from "./pages/Budget/BudgetStatistics";
+import MemberExpensePage from "./pages/Budget/MemberExpensePage";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -408,6 +416,83 @@ export default function App() {
                 <FeedbackSummary />
               </ProtectedRoute>
             } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            }
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
           />
           
           {/* Admin Routes */}

@@ -838,6 +838,7 @@ export default function HoOCEventDetail() {
               <div className="d-flex flex-wrap gap-2">
                 {members.slice(0, 10).map((member, index) => (
                   <div
+                    key={index}
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -846,7 +847,6 @@ export default function HoOCEventDetail() {
                     }}
                   >
                     <div
-                      key={index}
                       className="member-avatar"
                       title={member.userId?.fullName || "Thành viên"}
                     >

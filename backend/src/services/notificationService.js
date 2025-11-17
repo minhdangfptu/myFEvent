@@ -91,7 +91,7 @@ export const notifyTaskAssigned = async (eventId, taskId, assigneeId) => {
 };
 
 /**
- * Thông báo khi task hoàn thành - gửi cho HoD
+ * Thông báo khi task hoàn thành - phân biệt Member -> HoD và HoD -> HoOC
  */
 export const notifyTaskCompleted = async (eventId, taskId) => {
   try {
@@ -99,39 +99,78 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       .populate('departmentId')
       .populate('assigneeId');
     
-    if (!task || !task.departmentId) {
-      console.log('Task or departmentId not found');
+    if (!task || !task.departmentId || !task.assigneeId) {
+      console.log('Task, departmentId or assigneeId not found');
       return;
     }
 
     const departmentId = task.departmentId._id || task.departmentId;
+    const assigneeMember = await EventMember.findById(task.assigneeId._id || task.assigneeId)
+      .populate('userId');
     
-    // Tìm HoD của department này
-    const hodMember = await EventMember.findOne({
-      eventId,
-      departmentId,
-      role: 'HoD'
-    }).populate('userId');
-
-    if (!hodMember || !hodMember.userId) {
-      console.log('HoD not found for department:', departmentId);
+    if (!assigneeMember || !assigneeMember.userId) {
+      console.log('Assignee member not found');
       return;
     }
 
-    const hodUserId = hodMember.userId._id;
+    const assigneeRole = assigneeMember.role;
     const taskTitle = task.title || 'Công việc';
 
-    await createNotification({
-      userId: hodUserId,
-      eventId,
-      category: 'CÔNG VIỆC',
-      title: `Công việc "${taskTitle}" đã được hoàn thành`,
-      icon: 'bi bi-check-circle',
-      color: '#10b981',
-      relatedTaskId: taskId,
-    });
-    
-    console.log('Notification sent to HoD:', hodUserId, 'for task:', taskTitle);
+    // Nếu Member hoàn thành -> thông báo cho HoD
+    if (assigneeRole === 'Member') {
+      const hodMember = await EventMember.findOne({
+        eventId,
+        departmentId,
+        role: 'HoD'
+      }).populate('userId');
+
+      if (hodMember && hodMember.userId) {
+        const hodUserId = hodMember.userId._id;
+        const assigneeName = assigneeMember.userId.fullName || 'Thành viên';
+
+        await createNotification({
+          userId: hodUserId,
+          eventId,
+          category: 'CÔNG VIỆC',
+          title: `${assigneeName} đã hoàn thành công việc "${taskTitle}"`,
+          icon: 'bi bi-check-circle',
+          color: '#10b981',
+          relatedTaskId: taskId,
+        });
+        
+        console.log('Notification sent to HoD:', hodUserId, 'for task:', taskTitle);
+      }
+    }
+    // Nếu HoD hoàn thành -> thông báo cho HoOC
+    else if (assigneeRole === 'HoD') {
+      const hoocMembers = await EventMember.find({
+        eventId,
+        role: 'HoOC',
+      }).populate('userId');
+
+      if (hoocMembers.length > 0) {
+        const hoocUserIds = hoocMembers
+          .filter(m => m.userId)
+          .map(m => m.userId._id);
+
+        if (hoocUserIds.length > 0) {
+          const hodName = assigneeMember.userId.fullName || 'Trưởng ban';
+          const departmentName = task.departmentId.name || 'Ban';
+
+          await createNotificationsForUsers(hoocUserIds, {
+            eventId,
+            category: 'CÔNG VIỆC',
+            title: `${hodName} (${departmentName}) đã hoàn thành công việc "${taskTitle}"`,
+            icon: 'bi bi-check-circle',
+            color: '#10b981',
+            relatedTaskId: taskId,
+            unread: true,
+          });
+          
+          console.log('Notification sent to HoOC for task:', taskTitle);
+        }
+      }
+    }
   } catch (error) {
     console.error('Error notifying task completed:', error);
   }
@@ -268,6 +307,65 @@ export const notifyAgendaCreated = async (eventId, agendaId, milestoneId) => {
     });
   } catch (error) {
     console.error('Error notifying agenda created:', error);
+  }
+};
+
+/**
+ * Thông báo khi thành viên tham gia ban - gửi cho HoD và các Member khác trong ban
+ */
+export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => {
+  try {
+    const newMember = await EventMember.findById(newMemberId)
+      .populate('userId')
+      .populate('departmentId');
+    
+    if (!newMember || !newMember.userId) {
+      console.log('New member not found');
+      return;
+    }
+
+    const newMemberName = newMember.userId.fullName || 'Thành viên mới';
+    const departmentName = newMember.departmentId?.name || 'Ban';
+
+    // Lấy tất cả HoD và Member khác trong ban (trừ member mới)
+    const members = await EventMember.find({
+      eventId,
+      departmentId,
+      role: { $in: ['HoD', 'Member'] },
+      _id: { $ne: newMemberId },
+    }).populate('userId');
+
+    if (members.length === 0) return;
+
+    const userIds = members
+      .filter(m => m.userId)
+      .map(m => m.userId._id);
+
+    if (userIds.length === 0) return;
+
+    await createNotificationsForUsers(userIds, {
+      eventId,
+      category: 'THÀNH VIÊN',
+      title: `${newMemberName} đã tham gia ${departmentName}`,
+      icon: 'bi bi-person-plus',
+      color: '#3b82f6',
+      unread: true,
+    });
+
+    // Thông báo cho chính member mới
+    await createNotification({
+      userId: newMember.userId._id,
+      eventId,
+      category: 'THÀNH VIÊN',
+      title: `Bạn đã được thêm vào ${departmentName}`,
+      icon: 'bi bi-person-check',
+      color: '#10b981',
+      unread: true,
+    });
+
+    console.log('Notifications sent for member joined:', newMemberName);
+  } catch (error) {
+    console.error('Error notifying member joined:', error);
   }
 };
 

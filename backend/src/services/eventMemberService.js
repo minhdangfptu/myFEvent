@@ -1,5 +1,6 @@
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
+import mongoose from 'mongoose';
 
 export const ensureEventExists = async (eventId) => {
   const event = await Event.findById(eventId).lean();
@@ -72,8 +73,22 @@ export const findEventMemberById = async (memberId) => {
 };
 
 export const getRequesterMembership = async (eventId, userId) => {
-  if (!userId) return null;
-  return await EventMember.findOne({ eventId, userId }).lean();
+  if (!userId || !eventId) return null;
+  
+  try {
+    // Convert sang ObjectId nếu cần
+    const eventIdObj = eventId instanceof mongoose.Types.ObjectId 
+      ? eventId 
+      : new mongoose.Types.ObjectId(eventId);
+    const userIdObj = userId instanceof mongoose.Types.ObjectId 
+      ? userId 
+      : new mongoose.Types.ObjectId(userId);
+    
+    return await EventMember.findOne({ eventId: eventIdObj, userId: userIdObj }).lean();
+  } catch (error) {
+    console.error('Error in getRequesterMembership:', error);
+    return null;
+  }
 };
 export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
   return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' } });
