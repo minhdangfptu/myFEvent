@@ -43,49 +43,37 @@ export const taskApi = {
     const res = await axiosClient.patch(`/api/tasks/${eventId}/${taskId}/unassign`);
     return res.data;
   },
-  
-  getTaskStatisticsByMilestone: async (eventId, milestoneId) => {
-    console.log('=== TASK API CALL ===');
-    console.log('eventId:', eventId);
-    console.log('milestoneId:', milestoneId);
 
+  getTaskStatisticsByMilestone: async (eventId, milestoneId) => {
     if (!milestoneId) {
       throw new Error('Milestone ID is required');
     }
-
     const url = `/api/tasks/${eventId}/statistics/${milestoneId}`;
-    console.log('API URL:', url);
-
     try {
       const res = await axiosClient.get(url);
-
-      console.log('=== AXIOS RESPONSE DEBUG ===');
-      console.log('Status:', res.status);
-      console.log('Raw res:', res);
-      console.log('res.data:', res.data);
-      console.log('res.data type:', typeof res.data);
-      console.log('res.data keys:', res.data ? Object.keys(res.data) : 'null');
-
-      // ✅ CRITICAL: Check response structure
       if (res.data && res.data.data) {
-        console.log('✅ Found nested data structure in response');
-        console.log('res.data.data:', res.data.data);
         return res.data; // Return { data: { summary, milestone, ... } }
       } else if (res.data && res.data.summary) {
-        console.log('✅ Found flat data structure in response');
         return res.data; // Return { summary, milestone, ... }
       } else {
         console.log('❌ Unexpected response structure');
         console.log('Available keys:', res.data ? Object.keys(res.data) : 'none');
         return res.data;
       }
-
     } catch (error) {
       console.error('❌ Axios error:', error);
       console.error('Error response:', error.response?.data);
       throw error;
     }
+  },
 
-  }
+  getBurnupData: async (eventId, milestoneId) => {
+    const res = await axiosClient.get(`/api/tasks/${eventId}/burnup-data/${milestoneId}`);
+    return res.data;
+  },
+  getDepartmentBurnupData: async (eventId, milestoneId) => {
+    const res = await axiosClient.patch(`/api/tasks/${eventId}/burnup-data/${milestoneId}`);
+    return res.data;
+  },
 
 }
