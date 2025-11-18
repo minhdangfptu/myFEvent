@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ToastContainer, toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import ConfirmModal from "~/components/ConfirmModal"
@@ -86,7 +86,7 @@ const styles = {
   },
   milestoneDot: {
     position: "absolute",
-    left: "-1.5rem",
+    left: "-1.9rem",
     top: "1.25rem",
     width: "2rem",
     height: "2rem",
@@ -319,6 +319,7 @@ const Milestone = () => {
   const { eventId } = useParams()
   const { events, fetchEventRole, getEventRole } = useEvents()
   const [eventRole, setEventRole] = useState("")
+  const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   const [milestones, setMilestones] = useState([])
   const [selectedMilestone, setSelectedMilestone] = useState(null)
@@ -458,9 +459,25 @@ const Milestone = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault()
+    setError("")
+
+    if (!createForm.targetDate) {
+      toast.error("Vui lòng chọn thời hạn cột mốc")
+      return
+    }
+
+    const selectedDate = new Date(createForm.targetDate)
+    const today = new Date(todayISODate)
+    selectedDate.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+
+    if (selectedDate < today) {
+      toast.error("Không thể chọn cột mốc ở ngày trong quá khứ")
+      return
+    }
+
     try {
       setLoading(true)
-      setError("")
 
       const response = await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
@@ -691,6 +708,7 @@ const Milestone = () => {
                     type="date"
                     style={styles.formInput}
                     value={createForm.targetDate}
+                    min={todayISODate}
                     onChange={(e) => setCreateForm({ ...createForm, targetDate: e.target.value })}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#ef4444"

@@ -17,7 +17,10 @@ export default function HoOCTaskStatisticPage() {
   const [showModal, setShowModal] = useState(false);
   // Fetch milestones
   useEffect(() => {
-    if (!eventId) return;
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
 
     const fetchMilestones = async () => {
       try {
@@ -36,13 +39,18 @@ export default function HoOCTaskStatisticPage() {
             !milestoneList.find((m) => (m._id || m.id) === selectedMilestoneId)
           ) {
             setSelectedMilestoneId(firstMilestoneId);
+          } else {
+            // Nếu đã có selectedMilestoneId hợp lệ, đảm bảo loading = false
+            setLoading(false);
           }
         } else {
           console.log("⚠️ No milestones found in event");
           setSelectedMilestoneId("");
+          setLoading(false);
         }
       } catch (error) {
         console.error("Error fetching milestones:", error);
+        setLoading(false);
       }
     };
 
@@ -50,7 +58,17 @@ export default function HoOCTaskStatisticPage() {
   }, [eventId]);
 
   useEffect(() => {
-    if (!eventId || !selectedMilestoneId) return;
+    if (!eventId) {
+      setLoading(false);
+      return;
+    }
+
+    // Nếu không có selectedMilestoneId, set loading = false và return
+    if (!selectedMilestoneId) {
+      setLoading(false);
+      setStatistics(null);
+      return;
+    }
 
     const fetchStatistics = async () => {
       try {
@@ -71,6 +89,7 @@ export default function HoOCTaskStatisticPage() {
           finalData = response;
         } else {
           setStatistics(null);
+          setLoading(false);
           return;
         }
 
@@ -169,16 +188,82 @@ export default function HoOCTaskStatisticPage() {
     setSelectedDept(null); // ✅ Clear selected data
   };
 
-  const chartData = [
-    { date: "11/30", planned: 2, actual: 2, ideal: 0 },
-    { date: "12/03", planned: 5, actual: 5, ideal: 5 },
-    { date: "12/06", planned: 15, actual: 15, ideal: 15 },
-    { date: "12/09", planned: 25, actual: 28, ideal: 30 },
-    { date: "12/12", planned: 40, actual: 45, ideal: 45 },
-    { date: "12/15", planned: 48, actual: 50, ideal: 50 },
-    { date: "12/18", planned: 52, actual: 51, ideal: 52 },
-    { date: "12/21", planned: 56, actual: 56, ideal: 56 },
-  ];
+  // Giá trị phục vụ Burnup chart (dùng số task lớn)
+  const totalTasksForChart =
+    statistics?.summary?.totalMajorTasks || 0;
+  const completedTasksForChart = statistics?.summary?.completedMajorTasks || 0;
+
+  // Xây dựng dữ liệu động cho Burnup chart dựa trên thống kê hiện tại
+  const buildBurnupChartData = () => {
+    if (!statistics?.summary || totalTasksForChart === 0) return [];
+
+    const total = totalTasksForChart;
+    const completed = completedTasksForChart;
+
+    // Lấy khung thời gian từ milestone (nếu có), nếu không thì dùng 8 mốc giả lập
+    let dates = [];
+    const steps = 8;
+
+    if (selectedMilestone?.startDate && selectedMilestone?.targetDate) {
+      const start = new Date(selectedMilestone.startDate);
+      const end = new Date(selectedMilestone.targetDate);
+      const diff = end.getTime() - start.getTime();
+      for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1);
+        const d = new Date(start.getTime() + diff * t);
+        dates.push({
+          date: d,
+          label: formatDate(d.toISOString()),
+        });
+      }
+    } else {
+      // Fallback dates
+      const today = new Date();
+      for (let i = 0; i < steps; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() + (i - steps + 1) * 3);
+        dates.push({
+          date: d,
+          label: formatDate(d.toISOString()),
+        });
+      }
+    }
+
+    // Tạo dữ liệu scope / ideal / actual theo số lượng task
+    return dates.map((dateObj, idx) => {
+      const t = idx / (dates.length - 1 || 1);
+      const scope = total; // scope: luôn là tổng số task
+      const ideal = t * total;
+      // actual: tuyến tính từ 0 → số task đã hoàn thành
+      const actual = t * completed;
+
+      return {
+        label: dateObj.label,
+        date: dateObj.date,
+        scope,
+        ideal,
+        actual,
+      };
+    });
+  };
+
+  const burnupData = buildBurnupChartData();
+  const maxYForChart = Math.max(
+    totalTasksForChart,
+    completedTasksForChart,
+    Math.ceil(totalTasksForChart * 1.2)
+  );
+  // Generate Y-axis ticks in increments of 10
+  const yTicks = [];
+  const step = Math.max(10, Math.ceil(maxYForChart / 6));
+  for (let i = 0; i <= maxYForChart + step; i += step) {
+    yTicks.push(i);
+  }
+  
+  // Get milestone deadline date for marker
+  const milestoneDeadlineDate = selectedMilestone?.targetDate
+    ? new Date(selectedMilestone.targetDate)
+    : null;
 
   // ✅ EARLY RETURNS: Handle loading states
   if (milestones.length === 0 && !loading) {
@@ -214,16 +299,11 @@ export default function HoOCTaskStatisticPage() {
           {/* Filter Controls */}
           <div className="hooc-task-statistic-page__filters">
             <div className="hooc-task-statistic-page__filter-item">
+              <label className="hooc-task-statistic-page__filter-label">
+                Milestone:
+              </label>
               <select
                 className="hooc-task-statistic-page__milestone-btn"
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "20px",
-                  border: "1px solid #e0e0e0",
-                  backgroundColor: "white",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
                 value={selectedMilestoneId}
                 onChange={(e) => {
                   setSelectedMilestoneId(e.target.value);
@@ -235,7 +315,7 @@ export default function HoOCTaskStatisticPage() {
                 )}
                 {milestones.map((m) => (
                   <option key={m._id || m.id} value={m._id || m.id}>
-                    📌 {m.name}
+                    {m.name}
                   </option>
                 ))}
               </select>
@@ -247,6 +327,7 @@ export default function HoOCTaskStatisticPage() {
                   <span className="hooc-task-statistic-page__date-range">
                     {selectedMilestone.startDate &&
                       formatDate(selectedMilestone.startDate)}{" "}
+                    -{" "}
                     {selectedMilestone.targetDate &&
                       formatDate(selectedMilestone.targetDate)}{" "}
                     (Deadline)
@@ -306,29 +387,12 @@ export default function HoOCTaskStatisticPage() {
         {/* ✅ MAIN CONTENT: Only show when we have data */}
         {!loading && selectedMilestoneId && statistics && (
           <>
-            {/* KPI Cards */}
+            {/* KPI Cards - Only 2 cards as per image */}
             <div className="hooc-task-statistic-page__kpi-section">
               <div className="hooc-task-statistic-page__kpi-card">
-                <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--tasks">
-                  <i className="bi bi-list-task"></i>
-                </div>
                 <div className="hooc-task-statistic-page__kpi-content">
                   <div className="hooc-task-statistic-page__kpi-label">
-                    Tổng số công việc
-                  </div>
-                  <div className="hooc-task-statistic-page__kpi-value">
-                    {statistics?.summary?.totalTasks || 0} task
-                  </div>
-                </div>
-              </div>
-
-              <div className="hooc-task-statistic-page__kpi-card">
-                <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--tasks">
-                  <i className="bi bi-briefcase"></i>
-                </div>
-                <div className="hooc-task-statistic-page__kpi-content">
-                  <div className="hooc-task-statistic-page__kpi-label">
-                    Công việc lớn (Ban)
+                    Tổng task lớn
                   </div>
                   <div className="hooc-task-statistic-page__kpi-value">
                     {statistics?.summary?.totalMajorTasks || 0} task
@@ -337,36 +401,14 @@ export default function HoOCTaskStatisticPage() {
               </div>
 
               <div className="hooc-task-statistic-page__kpi-card">
-                <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--completed">
-                  <i className="bi bi-person-check"></i>
-                </div>
                 <div className="hooc-task-statistic-page__kpi-content">
                   <div className="hooc-task-statistic-page__kpi-label">
-                    Công việc cá nhân
+                    Đã hoàn thành
                   </div>
                   <div className="hooc-task-statistic-page__kpi-value">
-                    {statistics?.summary?.totalAssignedTasks || 0} task
-                  </div>
-                </div>
-              </div>
-
-              <div className="hooc-task-statistic-page__kpi-card">
-                <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--completed">
-                  <i className="bi bi-check-circle"></i>
-                </div>
-                <div className="hooc-task-statistic-page__kpi-content">
-                  <div className="hooc-task-statistic-page__kpi-label">
-                    Công việc đã hoàn thành
-                  </div>
-                  <div className="hooc-task-statistic-page__kpi-value">
-                    {statistics?.summary?.completedTasks || 0}/
-                    {statistics?.summary?.totalTasks || 0} (
-                    {Math.round(
-                      ((statistics?.summary?.completedTasks || 0) /
-                        (statistics?.summary?.totalTasks || 1)) *
-                        100
-                    )}
-                    %)
+                    {statistics?.summary?.completedMajorTasks || 0}/
+                    {statistics?.summary?.totalMajorTasks || 0} (
+                    {statistics?.summary?.completedMajorTasksPercentage || 0}%)
                   </div>
                 </div>
               </div>
@@ -386,13 +428,13 @@ export default function HoOCTaskStatisticPage() {
                         Tên ban
                       </th>
                       <th className="hooc-task-statistic-page__table-header-cell">
-                        Công việc lớn
+                        Task lớn
                       </th>
                       <th className="hooc-task-statistic-page__table-header-cell">
-                        Công việc cá nhân
+                        Số task con
                       </th>
                       <th className="hooc-task-statistic-page__table-header-cell">
-                        Tiến độ tổng
+                        Tiến độ
                       </th>
                       <th className="hooc-task-statistic-page__table-header-cell">
                         Hành động
@@ -411,33 +453,15 @@ export default function HoOCTaskStatisticPage() {
                             {dept.departmentName}
                           </td>
                           <td className="hooc-task-statistic-page__table-body-cell">
-                            <div style={{ fontSize: "14px" }}>
-                              <div>
-                                <strong>
-                                  {dept.majorTasksCompleted || 0}/
-                                  {dept.majorTasksTotal || 0}
-                                </strong>{" "}
-                                ({dept.majorTasksProgress || 0}%)
-                              </div>
-                              <div style={{ color: "#666", fontSize: "12px" }}>
-                                {(dept.majorTasksTotal || 0) -
-                                  (dept.majorTasksCompleted || 0)}{" "}
-                                còn lại
-                              </div>
+                            <div style={{ fontSize: "14px", fontWeight: "500" }}>
+                              {dept.majorTasksCompleted || 0}/
+                              {dept.majorTasksTotal || 0}
                             </div>
                           </td>
                           <td className="hooc-task-statistic-page__table-body-cell">
-                            <div style={{ fontSize: "14px" }}>
-                              <div>
-                                <strong>
-                                  {dept.assignedTasksCompleted || 0}/
-                                  {dept.assignedTasksTotal || 0}
-                                </strong>{" "}
-                                ({dept.assignedTasksProgress || 0}%)
-                              </div>
-                              <div style={{ color: "#666", fontSize: "12px" }}>
-                                {dept.remainingAssignedTasks || 0} còn lại
-                              </div>
+                            <div style={{ fontSize: "14px", fontWeight: "500" }}>
+                              {dept.childTasksCompleted || 0}/
+                              {dept.childTasksTotal || 0}
                             </div>
                           </td>
                           <td className="hooc-task-statistic-page__table-body-cell">
@@ -562,89 +586,195 @@ export default function HoOCTaskStatisticPage() {
                       strokeWidth="2"
                     />
 
-                    {/* Y-axis labels */}
-                    <text x="35" y="255" fontSize="12" textAnchor="end">
-                      0
-                    </text>
-                    <text x="35" y="205" fontSize="12" textAnchor="end">
-                      20
-                    </text>
-                    <text x="35" y="155" fontSize="12" textAnchor="end">
-                      40
-                    </text>
-                    <text x="35" y="105" fontSize="12" textAnchor="end">
-                      60
+                    {/* Y-axis label */}
+                    <text
+                      x="20"
+                      y="150"
+                      fontSize="12"
+                      textAnchor="middle"
+                      transform="rotate(-90, 20, 150)"
+                      fill="#333"
+                    >
+                      Số lượng task lớn
                     </text>
 
-                    {/* Ideal line (dashed) */}
-                    <polyline
-                      points="60,240 113,238 166,210 219,180 272,128 325,80 378,52 431,50 484,50 537,50"
-                      fill="none"
-                      stroke="#00d4aa"
-                      strokeWidth="2"
-                      strokeDasharray="5,5"
-                    />
+                    {/* Y-axis labels theo số lượng task */}
+                    {yTicks.map((v) => {
+                      const yBottom = 250;
+                      const yTop = 50;
+                      const maxY = maxYForChart || 1;
+                      const ratio = maxY === 0 ? 0 : v / maxY;
+                      const y =
+                        yBottom - ratio * (yBottom - yTop);
+                      return (
+                        <text
+                          key={v}
+                          x="35"
+                          y={y + 5}
+                          fontSize="12"
+                          textAnchor="end"
+                        >
+                          {v}
+                        </text>
+                      );
+                    })}
 
-                    {/* Actual line (blue) */}
-                    <polyline
-                      points="60,240 113,235 166,208 219,175 272,120 325,70 378,45 431,42 484,40 537,40"
-                      fill="none"
-                      stroke="#1e90ff"
-                      strokeWidth="2"
-                    />
+                    {/* Helper để convert % → tọa độ cho 3 đường */}
+                    {burnupData.length > 0 && (
+                      <>
+                        {/* Scope (planned) - Blue solid line */}
+                        <polyline
+                          points={burnupData
+                            .map((p, idx) => {
+                              const xStart = 60;
+                              const xEnd = 580;
+                              const yBottom = 250;
+                              const yTop = 50;
+                              const t =
+                                burnupData.length === 1
+                                  ? 0
+                                  : idx / (burnupData.length - 1);
+                              const x =
+                                xStart +
+                                (xEnd - xStart) * t;
+                              const y =
+                                yBottom -
+                                (p.scope / (maxYForChart || 1)) *
+                                  (yBottom - yTop);
+                              return `${x},${y}`;
+                            })
+                            .join(" ")}
+                          fill="none"
+                          stroke="#4da6ff"
+                          strokeWidth="2"
+                        />
 
-                    {/* Planned line (blue lighter) */}
-                    <polyline
-                      points="60,240 113,236 166,225 219,205 272,165 325,95 378,55 431,50 484,45 537,42"
-                      fill="none"
-                      stroke="#4da6ff"
-                      strokeWidth="2"
-                    />
+                        {/* Actual (đường hoàn thành) - Green solid line */}
+                        <polyline
+                          points={burnupData
+                            .map((p, idx) => {
+                              const xStart = 60;
+                              const xEnd = 580;
+                              const yBottom = 250;
+                              const yTop = 50;
+                              const t =
+                                burnupData.length === 1
+                                  ? 0
+                                  : idx / (burnupData.length - 1);
+                              const x =
+                                xStart +
+                                (xEnd - xStart) * t;
+                              const y =
+                                yBottom -
+                                (p.actual / (maxYForChart || 1)) *
+                                  (yBottom - yTop);
+                              return `${x},${y}`;
+                            })
+                            .join(" ")}
+                          fill="none"
+                          stroke="#2ecc71"
+                          strokeWidth="2"
+                        />
 
-                    {/* X-axis labels */}
-                    <text x="60" y="275" fontSize="12" textAnchor="middle">
-                      11/30
-                    </text>
-                    <text x="113" y="275" fontSize="12" textAnchor="middle">
-                      12/03
-                    </text>
-                    <text x="166" y="275" fontSize="12" textAnchor="middle">
-                      12/06
-                    </text>
-                    <text x="219" y="275" fontSize="12" textAnchor="middle">
-                      12/09
-                    </text>
-                    <text x="272" y="275" fontSize="12" textAnchor="middle">
-                      12/12
-                    </text>
-                    <text x="325" y="275" fontSize="12" textAnchor="middle">
-                      12/15
-                    </text>
-                    <text x="378" y="275" fontSize="12" textAnchor="middle">
-                      12/18
-                    </text>
-                    <text x="431" y="275" fontSize="12" textAnchor="middle">
-                      12/21
-                    </text>
+                        {/* Ideal (đường ước tính) - Blue dashed line */}
+                        <polyline
+                          points={burnupData
+                            .map((p, idx) => {
+                              const xStart = 60;
+                              const xEnd = 580;
+                              const yBottom = 250;
+                              const yTop = 50;
+                              const t =
+                                burnupData.length === 1
+                                  ? 0
+                                  : idx / (burnupData.length - 1);
+                              const x =
+                                xStart +
+                                (xEnd - xStart) * t;
+                              const y =
+                                yBottom -
+                                (p.ideal / (maxYForChart || 1)) *
+                                  (yBottom - yTop);
+                              return `${x},${y}`;
+                            })
+                            .join(" ")}
+                          fill="none"
+                          stroke="#4da6ff"
+                          strokeWidth="2"
+                          strokeDasharray="5,5"
+                        />
+
+                        {/* Milestone deadline marker - Vertical grey bar */}
+                        {milestoneDeadlineDate && burnupData.length > 0 && (() => {
+                          const xStart = 60;
+                          const xEnd = 580;
+                          const startDate = burnupData[0]?.date;
+                          const endDate = burnupData[burnupData.length - 1]?.date;
+                          
+                          if (startDate && endDate) {
+                            const startTime = startDate.getTime();
+                            const endTime = endDate.getTime();
+                            const deadlineTime = milestoneDeadlineDate.getTime();
+                            const ratio = (deadlineTime - startTime) / (endTime - startTime);
+                            const x = xStart + (xEnd - xStart) * Math.max(0, Math.min(1, ratio));
+                            
+                            return (
+                              <line
+                                x1={x}
+                                y1="30"
+                                x2={x}
+                                y2="260"
+                                stroke="#999"
+                                strokeWidth="2"
+                                opacity="0.6"
+                              />
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {/* Nhãn ngày dưới trục X */}
+                        {burnupData.map((p, idx) => {
+                          const xStart = 60;
+                          const xEnd = 580;
+                          const t =
+                            burnupData.length === 1
+                              ? 0
+                              : idx /
+                                (burnupData.length - 1);
+                          const x =
+                            xStart +
+                            (xEnd - xStart) * t;
+                          return (
+                            <text
+                              key={idx}
+                              x={x}
+                              y="275"
+                              fontSize="12"
+                              textAnchor="middle"
+                              fill="#333"
+                            >
+                              {p.label}
+                            </text>
+                          );
+                        })}
+                      </>
+                    )}
                   </svg>
 
                   {/* Chart Legend */}
                   <div className="hooc-task-statistic-page__chart-legend">
                     <div className="hooc-task-statistic-page__legend-item">
                       <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--planned"></span>
-                      <span>Đường Scope - Tổng số công việc</span>
+                      <span>Tổng số task lớn</span>
                     </div>
                     <div className="hooc-task-statistic-page__legend-item">
                       <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--actual"></span>
-                      <span>Đường Thực tế – Task hoàn thành</span>
+                      <span>Thực tế hoàn thành</span>
                     </div>
                     <div className="hooc-task-statistic-page__legend-item">
                       <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--ideal"></span>
-                      <span>Đường Ước tính – Tốc độ dự kiến</span>
-                    </div>
-                    <div className="hooc-task-statistic-page__legend-item">
-                      <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--milestone"></span>
-                      <span>Mốc Milestone</span>
+                      <span>Đường ước tính</span>
                     </div>
                   </div>
                 </div>
@@ -661,11 +791,10 @@ export default function HoOCTaskStatisticPage() {
                     <span className="hooc-task-statistic-page__legend-dot hooc-task-statistic-page__legend-dot--scope"></span>
                     <div>
                       <div className="hooc-task-statistic-page__legend-explanation-title">
-                        Đường Scope - Tổng số công việc
+                        Đường Scope - Tổng số task
                       </div>
                       <div className="hooc-task-statistic-page__legend-explanation-text">
-                        Tổng số lượng công việc cần hoàn thành. Có thể tăng nếu
-                        thêm công việc.
+                        Tổng số lượng task cần hoàn thành. Có thể tăng nếu thêm task.
                       </div>
                     </div>
                   </div>
@@ -674,10 +803,10 @@ export default function HoOCTaskStatisticPage() {
                     <span className="hooc-task-statistic-page__legend-dot hooc-task-statistic-page__legend-dot--actual"></span>
                     <div>
                       <div className="hooc-task-statistic-page__legend-explanation-title">
-                        Đường Thực tế – Task hoàn thành
+                        Đường Thực tế - Task hoàn thành
                       </div>
                       <div className="hooc-task-statistic-page__legend-explanation-text">
-                        Số lượng công việc đã giải quyết theo thời gian.
+                        Số lượng task đã giải quyết theo thời gian.
                       </div>
                     </div>
                   </div>
@@ -708,10 +837,12 @@ export default function HoOCTaskStatisticPage() {
                 </div>
 
                 <div className="hooc-task-statistic-page__milestone-note">
-                  Nếu đường xanh lá nằm trên đường nét đứt → Tiến độ nhanh hơn
-                  dự kiến.
-                  <br />
-                  Nếu nằm dưới → Chậm tiến độ.
+                  <div style={{ marginBottom: "8px" }}>
+                    Nếu đường xanh là nằm trên đường nét đứt → Tiến độ nhanh hơn dự kiến.
+                  </div>
+                  <div>
+                    Nếu nằm dưới → Chậm tiến độ.
+                  </div>
                 </div>
               </div>
             </div>

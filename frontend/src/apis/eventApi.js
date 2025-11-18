@@ -85,6 +85,10 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
+  leaveEvent: async (eventId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/me`);
+    return res.data;
+  },
   
 }
 

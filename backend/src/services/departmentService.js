@@ -2,6 +2,7 @@ import Event from '../models/event.js';
 import Department from '../models/department.js';
 import EventMember from '../models/eventMember.js';
 import User from '../models/user.js';
+import Task from '../models/task.js';
 
 // Basic helpers
 export const ensureEventExists = async (eventId) => {
@@ -104,6 +105,19 @@ export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, 
 };
 
 export const removeMemberFromDepartmentDoc = async (eventId, departmentId, memberId) => {
+  // ✅ Xử lý tasks: chỉ unassign các task chưa hoàn thành
+  // Giữ nguyên các task đã done, chỉ unassign các task todo/in_progress/blocked
+  await Task.updateMany(
+    {
+      eventId,
+      assigneeId: memberId,
+      status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+    },
+    {
+      $set: { assigneeId: null }
+    }
+  );
+
   return await EventMember.findOneAndUpdate(
     { _id: memberId, departmentId },
     { $set: { departmentId: null, role: 'Member' } },

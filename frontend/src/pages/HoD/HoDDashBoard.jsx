@@ -5,6 +5,7 @@ import { eventApi } from "../../apis/eventApi"
 import { taskApi } from "../../apis/taskApi"
 import { departmentService } from "../../services/departmentService"
 import { milestoneService } from "../../services/milestoneService"
+import calendarService from "../../services/calendarService"
 import Loading from "../../components/Loading"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
@@ -51,6 +52,28 @@ const parseDate = (value) => {
   const date = new Date(value)
   if (!Number.isNaN(date.getTime())) return date
   return null
+}
+
+const normalizeCalendars = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.calendars)) return data.calendars
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  return []
+}
+
+const parseCalendarEventStart = (calendar) => {
+  if (!calendar) return null
+  const candidate =
+    calendar.startAt ||
+    (calendar.meetingDate
+      ? `${calendar.meetingDate}T${calendar.startTime || "00:00"}`
+      : null)
+  if (!candidate) return null
+  const date = new Date(candidate)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
@@ -111,6 +134,7 @@ export default function HoDDashBoard() {
   const [members, setMembers] = useState([])
   const [tasks, setTasks] = useState([])
   const [milestones, setMilestones] = useState([])
+  const [calendarEvents, setCalendarEvents] = useState([])
   const [eventRole, setEventRole] = useState("")
   const [departmentId, setDepartmentId] = useState(null)
   const [hoveredDay, setHoveredDay] = useState(null)
@@ -179,14 +203,15 @@ export default function HoDDashBoard() {
 
         // If we have departmentId, fetch department-specific data
         if (departmentId) {
-          const [deptResponse, membersResponse, tasksResponse, milestonesResponse] = await Promise.all([
+          const [deptResponse, membersResponse, tasksResponse, milestonesResponse, calendarsResponse] = await Promise.all([
             departmentService.getDepartmentDetail(eventId, departmentId),
             departmentService.getMembersByDepartment(eventId, departmentId),
             taskApi.getTaskByEvent(eventId),
             milestoneService.listMilestones(eventId, {
               sortBy: "targetDate",
               sortDir: "asc"
-            })
+            }),
+            calendarService.getCalendarsByEventId(eventId)
           ])
 
           if (cancelled) return
@@ -217,6 +242,7 @@ export default function HoDDashBoard() {
               return da.getTime() - db.getTime()
             })
           if (!cancelled) setMilestones(sortedMilestones)
+          if (!cancelled) setCalendarEvents(normalizeCalendars(calendarsResponse))
         }
         // If no departmentId yet, the useEffect will run again when departmentId is set
       } catch (error) {
@@ -303,7 +329,26 @@ export default function HoDDashBoard() {
   )
 
   // Calendar data (current month)
-  const calendarDays = generateCalendarDays()
+  const calendarDays = useMemo(() => {
+    const baseDays = generateCalendarDays()
+    if (!calendarEvents.length) return baseDays
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const highlighted = new Set()
+
+    calendarEvents.forEach((event) => {
+      const startDate = parseCalendarEventStart(event)
+      if (!startDate) return
+      if (startDate.getFullYear() !== year || startDate.getMonth() !== month) return
+      highlighted.add(startDate.getDate())
+    })
+
+    return baseDays.map((day) => ({
+      ...day,
+      highlight: highlighted.has(day.day)
+    }))
+  }, [calendarEvents])
 
   // Get events for a specific day
   const getEventsForDay = useMemo(() => {
@@ -313,21 +358,16 @@ export default function HoDDashBoard() {
     
     return (day) => {
       if (!day) return []
-      const targetDate = new Date(year, month, day)
-      
-      return milestones.filter((milestone) => {
-        const milestoneDate = parseDate(milestone?.targetDate || milestone?.dueDate)
-        if (!milestoneDate) return false
-        
-        // Compare only year, month, day (ignore time)
-        return (
-          milestoneDate.getFullYear() === targetDate.getFullYear() &&
-          milestoneDate.getMonth() === targetDate.getMonth() &&
-          milestoneDate.getDate() === targetDate.getDate()
-        )
-      })
+      return calendarEvents
+        .map((event) => {
+          const startDate = parseCalendarEventStart(event)
+          return startDate ? { event, startDate } : null
+        })
+        .filter(Boolean)
+        .filter(({ startDate }) => startDate.getFullYear() === year && startDate.getMonth() === month && startDate.getDate() === day)
+        .map(({ event }) => event)
     }
-  }, [milestones])
+  }, [calendarEvents])
 
   const milestoneCompletionPercent = milestones.length > 0
     ? Math.round((milestones.filter((m) => isCompletedStatus(m?.status)).length / milestones.length) * 100)
@@ -693,30 +733,31 @@ export default function HoDDashBoard() {
                             const dayData = calendarDays[weekIndex * 7 + dayIndex]
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
+                            const hasEvents = dayEvents.length > 0
                             
                             return (
                               <td
                                 key={dayIndex}
                                 className={`text-center ${
-                                  dayData?.today ? "text-white rounded" : dayData?.highlight ? "fw-semibold" : ""
+                                  dayData?.today ? "text-white rounded" : hasEvents ? "fw-semibold" : ""
                                 }`}
                                 style={{
                                   fontSize: "13px",
                                   backgroundColor: dayData?.today
                                     ? "#dc2626"
-                                    : isHovered
-                                    ? "#fee2e2"
-                                    : dayData?.highlight
+                                    : isHovered && hasEvents
+                                    ? "#ffe4e6"
+                                    : hasEvents
                                     ? "#fee2e2"
                                     : "transparent",
                                   color: dayData?.today 
                                     ? "white" 
-                                    : isHovered 
-                                    ? "#dc2626" 
-                                    : dayData?.highlight 
-                                    ? "#dc2626" 
+                                    : hasEvents
+                                    ? "#991b1b"
                                     : "#374151",
+                                  border: hasEvents ? "1px solid #fecdd3" : "1px solid transparent",
                                   padding: "8px 4px",
+                                  borderRadius: "8px",
                                   cursor: dayData?.day ? "pointer" : "default",
                                   transition: "all 0.2s ease",
                                 }}
@@ -732,36 +773,100 @@ export default function HoDDashBoard() {
                     </tbody>
                   </table>
 
-                  {hoveredDay && getEventsForDay(hoveredDay).length > 0 ? (
-                    <div className="mt-4 pt-3 border-top">
-                      {getEventsForDay(hoveredDay).map((event, index) => {
-                        const eventDate = parseDate(event?.targetDate || event?.dueDate)
-                        const timeStr = eventDate ? eventDate.toLocaleTimeString('vi-VN', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        }) : ''
-                        
-                        return (
-                          <div key={index} className={index > 0 ? "mt-3" : ""}>
-                            <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                              {event?.name || "Cột mốc"}
-                            </div>
-                            {timeStr && (
-                              <div className="text-muted" style={{ fontSize: "13px" }}>
-                                {timeStr}
+                  {(() => {
+                    const hoveredEvents = hoveredDay ? getEventsForDay(hoveredDay) : []
+                    if (hoveredDay && hoveredEvents.length > 0) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          {hoveredEvents.map((event, index) => {
+                            const startDate = parseCalendarEventStart(event)
+                            const endCandidate =
+                              event?.endAt ||
+                              (event?.meetingDate && event?.endTime
+                                ? `${event.meetingDate}T${event.endTime}`
+                                : null)
+                            const endDate = endCandidate ? new Date(endCandidate) : null
+                            const timeStr = startDate
+                              ? startDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                              : ""
+                            const endStr =
+                              endDate && !Number.isNaN(endDate.getTime())
+                                ? endDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                                : ""
+                            const timeDisplay = endStr && timeStr ? `${timeStr} - ${endStr}` : timeStr
+
+                            return (
+                              <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                                  {event?.name || "Lịch họp"}
+                                </div>
+                                {timeDisplay && (
+                                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                                    {timeDisplay}
+                                  </div>
+                                )}
+                                {event?.location && (
+                                  <div className="text-muted" style={{ fontSize: "12px" }}>
+                                    {event.location}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+
+                    if (hoveredDay) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          <div className="text-muted" style={{ fontSize: "13px" }}>
+                            Không có lịch họp
                           </div>
-                        )
-                      })}
-                    </div>
-                  ) : hoveredDay ? (
-                    <div className="mt-4 pt-3 border-top">
-                      <div className="text-muted" style={{ fontSize: "13px" }}>
-                        Không có sự kiện
-                      </div>
-                    </div>
-                  ) : null}
+                        </div>
+                      )
+                    }
+
+                    // Fallback: upcoming milestone within 7 days
+                    const upcomingMilestone = milestones.find(m => !isCompletedStatus(m?.status))
+                    if (!upcomingMilestone) return null
+                    const milestoneDate = parseDate(upcomingMilestone?.targetDate || upcomingMilestone?.dueDate)
+                    if (!milestoneDate) return null
+                    
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const milestoneDay = new Date(milestoneDate)
+                    milestoneDay.setHours(0, 0, 0, 0)
+                    
+                    const diffTime = milestoneDay - today
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                    
+                    if (diffDays >= 0 && diffDays <= 7) {
+                      const timeStr = milestoneDate.toLocaleTimeString('vi-VN', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })
+                      const dateStr = diffDays === 0 ? "Hôm nay" : diffDays === 1 ? "Mai" : formatDate(milestoneDate)
+                      
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          <div className="d-flex align-items-center gap-2">
+                            <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                            <div>
+                              <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                                {upcomingMilestone?.name || "Cột mốc"}
+                              </div>
+                              <div className="text-muted" style={{ fontSize: "12px" }}>
+                                {timeStr} {dateStr}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })()}
                 </div>
               </div>
             </div>

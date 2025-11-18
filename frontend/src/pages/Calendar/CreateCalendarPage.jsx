@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import UserLayout from "~/components/UserLayout";
@@ -8,11 +8,57 @@ import { departmentService } from "~/services/departmentService";
 import { eventService } from "~/services/eventService";
 import ConfirmModal from "../../components/ConfirmModal";
 
+const toMinutes = (timeStr) => {
+    if (!timeStr || typeof timeStr !== "string") return null;
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+};
+
+const isTimeBefore = (timeA, timeB) => {
+    const minutesA = toMinutes(timeA);
+    const minutesB = toMinutes(timeB);
+    if (minutesA == null || minutesB == null) return false;
+    return minutesA < minutesB;
+};
+
+const getSafeNowInfo = () => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    now.setMilliseconds(0);
+    now.setMinutes(now.getMinutes() + 1);
+    return {
+        date: now.toISOString().split("T")[0],
+        time: now.toTimeString().slice(0, 5)
+    };
+};
+
+const sanitizeMeetingTimes = (meetingDate, startTime, endTime, safeInfo = getSafeNowInfo()) => {
+    let sanitizedStart = startTime;
+    let sanitizedEnd = endTime;
+
+    if (meetingDate === safeInfo.date) {
+        if (!sanitizedStart || isTimeBefore(sanitizedStart, safeInfo.time)) {
+            sanitizedStart = safeInfo.time;
+        }
+
+        if (sanitizedEnd && !isTimeBefore(sanitizedStart, sanitizedEnd)) {
+            sanitizedEnd = "";
+        }
+    }
+
+    return {
+        startTime: sanitizedStart,
+        endTime: sanitizedEnd
+    };
+};
+
 export default function CreateEventCalendarPage() {
     const navigate = useNavigate();
     const { eventId } = useParams();
     const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
+    const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
     useEffect(() => {
         let mounted = true
@@ -79,7 +125,21 @@ export default function CreateEventCalendarPage() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const safeInfo = getSafeNowInfo();
+        setFormData(prev => {
+            const updated = { ...prev, [name]: value };
+            if (["meetingDate", "startTime", "endTime"].includes(name)) {
+                const sanitized = sanitizeMeetingTimes(
+                    updated.meetingDate,
+                    updated.startTime,
+                    updated.endTime,
+                    safeInfo
+                );
+                updated.startTime = sanitized.startTime;
+                updated.endTime = sanitized.endTime;
+            }
+            return updated;
+        });
     };
 
     const handleParticipantTypeChange = (type) => {
@@ -365,6 +425,7 @@ export default function CreateEventCalendarPage() {
                                             name="meetingDate"
                                             value={formData.meetingDate}
                                             onChange={handleChange}
+                                            min={todayISODate}
                                             style={{
                                                 width: "100%",
                                                 padding: "10px 12px",

@@ -9,7 +9,10 @@ import {
   getEventMemberProfileById
 } from '../services/eventMemberService.js';
 import { findEventById } from '../services/eventService.js';
-import eventMember from '../models/eventMember.js';
+import EventMember from '../models/eventMember.js';
+import Event from '../models/event.js';
+import Task from '../models/task.js';
+import { createNotificationsForUsers } from '../services/notificationService.js';
 
 // Get members by event
 export const getMembersByEvent = async (req, res) => {
@@ -102,5 +105,100 @@ export const getCoreTeamList = async (req, res) => {
   } catch (error) {
     console.error('getCoreTeamList error:', error);
     return res.status(500).json({ message: 'Failed to load core team members' });
+  }
+};
+
+// DELETE /api/events/:eventId/members/me
+export const leaveEvent = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { eventId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    if (!eventId) {
+      return res.status(400).json({ message: 'Event ID is required' });
+    }
+
+    const membership = await EventMember.findOne({ userId, eventId })
+      .populate('userId', 'fullName email')
+      .populate('departmentId', 'name')
+      .lean();
+
+    if (!membership) {
+      return res.status(404).json({ message: 'Bạn không phải thành viên của sự kiện này' });
+    }
+
+    if (membership.role === 'HoOC' || membership.role === 'HoD') {
+      return res.status(400).json({ message: 'HoOC hoặc HoD không thể rời sự kiện bằng chức năng này' });
+    }
+
+    // Lấy thông tin event để hiển thị tên trong thông báo
+    const event = await Event.findById(eventId).select('name').lean();
+
+    // ✅ Xử lý tasks: chỉ unassign các task chưa hoàn thành
+    // Giữ nguyên các task đã done, chỉ unassign các task todo/in_progress/blocked
+    await Task.updateMany(
+      {
+        eventId,
+        assigneeId: membership._id,
+        status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+      },
+      {
+        $set: { assigneeId: null }
+      }
+    );
+
+    await EventMember.deleteOne({ _id: membership._id });
+
+    // Gửi thông báo cho HoOC và HoD trong ban của member (nếu có department)
+    const departmentId = membership.departmentId?._id || membership.departmentId;
+    const notifyUsers = [];
+
+    if (departmentId) {
+      const hod = await EventMember.findOne({
+        eventId,
+        departmentId,
+        role: 'HoD'
+      }).populate('userId', '_id').lean();
+
+      if (hod?.userId?._id) {
+        notifyUsers.push(hod.userId._id);
+      }
+    }
+
+    const hoocMembers = await EventMember.find({
+      eventId,
+      role: 'HoOC'
+    }).populate('userId', '_id').lean();
+
+    hoocMembers.forEach(m => {
+      if (m.userId?._id) {
+        notifyUsers.push(m.userId._id);
+      }
+    });
+
+    const uniqueUserIds = [...new Set(notifyUsers.map(id => id.toString()))];
+
+    if (uniqueUserIds.length > 0) {
+      const memberName = membership.userId?.fullName || 'Một thành viên';
+      const deptName = membership.departmentId?.name || 'ban';
+      const eventName = event?.name || 'sự kiện';
+
+      await createNotificationsForUsers(uniqueUserIds, {
+        eventId,
+        category: 'THÀNH VIÊN',
+        title: `${memberName} đã rời khỏi ${deptName} của ${eventName}`,
+        icon: 'bi bi-box-arrow-right',
+        color: '#ef4444',
+        unread: true
+      });
+    }
+
+    return res.status(200).json({ message: 'Rời sự kiện thành công' });
+  } catch (error) {
+    console.error('leaveEvent error:', error);
+    return res.status(500).json({ message: 'Không thể rời sự kiện' });
   }
 };
