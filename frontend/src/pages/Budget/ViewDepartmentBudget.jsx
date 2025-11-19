@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import * as XLSX from 'xlsx';
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
@@ -264,6 +265,105 @@ const ViewDepartmentBudget = () => {
       toast.error(error?.response?.data?.message || "Thu hồi thất bại!");
     } finally {
       setShowRecallModal(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!budget || !filteredItems.length) {
+      toast.warning("Không có dữ liệu để xuất");
+      return;
+    }
+
+    try {
+      const wb = XLSX.utils.book_new();
+      
+      if (activeTable === "hooc") {
+        // Bảng gửi HoOC
+        const hoocData = filteredItems.map((item) => ({
+          "Hạng Mục": item.category || "",
+          "Nội dung": item.name || "",
+          "Đơn Giá (VNĐ)": parseFloat(item.unitCost) || 0,
+          "Số Lượng": item.qty || 0,
+          "Đơn Vị Tính": item.unit || "",
+          "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
+          "Ghi Chú": item.note || "",
+          "Phản hồi từ HoOC": item.feedback || ""
+        }));
+
+        const wsHooc = XLSX.utils.json_to_sheet(hoocData);
+        wsHooc['!cols'] = [
+          { wch: 15 }, // Hạng Mục
+          { wch: 30 }, // Nội dung
+          { wch: 15 }, // Đơn Giá
+          { wch: 12 }, // Số Lượng
+          { wch: 12 }, // Đơn Vị Tính
+          { wch: 18 }, // Tổng Tiền
+          { wch: 30 }, // Ghi Chú
+          { wch: 40 }  // Phản hồi từ HoOC
+        ];
+        XLSX.utils.book_append_sheet(wb, wsHooc, "Bảng gửi HoOC");
+      } else {
+        // Bảng kiểm soát Member
+        const memberData = filteredItems.map((item) => {
+          const baseRow = {
+            "Hạng Mục": item.category || "",
+            "Nội dung": item.name || "",
+            "Đơn Giá (VNĐ)": parseFloat(item.unitCost) || 0,
+            "Số Lượng": item.qty || 0,
+            "Đơn Vị Tính": item.unit || "",
+            "Ghi Chú": item.note || "",
+            "Bằng chứng": item.evidence && item.evidence.length > 0 
+              ? item.evidence.map(ev => ev.type === 'link' ? ev.url : ev.name).join(", ")
+              : "",
+            "Chú thích (member ghi)": item.memberNote || "",
+            "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
+            "Tổng tiền thực tế": parseFloat(item.actualAmount) || 0
+          };
+
+          if (isApproved && isHoD) {
+            const assignedToName = item.assignedToInfo?.fullName || item.assignedToInfo?.name || "Chưa phân công";
+            baseRow["Giao việc"] = assignedToName;
+          }
+
+          return baseRow;
+        });
+
+        const wsMember = XLSX.utils.json_to_sheet(memberData);
+        const colWidths = [
+          { wch: 15 }, // Hạng Mục
+          { wch: 30 }, // Nội dung
+          { wch: 15 }, // Đơn Giá
+          { wch: 12 }, // Số Lượng
+          { wch: 12 }, // Đơn Vị Tính
+          { wch: 30 }, // Ghi Chú
+        ];
+        
+        if (isApproved && isHoD) {
+          colWidths.push({ wch: 25 }); // Giao việc
+        }
+        
+        colWidths.push(
+          { wch: 30 }, // Bằng chứng
+          { wch: 30 }, // Chú thích
+          { wch: 18 }, // Tổng Tiền
+          { wch: 20 }  // Tổng tiền thực tế
+        );
+        
+        wsMember['!cols'] = colWidths;
+        XLSX.utils.book_append_sheet(wb, wsMember, "Bảng kiểm soát Member");
+      }
+
+      // Generate filename
+      const dateStr = new Date().toISOString().split('T')[0];
+      const deptName = (department?.name || 'budget').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+      const tableName = activeTable === "hooc" ? "HoOC" : "Member";
+      const filename = `Ngansach_${deptName}_${tableName}_${dateStr}.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success("Xuất Excel thành công!");
+    } catch (error) {
+      console.error("Error exporting Excel:", error);
+      toast.error("Không thể xuất file Excel");
     }
   };
 
@@ -1124,7 +1224,7 @@ const ViewDepartmentBudget = () => {
                                   handleAssignItem(itemIdToUse, e.target.value || null);
                                 }}
                                 disabled={isAssigningThisItem}
-                                style={{ minWidth: "150px" }}
+                                style={{ width: "100%", minWidth: 0 }}
                               >
                                 <option value="">Chưa phân công</option>
                                 {members.map((member) => (
@@ -1133,32 +1233,6 @@ const ViewDepartmentBudget = () => {
                                   </option>
                                 ))}
                               </select>
-                              {currentMemberId && (
-                                <div className="d-flex flex-column gap-1 mt-2">
-                                  {isSelfBudgetAssignee ? (
-                                    <>
-                                      <span className="text-success small fw-semibold">
-                                        Bạn đang phụ trách mục này
-                                      </span>
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary"
-                                        onClick={() => handleAssignItem(itemIdToUse, null)}
-                                        disabled={isAssigningThisItem}
-                                      >
-                                        {isAssigningThisItem ? "Đang bỏ nhận..." : "Nhường lại"}
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      className="btn btn-sm btn-outline-primary"
-                                      onClick={() => handleAssignItem(itemIdToUse, currentMemberId)}
-                                      disabled={isAssigningThisItem}
-                                    >
-                                      {isAssigningThisItem ? "Đang nhận..." : "Tôi sẽ làm mục này"}
-                                    </button>
-                                  )}
-                                </div>
-                              )}
                             </td>
                           )}
                           <td style={{ 
@@ -1381,14 +1455,12 @@ const ViewDepartmentBudget = () => {
           )}
 
           <button
-            className="btn btn-primary"
-            onClick={() => {
-              toast.info("Tính năng tải PDF đang được phát triển");
-            }}
+            className="btn btn-success"
+            onClick={handleExportExcel}
             style={{ borderRadius: "8px" }}
           >
-            <i className="bi bi-download me-2"></i>
-            Tải xuống PDF
+            <i className="bi bi-file-earmark-excel me-2"></i>
+            Xuất Excel
           </button>
         </div>
       </div>
