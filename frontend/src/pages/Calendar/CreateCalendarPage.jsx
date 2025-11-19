@@ -224,7 +224,7 @@ export default function CreateEventCalendarPage() {
         navigate(`/events/${eventId}/my-calendar`);
     };
     return (
-        <UserLayout sidebarType={eventRole} activePage="work-timeline">
+        <UserLayout sidebarType={eventRole} activePage="calendar">
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",

@@ -6,6 +6,7 @@ import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
 import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Trash, Users, X, XCircle } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
+import Loading from "~/components/Loading";
 
 export default function CalendarDetail() {
     const navigate = useNavigate();
@@ -74,12 +75,7 @@ export default function CalendarDetail() {
     if (loading) {
         return (
             <UserLayout sidebarType={eventRole}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-                        <p style={{ fontSize: '16px', color: '#6b7280' }}>Đang tải thông tin cuộc họp...</p>
-                    </div>
-                </div>
+                <Loading/>
             </UserLayout>
         );
     }
@@ -238,7 +234,7 @@ export default function CalendarDetail() {
     };
 
     return (
-        <UserLayout sidebarType={eventRole}>
+        <UserLayout sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{ margin: 0, padding: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
                 <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
