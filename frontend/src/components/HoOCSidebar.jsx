@@ -104,12 +104,8 @@ export default function HoOCSidebar({
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
   const exportSubItems = [
-    { id: "export-all", label: "Tất cả dữ liệu", path: `/` },
-    { id: "export-mem&dept", label: "Ban & Thành viên", path: `/` },
-    { id: "export-milestone&agenda", label: "Timeline & Agenda", path: `/` },
-    { id: "export-task", label: "Công việc", path: `/` },
-    { id: "export-finance", label: "Tài chính", path: `/` },
-    { id: "export-risk", label: "Rủi ro", path: `/` },
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/` },
   ];
 
   // Hover handlers giữ nguyên
@@ -534,11 +530,11 @@ export default function HoOCSidebar({
                     className={`btn-nav${activePage.startsWith("export") ? " active" : ""}`}
                     onClick={() => sidebarOpen && setExportsOpen((prev) => !prev)}
                     style={{ cursor: "pointer", background: hoveredMenu === "export" && !sidebarOpen ? "#e7ebef" : undefined }}
-                    title="Xuất dữ liệu"
+                    title="Tải xuống"
                   >
                     <div className="d-flex align-items-center">
                       <i className="bi bi-database-down me-3" style={{ width: 20 }} />
-                      {sidebarOpen && <span>Xuất dữ liệu</span>}
+                      {sidebarOpen && <span>Tải xuống</span>}
                     </div>
                     {sidebarOpen && (
                       <i className={`bi ${exportsOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />

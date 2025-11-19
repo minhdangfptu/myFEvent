@@ -54,7 +54,7 @@ export const eventService = {
         .sort({ eventStartDate: 1, createdAt: -1 })
         .skip(skip)
         .limit(lim)
-        .select('name type description eventStartDate eventEndDate location image status createdAt updatedAt organizerName')
+        .select('name type description eventStartDate eventEndDate location image status organizerName')
         .lean(),
       Event.countDocuments(filter)
     ]);
@@ -235,7 +235,7 @@ export const eventService = {
     
     // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventStartDate eventEndDate joinCode image type description location organizerName')
+      .select('name status eventStartDate eventEndDate image description location')
       .lean();
 
     // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
