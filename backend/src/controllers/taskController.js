@@ -10,6 +10,7 @@ import {
   notifyMajorTaskStatus,
 } from '../services/notificationService.js';
 import mongoose from 'mongoose';
+import eventMember from '../models/eventMember.js';
 // GET /api/tasks/:eventId?departmentId=...: (HoOC/HoD/Mem)
 //http://localhost:8080/api/tasks/68fd264703c943724fa8cbff?departmentId=6500000000000000000000a1
 export const listTasksByEventOrDepartment = async (req, res) => {
@@ -426,8 +427,10 @@ export const updateTaskProgress = async (req, res) => {
             return res.status(403).json({ message: 'Task giao cho ban không được chỉnh trực tiếp. Trạng thái/tiến độ tự tính theo task con.' });
         }
 
-        // 3) Quyền - CHỈ assignee mới được cập nhật trạng thái task
-        const isAssignee = String(task.assigneeId) === String(member._id); // assigneeId là EventMember._id
+        // 3) Quyền - người được assign (dù vai trò nào) mới được cập nhật trạng thái task
+        // Lấy tất cả membership của user trong event này
+        const memberships = await eventMember.find({ userId: req.user.id, eventId });
+        const isAssignee = memberships.some(m => String(m._id) === String(task.assigneeId));
         if (!isAssignee) {
             return res.status(403).json({ message: 'Chỉ người được assign task mới được cập nhật trạng thái.' });
         }
@@ -511,7 +514,8 @@ export const updateTaskProgress = async (req, res) => {
 
         return res.status(200).json({ message: "Update Task progress successfully", data: task });
     } catch (err) {
-        return res.status(500).json({ message: 'Cập nhật progress thất bại' });
+        console.error('ERR updateTaskProgress:', err);
+        return res.status(500).json({ message: 'Cập nhật progress thất bại', err });
     }
 };
 
@@ -1010,3 +1014,393 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
         });
     }
 };
+
+export const getBurnupChartData = async (req, res) => {
+    try {
+      const { eventId, milestoneId } = req.params;
+  
+      console.log(`🔥 Getting burnup data for Event: ${eventId}, Milestone: ${milestoneId}`);
+  
+      // ✅ 1. Get milestone info
+      const milestone = await Milestone.findById(milestoneId);
+      if (!milestone) {
+        return res.status(404).json({
+          success: false,
+          message: 'Milestone not found'
+        });
+      }
+  
+      console.log('📅 Milestone data:', {
+        name: milestone.name,
+        startDate: milestone.startDate,
+        targetDate: milestone.targetDate
+      });
+  
+      // ✅ 2. Validate dates với fallbacks
+      let startDate = milestone.startDate;
+      let endDate = milestone.targetDate;
+  
+      if (!startDate) {
+        startDate = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000); // 21 days ago
+        console.log('⚠️ Using fallback start date:', startDate);
+      }
+  
+      if (!endDate) {
+        endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+        console.log('⚠️ Using fallback end date:', endDate);
+      }
+  
+      // Convert to Date objects if they're strings
+      startDate = new Date(startDate);
+      endDate = new Date(endDate);
+  
+      console.log('📅 Using dates:', { startDate, endDate });
+  
+      // ✅ 3. Get major tasks (no assigneeId) trong milestone này
+      const majorTasks = await Task.find({
+        eventId: eventId,
+        milestoneId: milestoneId,
+        assigneeId: { $exists: false }, // ✅ Major tasks = không có assigneeId
+        // Alternative: assigneeId: null hoặc assigneeId: undefined
+      })
+      .populate('departmentId', 'name')
+      .sort({ createdAt: 1 });
+  
+      console.log(`📊 Found ${majorTasks.length} major tasks (no assigneeId)`);
+  
+      // ✅ 4. If no major tasks, try alternative query
+      if (majorTasks.length === 0) {
+        const alternativeTasks = await Task.find({
+          eventId: eventId,
+          milestoneId: milestoneId,
+          $or: [
+            { assigneeId: { $exists: false } },
+            { assigneeId: null },
+            { assigneeId: undefined }
+          ]
+        })
+        .populate('departmentId', 'name')
+        .sort({ createdAt: 1 });
+  
+        console.log(`📋 Alternative query found ${alternativeTasks.length} tasks`);
+        majorTasks.push(...alternativeTasks);
+      }
+  
+      // ✅ 5. Debug sample task if available
+      if (majorTasks.length > 0) {
+        console.log('🔍 Sample major task:', {
+          id: majorTasks[0]._id,
+          title: majorTasks[0].title,
+          status: majorTasks[0].status,
+          hasAssigneeId: !!majorTasks[0].assigneeId,
+          departmentId: majorTasks[0].departmentId,
+          createdAt: majorTasks[0].createdAt
+        });
+      }
+  
+      // ✅ 6. Generate timeline với safe date handling
+      const dateRange = generateDateRange(startDate, endDate, 2);
+      console.log(`📅 Generated ${dateRange.length} date points`);
+  
+      // ✅ 7. Calculate burnup data
+      const burnupData = [];
+      const today = new Date();
+  
+      for (const targetDate of dateRange) {
+        // Tasks created before this date (scope)
+        const tasksInScopeByDate = majorTasks.filter(task => 
+          new Date(task.createdAt) <= targetDate
+        );
+  
+        // Tasks completed by this date
+        const completedTasksByDate = majorTasks.filter(task => {
+          const isCompleted = task.status === 'done';
+          const wasCreatedByDate = new Date(task.createdAt) <= targetDate;
+          
+          // For completed tasks, check if completed by target date
+          // Since we don't have completedAt, use updatedAt as proxy
+          const wasCompletedByDate = isCompleted && new Date(task.updatedAt) <= targetDate;
+          
+          return wasCreatedByDate && wasCompletedByDate;
+        });
+  
+        // Calculate ideal progress
+        const totalDays = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000));
+        const daysPassed = Math.ceil((targetDate - startDate) / (24 * 60 * 60 * 1000));
+        const idealProgress = Math.min(Math.max(daysPassed / totalDays, 0), 1);
+        const idealTasksCompleted = Math.floor(tasksInScopeByDate.length * idealProgress);
+  
+        burnupData.push({
+          date: targetDate.toISOString().split('T')[0],
+          displayDate: targetDate.toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit'
+          }),
+          totalMajorTasks: tasksInScopeByDate.length,
+          completedMajorTasks: completedTasksByDate.length,
+          idealMajorTasks: idealTasksCompleted,
+          completionRate: tasksInScopeByDate.length > 0 
+            ? Math.round((completedTasksByDate.length / tasksInScopeByDate.length) * 100)
+            : 0
+        });
+      }
+  
+      // ✅ 8. Current summary stats
+      const currentStats = {
+        totalMajorTasks: majorTasks.length,
+        completedMajorTasks: majorTasks.filter(t => t.status === 'done').length,
+        inProgressMajorTasks: majorTasks.filter(t => t.status === 'in_progress').length,
+        todoMajorTasks: majorTasks.filter(t => t.status === 'todo').length,
+        blockedMajorTasks: majorTasks.filter(t => t.status === 'blocked').length,
+        overallProgress: majorTasks.length > 0 
+          ? Math.round((majorTasks.filter(t => t.status === 'done').length / majorTasks.length) * 100)
+          : 0
+      };
+  
+      // ✅ 9. Department stats for major tasks
+      const departmentStats = await getDepartmentMajorTaskStats(eventId, milestoneId, majorTasks);
+  
+      console.log(`✅ Generated burnup data: ${burnupData.length} points, ${currentStats.totalMajorTasks} major tasks`);
+  
+      res.json({
+        success: true,
+        data: {
+          milestone: {
+            id: milestone._id,
+            name: milestone.name,
+            startDate: milestone.startDate,
+            targetDate: milestone.targetDate,
+            remainingDays: Math.ceil((endDate - today) / (24 * 60 * 60 * 1000))
+          },
+          burnupData: burnupData,
+          currentStats: currentStats,
+          departmentStats: departmentStats,
+          debug: {
+            totalTasksFound: majorTasks.length,
+            dateRangePoints: dateRange.length,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString()
+          }
+        }
+      });
+  
+    } catch (error) {
+      console.error('💥 Error getting burnup data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  };
+  
+  /**
+   * Helper function: Generate date range với safe date handling
+   */
+  const generateDateRange = (startDate, endDate, intervalDays = 2) => {
+    try {
+      // ✅ Convert to Date objects nếu chưa phải
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // ✅ Validate dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.error('❌ Invalid dates provided to generateDateRange:', { startDate, endDate });
+        
+        // Return fallback date range (21 days ago to 7 days future)
+        const fallbackStart = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+        const fallbackEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        
+        console.log('🔄 Using fallback dates:', { 
+          fallbackStart: fallbackStart.toISOString(),
+          fallbackEnd: fallbackEnd.toISOString()
+        });
+        
+        return generateDateRange(fallbackStart, fallbackEnd, intervalDays);
+      }
+  
+      // ✅ Ensure start is before end
+      if (start > end) {
+        console.warn('⚠️ Start date after end date, swapping them');
+        return generateDateRange(end, start, intervalDays);
+      }
+  
+      const dates = [];
+      const current = new Date(start);
+      
+      // ✅ Generate points với limit để prevent infinite loop
+      let iterations = 0;
+      const maxIterations = 50; // Prevent infinite loops
+      
+      while (current <= end && iterations < maxIterations) {
+        dates.push(new Date(current));
+        current.setDate(current.getDate() + intervalDays);
+        iterations++;
+      }
+      
+      // ✅ Always include end date if not already included
+      if (dates.length > 0 && dates[dates.length - 1].getTime() !== end.getTime()) {
+        dates.push(new Date(end));
+      }
+  
+      // ✅ Ensure we have at least 2 points
+      if (dates.length < 2) {
+        dates.push(new Date(end));
+      }
+      
+      console.log(`📅 Generated ${dates.length} date points from ${start.toDateString()} to ${end.toDateString()}`);
+      
+      return dates;
+    } catch (error) {
+      console.error('💥 Error in generateDateRange:', error);
+      
+      // Return minimal fallback
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      return [weekAgo, now];
+    }
+  };
+  
+  /**
+   * Helper function: Get department stats for major tasks với đúng schema
+   */
+  const getDepartmentMajorTaskStats = async (eventId, milestoneId, majorTasks) => {
+    try {
+      // ✅ Group major tasks by departmentId
+      const tasksByDept = {};
+      
+      majorTasks.forEach(task => {
+        const deptId = task.departmentId?._id?.toString() || task.departmentId?.toString() || 'unassigned';
+        const deptName = task.departmentId?.name || 'Chưa phân ban';
+        
+        if (!tasksByDept[deptId]) {
+          tasksByDept[deptId] = {
+            departmentId: deptId,
+            departmentName: deptName,
+            tasks: []
+          };
+        }
+        
+        tasksByDept[deptId].tasks.push(task);
+      });
+  
+      // ✅ Calculate stats với đúng status values
+      const departmentStats = Object.values(tasksByDept).map(dept => {
+        const totalTasks = dept.tasks.length;
+        const completedTasks = dept.tasks.filter(t => t.status === 'done').length;
+        const inProgressTasks = dept.tasks.filter(t => t.status === 'in_progress').length;
+        const todoTasks = dept.tasks.filter(t => t.status === 'todo').length;
+        const blockedTasks = dept.tasks.filter(t => t.status === 'blocked').length;
+        
+        return {
+          departmentId: dept.departmentId,
+          departmentName: dept.departmentName,
+          majorTasksTotal: totalTasks,
+          majorTasksCompleted: completedTasks,
+          majorTasksInProgress: inProgressTasks,
+          majorTasksTodo: todoTasks,
+          majorTasksBlocked: blockedTasks,
+          majorTasksProgress: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+          tasks: dept.tasks.map(task => ({
+            id: task._id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            progressPct: task.progressPct,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            startDate: task.startDate,
+            dueDate: task.dueDate,
+            estimate: task.estimate,
+            estimateUnit: task.estimateUnit
+          }))
+        };
+      });
+  
+      return departmentStats;
+  
+    } catch (error) {
+      console.error('💥 Error getting department stats:', error);
+      return [];
+    }
+  };
+  
+  /**
+   * @desc Get detailed task list for department burnup
+   * @route GET /api/tasks/department-burnup/:eventId/:milestoneId/:departmentId  
+   * @access Private
+   */
+  export const getDepartmentBurnupTasks = async (req, res) => {
+    try {
+      const { eventId, milestoneId, departmentId } = req.params;
+  
+      console.log(`📋 Getting department burnup for:`, { eventId, milestoneId, departmentId });
+  
+      // ✅ Get major tasks (no assigneeId) for specific department
+      const majorTasks = await Task.find({
+        eventId: eventId,
+        milestoneId: milestoneId,
+        departmentId: departmentId, // ✅ Use departmentId instead of assignedDepartment
+        assigneeId: { $exists: false }, // ✅ Major tasks = no assigneeId
+      })
+      .populate('departmentId', 'name')
+      .sort({ createdAt: 1 });
+  
+      console.log(`📊 Found ${majorTasks.length} major tasks for department ${departmentId}`);
+  
+      // ✅ Group by status với correct enum values
+      const tasksByStatus = {
+        done: majorTasks.filter(t => t.status === 'done'),
+        in_progress: majorTasks.filter(t => t.status === 'in_progress'),
+        todo: majorTasks.filter(t => t.status === 'todo'),
+        blocked: majorTasks.filter(t => t.status === 'blocked'),
+        suggested: majorTasks.filter(t => t.status === 'suggested'),
+        cancelled: majorTasks.filter(t => t.status === 'cancelled')
+      };
+  
+      // ✅ Calculate progress stats
+      const stats = {
+        total: majorTasks.length,
+        completed: tasksByStatus.done.length,
+        inProgress: tasksByStatus.in_progress.length,
+        todo: tasksByStatus.todo.length,
+        blocked: tasksByStatus.blocked.length,
+        completionRate: majorTasks.length > 0 
+          ? Math.round((tasksByStatus.done.length / majorTasks.length) * 100)
+          : 0
+      };
+  
+      res.json({
+        success: true,
+        data: {
+          departmentId,
+          departmentName: majorTasks[0]?.departmentId?.name || 'Unknown Department',
+          stats,
+          tasksByStatus,
+          allTasks: majorTasks.map(task => ({
+            id: task._id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            progressPct: task.progressPct,
+            estimate: task.estimate,
+            estimateUnit: task.estimateUnit,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+            startDate: task.startDate,
+            dueDate: task.dueDate
+          }))
+        }
+      });
+  
+    } catch (error) {
+      console.error('💥 Error getting department burnup tasks:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  };

@@ -20,6 +20,7 @@ export default function HoOCSidebar({
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
+  const [exportsOpen, setExportsOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
@@ -133,6 +134,10 @@ export default function HoOCSidebar({
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
+  ];
+  const exportSubItems = [
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/` },
   ];
 
   // Hover handlers giữ nguyên
@@ -464,7 +469,7 @@ export default function HoOCSidebar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-camera me-3" style={{ width: 20 }} />
+                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
@@ -560,6 +565,61 @@ export default function HoOCSidebar({
                     </div>
                   )}
                 </div>
+                {/* Xuất */}
+                <div
+                  className="menu-item-hover"
+                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("export", e)}
+                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
+                >
+                  <button
+                    className={`btn-nav${activePage.startsWith("export") ? " active" : ""}`}
+                    onClick={() => sidebarOpen && setExportsOpen((prev) => !prev)}
+                    style={{ cursor: "pointer", background: hoveredMenu === "export" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    title="Tải xuống"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-database-down me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Tải xuống</span>}
+                    </div>
+                    {sidebarOpen && (
+                      <i className={`bi ${exportsOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    )}
+                  </button>
+
+                  {!sidebarOpen && hoveredMenu === "export" && (
+                    <div
+                      className="hover-submenu"
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      onMouseEnter={handlePopupMouseEnter}
+                      onMouseLeave={handlePopupMouseLeave}
+                    >
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {exportsOpen && sidebarOpen && (
+                    <div className="ms-2">
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
               </>
             )}
           </div>

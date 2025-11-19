@@ -11,6 +11,8 @@ import {
   getTaskByDepartment,
   getEventTaskProgressChart,
   getTaskStatisticsByMilestone,
+  getBurnupChartData,
+  getDepartmentBurnupTasks,
 } from '../controllers/taskController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -18,6 +20,10 @@ const router = express.Router({ mergeParams: true });
 
 // Thống kê task theo milestone
 router.get('/:eventId/statistics/:milestoneId', authenticateToken, getTaskStatisticsByMilestone);
+
+router.get('/:eventId/burnup-data/:milestoneId', authenticateToken, getBurnupChartData);
+
+router.get('/:eventId/department-burnup/:milestoneId/:departmentId', authenticateToken, getDepartmentBurnupTasks);
 
 router.get('/:eventId/', authenticateToken, listTasksByEventOrDepartment);
 // Lấy chi tiết 1 task

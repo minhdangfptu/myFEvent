@@ -290,6 +290,7 @@ export default function HoOCTaskStatisticModal({ show, dept, onClose }) {
           <button
             className="hooc-task-statistic-page__modal-close-footer-btn"
             onClick={onClose}
+            style={{background: '#e74c3c', marginLeft: 12}}
           >
             Đóng
           </button>
