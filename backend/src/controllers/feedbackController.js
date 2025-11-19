@@ -114,3 +114,12 @@ export const submitResponse = (req, res) =>
     const result = await feedbackService.submitResponse({ userId, eventId, formId, body: req.body });
     return { status: 201, ...result };
   });
+
+// GET /api/feedback/event/:eventId/forms/:formId/export
+export const exportFormResponses = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId, formId } = req.params;
+    const result = await feedbackService.exportFormResponses({ userId, eventId, formId });
+    return { status: 200, ...result };
+  });

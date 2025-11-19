@@ -11,7 +11,8 @@ import {
   reopenForm,
   getAvailableFormsForMember,
   submitResponse,
-  getFormSummary
+  getFormSummary,
+  exportFormResponses
 } from '../controllers/feedbackController.js';
 
 const router = express.Router();
@@ -33,6 +34,7 @@ router.post('/event/:eventId/forms/:formId/reopen', reopenForm);
 router.get('/event/:eventId/available-forms', getAvailableFormsForMember);
 router.post('/event/:eventId/forms/:formId/submit', submitResponse);
 router.get('/event/:eventId/forms/:formId/summary', getFormSummary);
+router.get('/event/:eventId/forms/:formId/export', exportFormResponses);
 
 export default router;
 

@@ -69,6 +69,12 @@ export const feedbackApi = {
       responses
     });
     return response.data;
+  },
+
+  // HoOC - Export form responses
+  exportFormResponses: async (eventId, formId) => {
+    const response = await axiosClient.get(`/api/feedback/event/${eventId}/forms/${formId}/export`);
+    return response.data;
   }
 };
 

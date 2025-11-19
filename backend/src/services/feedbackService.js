@@ -672,6 +672,57 @@ export const feedbackService = {
     await FeedbackResponse.deleteMany({ formId });
 
     return { message: 'Đã xoá biểu mẫu' };
+  },
+
+  // Export form responses to Excel format (HoOC only)
+  async exportFormResponses({ userId, eventId, formId }) {
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền xuất dữ liệu');
+      err.status = 403;
+      throw err;
+    }
+
+    const form = await FeedbackForm.findOne({ _id: formId, eventId }).lean();
+    if (!form) {
+      const err = new Error('Không tìm thấy biểu mẫu');
+      err.status = 404;
+      throw err;
+    }
+
+    const responses = await FeedbackResponse.find({ formId })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: 1 })
+      .lean();
+
+    // Transform responses into flat structure for Excel
+    const exportData = [];
+    responses.forEach((response) => {
+      const user = response.userId || {};
+      response.responses.forEach((resp) => {
+        let answerText = '';
+        if (resp.questionType === 'rating') {
+          answerText = `${resp.answer} sao`;
+        } else if (resp.questionType === 'multiple-choice') {
+          answerText = Array.isArray(resp.answer) ? resp.answer.join(', ') : String(resp.answer);
+        } else if (resp.questionType === 'yes-no') {
+          answerText = resp.answer ? 'Có' : 'Không';
+        } else {
+          answerText = String(resp.answer || '');
+        }
+
+        exportData.push({
+          submittedAt: response.submittedAt,
+          userFullName: user.fullName || 'N/A',
+          userEmail: user.email || 'N/A',
+          questionText: resp.questionText || '',
+          questionType: resp.questionType || '',
+          answer: answerText
+        });
+      });
+    });
+
+    return { data: exportData, formName: form.name };
   }
 };
 
