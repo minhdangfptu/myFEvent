@@ -7,7 +7,7 @@ export const ensureEventExists = async (eventId) => {
 };
 
 export const getMembersByEventRaw = async (eventId) => {
-  return await EventMember.find({ eventId })
+  return await EventMember.find({ eventId, status: { $ne: 'deactive' } })
     .populate([
       { path: 'userId', select: 'fullName email avatarUrl' },
       { path: 'departmentId', select: 'name' }
@@ -44,14 +44,15 @@ export const getUnassignedMembersRaw = async (eventId) => {
   return await EventMember.find({ 
     eventId, 
     departmentId: null, 
-    role: { $ne: 'HoOC' } // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
+    role: { $ne: 'HoOC' }, // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
+    status: { $ne: 'deactive' }
   })
     .populate('userId', 'fullName email avatarUrl')
     .lean();
 };
 
 export const getMembersByDepartmentRaw = async (departmentId) => {
-  const members = await EventMember.find({ departmentId })
+  const members = await EventMember.find({ departmentId, status: { $ne: 'deactive' } })
     .populate('userId', 'fullName email avatarUrl')
     .lean();
   return members.map(member => ({
@@ -68,18 +69,18 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
 };
 
 export const findEventMemberById = async (memberId) => {
-  return await EventMember.findOne({ _id: memberId }).lean();
+  return await EventMember.findOne({ _id: memberId, status: { $ne: 'deactive' } }).lean();
 };
 
 export const getRequesterMembership = async (eventId, userId) => {
   if (!userId) return null;
-  return await EventMember.findOne({ eventId, userId }).lean();
+  return await EventMember.findOne({ eventId, userId, status: { $ne: 'deactive' } }).lean();
 };
 export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
-  return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' } });
+  return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' }, status: { $ne: 'deactive' } });
 };
 export const getEventMemberProfileById = async (memberId) => {
-  return await EventMember.findOne({ _id: memberId })
+  return await EventMember.findOne({ _id: memberId, status: { $ne: 'deactive' } })
     .populate('userId', 'fullName email avatarUrl phone status bio highlight tags verified')
     .populate('departmentId', 'name')
     .lean();

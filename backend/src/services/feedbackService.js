@@ -268,7 +268,7 @@ export const feedbackService = {
   // Get available forms for member to submit (Member only, after event ends)
   async getAvailableFormsForMember({ userId, eventId }) {
     // Check if user is a member of the event
-    const member = await EventMember.findOne({ userId, eventId }).lean();
+    const member = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } }).lean();
     if (!member) {
       const err = new Error('Bạn không phải thành viên của sự kiện này');
       err.status = 403;
@@ -322,7 +322,7 @@ export const feedbackService = {
   // Submit feedback response (Member only)
   async submitResponse({ userId, eventId, formId, body }) {
     // Check if user is a member
-    const member = await EventMember.findOne({ userId, eventId }).lean();
+    const member = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } }).lean();
     if (!member) {
       const err = new Error('Bạn không phải thành viên của sự kiện này');
       err.status = 403;
@@ -469,7 +469,8 @@ export const feedbackService = {
     const totalResponses = responses.length;
     const totalInvited = await EventMember.countDocuments({
       eventId,
-      role: { $in: form.targetAudience.includes('All') ? ['Member', 'HoD', 'HoOC'] : form.targetAudience }
+      role: { $in: form.targetAudience.includes('All') ? ['Member', 'HoD', 'HoOC'] : form.targetAudience },
+      status: { $ne: 'deactive' }
     });
 
     const completionRate = totalInvited > 0 ? ((totalResponses / totalInvited) * 100).toFixed(1) : 0;

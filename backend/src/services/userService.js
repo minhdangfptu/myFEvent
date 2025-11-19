@@ -47,7 +47,7 @@ export const getUserProfileWithEvents = async (userId) => {
     throw new Error('User not found');
   }
 
-  const memberships = await EventMember.find({ userId })
+  const memberships = await EventMember.find({ userId, status: { $ne: 'deactive' } })
     .populate({
       path: 'eventId',
       select: 'name eventStartDate eventEndDate organizerName status banInfo createdAt '

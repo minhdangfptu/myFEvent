@@ -55,6 +55,8 @@ export default function EventTaskDetailPage() {
     dependencies: [], // [{ id, title }]
   });
   const [tasksAll, setTasksAll] = useState([]);
+  const [claimingTask, setClaimingTask] = useState(false);
+  const [releasingSelf, setReleasingSelf] = useState(false);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
@@ -495,6 +497,40 @@ export default function EventTaskDetailPage() {
     }
   };
 
+  const handleSelfAssign = async () => {
+    if (!currentMembershipId) {
+      toast.error("Không tìm thấy thông tin thành viên của bạn trong ban này");
+      return;
+    }
+    try {
+      setClaimingTask(true);
+      await taskApi.assignTask(eventId, taskId, currentMembershipId);
+      toast.success("Đã nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Không thể nhận công việc"
+      );
+    } finally {
+      setClaimingTask(false);
+    }
+  };
+
+  const handleSelfUnassign = async () => {
+    try {
+      setReleasingSelf(true);
+      await taskApi.unassignTask(eventId, taskId);
+      toast.success("Đã bỏ nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Không thể bỏ nhận công việc"
+      );
+    } finally {
+      setReleasingSelf(false);
+    }
+  };
+
   const assigneeName = useMemo(() => {
     const a = assignees.find(
       (x) =>
@@ -536,6 +572,39 @@ export default function EventTaskDetailPage() {
     }
     return [];
   }, [assignees, form.assigneeId, assigneeFallbackName]);
+
+  const currentUserId = user?._id || user?.id || user?.userId;
+
+  const currentMembership = useMemo(() => {
+    if (!currentUserId || !Array.isArray(assignees)) return null;
+    return assignees.find((member) => {
+      const memberUserId =
+        member?.userId?._id ||
+        member?.userId ||
+        member?.id ||
+        member?._id;
+      return (
+        memberUserId && String(memberUserId) === String(currentUserId)
+      );
+    });
+  }, [assignees, currentUserId]);
+
+  const currentMembershipId =
+    currentMembership?._id || currentMembership?.id || currentMembership?.userId;
+  const currentMembershipDeptId =
+    currentMembership?.departmentId?._id ||
+    currentMembership?.departmentId ||
+    form.departmentId;
+  const isSelfAssigned =
+    currentMembershipId &&
+    form.assigneeId &&
+    String(form.assigneeId) === String(currentMembershipId);
+  const canHoDClaim =
+    eventRole === "HoD" &&
+    !!currentMembershipId &&
+    (!!form.departmentId
+      ? String(form.departmentId) === String(currentMembershipDeptId || form.departmentId)
+      : true);
 
   // Kiểm tra xem có thể edit không (chỉ khi status = "todo"/"Chưa bắt đầu")
   const canEdit =
@@ -790,6 +859,33 @@ export default function EventTaskDetailPage() {
             >
               🗑
             </button>
+          </div>
+        )}
+        {canHoDClaim && (
+          <div className="d-flex flex-wrap gap-2 mt-2">
+            {!isSelfAssigned && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={handleSelfAssign}
+                disabled={claimingTask}
+              >
+                {claimingTask ? "Đang nhận..." : "Tôi sẽ thực hiện công việc này"}
+              </button>
+            )}
+            {isSelfAssigned && (
+              <>
+                <span className="text-success small fw-semibold d-flex align-items-center">
+                  Bạn đang phụ trách công việc này
+                </span>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={handleSelfUnassign}
+                  disabled={releasingSelf}
+                >
+                  {releasingSelf ? "Đang bỏ nhận..." : "Nhường lại"}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

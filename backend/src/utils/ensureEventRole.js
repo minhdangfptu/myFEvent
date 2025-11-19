@@ -12,7 +12,8 @@ const ensureEventRole = async (userId, eventId, allowedRoles = ['HoOC', 'HoD', '
 		const membership = await EventMember.findOne({ 
 			userId, 
 			eventId, 
-			role: { $in: allowedRoles } 
+			role: { $in: allowedRoles },
+      status: { $ne: 'deactive' }
 		}).lean();
 		
 		return membership;

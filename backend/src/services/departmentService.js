@@ -69,15 +69,20 @@ export const assignHoDToDepartment = async (eventId, department, userId) => {
   department.leaderId = userId;
   await department.save();
 
+  const targetMembership = await EventMember.findOne({ eventId, userId, status: { $ne: 'deactive' } });
+  if (!targetMembership) {
+    throw new Error('Người dùng chưa tham gia sự kiện');
+  }
+
   await EventMember.findOneAndUpdate(
-    { eventId, userId },
+    { _id: targetMembership._id },
     { $set: { departmentId: department._id, role: 'HoD' } },
-    { upsert: true, new: true }
+    { new: true }
   );
 
   if (previousLeaderId && previousLeaderId !== userId) {
     await EventMember.findOneAndUpdate(
-      { eventId, userId: previousLeaderId },
+      { eventId, userId: previousLeaderId, status: { $ne: 'deactive' } },
       { $set: { departmentId: department._id, role: 'staff' } }
     );
   }
@@ -92,13 +97,13 @@ export const ensureUserExists = async (userId) => {
 };
 
 export const isUserMemberOfDepartment = async (eventId, departmentId, userId) => {
-  const m = await EventMember.findOne({ eventId, userId, departmentId }).lean();
+  const m = await EventMember.findOne({ eventId, userId, departmentId, status: { $ne: 'deactive' } }).lean();
   return !!m;
 };
 
 export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, roleToSet) => {
   return await EventMember.findOneAndUpdate(
-    { _id: memberId },
+    { _id: memberId, status: { $ne: 'deactive' } },
     { $set: { departmentId, ...(roleToSet ? { role: roleToSet } : {}) } },
     { new: true }
   ).populate('userId', 'fullName email avatarUrl');
@@ -119,14 +124,14 @@ export const removeMemberFromDepartmentDoc = async (eventId, departmentId, membe
   );
 
   return await EventMember.findOneAndUpdate(
-    { _id: memberId, departmentId },
+    { _id: memberId, departmentId, status: { $ne: 'deactive' } },
     { $set: { departmentId: null, role: 'Member' } },
     { new: true }
   );
 };
 
 export const findEventMemberById = async (memberId) => {
-  return await EventMember.findOne({ _id: memberId }).lean();
+  return await EventMember.findOne({ _id: memberId, status: { $ne: 'deactive' } }).lean();
 };
 
 

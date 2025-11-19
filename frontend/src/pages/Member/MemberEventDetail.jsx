@@ -13,6 +13,7 @@ export default function MemberEventDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const [event, setEvent] = useState(null);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [eventRole, setEventRole] = useState('');
@@ -52,9 +53,13 @@ export default function MemberEventDetail() {
       const response = await eventApi.getAllEventDetail(eventId);
       console.log('Event detail response:', response);
       
-      // API returns { event, members } but we just need event for now
       if (response.data && response.data.event) {
-        setEvent(response.data.event);
+        const memberList = response.data.members || [];
+        setEvent({
+          ...response.data.event,
+          memberCount: memberList.length || response.data.event.memberCount || 0,
+        });
+        setMembers(memberList);
       } else {
         setError('Không tìm thấy thông tin sự kiện');
       }
@@ -213,16 +218,40 @@ export default function MemberEventDetail() {
             <h5 className="fw-bold mb-3">Thông tin</h5>
             <div className="d-flex justify-content-between mb-2">
               <span>Số thành viên:</span>
-              <span className="fw-bold">{event.memberCount || 0}</span>
+              <span className="fw-bold">{event.memberCount || members.length || 0}</span>
             </div>
-            {/* <div className="d-flex justify-content-between mb-2">
-              <span>Ngân sách:</span>
-              <span className="fw-bold">{event.budget ? `${event.budget.toLocaleString()} VNĐ` : 'Chưa cập nhật'}</span>
-            </div>
-            <div className="d-flex justify-content-between mb-2">
-              <span>Chi tiêu:</span>
-              <span className="fw-bold">{event.expenses ? `${event.expenses.toLocaleString()} VNĐ` : '0 VNĐ'}</span>
-            </div> */}
+            {members.length > 0 && (
+              <div>
+                <div className="text-muted small mb-2">Thành viên tiêu biểu</div>
+                <div className="d-flex flex-wrap gap-2">
+                  {members.slice(0, 4).map((m) => (
+                    <div
+                      key={m._id || m.id}
+                      className="d-flex align-items-center gap-2 rounded border px-2 py-1"
+                    >
+                      <img
+                        src={m.userId?.avatarUrl || "/website-icon-fix@3x.png"}
+                        alt={m.userId?.fullName || "Member"}
+                        style={{ width: 32, height: 32, borderRadius: 999, objectFit: "cover" }}
+                      />
+                      <div>
+                        <div className="fw-semibold" style={{ fontSize: 13 }}>
+                          {m.userId?.fullName || "Thành viên"}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: 12 }}>
+                          {m.departmentId?.name || "Chưa phân ban"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {members.length > 4 && (
+                    <div className="text-muted small d-flex align-items-center">
+                      +{members.length - 4} thành viên khác
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="info-card">

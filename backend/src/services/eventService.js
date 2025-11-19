@@ -193,9 +193,19 @@ export const eventService = {
       throw err;
     }
 
-    const exists = await EventMember.findOne({ eventId: event._id, userId }).lean();
-    if (!exists) {
+    const existingMembership = await EventMember.findOne({ eventId: event._id, userId }).lean();
+    if (!existingMembership) {
       await EventMember.create({ eventId: event._id, userId, role: 'Member' });
+    } else if (existingMembership.status === 'deactive') {
+      await EventMember.updateOne(
+        { _id: existingMembership._id },
+        { $set: { status: 'active', departmentId: null, role: 'Member' } }
+      );
+    }
+    if (existingMembership && existingMembership.status === 'active') {
+      const err = new Error('Bạn đã tham gia sự kiện này');
+      err.status = 400;
+      throw err;
     }
     return { message: 'Joined event', data: { eventId: event._id } };
   },
@@ -211,7 +221,7 @@ export const eventService = {
 
     const [event, members] = await Promise.all([
       ensureAutoStatusForDoc(eventRaw),
-      EventMember.find({ eventId: eventRaw._id })
+      EventMember.find({ eventId: eventRaw._id, status: { $ne: 'deactive' } })
         .populate('userId', 'fullName email')
         .lean()
     ]);
@@ -222,7 +232,7 @@ export const eventService = {
   // GET /api/events/me/list
   async listMyEvents({ userId }) {
     // Tối ưu: Bỏ populate userId vì không cần thiết, chỉ cần role và eventId
-    const memberships = await EventMember.find({ userId })
+    const memberships = await EventMember.find({ userId, status: { $ne: 'deactive' } })
       .select('eventId role _id')
       .sort({ createdAt: -1 })
       .lean();
@@ -458,7 +468,7 @@ export const eventService = {
       return { data: { event } };
     }
 
-    const membership = await EventMember.findOne({ eventId: id, userId }).lean();
+    const membership = await EventMember.findOne({ eventId: id, userId, status: { $ne: 'deactive' } }).lean();
     if (!membership) {
       const err = new Error('Access denied. You are not a member of this event.');
       err.status = 403;
@@ -536,7 +546,8 @@ export const getEventByIdForAdmin = async (eventId) => {
   // Lấy các thành viên có role là HoD hoặc HoOC
   const leaders = await EventMember.find({
     eventId: eventId,
-    role: { $in: ['HoD', 'HoOC'] }
+    role: { $in: ['HoD', 'HoOC'] },
+    status: { $ne: 'deactive' }
   })
     .populate('userId', 'fullName email')
     .populate('departmentId', 'name')

@@ -263,6 +263,7 @@ export const applyWBS = async (req, res) => {
         eventId,
         departmentId: dept._id,
         role: 'HoD',
+        status: { $ne: 'deactive' },
       }).lean();
       if (hod) {
         hodMap.set(dept._id.toString(), hod._id);

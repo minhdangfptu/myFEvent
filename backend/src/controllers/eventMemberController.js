@@ -121,7 +121,7 @@ export const leaveEvent = async (req, res) => {
       return res.status(400).json({ message: 'Event ID is required' });
     }
 
-    const membership = await EventMember.findOne({ userId, eventId })
+    const membership = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } })
       .populate('userId', 'fullName email')
       .populate('departmentId', 'name')
       .lean();
@@ -134,12 +134,10 @@ export const leaveEvent = async (req, res) => {
       return res.status(400).json({ message: 'HoOC hoặc HoD không thể rời sự kiện bằng chức năng này' });
     }
 
-    // Lấy thông tin event để hiển thị tên trong thông báo
+    
     const event = await Event.findById(eventId).select('name').lean();
 
-    // ✅ Xử lý tasks: chỉ unassign các task chưa hoàn thành
-    // Giữ nguyên các task đã done, chỉ unassign các task todo/in_progress/blocked
-    await Task.updateMany(
+       await Task.updateMany(
       {
         eventId,
         assigneeId: membership._id,
@@ -150,7 +148,10 @@ export const leaveEvent = async (req, res) => {
       }
     );
 
-    await EventMember.deleteOne({ _id: membership._id });
+    await EventMember.updateOne(
+      { _id: membership._id },
+      { $set: { status: 'deactive' } }
+    );
 
     // Gửi thông báo cho HoOC và HoD trong ban của member (nếu có department)
     const departmentId = membership.departmentId?._id || membership.departmentId;
@@ -160,7 +161,8 @@ export const leaveEvent = async (req, res) => {
       const hod = await EventMember.findOne({
         eventId,
         departmentId,
-        role: 'HoD'
+        role: 'HoD',
+        status: { $ne: 'deactive' }
       }).populate('userId', '_id').lean();
 
       if (hod?.userId?._id) {
@@ -170,7 +172,8 @@ export const leaveEvent = async (req, res) => {
 
     const hoocMembers = await EventMember.find({
       eventId,
-      role: 'HoOC'
+      role: 'HoOC',
+      status: { $ne: 'deactive' }
     }).populate('userId', '_id').lean();
 
     hoocMembers.forEach(m => {

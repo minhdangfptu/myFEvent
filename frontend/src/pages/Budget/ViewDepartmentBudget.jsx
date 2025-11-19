@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
@@ -88,12 +88,29 @@ const ViewDepartmentBudget = () => {
   };
   
   // Check if current user is HoD (Head of Department)
-  const isHoD = React.useMemo(() => {
+  const isHoD = useMemo(() => {
     if (!user || !department) return false;
     const userId = user._id || user.id;
     const leaderId = department.leaderId?._id || department.leaderId || department.leader?._id || department.leader;
     return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
   }, [user, department]);
+
+  const currentMember = useMemo(() => {
+    if (!user || !Array.isArray(members) || members.length === 0) return null;
+    const userId = user._id || user.id;
+    if (!userId) return null;
+    return members.find((member) => {
+      const memberUserId =
+        member?.userId?._id ||
+        member?.userId ||
+        member?.id ||
+        member?._id;
+      return memberUserId && String(memberUserId) === String(userId);
+    });
+  }, [members, user]);
+
+  const currentMemberId =
+    currentMember?._id || currentMember?.id || currentMember?.userId;
 
   // Load column widths from localStorage when departmentId is available
   useEffect(() => {
@@ -1028,8 +1045,24 @@ const ViewDepartmentBudget = () => {
                       const estimatedTotal = parseFloat(item.total?.toString() || 0);
                       const actualAmount = parseFloat(item.actualAmount?.toString() || 0);
                       const isPaid = item.isPaid || false;
-                      // Nếu đã thanh toán, background màu xanh lá nhạt
                       const rowBgColor = isPaid ? "#D1FAE5" : "transparent";
+                      const itemIdToUse =
+                        item.itemId?.toString() ||
+                        item.itemId?._id?.toString() ||
+                        item.itemId ||
+                        item._id?.toString() ||
+                        item._id;
+                      const assignedMemberId =
+                        item.assignedTo?.toString() ||
+                        item.assignedToInfo?._id?.toString() ||
+                        item.assignedToInfo?.id?.toString() ||
+                        "";
+                      const isSelfBudgetAssignee =
+                        currentMemberId &&
+                        assignedMemberId &&
+                        String(assignedMemberId) === String(currentMemberId);
+                      const isAssigningThisItem =
+                        assigningItem === itemIdToUse;
                       
                       return (
                         <tr key={item.itemId || index} style={{ backgroundColor: rowBgColor }}>
@@ -1088,10 +1121,9 @@ const ViewDepartmentBudget = () => {
                                   ""
                                 }
                                 onChange={(e) => {
-                                  const itemIdToUse = item.itemId?.toString() || item.itemId?._id?.toString() || item.itemId || item._id?.toString() || item._id;
                                   handleAssignItem(itemIdToUse, e.target.value || null);
                                 }}
-                                disabled={assigningItem === (item.itemId?.toString() || item.itemId || item._id?.toString() || item._id)}
+                                disabled={isAssigningThisItem}
                                 style={{ minWidth: "150px" }}
                               >
                                 <option value="">Chưa phân công</option>
@@ -1101,6 +1133,32 @@ const ViewDepartmentBudget = () => {
                                   </option>
                                 ))}
                               </select>
+                              {currentMemberId && (
+                                <div className="d-flex flex-column gap-1 mt-2">
+                                  {isSelfBudgetAssignee ? (
+                                    <>
+                                      <span className="text-success small fw-semibold">
+                                        Bạn đang phụ trách mục này
+                                      </span>
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={() => handleAssignItem(itemIdToUse, null)}
+                                        disabled={isAssigningThisItem}
+                                      >
+                                        {isAssigningThisItem ? "Đang bỏ nhận..." : "Nhường lại"}
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      className="btn btn-sm btn-outline-primary"
+                                      onClick={() => handleAssignItem(itemIdToUse, currentMemberId)}
+                                      disabled={isAssigningThisItem}
+                                    >
+                                      {isAssigningThisItem ? "Đang nhận..." : "Tôi sẽ làm mục này"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                           )}
                           <td style={{ 

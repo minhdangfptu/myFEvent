@@ -1420,7 +1420,8 @@ export const assignItem = async (req, res) => {
           const member = await EventMember.findOne({
             _id: memberIdObj,
             eventId: new mongoose.Types.ObjectId(eventId),
-            departmentId: new mongoose.Types.ObjectId(departmentId)
+            departmentId: new mongoose.Types.ObjectId(departmentId),
+            status: { $ne: 'deactive' }
           });
 
           if (!member) {
@@ -1654,7 +1655,8 @@ export const undoSubmitExpense = async (req, res) => {
     const userMember = await EventMember.findOne({
       userId: new mongoose.Types.ObjectId(userId),
       eventId: new mongoose.Types.ObjectId(eventId),
-      departmentId: new mongoose.Types.ObjectId(departmentId)
+      departmentId: new mongoose.Types.ObjectId(departmentId),
+      status: { $ne: 'deactive' }
     });
 
     if (!userMember) {

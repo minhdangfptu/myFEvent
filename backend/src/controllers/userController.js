@@ -5,7 +5,7 @@ export const getUserRoleByEvent = async (req, res) => {
   try {
     const userId = req.user.id; // Lấy từ middleware xác thực
     const { eventId } = req.params;
-    const membership = await EventMember.findOne({ userId, eventId })
+    const membership = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } })
       .populate('userId', 'fullName')
       .populate('eventId', 'name')
       .populate('departmentId', 'name')

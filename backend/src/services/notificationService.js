@@ -121,7 +121,8 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       const hodMember = await EventMember.findOne({
         eventId,
         departmentId,
-        role: 'HoD'
+        role: 'HoD',
+        status: { $ne: 'deactive' }
       }).populate('userId');
 
       if (hodMember && hodMember.userId) {
@@ -146,6 +147,7 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       const hoocMembers = await EventMember.find({
         eventId,
         role: 'HoOC',
+        status: { $ne: 'deactive' },
       }).populate('userId');
 
       if (hoocMembers.length > 0) {
@@ -203,7 +205,8 @@ export const notifyTaskOverdue = async (eventId, taskId) => {
       const hodMember = await EventMember.findOne({
         eventId,
         departmentId,
-        role: 'HoD'
+        role: 'HoD',
+        status: { $ne: 'deactive' }
       }).populate('userId');
       
       if (hodMember && hodMember.userId) {
@@ -247,6 +250,7 @@ export const notifyMajorTaskStatus = async (eventId, taskId, isCompleted) => {
     const hoocMembers = await EventMember.find({
       eventId,
       role: 'HoOC',
+      status: { $ne: 'deactive' },
     }).populate('userId');
 
     if (hoocMembers.length === 0) return;
@@ -285,6 +289,7 @@ export const notifyAgendaCreated = async (eventId, agendaId, milestoneId) => {
     const members = await EventMember.find({
       eventId,
       role: { $in: ['HoD', 'Member'] },
+      status: { $ne: 'deactive' },
     }).populate('userId');
 
     if (members.length === 0) return;
@@ -332,6 +337,7 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
       eventId,
       departmentId,
       role: { $in: ['HoD', 'Member'] },
+      status: { $ne: 'deactive' },
       _id: { $ne: newMemberId },
     }).populate('userId');
 

@@ -165,7 +165,7 @@ export const createTask = async (req, res) => {
             // Department thuộc event
             Department.exists({ _id: departmentId, eventId }),
             // Assignee (EventMember) thuộc event
-            assigneeId ? EventMember.exists({ _id: assigneeId, eventId }) : Promise.resolve(true),
+            assigneeId ? EventMember.exists({ _id: assigneeId, eventId, status: { $ne: 'deactive' } }) : Promise.resolve(true),
             // Milestone thuộc event
             milestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
             // Parent task thuộc event
@@ -330,7 +330,7 @@ export const editTask = async (req, res) => {
             depFound
         ] = await Promise.all([
             update.departmentId ? Department.exists({ _id: update.departmentId, eventId }) : Promise.resolve(true),
-            update.assigneeId ? EventMember.exists({ _id: update.assigneeId, eventId }) : Promise.resolve(true),
+            update.assigneeId ? EventMember.exists({ _id: update.assigneeId, eventId, status: { $ne: 'deactive' } }) : Promise.resolve(true),
             update.milestoneId ? Milestone.exists({ _id: update.milestoneId, eventId }) : Promise.resolve(true),
             update.parentId ? Task.exists({ _id: update.parentId, eventId }) : Promise.resolve(true),
             deps.length ? Task.find({ _id: { $in: deps }, eventId }).select('_id').lean() : Promise.resolve([])
@@ -526,7 +526,7 @@ export const assignTask = async (req, res) => {
         const { assigneeId } = req.body;
         if (!assigneeId) return res.status(404).json({ message: 'Thiếu thông tin người assign' })
         // Kiểm tra EventMember thuộc đúng event
-        const assigneeExists = await EventMember.exists({ _id: assigneeId, eventId });
+        const assigneeExists = await EventMember.exists({ _id: assigneeId, eventId, status: { $ne: 'deactive' } });
         if (!assigneeExists) {
             return res.status(404).json({ message: 'Người được gán không tồn tại trong sự kiện này' });
         }
