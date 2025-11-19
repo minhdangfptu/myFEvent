@@ -528,18 +528,16 @@ export default function HoDSideBar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <>
-                {isEventCompleted && (
-                  <button
-                    className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                    onClick={() => navigate(`/events/${eventId || selectedEvent || ''}/feedback`)}
-                    title="Phản hồi sự kiện"
-                  >
-                    <div className="d-flex align-items-center">
-                      <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
-                      {sidebarOpen && <span>Feedback</span>}
-                    </div>
-                  </button>
-                )}
+                <button
+                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                  onClick={() => navigate(`/events/${eventId || selectedEvent || ''}/feedback/member`)}
+                  title="Phản hồi sự kiện"
+                >
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Feedback</span>}
+                  </div>
+                </button>
 
                 <div
                   className="menu-item-hover"

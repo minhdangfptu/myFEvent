@@ -5,7 +5,10 @@ import {
     getMembersByDepartment,
     getMemberDetail,
     getCoreTeamList,
-    leaveEvent
+    leaveEvent,
+    updateMemberRole,
+    changeMemberDepartment,
+    removeMemberFromEvent
 } from '../controllers/eventMemberController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
@@ -18,6 +21,9 @@ router.get('/coreteam', authenticateToken, getCoreTeamList);
 router.get('/department/:departmentId', authenticateToken, getMembersByDepartment);
 router.get('/:memberId', authenticateToken, getMemberDetail); 
 router.delete('/me', authenticateToken, leaveEvent);
+router.patch('/:memberId/role', authenticateToken, updateMemberRole);
+router.patch('/:memberId/department', authenticateToken, changeMemberDepartment);
+router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
 
 export default router;
 

@@ -27,6 +27,12 @@ export const feedbackApi = {
     return response.data;
   },
 
+  // HoOC - Delete form
+  deleteForm: async (eventId, formId) => {
+    const response = await axiosClient.delete(`/api/feedback/event/${eventId}/forms/${formId}`);
+    return response.data;
+  },
+
   // HoOC - Publish form
   publishForm: async (eventId, formId) => {
     const response = await axiosClient.post(`/api/feedback/event/${eventId}/forms/${formId}/publish`);

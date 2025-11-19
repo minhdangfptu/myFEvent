@@ -72,6 +72,8 @@ import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
 import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
 import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+import MemberFeedbackListPage from "./pages/Feedback/MemberFeedbackListPage";
+import SubmitFeedbackResponsePage from "./pages/Feedback/SubmitFeedbackResponsePage";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
@@ -482,6 +484,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <FeedbackSummary />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
               </ProtectedRoute>
             } 
           />

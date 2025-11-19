@@ -453,10 +453,10 @@ export default function MemberSidebar({
               </div>
             </button>
 
-            {hasEvents && isEventCompleted && (
+            {hasEvents && (
               <button
                 className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                onClick={() => navigate(`/events/${eventId || ''}/feedback/member`)}
                 title="Phản hồi sự kiện"
               >
                 <div className="d-flex align-items-center">
