@@ -4,6 +4,7 @@ const EventMemberSchema = new Schema({
     userId: { type: Types.ObjectId, ref: 'User', required: true, index: true },
     departmentId: { type: Types.ObjectId, ref: 'Department' },
     role: {type: String, enum: ['HoOC', 'HoD', 'Member'], default: 'Member' },
+    status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
 }, { timestamps: true, versionKey: false });
 
 // Compound index để tối ưu query tìm membership

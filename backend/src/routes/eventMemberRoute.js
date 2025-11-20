@@ -4,7 +4,8 @@ import {
     getUnassignedMembersByEvent,
     getMembersByDepartment,
     getMemberDetail,
-    getCoreTeamList
+    getCoreTeamList,
+    removeMemberFromEvent
 } from '../controllers/eventMemberController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
@@ -16,6 +17,7 @@ router.get('/unassigned', authenticateToken, getUnassignedMembersByEvent);
 router.get('/coreteam', authenticateToken, getCoreTeamList);
 router.get('/department/:departmentId', authenticateToken, getMembersByDepartment);
 router.get('/:memberId', authenticateToken, getMemberDetail); 
+router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
 
 export default router;
 

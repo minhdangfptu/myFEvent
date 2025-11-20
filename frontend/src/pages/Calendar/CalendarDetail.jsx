@@ -199,7 +199,7 @@ export default function CalendarDetail() {
             if (response) {
                 const updatedResponse = await calendarService.getCalendarEventDetail(eventId, calendarId);
                 setCalendar(updatedResponse.data);
-                toast.success('Cập nhật trạng thái tham gia thành công');
+                toast.success('Cập nhật trạng thái tham gia thành công');
             }
         } catch (error) {
             console.error('Error updating participation status:', error);
@@ -268,20 +268,33 @@ export default function CalendarDetail() {
                     <div style={{ padding: '24px' }}>
                         {/* Meeting Title */}
                         <div style={{ marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                 <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 600, color: '#1f2937' }}>{calendar.name}</h1>
-                                {currentUserStatus === 'confirmed' ? (
-                                    <span style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ✓ Đã xác nhận tham gia
+                                
+                                {/* Badge hiển thị cuộc họp đã qua */}
+                                {isPastMeeting && (
+                                    <span style={{ backgroundColor: '#e5e7eb', color: '#4b5563', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                        🕐 Cuộc họp đã kết thúc
                                     </span>
-                                ) : currentUserStatus === 'absent' ? (
-                                    <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ✖ Đã từ chối
-                                    </span>
-                                ) : (
-                                    <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ⏳ Chưa phản hồi
-                                    </span>
+                                )}
+                                
+                                {/* Badge trạng thái tham gia của user */}
+                                {!isPastMeeting && (
+                                    <>
+                                        {currentUserStatus === 'confirmed' ? (
+                                            <span style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ✓ Đã xác nhận tham gia
+                                            </span>
+                                        ) : currentUserStatus === 'absent' ? (
+                                            <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ✖ Đã từ chối
+                                            </span>
+                                        ) : (
+                                            <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ⏳ Chưa phản hồi
+                                            </span>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
