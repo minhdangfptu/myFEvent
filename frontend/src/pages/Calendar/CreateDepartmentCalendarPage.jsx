@@ -223,7 +223,7 @@ export default function CreateDepartmentCalendarPage() {
 	};
 
 	return (
-		<UserLayout sidebarType={eventRole} activePage="work-timeline">
+		<UserLayout sidebarType={eventRole} activePage="calendar">
 			<div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", padding: "24px" }}>
 				<div style={{ maxWidth: "1200px", margin: "0 auto", backgroundColor: "white", borderRadius: "12px", padding: "32px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
 					<h1 style={{ margin: "0 0 32px 0", fontSize: "24px", fontWeight: "600", color: "#ef4444" }}>
@@ -383,6 +383,7 @@ export default function CreateDepartmentCalendarPage() {
 		</UserLayout>
 	);
 }
+
 
 
 

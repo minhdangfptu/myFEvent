@@ -419,7 +419,8 @@ export const createCalendarForDepartment = async (req, res) => {
 }
 export const updateCalendarForEvent = async (req, res) => {
     try {
-        const { calendarId, updateData } = req.body;
+        const { calendarId } = req.params;
+        const {  updateData } = req.body;
 		let calendar = await getCalendarById(calendarId);
         if (!calendar) {
             return res.status(404).json({ message: 'Calendar not found' });
@@ -428,7 +429,7 @@ export const updateCalendarForEvent = async (req, res) => {
 		let ownerMemberid = null;
 		if (calendar.eventId) { // Calendar belongs to event
 			const requesterMembership = await getRequesterMembership(calendar.eventId?.toString(), req.user?.id);
-            isHoOC = requesterMembership?.role === 'HoOC';
+            const isHoOC = requesterMembership?.role === 'HoOC';
 			ownerMemberid = requesterMembership?._id;
             if (!isHoOC) {
                 return res.status(403).json({ message: 'Only HoOC can update calendar for event!' });

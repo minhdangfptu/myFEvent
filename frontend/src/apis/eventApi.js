@@ -101,6 +101,14 @@ export const eventApi = {
     const res = await axiosClient.delete(`/api/events/${eventId}/members/me`);
     return res.data;
   },
+  getCoreTeamList: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
+    return res.data;
+  },
+  removeMemberFromEvent: async (eventId, memberId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/${memberId}`);
+    return res.data;
+  },
   
 }
 

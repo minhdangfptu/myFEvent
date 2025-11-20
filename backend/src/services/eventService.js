@@ -492,10 +492,16 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
       { organizerName: { $regex: search, $options: 'i' } }
     ];
   }
+
   if (status && status !== "all") {
-    filter.status = status;     
+    if (status === "banned") {
+      filter["banInfo.isBanned"] = true;
+    } else {
+      filter.status = status;
+    }
   }
-  if(eventDate){
+
+  if (eventDate) {
     const date = new Date(eventDate);
     filter.eventStartDate = { $lte: date };
     filter.eventEndDate = { $gte: date };
@@ -504,10 +510,19 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
   const skip = (page - 1) * limit;
 
   const data = await Event.find(filter)
-    .select('name organizerName eventStartDate eventEndDate status banInfo')
+    .select("name organizerName type eventStartDate eventEndDate status banInfo")
+    .populate({
+      path: "members",
+      match: { role: "HoOC" },
+      populate: {
+        path: "userId",
+        select: "fullName email avatarUrl phone"
+      }
+    })
     .skip(skip)
     .limit(limit)
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   const total = await Event.countDocuments(filter);
 
@@ -518,13 +533,32 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
     data
   };
 };
-export const updateEventByAdmin = async (eventId, banInfo) => {
-  const updatedEvent = await Event.findByIdAndUpdate(
+export const updateEventByAdmin = async (eventId, data, action) => {
+  let updateFields = {};
+
+  if (action === "ban") {
+    updateFields = {
+      type: "private",
+      "banInfo.isBanned": true,
+      "banInfo.banReason": data.banReason,
+      "banInfo.bannedAt": new Date()
+    };
+  }
+
+  if (action === "unban") {
+    updateFields = {
+      type: "public",
+      "banInfo.isBanned": false,
+      "banInfo.banReason": null,
+      "banInfo.bannedAt": null
+    };
+  }
+
+  return await Event.findByIdAndUpdate(
     eventId,
-    { $set: { banInfo } },
+    { $set: updateFields },
     { new: true }
   );
-  return updatedEvent;
 };
 
 export const getEventById = async (eventId) => {
@@ -532,24 +566,21 @@ export const getEventById = async (eventId) => {
   return event;
 }
 
-// Lấy event detail cho admin, kèm thông tin HoD và HoOC
 export const getEventByIdForAdmin = async (eventId) => {
-  // Lấy thông tin event
   const event = await Event.findById(eventId).lean();
-  
+
   if (!event) {
     const err = new Error('Event not found');
     err.status = 404;
     throw err;
   }
 
-  // Lấy các thành viên có role là HoD hoặc HoOC
   const leaders = await EventMember.find({
     eventId: eventId,
     role: { $in: ['HoD', 'HoOC'] },
     status: { $ne: 'deactive' }
   })
-    .populate('userId', 'fullName email')
+    .populate('userId', 'fullName email avatarUrl phone')
     .populate('departmentId', 'name')
     .select('userId role departmentId')
     .lean();
@@ -558,12 +589,13 @@ export const getEventByIdForAdmin = async (eventId) => {
     userId: leader.userId?._id || null,
     fullName: leader.userId?.fullName || '',
     email: leader.userId?.email || '',
+    avatarUrl: leader.userId?.avatarUrl || '',
+    phone: leader.userId?.phone || '',
     role: leader.role,
     departmentId: leader.departmentId?._id || null,
     departmentName: leader.departmentId?.name || null
   }));
 
-  // Tách HoOC và HoD
   const hooc = leadersData.filter(l => l.role === 'HoOC');
   const hod = leadersData.filter(l => l.role === 'HoD');
 

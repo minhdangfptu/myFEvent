@@ -1,19 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Ban } from 'lucide-react';
+import adminService from "~/services/adminService";
+import { toast } from "react-toastify";
 
-export default function BanEventModal({ isOpen, onClose, eventData }) {
+export default function BanEventModal({ isOpen, onClose, eventData, onBanSuccess }) {
   const [reason, setReason] = useState("");
-
+  
+  useEffect(() => {
+    if (isOpen) {
+      setReason("");
+    }
+  }, [isOpen]);
+  
   if (!isOpen) return null;
-
-  const handleBan = () => {
+  
+  const handleBan = async () => {
     if (!reason.trim()) {
-      alert("Vui lòng nhập lý do cấm!");
+      toast.error("Vui lòng nhập lý do cấm!");
       return;
     }
-    // Xử lý logic cấm sự kiện
-    console.log("Ban event:", eventData, "Reason:", reason);
-    onClose();
-    setReason("");
+    try {
+      const response = await adminService.banEvent(eventData.eventId, reason);
+      if (onBanSuccess) {
+        onBanSuccess();
+      }
+      onClose(); // THÊM DÒNG NÀY
+    } catch (error) {
+      console.error("Error banning event:", error);
+      toast.error("Có lỗi xảy ra khi cấm sự kiện");
+    }
   };
 
   const handleClose = () => {
@@ -45,45 +60,34 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
           borderRadius: "12px",
           padding: "24px",
           width: "90%",
-          maxWidth: "480px",
+          maxWidth: "460px",
           zIndex: 9999,
           boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
         }}
+        onClick={(e) => e.stopPropagation()} // THÊM DÒNG NÀY
       >
         {/* Header with Icon */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
           <div
             style={{
               width: "40px",
               height: "40px",
               borderRadius: "50%",
-              background: "#fee2e2",
+              background: "#FEE2E2",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#dc2626"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-            </svg>
+            <Ban style={{ width: "20px", height: "20px", color: "#DC2626" }} />
           </div>
           <h2
             style={{
               margin: 0,
-              fontSize: "20px",
+              fontSize: "18px",
               fontWeight: "600",
-              color: "#1f2937",
+              color: "#212121",
             }}
           >
             Cấm sự kiện
@@ -95,7 +99,7 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
           style={{
             margin: "0 0 20px 0",
             fontSize: "14px",
-            color: "#6b7280",
+            color: "#757575",
             lineHeight: "1.5",
           }}
         >
@@ -103,13 +107,20 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
         </p>
 
         {/* Event Info Section */}
-        <div style={{ marginBottom: "20px" }}>
+        <div
+          style={{
+            marginBottom: "20px",
+            background: "#F9FAFB",
+            padding: "16px",
+            borderRadius: "8px",
+          }}
+        >
           <h3
             style={{
               margin: "0 0 12px 0",
               fontSize: "14px",
               fontWeight: "600",
-              color: "#1f2937",
+              color: "#212121",
             }}
           >
             Thông tin sự kiện
@@ -117,28 +128,28 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
+              <div style={{ fontSize: "13px", color: "#757575", marginBottom: "4px" }}>
                 Tên sự kiện
               </div>
-              <div style={{ fontSize: "14px", color: "#1f2937", fontWeight: "500" }}>
+              <div style={{ fontSize: "14px", color: "#212121", fontWeight: "500" }}>
                 {eventData?.name || "FPT Coding Week 2025"}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
-                Trường Ban tổ chức
+              <div style={{ fontSize: "13px", color: "#757575", marginBottom: "4px" }}>
+                Trưởng Ban tổ chức
               </div>
-              <div style={{ fontSize: "14px", color: "#1f2937", fontWeight: "500" }}>
-                {eventData?.organizer || "Nguyễn Văn An"}
+              <div style={{ fontSize: "14px", color: "#212121", fontWeight: "500" }}>
+                {eventData?.hooc || "Nguyễn Văn An"}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
+              <div style={{ fontSize: "13px", color: "#757575", marginBottom: "4px" }}>
                 Ngày diễn ra
               </div>
-              <div style={{ fontSize: "14px", color: "#1f2937", fontWeight: "500" }}>
+              <div style={{ fontSize: "14px", color: "#212121", fontWeight: "500" }}>
                 {eventData?.date || "15/03/2025 - 22/03/2025"}
               </div>
             </div>
@@ -152,55 +163,57 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
               display: "block",
               fontSize: "14px",
               fontWeight: "500",
-              color: "#1f2937",
+              color: "#212121",
               marginBottom: "8px",
             }}
           >
-            Lý do cấm <span style={{ color: "#dc2626" }}>(bắt buộc)</span>
+            Lý do cấm <span style={{ color: "#9CA3AF" }}>(bắt buộc)</span>
           </label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Ví dụ: Sự kiện vi phạm quy định đăng ký nội dung không phù hợp."
+            placeholder="Ví dụ: Sự kiện vi phạm quy định đăng nội dung không phù hợp."
             style={{
               width: "100%",
               minHeight: "100px",
               padding: "12px",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
+              border: "1px solid #E0E0E0",
+              borderRadius: "8px",
               fontSize: "14px",
-              color: "#1f2937",
+              color: "#212121",
               resize: "vertical",
               fontFamily: "inherit",
               outline: "none",
               transition: "border-color 0.2s",
+              boxSizing: "border-box",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#3b82f6";
+              e.target.style.borderColor = "#2196F3";
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = "#d1d5db";
+              e.target.style.borderColor = "#E0E0E0";
             }}
           />
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "12px" }}>
           <button
             onClick={handleClose}
             style={{
-              border: "1px solid #d1d5db",
+              flex: 1,
+              border: "1px solid #E0E0E0",
               background: "white",
-              color: "#374151",
-              padding: "10px 20px",
-              borderRadius: "6px",
+              color: "#424242",
+              padding: "12px 20px",
+              borderRadius: "8px",
               fontSize: "14px",
               fontWeight: "500",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = "#f9fafb";
+              e.target.style.background = "#F5F5F5";
             }}
             onMouseLeave={(e) => {
               e.target.style.background = "white";
@@ -211,21 +224,22 @@ export default function BanEventModal({ isOpen, onClose, eventData }) {
           <button
             onClick={handleBan}
             style={{
+              flex: 1,
               border: "none",
-              background: "#dc2626",
+              background: "#DC2626",
               color: "white",
-              padding: "10px 24px",
-              borderRadius: "6px",
+              padding: "12px 24px",
+              borderRadius: "8px",
               fontSize: "14px",
               fontWeight: "500",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = "#b91c1c";
+              e.target.style.background = "#B91C1C";
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = "#dc2626";
+              e.target.style.background = "#DC2626";
             }}
           >
             Xác nhận cấm

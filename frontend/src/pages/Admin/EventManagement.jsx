@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Calendar, Eye, Ban, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, Calendar, Eye, Ban, ChevronRight, ChevronLeft, Globe, Lock } from 'lucide-react';
 import UserLayout from '~/components/UserLayout';
 import adminService from '~/services/adminService';
 import { formatDate } from '~/utils/formatDate';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import BanEventModal from '~/components/BanEventModal';
+import UnbanEventModal from '~/components/UnBanEventModal';
 
 const EventManagement = () => {
   const [events, setEvents] = useState([]);
@@ -16,7 +20,10 @@ const EventManagement = () => {
   const [limit, setLimit] = useState(8);
   const start = (currentPage - 1) * limit + 1;
   const end = Math.min(currentPage * limit, totalEvents);
-
+  const navigate = useNavigate();
+  const [isBanModalOpen, setIsBanModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isUnBanModalOpen, setIsUnBanModalOpen] = useState(false);
   useEffect(() => {
     // setEvents(eventsMock);
     fetchEvents();
@@ -38,12 +45,14 @@ const EventManagement = () => {
   const getStatusStyle = (status) => {
     if (status === 'scheduled') {
       return {
-        backgroundColor: '#ffc107',
-        color: '#212529',
+        backgroundColor: '#ffe7a1ff',
+        color: '#9f7c10ff',
         padding: '6px 12px',
         borderRadius: '20px',
         fontSize: '14px',
-        fontWeight: '500'
+        fontWeight: '500',
+        whiteSpace: "nowrap",
+        display: "inline-block"
       };
     } else if (status === 'ongoing') {
       return {
@@ -52,7 +61,9 @@ const EventManagement = () => {
         padding: '6px 12px',
         borderRadius: '20px',
         fontSize: '14px',
-        fontWeight: '500'
+        fontWeight: '500',
+        whiteSpace: "nowrap",
+        display: "inline-block"
       };
     } else if (status === 'completed') {
       return {
@@ -61,7 +72,9 @@ const EventManagement = () => {
         padding: '6px 12px',
         borderRadius: '20px',
         fontSize: '14px',
-        fontWeight: '500'
+        fontWeight: '500',
+        whiteSpace: "nowrap",
+        display: "inline-block"
       };
     }
     else if (status === 'cancelled') {
@@ -71,7 +84,9 @@ const EventManagement = () => {
         padding: '6px 12px',
         borderRadius: '20px',
         fontSize: '14px',
-        fontWeight: '500'
+        fontWeight: '500',
+        whiteSpace: "nowrap",
+        display: "inline-block"
       };
     } else if (status === 'banned') {
       return {
@@ -80,9 +95,46 @@ const EventManagement = () => {
         padding: '6px 12px',
         borderRadius: '20px',
         fontSize: '14px',
-        fontWeight: '500'
+        fontWeight: '500',
+        whiteSpace: "nowrap",
+        display: "inline-block"
       };
     }
+  };
+
+  const getTypeStyle = (type) => {
+    const baseStyle = {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "6px",
+      padding: "6px 14px",
+      borderRadius: "16px",
+      fontSize: "13px",
+      fontWeight: "500",
+      border: "1px solid transparent"
+    };
+
+    if (type === "public") {
+      return {
+        ...baseStyle,
+        backgroundColor: "rgba(16, 185, 129, 0.15)",  // xanh ngọc nhạt
+        color: "#059669",
+        borderColor: "rgba(16, 185, 129, 0.3)",
+        icon: <Globe size={14} strokeWidth={2} />
+      };
+    }
+
+    if (type === "private") {
+      return {
+        ...baseStyle,
+        backgroundColor: "rgba(239, 68, 68, 0.15)", // đỏ nhạt
+        color: "#DC2626",
+        borderColor: "rgba(239, 68, 68, 0.3)",
+        icon: <Lock size={14} strokeWidth={2} />
+      };
+    }
+
+    return baseStyle;
   };
 
   const getInitials = (name) => {
@@ -94,6 +146,7 @@ const EventManagement = () => {
     const colors = ['#E3F2FD', '#F3E5F5', '#E8F5E9', '#FFF3E0'];
     return colors[index % colors.length];
   };
+
 
   return (
     <UserLayout activePage="events" sidebarType="admin" >
@@ -139,7 +192,7 @@ const EventManagement = () => {
             }} />
             <input
               type="text"
-              placeholder="Tìm kiếm sự kiện theo người tổ chức..."
+              placeholder="Tìm kiếm sự kiện theo tên hoặc đơn vị tổ chức..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               style={{
@@ -265,7 +318,17 @@ const EventManagement = () => {
                   color: '#616161',
                   width: '25%'
                 }}>
-                  Người tổ chức
+                  Đơn vị tổ chức
+                </th>
+                <th style={{
+                  padding: '12px 16px',
+                  textAlign: 'left',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#616161',
+                  width: '20%'
+                }}>
+                  Kiểu
                 </th>
                 <th style={{
                   padding: '12px 16px',
@@ -300,142 +363,225 @@ const EventManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {events.map((event, index) => (
-                <tr key={event.id} style={{
-                  borderBottom: '1px solid #F0F0F0'
-                }}>
-                  <td style={{
-                    padding: '16px'
+              {events.map((event, index) => {
+                {/*  )})}*/ }
+                const typeInfo = getTypeStyle(event.type);
+                return (
+                  <tr key={event.id} style={{
+                    borderBottom: '1px solid #F0F0F0'
                   }}>
-                    <div style={{
-                      fontWeight: '500',
-                      color: '#212121',
-                      fontSize: '14px',
-                      marginBottom: '4px'
-                    }}>
-                      {event.name}
-                    </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#757575'
-                    }}>
-                      {event.subtitle}
-                    </div>
-                  </td>
-                  <td style={{
-                    padding: '16px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
+                    <td style={{
+                      padding: '16px'
                     }}>
                       <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        backgroundColor: getAvatarColor(index),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        fontWeight: '500',
+                        color: '#212121',
+                        fontSize: '14px',
+                        marginBottom: '4px'
+                      }}>
+                        {event.name}
+                      </div>
+                      <div style={{
                         fontSize: '13px',
-                        fontWeight: '600',
-                        color: '#424242'
+                        color: '#757575'
                       }}>
-                        {getInitials(event.organizerName)}
+                        {event.subtitle}
                       </div>
-                      <div>
-                        <div style={{
-                          fontSize: '14px',
-                          color: '#212121',
-                          fontWeight: '500',
-                          marginBottom: '2px'
-                        }}>
-                          {event.organizerName}
-                        </div>
-                        <div style={{
-                          fontSize: '13px',
-                          color: '#757575'
-                        }}>
-                          {event.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{
-                    padding: '16px',
-                    fontSize: '14px',
-                    color: '#424242'
-                  }}>
-                    {!event.eventStartDate
-                      ? "Không rõ"
-                      : event.eventEndDate
-                        ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
-                        : formatDate(event.eventStartDate)
-                    }
-                  </td>
-                  <td style={{
-                    padding: '16px'
-                  }}>
-                    {event.banInfo?.isBanned
-                      ? (
-                        <span style={{
-                          backgroundColor: '#FFEBEE',
-                          color: '#C62828',
-                          padding: '6px 12px',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          fontWeight: '500'
-                        }}>
-                          Bị cấm
-                        </span>
-                      )
-                      : (
-                        <span style={getStatusStyle(event.status)}>
-                          {event.status === 'scheduled' ? 'Sắp diễn ra' :
-                            event.status === 'ongoing' ? 'Đang diễn ra' :
-                              event.status === 'completed' ? 'Hoàn thành' :
-                                event.status === 'cancelled' ? 'Đã hủy' : 'Không xác định'}
-                        </span>
-                      )
-                    }
-                  </td>
-                  <td style={{
-                    padding: '16px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      gap: '8px',
-                      justifyContent: 'center'
+                    </td>
+                    <td style={{
+                      padding: '16px'
                     }}>
-                      <button style={{
-                        padding: '6px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderRadius: '4px',
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        transition: 'background-color 0.2s'
+                        gap: '12px'
                       }}>
-                        <Eye style={{ width: '18px', height: '18px', color: '#2196F3' }} />
-                      </button>
-                      <button style={{
-                        padding: '6px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderRadius: '4px',
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: getAvatarColor(index),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          color: '#424242'
+                        }}>
+                          {getInitials(event.organizerName)}
+                        </div>
+                        <div>
+                          <div style={{
+                            fontSize: '14px',
+                            color: '#212121',
+                            fontWeight: '500',
+                            marginBottom: '2px'
+                          }}>
+                            {event.organizerName}
+                          </div>
+                          <div style={{
+                            fontSize: '13px',
+                            color: '#757575'
+                          }}>
+                            {event.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{
+                      padding: '16px',
+                      fontSize: '14px',
+                      color: '#424242'
+                    }}>
+                      <span style={typeInfo}>
+                        {event.type === 'public' ? 'Công khai' : 'Riêng tư'}
+                      </span>
+                    </td>
+                    <td style={{
+                      padding: '16px',
+                      fontSize: '14px',
+                      color: '#424242'
+                    }}>
+                      {!event.eventStartDate
+                        ? "Không rõ"
+                        : event.eventEndDate
+                          ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
+                          : formatDate(event.eventStartDate)
+                      }
+                    </td>
+                    <td style={{
+                      padding: '16px'
+                    }}>
+                      {event.banInfo?.isBanned
+                        ? (
+                          <span style={{
+                            backgroundColor: '#FFEBEE',
+                            color: '#C62828',
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            display: "inline-flex",
+                            whiteSpace: "nowrap",
+                            alignItems: "center"
+                          }}>
+                            Bị cấm
+                          </span>
+                        )
+                        : (
+                          <span style={getStatusStyle(event.status)}>
+                            {event.status === 'scheduled' ? 'Sắp diễn ra' :
+                              event.status === 'ongoing' ? 'Đang diễn ra' :
+                                event.status === 'completed' ? 'Hoàn thành' :
+                                  event.status === 'cancelled' ? 'Đã hủy' : 'Không xác định'}
+                          </span>
+                        )
+                      }
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        transition: 'background-color 0.2s'
+                        gap: '12px',
+                        justifyContent: 'center'
                       }}>
-                        <Ban style={{ width: '18px', height: '18px', color: '#F44336' }} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* View Button */}
+                        <button
+                          onClick={() => { navigate(`/admin/event-management/${event._id}`) }}
+                          style={{
+                            padding: '4px',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '14px',
+                            fontWeight: '400',
+                            color: '#2196F3',
+                            transition: 'opacity 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '0.7';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                        >
+                          <Eye style={{ width: '18px', height: '18px' }} />
+                          Xem
+                        </button>
+
+                        {/* Ban/Unban Button */}
+                        {event.banInfo?.isBanned ? (
+                          <button
+                            onClick={() => { setIsUnBanModalOpen(true); setSelectedEvent(event); }}
+                            style={{
+                              padding: '4px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '14px',
+                              fontWeight: '400',
+                              color: '#4CAF50',
+                              transition: 'opacity 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '0.7';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Gỡ cấm
+                          </button>
+                        ) : (
+                          event.type === 'public' && (
+                            <button
+                              onClick={() => { setIsBanModalOpen(true); setSelectedEvent(event); }}
+                              style={{
+                                padding: '4px',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '14px',
+                                fontWeight: '400',
+                                color: '#F44336',
+                                transition: 'opacity 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = '0.7';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                            >
+                              <Ban style={{ width: '18px', height: '18px' }} />
+                              Cấm
+                            </button>
+                          ))}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -463,10 +609,6 @@ const EventManagement = () => {
               borderTop: '1px solid #E0E0E0'
             }}
           >
-            {/* Left side: Display info */}
-            <div style={{ fontSize: '14px', color: '#616161' }}>
-              Hiển thị {start}–{end} trong tổng số {totalEvents} sự kiện
-            </div>
 
             {/* Right side: Pagination buttons */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -531,6 +673,56 @@ const EventManagement = () => {
           </div>
         </div>
       </div>
+      {selectedEvent && (
+        <BanEventModal
+          isOpen={isBanModalOpen}
+          onClose={() => {
+            setIsBanModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          eventData={{
+            eventId: selectedEvent._id,
+            name: selectedEvent.name,
+            hooc: selectedEvent.members?.[0]?.userId?.fullName ?? "Không xác định",
+            date: selectedEvent.eventStartDate
+              ? selectedEvent.eventEndDate
+                ? `${formatDate(selectedEvent.eventStartDate)} - ${formatDate(selectedEvent.eventEndDate)}`
+                : formatDate(selectedEvent.eventStartDate)
+              : "Chưa xác định"
+          }}
+          onBanSuccess={() => {
+            toast.success('Cấm sự kiện thành công');
+            setIsBanModalOpen(false);
+            setSelectedEvent(null);
+            fetchEvents();
+          }}
+        />
+      )}
+      {selectedEvent && (
+        <UnbanEventModal
+          isOpen={isUnBanModalOpen}
+          onClose={() => {
+            setIsUnBanModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          eventData={{
+            eventId: selectedEvent._id,
+            name: selectedEvent.name,
+            hooc: selectedEvent.members?.[0]?.userId?.fullName ?? "Không xác định",
+            date: selectedEvent.eventStartDate
+              ? selectedEvent.eventEndDate
+                ? `${formatDate(selectedEvent.eventStartDate)} - ${formatDate(selectedEvent.eventEndDate)}`
+                : formatDate(selectedEvent.eventStartDate)
+              : "Chưa xác định"
+          }}
+          onUnbanSuccess={() => {
+            toast.success('Gỡ cấm sự kiện thành công');
+            setIsUnBanModalOpen(false);
+            setSelectedEvent(null);
+            fetchEvents();
+          }}
+        />
+      )}
     </UserLayout>
   );
 };

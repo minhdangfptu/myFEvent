@@ -95,15 +95,23 @@ export const banEvent = async (req, res) => {
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
-        if (event.status === 'banned') {
+        if (event.banInfo.isBanned) {
             return res.status(400).json({ message: 'Event is already banned' });
+        }
+        if (event.type === 'private') {
+            return res.status(400).json({ message: 'Cannot ban a private event' });
         }
         if (!banReason) {
             return res.status(400).json({ message: 'Ban reason is required' });
         }
-        await eventService.updateEventByAdmin(eventId, { status: 'banned', banReason }, { new: true });
-        return res.status(200).json(event);
+        const updatedEvent = await eventService.updateEventByAdmin(
+            eventId,
+            { banReason },
+            "ban"
+        );
+        return res.status(200).json(updatedEvent);
     } catch (err) {
+        console.error('Ban event error:', err.message);
         return res.status(500).json({ message: 'Fail to ban event', error: err.message });
     }
 };
@@ -114,12 +122,17 @@ export const unbanEvent = async (req, res) => {
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
-        if (event.status !== 'banned') {
+        if (!event.banInfo.isBanned) {
             return res.status(400).json({ message: 'Event is not banned' });
         }
-        await eventService.updateEventByAdmin(eventId, { status: 'active', banReason: '' }, { new: true });
-        return res.status(200).json(event);
+        const updatedEvent = await eventService.updateEventByAdmin(
+            eventId,
+            {},
+            "unban"
+        );
+        return res.status(200).json(updatedEvent);
     } catch (err) {
+        console.error('Unban event error:', err.message);
         return res.status(500).json({ message: 'Fail to unban event', error: err.message });
     }
 };

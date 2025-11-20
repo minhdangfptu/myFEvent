@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
+import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import calendarService from "~/services/calendarService";
@@ -58,7 +59,7 @@ export default function CreateEventCalendarPage() {
     const { eventId } = useParams();
     const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
-    const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
     useEffect(() => {
         let mounted = true
@@ -173,14 +174,21 @@ export default function CreateEventCalendarPage() {
         if (formData.startTime && formData.endTime) {
             const [startH, startM] = formData.startTime.split(':').map(Number);
             const [endH, endM] = formData.endTime.split(':').map(Number);
-            const startMinutes = startH * 60 + startM;
-            const endMinutes = endH * 60 + endM;
+            let startMinutes = startH * 60 + startM;
+            let endMinutes = endH * 60 + endM;
+
+            // Nếu endTime < startTime, nghĩa là sang ngày hôm sau
+            const isOvernight = endH < startH || (endH === startH && endM < startM);
+            if (isOvernight) {
+                endMinutes += 24 * 60; // Cộng thêm 24 giờ
+            }
+
             const duration = endMinutes - startMinutes;
 
             if (duration > 0) {
                 const hours = Math.floor(duration / 60);
                 const minutes = duration % 60;
-                return `${hours} tiếng${minutes > 0 ? ' ' + minutes + ' phút' : ''}`;
+                return `${hours} tiếng${minutes > 0 ? ' ' + minutes + ' phút' : ''}${isOvernight ? ' (qua đêm)' : ''}`;
             }
         }
         return "";
@@ -216,8 +224,20 @@ export default function CreateEventCalendarPage() {
 
         const [startH, startM] = formData.startTime.split(':').map(Number);
         const [endH, endM] = formData.endTime.split(':').map(Number);
-        if (endH * 60 + endM <= startH * 60 + startM) {
-            setError("Thời gian kết thúc phải sau thời gian bắt đầu");
+
+        // KIỂM TRA THỜI GIAN
+        const now = new Date();
+        const selectedStartDateTime = new Date(formData.meetingDate + 'T' + formData.startTime + ':00');
+        const selectedEndDateTime = new Date(formData.meetingDate + 'T' + formData.endTime + ':00');
+
+        // Nếu giờ kết thúc < giờ bắt đầu, nghĩa là sang ngày hôm sau
+        if (endH < startH || (endH === startH && endM < startM)) {
+            selectedEndDateTime.setDate(selectedEndDateTime.getDate() + 1);
+        }
+
+        // Kiểm tra thời gian bắt đầu có trong quá khứ không
+        if (selectedStartDateTime < now) {
+            setError("Không thể tạo cuộc họp với thời gian trong quá khứ");
             return;
         }
 
@@ -229,9 +249,8 @@ export default function CreateEventCalendarPage() {
                 eventId: eventId,
                 locationType: formData.locationType,
                 location: formData.location,
-                meetingDate: formData.meetingDate,
-                startTime: formData.startTime,
-                endTime: formData.endTime,
+                startAt: selectedStartDateTime.toISOString(),
+                endAt: selectedEndDateTime.toISOString(),
                 participantType: formData.participantType,
                 notes: formData.notes,
                 attachments: formData.attachments.filter(link => link.trim() !== "")
@@ -253,42 +272,42 @@ export default function CreateEventCalendarPage() {
             }
 
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.message || err.message);
         } finally {
             setLoading(false);
         }
     };
 
     const handleCancel = () => {
-        setShowConfirmModal(true);
+        setIsCancelModalOpen(true);
     };
-
+    const confirmCancel = () => {
+        navigate(`/events/${eventId}/my-calendar`);
+    };
     return (
-        <>
-            <UserLayout title="Tạo cuộc họp mới" sidebarType={eventRole} activePage="calendar">
-                <ToastContainer position="top-right" autoClose={3000} />
+        <UserLayout sidebarType={eventRole} activePage="calendar">
+            <div style={{
+                minHeight: "100vh",
+                backgroundColor: "#f8f9fa",
+                padding: "24px"
+            }}>
                 <div style={{
-                    minHeight: "100vh",
-                    backgroundColor: "#f8f9fa",
-                    padding: "24px"
+                    maxWidth: "1200px",
+                    margin: "0 auto",
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    padding: "32px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                 }}>
-                    <div style={{
-                        maxWidth: "1200px",
-                        margin: "0 auto",
-                        backgroundColor: "white",
-                        borderRadius: "12px",
-                        padding: "32px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                    {/* Header */}
+                    <h1 style={{
+                        margin: "0 0 32px 0",
+                        fontSize: "24px",
+                        fontWeight: "600",
+                        color: "#ef4444"
                     }}>
-                        {/* Header */}
-                        {/* <h1 style={{
-                            margin: "0 0 32px 0",
-                            fontSize: "24px",
-                            fontWeight: "600",
-                            color: "#ef4444"
-                        }}>
-                            Tạo cuộc họp mới
-                        </h1> */}
+                        Tạo cuộc họp mới
+                    </h1>
 
                         {error && (
                             <div style={{
@@ -681,22 +700,22 @@ export default function CreateEventCalendarPage() {
                                     />
                                 </div>
 
-                                {/* Box 5: Attachments */}
-                                <div style={{
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "8px",
-                                    padding: "20px",
-                                    backgroundColor: "white"
+                            {/* Box 5: Attachments */}
+                            <div style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                backgroundColor: "white"
+                            }}>
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a"
                                 }}>
-                                    <label style={{
-                                        display: "block",
-                                        marginBottom: "16px",
-                                        fontSize: "15px",
-                                        fontWeight: "600",
-                                        color: "#1a1a1a"
-                                    }}>
-                                        Link tài liệu cuộc họp <span style={{color:""}}>(vui lòng share quyền truy cập)</span>
-                                    </label>
+                                    Link tài liệu cuộc họp <span style={{ color: "" }}>(vui lòng share quyền truy cập)</span>
+                                </label>
 
                                     {formData.attachments?.map((attachment, index) => (
                                         <div key={index} style={{
@@ -769,64 +788,61 @@ export default function CreateEventCalendarPage() {
                                 </div>
                             </div>
 
-                            {/* Buttons */}
-                            <div style={{
-                                display: "flex",
-                                justifyContent: "center",
-                                gap: "16px",
-                                paddingTop: "24px",
-                                borderTop: "1px solid #e5e7eb"
-                            }}>
-                                <button
-                                    type="button"
-                                    onClick={handleCancel}
-                                    disabled={loading}
-                                    style={{
-                                        padding: "12px 32px",
-                                        backgroundColor: "#6b7280",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "8px",
-                                        cursor: loading ? "not-allowed" : "pointer",
-                                        fontSize: "15px",
-                                        fontWeight: "500",
-                                        opacity: loading ? 0.5 : 1,
-                                        transition: "opacity 0.2s"
-                                    }}
-                                >
-                                    × Hủy
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    style={{
-                                        padding: "12px 32px",
-                                        backgroundColor: loading ? "#93c5fd" : "#4285f4",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "8px",
-                                        cursor: loading ? "not-allowed" : "pointer",
-                                        fontSize: "15px",
-                                        fontWeight: "500",
-                                        minWidth: "150px"
-                                    }}
-                                >
-                                    {loading ? "Đang tạo..." : "✓ Tạo cuộc họp"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        {/* Buttons */}
+                        <div style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            gap: "16px",
+                            paddingTop: "24px",
+                            borderTop: "1px solid #e5e7eb"
+                        }}>
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                disabled={loading}
+                                style={{
+                                    padding: "12px 32px",
+                                    backgroundColor: "#6b7280",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    cursor: loading ? "not-allowed" : "pointer",
+                                    fontSize: "15px",
+                                    fontWeight: "500",
+                                    opacity: loading ? 0.5 : 1,
+                                    transition: "opacity 0.2s"
+                                }}
+                            >
+                                × Hủy
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                style={{
+                                    padding: "12px 32px",
+                                    backgroundColor: loading ? "#93c5fd" : "#4285f4",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    cursor: loading ? "not-allowed" : "pointer",
+                                    fontSize: "15px",
+                                    fontWeight: "500",
+                                    minWidth: "150px"
+                                }}
+                            >
+                                {loading ? "Đang tạo..." : "✓ Tạo cuộc họp"}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            </UserLayout>
-            <ConfirmModal
-                show={showConfirmModal}
-                onClose={() => setShowConfirmModal(false)}
-                onConfirm={() => {
-                    setShowConfirmModal(false);
-                    navigate(`/events/${eventId}/my-calendar`);
-                }}
-                message="Bạn có chắc muốn hủy? Dữ liệu đã nhập sẽ bị mất."
+            </div>
+            <CancelConfirmModal
+                isOpen={isCancelModalOpen}
+                onClose={() => setIsCancelModalOpen(false)}
+                onConfirm={confirmCancel}
+                title="Hủy chỉnh sửa"
+                message="Bạn có chắc chắn muốn hủy? Các thay đổi sẽ không được lưu."
             />
-        </>
+        </UserLayout>
     );
 }

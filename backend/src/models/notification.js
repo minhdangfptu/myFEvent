@@ -52,6 +52,10 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Agenda",
     },
+    relatedCalendarId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Calendar",
+    }
   },
   {
     timestamps: true,
