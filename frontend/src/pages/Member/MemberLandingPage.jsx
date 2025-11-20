@@ -48,7 +48,6 @@ export default function MemberLandingPage() {
   }, [location.search, navigate]);
 
   useEffect(() => {
-    // Đợi authLoading xong trước khi fetch events
     if (!authLoading) {
       fetchMyEvents();
     }
@@ -62,7 +61,7 @@ export default function MemberLandingPage() {
   const [sortBy, setSortBy] = useState(t('home.sorts.newest'));
 
   // Dropdown UI state
-  const [openMenu, setOpenMenu] = useState(null); // 'status' | 'sort' | null
+  const [openMenu, setOpenMenu] = useState(null); 
   const statusMenuRef = useRef(null);
   const sortMenuRef = useRef(null);
   useEffect(() => {
@@ -77,7 +76,6 @@ export default function MemberLandingPage() {
   }, []);
 
   const fetchMyEvents = async () => {
-    // Đợi authLoading xong và có user trước khi fetch
     if (authLoading || !user) {
       setLoading(true);
       return;
@@ -88,7 +86,6 @@ export default function MemberLandingPage() {
       const events = response.data || [];
       setMyEvents(events);
       
-      // Kiểm tra nếu user không có sự kiện nào, redirect về trang user
       if (events.length === 0) {
         navigate('/home-page');
         return;

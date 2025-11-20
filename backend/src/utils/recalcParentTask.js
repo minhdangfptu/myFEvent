@@ -1,12 +1,12 @@
 import Task from '../models/task.js';
 
 /**
- * Recalculate parent (assigneeId=null) dựa trên các con:
- * - done nếu tất cả con done
- * - in_progress nếu có ít nhất 1 con đã start
- * - todo nếu chưa con nào start
+ * Recalculate epic task dựa trên các normal tasks con:
+ * - hoan_thanh nếu tất cả con hoan_thanh
+ * - da_bat_dau nếu có ít nhất 1 con đã bắt đầu
+ * - chua_bat_dau nếu chưa con nào bắt đầu
  * - progressPct = trung bình progressPct của con
- * Đệ quy lên ancestor.
+ * Epic task không cho phép chỉnh sửa thủ công status
  */
 export default async function recalcParentsUpward(parentId, eventId) {
     if (!parentId) return;
@@ -14,27 +14,38 @@ export default async function recalcParentsUpward(parentId, eventId) {
     const parent = await Task.findOne({ _id: parentId, eventId });
     if (!parent) return;
 
-    // Chỉ auto-calc cho parent giao cho ban
-    if (parent.assigneeId) return;
+    // Chỉ auto-calc cho epic task (taskType = 'epic')
+    if (parent.taskType !== 'epic') return;
 
-    const children = await Task.find({ eventId, parentId: parent._id }).select('status progressPct');
+    // Lấy tất cả normal tasks con (taskType = 'normal' và parentId = parent._id)
+    const children = await Task.find({ 
+        eventId, 
+        parentId: parent._id,
+        taskType: 'normal'
+    }).select('status progressPct');
+    
     const total = children.length;
 
     if (total === 0) {
-        parent.status = 'todo';
+        parent.status = 'chua_bat_dau';
         parent.progressPct = 0;
     } else {
-        const doneCount = children.filter(c => c.status === 'done').length;
-        const startedCount = children.filter(c => c.status !== 'todo').length;
+        const completedCount = children.filter(c => c.status === 'hoan_thanh').length;
+        const startedCount = children.filter(c => c.status !== 'chua_bat_dau').length;
         const avgProgress = Math.round(children.reduce((s, c) => s + (Number(c.progressPct) || 0), 0) / total);
 
-        if (doneCount === total) parent.status = 'done';
-        else if (startedCount > 0) parent.status = 'in_progress';
-        else parent.status = 'todo';
+        // Epic task tự động chuyển sang hoan_thanh khi tất cả normal tasks hoàn thành
+        if (completedCount === total) {
+            parent.status = 'hoan_thanh';
+        } else if (startedCount > 0) {
+            parent.status = 'da_bat_dau';
+        } else {
+            parent.status = 'chua_bat_dau';
+        }
 
         parent.progressPct = avgProgress;
     }
 
     await parent.save();
-    return recalcParentsUpward(parent.parentId, eventId);
+    // Không đệ quy lên nữa vì chỉ có 1 cấp epic -> normal
 }

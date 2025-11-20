@@ -824,7 +824,7 @@ const MemberExpensePage = () => {
                           position: "relative",
                           userSelect: "none"
                         }}>
-                          TỔNG DỰ KIẾN
+                          GIÁ TRỊ DỰ KIẾN
                           <div
                             style={{
                               position: "absolute",
@@ -858,7 +858,7 @@ const MemberExpensePage = () => {
                           position: "relative",
                           userSelect: "none"
                         }}>
-                          TỔNG THỰC TẾ
+                          GIÁ TRỊ THỰC TẾ
                           <div
                             style={{
                               position: "absolute",
@@ -1017,7 +1017,15 @@ const MemberExpensePage = () => {
                                 </td>
                               <td style={{ padding: "12px" }}>
                                     {actualAmount > 0 ? (
-                                  <span className="fw-semibold">
+                                  <span className="fw-semibold d-flex align-items-center gap-1" style={{
+                                    color: actualAmount > estimatedTotal ? "#10B981" : actualAmount < estimatedTotal ? "#EF4444" : "#111827"
+                                  }}>
+                                        {actualAmount > estimatedTotal && (
+                                          <i className="bi bi-arrow-up-circle-fill"></i>
+                                        )}
+                                        {actualAmount < estimatedTotal && (
+                                          <i className="bi bi-arrow-down-circle-fill"></i>
+                                        )}
                                         {formatCurrency(actualAmount)}
                                       </span>
                                     ) : (
