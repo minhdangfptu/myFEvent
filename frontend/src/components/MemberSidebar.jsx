@@ -157,7 +157,6 @@ export default function MemberSidebar({
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/task" },
     { id: "expenses", label: "Chi tiêu", path: `/events/${eventId || ''}/expenses` },
-    { id: "income", label: "Thu nhập", path: "/task" },
     // Không có finance-stats (thống kê thu chi)
   ];
   const risksSubItems = [

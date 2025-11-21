@@ -5,11 +5,14 @@ import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
 import { findDepartmentsByEvent } from '../services/departmentService.js';
-import { countDepartmentMembersIncludingHoOC, getMemberInformationForExport } from '../services/eventMemberService.js'
+import { countDepartmentMembersIncludingHoOC, getMemberInformationForExport } from '../services/eventMemberService.js';
 import { getAgendaByEvent } from '../services/agendaService.js';
 import { getAllOccurredRisksByEvent, getAllRisksByEventWithoutPagination } from '../services/riskService.js';
 import { listMilestonesByEvent } from '../services/milestoneService.js';
 import event from '../models/event.js';
+import { getEpicTasksForExport } from '../services/taskService.js';
+import { getBudgetItemsForExport } from '../services/budgetService.js';
+import { getFeedbackFormsForExport } from '../services/feedbackService.js';
 export const exportSingleItem = async (req, res) => {
   try {
     const { eventId, itemId } = req.params;
@@ -36,6 +39,16 @@ export const exportSingleItem = async (req, res) => {
         filename = `Agenda_Su_Kien_${eventId}_${Date.now()}.xlsx`;
         break;
         
+      case 'tasks':
+        await createTaskSheets(workbook, eventId, subItems);
+        filename = `Cong_viec_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        break;
+
+      case 'budget':
+        await createBudgetSheets(workbook, eventId, subItems);
+        filename = `Kinh_phi_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        break;
+        
       case 'risks':
         await createRiskSheets(workbook, eventId, subItems);
         filename = `Rui_ro_Su_kien_${eventId}_${Date.now()}.xlsx`;
@@ -44,6 +57,11 @@ export const exportSingleItem = async (req, res) => {
       case 'timeline':
         await createTimelineSheets(workbook, eventId, subItems);
         filename = `Timeline_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        break;
+
+      case 'feedback':
+        await createFeedbackSheets(workbook, eventId);
+        filename = `Phan_hoi_Su_kien_${eventId}_${Date.now()}.xlsx`;
         break;
         
       case 'incidents': // Changed from 'issues' to 'incidents'
@@ -76,6 +94,9 @@ const getItemExportConfig = (itemId, eventId) => {
     'members': { filename: `Danh_sach_Thanh_vien_${eventId}.xlsx`, createFn: createMemberSheets },
     'timeline': { filename: `Timeline_Su_kien_${eventId}.xlsx`, createFn: createTimelineSheets },
     'agenda': { filename: `Agenda_Su_Kien_${eventId}.xlsx`, createFn: createAgendaSheets },
+    'tasks': { filename: `Danh_sach_Cong_viec_${eventId}.xlsx`, createFn: createTaskSheets },
+    'budget': { filename: `Kinh_phi_Su_kien_${eventId}.xlsx`, createFn: createBudgetSheets },
+    'feedback': { filename: `Phan_hoi_Su_kien_${eventId}.xlsx`, createFn: createFeedbackSheets },
     'risks': { filename: `Rui_ro_Su_kien_${eventId}.xlsx`, createFn: createRiskSheets },
     'incidents': { filename: `Su_co_Su_kien_${eventId}.xlsx`, createFn: createIncidentSheets }
   };
@@ -93,6 +114,9 @@ export const exportAllItemsZip = async (req, res) => {
       { itemId: 'members', ...getItemExportConfig('members', eventId) },
       { itemId: 'timeline', ...getItemExportConfig('timeline', eventId) },
       { itemId: 'agenda', ...getItemExportConfig('agenda', eventId) },
+      { itemId: 'tasks', ...getItemExportConfig('tasks', eventId) },
+      { itemId: 'budget', ...getItemExportConfig('budget', eventId) },
+      { itemId: 'feedback', ...getItemExportConfig('feedback', eventId) },
       { itemId: 'risks', ...getItemExportConfig('risks', eventId) },
       { itemId: 'incidents', ...getItemExportConfig('incidents', eventId) }
     ];
@@ -1580,6 +1604,654 @@ const createTimelineSheets = async (workbook, eventId, subItems) => {
     console.log(`✅ Created timeline sheet with ${milestones.length} milestones`);
   }
 };
+
+const createTaskSheets = async (workbook, eventId, subItems = []) => {
+  const filters = getTaskFilterConfigs(subItems);
+  const tasks = await getEpicTasksForExport(eventId);
+
+  if (!filters.length) {
+    filters.push(TASK_FILTER_MAP['tasks-all']);
+  }
+
+  filters.forEach((filterConfig, index) => {
+    const worksheet = workbook.addWorksheet(filterConfig.sheetName || `Công việc ${index + 1}`);
+    const filteredTasks = Array.isArray(tasks) ? tasks.filter(filterConfig.filterFn) : [];
+    createTaskWorksheet(worksheet, filterConfig.title, filteredTasks);
+  });
+};
+
+const createBudgetSheets = async (workbook, eventId, subItems = []) => {
+  const filters = getBudgetFilterConfigs(subItems);
+  const items = await getBudgetItemsForExport(eventId);
+
+  if (!filters.length) {
+    filters.push(BUDGET_FILTER_MAP['budget-summary']);
+  }
+
+  filters.forEach((filterConfig, index) => {
+    const worksheet = workbook.addWorksheet(filterConfig.sheetName || `Kinh phí ${index + 1}`);
+    const filteredItems = Array.isArray(items) ? items.filter(filterConfig.filterFn) : [];
+    createBudgetWorksheet(worksheet, filterConfig.title, filteredItems);
+  });
+};
+
+const createFeedbackSheets = async (workbook, eventId) => {
+  const { eventName, forms } = await getFeedbackFormsForExport(eventId);
+
+  if (!forms.length) {
+    const worksheet = workbook.addWorksheet('Phản hồi');
+    createEmptyFeedbackSheet(worksheet, eventName);
+    return;
+  }
+
+  forms.forEach((form, index) => {
+    const sheetName = sanitizeFeedbackSheetName(form.name, index);
+    const worksheet = workbook.addWorksheet(sheetName);
+    createFeedbackWorksheet(worksheet, eventName, form, index);
+  });
+};
+
+
+const TASK_STATUS_LABELS = {
+  chua_bat_dau: 'Chưa bắt đầu',
+  da_bat_dau: 'Đang thực hiện',
+  hoan_thanh: 'Đã hoàn thành',
+  huy: 'Đã hủy'
+};
+
+const TASK_FILTER_MAP = {
+  'tasks-all': {
+    id: 'tasks-all',
+    title: 'Danh sách công việc lớn',
+    sheetName: 'Công việc',
+    filterFn: () => true
+  },
+  'tasks-pending': {
+    id: 'tasks-pending',
+    title: 'Công việc đang chờ',
+    sheetName: 'Công việc - Đang chờ',
+    filterFn: (task) => isPendingTask(task)
+  },
+  'tasks-completed': {
+    id: 'tasks-completed',
+    title: 'Công việc đã hoàn thành',
+    sheetName: 'Công việc - Đã hoàn thành',
+    filterFn: (task) => isCompletedTask(task)
+  },
+  'tasks-overdue': {
+    id: 'tasks-overdue',
+    title: 'Công việc quá hạn',
+    sheetName: 'Công việc - Quá hạn',
+    filterFn: (task) => isOverdueTask(task)
+  }
+};
+
+const getTaskFilterConfigs = (subItems = []) => {
+  const requested = (subItems || [])
+    .map((itemId) => TASK_FILTER_MAP[itemId])
+    .filter(Boolean);
+
+  if (!requested.length) {
+    return [TASK_FILTER_MAP['tasks-all']];
+  }
+
+  const unique = [];
+  const seen = new Set();
+
+  requested.forEach((config) => {
+    if (!seen.has(config.id)) {
+      seen.add(config.id);
+      unique.push(config);
+    }
+  });
+
+  return unique;
+};
+
+const createTaskWorksheet = (worksheet, title, tasks = []) => {
+  // Column widths
+  worksheet.getColumn('A').width = 5;   // #
+  worksheet.getColumn('B').width = 30;  // Tên công việc
+  worksheet.getColumn('C').width = 40;  // Miêu tả
+  worksheet.getColumn('D').width = 20;  // Ban phụ trách
+  worksheet.getColumn('E').width = 15;  // Loại công việc
+  worksheet.getColumn('F').width = 20;  // Trạng thái
+  worksheet.getColumn('G').width = 20;  // Thuộc mốc
+  worksheet.getColumn('H').width = 18;  // Số công việc con
+  worksheet.getColumn('I').width = 20;  // Thời gian bắt đầu
+  worksheet.getColumn('J').width = 20;  // Thời gian kết thúc
+  worksheet.getColumn('K').width = 25;  // Ghi chú
+
+  worksheet.mergeCells('A1:K1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = title || 'Danh sách công việc';
+  titleCell.font = { name: 'Roboto', size: 14, bold: true };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  titleCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' },
+    left: { style: 'thin' }, right: { style: 'thin' }
+  };
+
+  const headers = [
+    '#',
+    'Tên công việc',
+    'Miêu tả',
+    'Ban phụ trách',
+    'Loại công việc',
+    'Trạng thái',
+    'Thuộc mốc',
+    'Số công việc con',
+    'Thời gian bắt đầu',
+    'Thời gian kết thúc',
+    'Ghi chú'
+  ];
+
+  const headerRow = worksheet.getRow(2);
+  headerRow.height = 20;
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { name: 'Roboto', size: 11 };
+    cell.alignment = { horizontal: 'left', vertical: 'middle' };
+    if (index === 0 || index === 7) {
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+    cell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' }
+    };
+  });
+
+  if (!tasks || tasks.length === 0) {
+    worksheet.mergeCells('A3:K3');
+    const emptyCell = worksheet.getCell('A3');
+    emptyCell.value = 'Chưa có công việc nào phù hợp điều kiện lọc';
+    emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+    emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    emptyCell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' }
+    };
+    return;
+  }
+
+  tasks.forEach((task, index) => {
+    const rowNumber = index + 3;
+    const row = worksheet.getRow(rowNumber);
+    row.height = 20;
+
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = task.title || '';
+    row.getCell(3).value = task.description || '';
+    row.getCell(4).value = task.departmentName || '';
+    row.getCell(5).value = formatTaskTypeText(task.taskType);
+    row.getCell(6).value = formatTaskStatusText(task.status);
+    row.getCell(7).value = task.milestoneName || '';
+    row.getCell(8).value = task.subTaskCount || 0;
+    row.getCell(9).value = formatTaskDateText(task.startDate);
+    row.getCell(10).value = formatTaskDateText(task.endDate);
+    row.getCell(11).value = task.note || '';
+
+    for (let col = 1; col <= 11; col++) {
+      const cell = row.getCell(col);
+      cell.font = { name: 'Roboto', size: 11 };
+      cell.border = {
+        top: { style: 'thin' }, bottom: { style: 'thin' },
+        left: { style: 'thin' }, right: { style: 'thin' }
+      };
+      if (col === 1 || col === 8) {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+    }
+  });
+
+  const totalSubTasks = tasks.reduce((sum, task) => sum + (task.subTaskCount || 0), 0);
+  const summaryRowNum = tasks.length + 3;
+  worksheet.mergeCells(summaryRowNum, 1, summaryRowNum, 11);
+  const summaryCell = worksheet.getCell(summaryRowNum, 1);
+  summaryCell.value = `Tổng cộng ${tasks.length} công việc lớn và ${totalSubTasks} công việc con`;
+  summaryCell.font = { name: 'Roboto', size: 11, bold: true };
+  summaryCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  summaryCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  summaryCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' },
+    left: { style: 'thin' }, right: { style: 'thin' }
+  };
+
+  console.log(`✅ Created task sheet "${title}" với ${tasks.length} công việc`);
+};
+
+const BUDGET_FILTER_MAP = {
+  'budget-summary': {
+    id: 'budget-summary',
+    title: 'Kinh phí sự kiện - Tổng quan',
+    sheetName: 'Kinh phí sự kiện',
+    filterFn: () => true,
+  },
+  'budget-expenses': {
+    id: 'budget-expenses',
+    title: 'Kinh phí sự kiện - Các khoản đã chi',
+    sheetName: 'Kinh phí - Đã chi',
+    filterFn: (item) => item.actualAmount > 0,
+  },
+  'budget-revenue': {
+    id: 'budget-revenue',
+    title: 'Kinh phí sự kiện - Khoản chưa chi',
+    sheetName: 'Kinh phí - Chưa chi',
+    filterFn: (item) => item.actualAmount === 0,
+  },
+  'budget-comparison': {
+    id: 'budget-comparison',
+    title: 'Kinh phí sự kiện - So sánh dự trù & thực tế',
+    sheetName: 'Kinh phí - So sánh',
+    filterFn: (item) => Math.abs(item.profit || 0) > 0 || item.actualAmount > 0,
+  },
+};
+
+const getBudgetFilterConfigs = (subItems = []) => {
+  const requested = (subItems || [])
+    .map((itemId) => BUDGET_FILTER_MAP[itemId])
+    .filter(Boolean);
+
+  if (!requested.length) {
+    return [BUDGET_FILTER_MAP['budget-summary']];
+  }
+
+  const unique = [];
+  const seen = new Set();
+
+  requested.forEach((config) => {
+    if (!seen.has(config.id)) {
+      seen.add(config.id);
+      unique.push(config);
+    }
+  });
+
+  return unique;
+};
+
+const PLAN_STATUS_LABELS = {
+  draft: 'Bản nháp',
+  submitted: 'Đã nộp',
+  changes_requested: 'Yêu cầu chỉnh sửa',
+  approved: 'Đã duyệt',
+  locked: 'Đã khóa',
+  sent_to_members: 'Đã gửi thành viên',
+};
+
+const ITEM_STATUS_LABELS = {
+  pending: 'Đang duyệt',
+  approved: 'Được duyệt',
+  rejected: 'Từ chối',
+};
+
+const SUBMITTED_STATUS_LABELS = {
+  draft: 'Chưa gửi',
+  submitted: 'Đã gửi',
+};
+
+const CURRENCY_FORMAT = '#,##0" đ"';
+
+const createBudgetWorksheet = (worksheet, title, items = []) => {
+  const columns = [
+    { width: 4 }, // #
+    { width: 18 }, // Ban
+    { width: 18 }, // Hạng mục
+    { width: 32 }, // Nội dung
+    { width: 12 }, // Đơn vị
+    { width: 12 }, // Số lượng
+    { width: 18 }, // Đơn giá dự kiến
+    { width: 20 }, // Thành tiền dự kiến
+    { width: 25 }, // Link mua
+    { width: 25 }, // Ghi chú dự trù
+    { width: 18 }, // Thực tế
+    { width: 18 }, // Lãi
+    { width: 25 }, // Ghi chú
+  ];
+
+  columns.forEach((col, idx) => {
+    worksheet.getColumn(idx + 1).width = col.width;
+  });
+
+  worksheet.mergeCells('A1:M1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = title || 'Kinh phí sự kiện';
+  titleCell.font = { name: 'Roboto', size: 14, bold: true };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  titleCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const headers = [
+    '#',
+    'Ban',
+    'Hạng mục',
+    'Nội dung',
+    'Đơn vị tính',
+    'Số lượng',
+    'Đơn giá dự kiến',
+    'Thành tiền dự kiến',
+    'Link mua',
+    'Ghi chú dự trù',
+    'Thực tế',
+    'Lãi',
+    'Ghi chú',
+  ];
+
+  const headerRow = worksheet.getRow(2);
+  headerRow.height = 20;
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { name: 'Roboto', size: 11, bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F0E3' } };
+    cell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+    };
+  });
+
+  if (!items.length) {
+    worksheet.mergeCells('A3:N3');
+    const emptyCell = worksheet.getCell('A3');
+    emptyCell.value = 'Chưa có dữ liệu kinh phí để xuất.';
+    emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+    emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    emptyCell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+    };
+    return;
+  }
+
+  const setCurrencyCell = (cell, value) => {
+    const numericValue = typeof value === 'number' ? value : Number(value) || 0;
+    cell.value = numericValue;
+    cell.numFmt = CURRENCY_FORMAT;
+    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+  };
+
+  let totalEstimated = 0;
+  let totalActual = 0;
+  let totalProfit = 0;
+
+  items.forEach((item, index) => {
+    const rowNumber = index + 3;
+    const row = worksheet.getRow(rowNumber);
+    row.height = 20;
+
+    row.getCell(1).value = index + 1;
+    row.getCell(2).value = item.departmentName || '';
+    row.getCell(3).value = item.category || '';
+    row.getCell(4).value = item.name || '';
+    row.getCell(5).value = item.unit || '';
+    row.getCell(6).value = item.quantity || 0;
+    row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+    setCurrencyCell(row.getCell(7), item.unitCost || 0);
+    setCurrencyCell(row.getCell(8), item.estimatedTotal || 0);
+
+    if (item.purchaseLink) {
+      row.getCell(9).value = { text: 'Link', hyperlink: item.purchaseLink };
+      row.getCell(9).font = { color: { argb: 'FF1D4ED8' }, underline: true };
+      row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle' };
+    } else {
+      row.getCell(9).value = '';
+    }
+
+    row.getCell(10).value = item.plannedNote || '';
+    setCurrencyCell(row.getCell(11), item.actualAmount || 0);
+    setCurrencyCell(row.getCell(12), item.profit || 0);
+    row.getCell(13).value = item.actualNote || '';
+
+    for (let col = 1; col <= headers.length; col++) {
+      const cell = row.getCell(col);
+      cell.font = { name: 'Roboto', size: 11 };
+      cell.border = {
+        top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+      };
+      if (![6, 7, 8, 9, 10, 11, 12].includes(col)) {
+        cell.alignment = cell.alignment || { horizontal: 'left', vertical: 'middle' };
+      }
+    }
+
+    totalEstimated += item.estimatedTotal || 0;
+    totalActual += item.actualAmount || 0;
+    totalProfit += item.profit || 0;
+  });
+
+  const summaryRowNum = items.length + 3;
+  worksheet.mergeCells(summaryRowNum, 1, summaryRowNum, 7);
+  const summaryLabelCell = worksheet.getCell(summaryRowNum, 1);
+  summaryLabelCell.value = 'Tổng cộng';
+  summaryLabelCell.font = { name: 'Roboto', size: 11, bold: true };
+  summaryLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  summaryLabelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  summaryLabelCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const summaryEstimatedCell = worksheet.getCell(summaryRowNum, 8);
+  setCurrencyCell(summaryEstimatedCell, totalEstimated);
+  summaryEstimatedCell.font = { ...summaryEstimatedCell.font, bold: true };
+  summaryEstimatedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE68A' } };
+  summaryEstimatedCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const summaryActualCell = worksheet.getCell(summaryRowNum, 11);
+  setCurrencyCell(summaryActualCell, totalActual);
+  summaryActualCell.font = { ...summaryActualCell.font, bold: true };
+  summaryActualCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE68A' } };
+  summaryActualCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const summaryProfitCell = worksheet.getCell(summaryRowNum, 12);
+  setCurrencyCell(summaryProfitCell, totalProfit);
+  summaryProfitCell.font = { ...summaryProfitCell.font, bold: true };
+  summaryProfitCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE68A' } };
+  summaryProfitCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const summaryNoteCell = worksheet.getCell(summaryRowNum, 13);
+  summaryNoteCell.value = '';
+  summaryNoteCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  console.log(`✅ Created budget sheet "${title}" với ${items.length} mục kinh phí`);
+};
+
+const MAX_SHEET_NAME_LENGTH = 31;
+
+const sanitizeSheetName = (name, index) => {
+  const fallback = `Form ${index + 1}`;
+  if (!name || typeof name !== 'string') return fallback;
+  let sanitized = name.replace(/[\[\]\*\/\\\?\:]/g, '').trim();
+  if (!sanitized) sanitized = fallback;
+  if (sanitized.length > MAX_SHEET_NAME_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_SHEET_NAME_LENGTH);
+  }
+  return sanitized;
+};
+
+const createFeedbackWorksheet = (worksheet, eventName, form, formIndex) => {
+  const questionCount = form.questions.length;
+  const columnCount = Math.max(questionCount + 1, 2);
+
+  worksheet.getColumn(1).width = 5;
+  for (let i = 2; i <= columnCount; i++) {
+    worksheet.getColumn(i).width = 25;
+  }
+
+  worksheet.mergeCells(1, 1, 1, columnCount);
+  const titleCell = worksheet.getCell(1, 1);
+  titleCell.value = 'Danh sách phản hồi';
+  titleCell.font = { name: 'Roboto', size: 14, bold: true };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  titleCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+  };
+
+  worksheet.mergeCells(2, 1, 2, columnCount);
+  const eventCell = worksheet.getCell(2, 1);
+  eventCell.value = `Tên sự kiện: ${eventName || 'Chưa cập nhật'}`;
+  eventCell.font = { name: 'Roboto', size: 11 };
+  eventCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  worksheet.mergeCells(3, 1, 3, columnCount);
+  const formCell = worksheet.getCell(3, 1);
+  formCell.value = `Form phản hồi: ${form.name || `Form ${formIndex + 1}`}`;
+  formCell.font = { name: 'Roboto', size: 11 };
+  formCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  worksheet.mergeCells(4, 1, 4, columnCount);
+  const descCell = worksheet.getCell(4, 1);
+  descCell.value = `Mô tả: ${form.description || 'Chưa có mô tả'}`;
+  descCell.font = { name: 'Roboto', size: 11 };
+  descCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  worksheet.mergeCells(5, 1, 5, columnCount);
+  worksheet.getCell(5, 1).value = '';
+
+  const headers = ['#', ...form.questions.map((q, idx) => q.text || `Câu hỏi ${idx + 1}`)];
+  const headerRow = worksheet.getRow(6);
+  headerRow.height = 20;
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { name: 'Roboto', size: 11, bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F0E3' } };
+    cell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+    };
+  });
+
+  if (!form.responses.length) {
+    worksheet.mergeCells(7, 1, 7, columnCount);
+    const emptyCell = worksheet.getCell(7, 1);
+    emptyCell.value = 'Chưa có phản hồi nào cho biểu mẫu này.';
+    emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+    emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    emptyCell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+    };
+    return;
+  }
+
+  form.responses.forEach((response, index) => {
+    const rowIndex = index + 7;
+    const row = worksheet.getRow(rowIndex);
+    row.height = 20;
+
+    row.getCell(1).value = index + 1;
+    row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    form.questions.forEach((question, qIdx) => {
+      const cell = row.getCell(qIdx + 2);
+      const answer = response.answers?.[question.questionId];
+      cell.value = formatFeedbackAnswer(question.type, answer);
+      cell.font = { name: 'Roboto', size: 11 };
+      cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+  });
+
+  console.log(`✅ Created feedback sheet "${form.name}" với ${form.responses.length} phản hồi`);
+};
+
+const createEmptyFeedbackSheet = (worksheet, eventName) => {
+  worksheet.getColumn(1).width = 5;
+  worksheet.getColumn(2).width = 40;
+
+  worksheet.mergeCells('A1:B1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = 'Danh sách phản hồi';
+  titleCell.font = { name: 'Roboto', size: 14, bold: true };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6B8AF' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  titleCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+  };
+
+  worksheet.mergeCells('A2:B2');
+  worksheet.getCell('A2').value = `Tên sự kiện: ${eventName || 'Chưa cập nhật'}`;
+  worksheet.getCell('A2').font = { name: 'Roboto', size: 11 };
+
+  worksheet.mergeCells('A4:B4');
+  const emptyCell = worksheet.getCell('A4');
+  emptyCell.value = 'Chưa có form phản hồi nào cho sự kiện này.';
+  emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+  emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  emptyCell.border = {
+    top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+  };
+};
+
+const formatFeedbackAnswer = (questionType, answer) => {
+  if (answer === null || typeof answer === 'undefined') return '';
+  if (Array.isArray(answer)) return answer.join(', ');
+
+  switch (questionType) {
+    case 'rating':
+      return `${answer}`;
+    case 'multiple-choice':
+      return String(answer);
+    case 'yes-no':
+      return answer ? 'Có' : 'Không';
+    default:
+      return String(answer);
+  }
+};
+
+const MAX_FEEDBACK_SHEET_NAME_LENGTH = 31;
+
+const sanitizeFeedbackSheetName = (name, index) => {
+  const fallback = `Form ${index + 1}`;
+  if (!name || typeof name !== 'string') return fallback;
+  let sanitized = name.replace(/[\[\]\*\/\\\?\:]/g, '').trim();
+  if (!sanitized) sanitized = fallback;
+  if (sanitized.length > MAX_FEEDBACK_SHEET_NAME_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_FEEDBACK_SHEET_NAME_LENGTH);
+  }
+  return sanitized;
+};
+
+const formatTaskStatusText = (status) => TASK_STATUS_LABELS[status] || 'Không xác định';
+
+const formatTaskTypeText = (taskType) => (taskType === 'epic' ? 'Lớn' : 'Nhỏ');
+
+const formatTaskDateText = (date) => {
+  if (!date) return '';
+  try {
+    return new Date(date).toLocaleDateString('vi-VN');
+  } catch (error) {
+    return '';
+  }
+};
+
+function isPendingTask(task) {
+  return ['chua_bat_dau', 'da_bat_dau'].includes(task?.status);
+}
+
+function isCompletedTask(task) {
+  return task?.status === 'hoan_thanh';
+}
+
+function isOverdueTask(task) {
+  if (!task || !task.endDate) return false;
+  const dueDate = new Date(task.endDate);
+  const now = new Date();
+  return dueDate < now && !['hoan_thanh', 'huy'].includes(task.status);
+}
 
 // Function lấy data milestones
 const getMilestoneData = async (eventId) => {

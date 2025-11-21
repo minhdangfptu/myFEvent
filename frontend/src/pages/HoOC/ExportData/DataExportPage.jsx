@@ -152,7 +152,7 @@ export default function DataExportPage() {
 
     const fetchExportedFiles = async () => {
       try {
-        const response = await getExportedFiles();
+        const response = await getExportedFiles(eventId);
         setExportedFiles(response.files || []);
       } catch (error) {
         console.error("Error fetching exported files:", error);
@@ -241,27 +241,12 @@ export default function DataExportPage() {
       color: "#f3f3f3",
       iconColor: "#00ACC1",
       description:
-        "Xuất quản lý công việc: Tên task, Deadline, Trạng thái, Người thực hiện",
+        "Xuất danh sách công việc lớn (epic): Tên công việc, Thời gian, Trạng thái, Ban phụ trách",
       subItems: [
         {
           id: "tasks-all",
-          title: "Tất cả công việc",
-          description: "Danh sách đầy đủ các task",
-        },
-        {
-          id: "tasks-pending",
-          title: "Công việc đang chờ",
-          description: "Các task chưa hoàn thành",
-        },
-        {
-          id: "tasks-completed",
-          title: "Công việc đã hoàn thành",
-          description: "Các task đã xong",
-        },
-        {
-          id: "tasks-overdue",
-          title: "Công việc quá hạn",
-          description: "Các task bị trễ deadline",
+          title: "Tất cả công việc lớn (epic)",
+          description: "Danh sách đầy đủ các công việc loại epic",
         },
       ],
     },
@@ -385,12 +370,15 @@ export default function DataExportPage() {
   };
 
   // Main download function 
-  const handleDownload = async (itemId) => {
+  const handleDownload = async (itemId, subItems = []) => {
     const implementedItems = [
       "team",
       "members",
       "timeline",
       "agenda",
+      "tasks",
+      "budget",
+      "feedback",
       "risks",
       "incidents",
     ];
@@ -406,7 +394,7 @@ export default function DataExportPage() {
       console.log("🚀 Starting export for:", itemId);
 
       // Gọi API export, axios trả về file blob
-      const response = await exportItem(eventId, itemId);
+      const response = await exportItem(eventId, itemId, subItems);
 
       // Xử lý tải về
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -491,7 +479,7 @@ export default function DataExportPage() {
 
   const fetchExportedFiles = async () => {
     try {
-      const response = await getExportedFiles();
+      const response = await getExportedFiles(eventId);
       setExportedFiles(response.files || []);
     } catch (error) {
       console.error("Error fetching exported files:", error);
@@ -560,7 +548,7 @@ export default function DataExportPage() {
 
   const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
     console.log("Downloading item with options:", itemId, selectedSubItems);
-    await handleDownload(itemId);
+    await handleDownload(itemId, selectedSubItems);
     setShowOptionsModal(null);
   };
 
@@ -739,6 +727,9 @@ export default function DataExportPage() {
                   "members",
                   "timeline",
                   "agenda",
+                  "tasks",
+                  "budget",
+                  "feedback",
                   "risks",
                   "incidents",
                 ].includes(item.id);

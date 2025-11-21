@@ -2,11 +2,11 @@ import axiosClient from './axiosClient.js';
 
 // === EXPORT APIs ===
 
-// Export single item (team, members, timeline, agenda, risks, incidents)
-export const exportItem = async (eventId, itemId) => {
+// Export single item (team, members, timeline, agenda, tasks, risks, incidents)
+export const exportItem = async (eventId, itemId, subItems = []) => {
   return await axiosClient.post(
     `/api/events/${eventId}/exports/items/${itemId}`,
-    { subItems: [] },
+    { subItems },
     { 
       responseType: 'blob',
       timeout: 120000 // 2 phút (120 giây) - đủ thời gian để generate file Excel lớn
@@ -37,9 +37,9 @@ export const exportSelectedItemsZip = async (eventId, itemIds) => {
   );
 };
 
-// List exported files
-export const getExportedFiles = async () => {
-  const res = await axiosClient.get('/api/events/exports/items/lists');
+// List exported files for a specific event
+export const getExportedFiles = async (eventId) => {
+  const res = await axiosClient.get(`/api/events/${eventId}/exports/items/lists`);
   return res.data;
 };
 

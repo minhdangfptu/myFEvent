@@ -726,3 +726,86 @@ export const feedbackService = {
   }
 };
 
+export const getFeedbackFormsForExport = async (eventId) => {
+  try {
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return { eventName: '', forms: [] };
+    }
+
+    const eventObjectId = new mongoose.Types.ObjectId(eventId);
+    const [eventDoc, forms] = await Promise.all([
+      Event.findById(eventObjectId).select('name').lean(),
+      FeedbackForm.find({ eventId: eventObjectId })
+        .sort({ createdAt: 1 })
+        .lean()
+    ]);
+
+    if (!forms.length) {
+      return { eventName: eventDoc?.name || '', forms: [] };
+    }
+
+    const formIds = forms.map((form) => form._id);
+    const responses = await FeedbackResponse.find({ formId: { $in: formIds } })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: 1 })
+      .lean();
+
+    const responseMap = new Map();
+    formIds.forEach((id) => responseMap.set(id.toString(), []));
+
+    responses.forEach((resp) => {
+      const key = resp.formId?.toString();
+      if (!key || !responseMap.has(key)) return;
+
+      const answerMap = {};
+      (resp.responses || []).forEach((answer) => {
+        if (!answer) return;
+        const answerKey = (answer.questionId ?? '').toString();
+        answerMap[answerKey] = answer.answer;
+      });
+
+      responseMap.get(key).push({
+        submittedAt: resp.submittedAt,
+        userName: resp.userId?.fullName || 'N/A',
+        userEmail: resp.userId?.email || 'N/A',
+        answers: answerMap
+      });
+    });
+
+    const formsWithResponses = forms.map((form) => {
+      const questions = (form.questions || []).map((question, index) => {
+        const questionOrder =
+          typeof question.order === 'number' ? question.order : index;
+        return {
+          questionId: index.toString(),
+          text: question.questionText || `Câu hỏi ${index + 1}`,
+          type: question.questionType || 'text',
+          order: questionOrder,
+          index
+        };
+      });
+
+      questions.sort((a, b) => {
+        if (a.order === b.order) return a.index - b.index;
+        return a.order - b.order;
+      });
+
+      return {
+        id: form._id?.toString(),
+        name: form.name || 'Biểu mẫu phản hồi',
+        description: form.description || '',
+        questions,
+        responses: responseMap.get(form._id?.toString()) || []
+      };
+    });
+
+    return {
+      eventName: eventDoc?.name || '',
+      forms: formsWithResponses
+    };
+  } catch (error) {
+    console.error('❌ Error fetching feedback forms for export:', error);
+    return { eventName: '', forms: [] };
+  }
+};
+
