@@ -40,6 +40,49 @@ export const getAgendasByMilestone = async (req, res) => {
     }
 };
 
+export const getAgendaByEvent = async (req, res) => {
+    try {
+        const validationError = handleValidationErrors(req, res);
+        if (validationError) return validationError;
+
+        const { eventId } = req.params;
+        
+        const agendaDoc = await agendaService.getAgendaByEvent(eventId);
+        
+        res.status(200).json({
+            success: true,
+            data: agendaDoc,
+            message: 'Agenda retrieved successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve agenda',
+            error: error.message
+        });
+    }
+};
+export const getNameAgendaWithMilestone = async (req, res) => {
+    try {
+        const validationError = handleValidationErrors(req, res);
+        if (validationError) return validationError;
+        const { eventId } = req.params;
+        const agendaDoc = await agendaService.getNameAgendaWithMilestone(eventId);
+        
+        res.status(200).json({
+            success: true,
+            data: agendaDoc,
+            message: 'Agenda retrieved successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve agenda',
+            error: error.message
+        });
+    }
+};
+
 // Lấy flattened agenda items
 export const getFlattenedAgendaItems = async (req, res) => {
     try {
@@ -74,10 +117,17 @@ export const createAgenda = async (req, res) => {
         if (validationError) return validationError;
 
         const { milestoneId } = req.params;
+
+        if (!milestoneId) {
+            return res.status(400).json({
+                success: false,
+                message: 'milestoneId is required'
+            });
+        }
         
         const payload = {
-            milestoneId,
-            ...req.body
+            ...req.body,
+            milestoneId
         };
         
         const agenda = await agendaService.createAgendaDoc(payload);
@@ -89,7 +139,7 @@ export const createAgenda = async (req, res) => {
         });
     } catch (error) {
         const statusCode = error.message.includes('already exists') ? 409 : 400;
-        res.status(statusCode).json({
+        return res.status(statusCode).json({
             success: false,
             message: 'Failed to create agenda',
             error: error.message

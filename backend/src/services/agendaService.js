@@ -12,28 +12,59 @@ import mongoose from 'mongoose';
 // Lấy agenda theo milestoneId (không cần validate role - chỉ đọc)
 export const getAgendaByMilestoneId = async (milestoneId) => {
     const agendaDoc = await Agenda.findOne({ milestoneId }).lean();
-    
     if (!agendaDoc) {
         return null;
     }
-    
-    // Sort các items trong mỗi agenda date theo startTime
     if (agendaDoc.agenda && agendaDoc.agenda.length > 0) {
         agendaDoc.agenda.forEach(dateAgenda => {
             if (dateAgenda.items && dateAgenda.items.length > 0) {
                 dateAgenda.items.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
             }
         });
-        
-        // Sort dates
         agendaDoc.agenda.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-    
     return agendaDoc;
 }
 
+export const getAgendaByEvent = async (eventId) => {
+    const agendas = await Agenda.find({})
+        .populate({
+            path: 'milestoneId',
+            select: 'eventId name description targetDate status isDeleted',
+            match: { eventId }
+        })
+        .lean();
+
+    if (!agendas || agendas.length === 0) {
+        return [];
+    }
+    if (agendas.agenda && agendas.agenda.length > 0) {
+        agendas.agenda.forEach(dateAgenda => {
+            if (dateAgenda.items && dateAgenda.items.length > 0) {
+                dateAgenda.items.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+            }
+        });
+        agendas.agenda.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    return agendas;
+}
+export const getNameAgendaWithMilestone = async (eventId) => {
+    const agendas = await Agenda.find({})
+        .populate({
+            path: 'milestoneId',
+            select: 'eventId name',
+            match: { eventId }
+        })
+        .select('_id')
+        .lean();
+    if (!agendas || agendas.length === 0) {
+        return [];
+    }
+    return agendas;
+}
+
 // Tạo agenda document mới
-export const createAgendaDoc = async (payload, userRole) => {
+export const createAgendaDoc = async (payload) => {
     // validateRole(userRole);
     
     // Check if agenda for this milestone already exists
@@ -54,7 +85,7 @@ export const createAgendaDoc = async (payload, userRole) => {
 // === QUẢN LÝ DATE LEVEL ===
 
 // Thêm một date mới vào agenda
-export const addDateToAgenda = async (milestoneId, date, userRole) => {
+export const addDateToAgenda = async (milestoneId, date) => {
     // validateRole(userRole);
     
     const dateObj = new Date(date);
@@ -72,7 +103,7 @@ export const addDateToAgenda = async (milestoneId, date, userRole) => {
 }
 
 // Update thông tin date trong agenda (by ID)
-export const updateDateInAgendaById = async (milestoneId, dateId, updates, userRole) => {
+export const updateDateInAgendaById = async (milestoneId, dateId, updates) => {
     // validateRole(userRole);
     
     return await Agenda.findOneAndUpdate(
@@ -88,7 +119,7 @@ export const updateDateInAgendaById = async (milestoneId, dateId, updates, userR
 }
 
 // Xóa một date khỏi agenda (by ID)
-export const removeDateFromAgendaById = async (milestoneId, dateId, userRole) => {
+export const removeDateFromAgendaById = async (milestoneId, dateId) => {
     // validateRole(userRole);
     
     return await Agenda.findOneAndUpdate(
@@ -100,7 +131,7 @@ export const removeDateFromAgendaById = async (milestoneId, dateId, userRole) =>
 
 // === QUẢN LÝ ITEM LEVEL ===
 // Thêm item vào date bằng dateId
-export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem, userRole) => {
+export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem) => {
     // validateRole(userRole);
     
     const itemWithDuration = {
@@ -117,7 +148,7 @@ export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem, u
 }
 
 // Xóa item khỏi agenda (by index)
-export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex, userRole) => {
+export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex) => {
     // validateRole(userRole);
     
     const agendaDoc = await Agenda.findOne({ milestoneId });
@@ -140,7 +171,7 @@ export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex, us
 
 
 // Update một item cụ thể (by index)
-export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, updates, userRole) => {
+export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, updates) => {
     // validateRole(userRole);
     
     // Tính duration nếu có update startTime hoặc endTime
@@ -230,7 +261,7 @@ export const findDateById = async (milestoneId, dateId) => {
 
 // === BATCH OPERATIONS ===
 // Batch thêm nhiều items vào date bằng dateId
-export const batchCreateItemsForDateById = async (milestoneId, dateId, itemsArray, userRole) => {
+export const batchCreateItemsForDateById = async (milestoneId, dateId, itemsArray) => {
     // validateRole(userRole);
     
     const itemsWithDuration = itemsArray.map(item => ({
@@ -247,7 +278,7 @@ export const batchCreateItemsForDateById = async (milestoneId, dateId, itemsArra
 }
 
 // Batch update nhiều items (by index)
-export const batchUpdateItems = async (milestoneId, itemUpdates, userRole) => {
+export const batchUpdateItems = async (milestoneId, itemUpdates) => {
     // validateRole(userRole);
     
     const updateFields = {};
@@ -270,7 +301,7 @@ export const batchUpdateItems = async (milestoneId, itemUpdates, userRole) => {
 }
 
 // Batch xóa nhiều items (by index)
-export const batchRemoveItems = async (milestoneId, itemsToRemove, userRole) => {
+export const batchRemoveItems = async (milestoneId, itemsToRemove) => {
     // validateRole(userRole);
     
     const agendaDoc = await Agenda.findOne({ milestoneId });

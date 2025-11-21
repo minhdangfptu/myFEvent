@@ -49,6 +49,9 @@ export default function HoOCSidebar({
         if (parsed.risksOpen !== undefined) {
           setRisksOpen(parsed.risksOpen);
         }
+        if (parsed.exportsOpen !== undefined) {
+          setExportsOpen(parsed.exportsOpen);
+        }
       }
     } catch (error) {
       console.error('Error loading sidebar state:', error);
@@ -68,13 +71,14 @@ export default function HoOCSidebar({
       financeOpen,
       overviewOpen,
       risksOpen,
+      exportsOpen
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (error) {
       console.error('Error saving sidebar state:', error);
     }
-  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
 
   // Sử dụng eventId từ props
   const { events, loading } = useEvents();
@@ -104,8 +108,8 @@ export default function HoOCSidebar({
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
   const exportSubItems = [
-    { id: "export-all", label: "Dữ liệu sự kiện", path: `/` },
-    { id: "export-example", label: "Mẫu tài liệu", path: `/` },
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId}/export/data` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId}/export/templates` },
   ];
 
   // Hover handlers giữ nguyên

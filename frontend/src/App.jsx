@@ -77,6 +77,9 @@ import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
 import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
 import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
+import DataExportPage from "./pages/HoOC/ExportData/DataExportPage";
+import DataTemplatePage from "./pages/HoOC/ExportData/DataTemplatePage";
+import DataExportPreviewModal from "./components/DataExportPreviewModal";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -468,6 +471,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <FeedbackSummary />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/export/data" 
+            element={
+              <ProtectedRoute>
+                <DataExportPage/>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/export/templates" 
+            element={
+              <ProtectedRoute>
+                <DataTemplatePage />
               </ProtectedRoute>
             } 
           />

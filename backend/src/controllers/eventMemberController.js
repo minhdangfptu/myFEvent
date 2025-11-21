@@ -6,10 +6,10 @@ import {
   groupMembersByDepartment,
   getUnassignedMembersRaw,
   getMembersByDepartmentRaw,
-  getEventMemberProfileById
+  getEventMemberProfileById,
+  getMemberInformationForExport
 } from '../services/eventMemberService.js';
 import { findEventById } from '../services/eventService.js';
-import eventMember from '../models/eventMember.js';
 
 // Get members by event
 export const getMembersByEvent = async (req, res) => {
@@ -101,6 +101,17 @@ export const getCoreTeamList = async (req, res) => {
     return res.status(200).json({ data: coreteam });
   } catch (error) {
     console.error('getCoreTeamList error:', error);
+    return res.status(500).json({ message: 'Failed to load core team members' });
+  }
+};
+export const getEventMemberForExport = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    await ensureEventExists(eventId);
+    const eventmembers = await getMemberInformationForExport(eventId);
+    return res.status(200).json({ data: eventmembers });
+  } catch (error) {
+    console.error('eventmembers error:', error);
     return res.status(500).json({ message: 'Failed to load core team members' });
   }
 };
