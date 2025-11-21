@@ -1,11 +1,17 @@
 import Task from '../models/task.js';
 import recalcParentsUpward from '../utils/recalcParentTask.js';
 
+const TASK_STATUSES = {
+  NOT_STARTED: 'chua_bat_dau',
+  IN_PROGRESS: 'da_bat_dau',
+  DONE: 'hoan_thanh'
+};
+
 /**
- * Tự động cập nhật trạng thái task sang "in_progress" khi đến thời gian bắt đầu
+ * Tự động cập nhật trạng thái task sang "đã bắt đầu" khi đến thời gian bắt đầu
  * Chỉ cập nhật các task có:
  * - startDate đã đến (startDate <= now)
- * - status hiện tại là "todo"
+ * - status hiện tại là "chưa bắt đầu"
  * - có assigneeId (không phải parent task)
  */
 export const autoUpdateTaskStatusByStartDate = async () => {
@@ -14,11 +20,11 @@ export const autoUpdateTaskStatusByStartDate = async () => {
     
     // Tìm các task cần cập nhật
     // - startDate đã được set và đã đến (startDate <= now)
-    // - status hiện tại là "todo"
+    // - status hiện tại là "chưa bắt đầu"
     // - có assigneeId (không phải parent task)
     const tasksToUpdate = await Task.find({
       startDate: { $exists: true, $ne: null, $lte: now },
-      status: 'todo',
+      status: TASK_STATUSES.NOT_STARTED,
       assigneeId: { $exists: true, $ne: null }, // Chỉ task có người assign
     }).lean();
 
@@ -39,7 +45,7 @@ export const autoUpdateTaskStatusByStartDate = async () => {
           eventId: task.eventId,
         }).select('status').lean();
         
-        const allDepsDone = depsStatus.every(dep => dep.status === 'done');
+        const allDepsDone = depsStatus.every(dep => dep.status === TASK_STATUSES.DONE);
         if (!allDepsDone) {
           canUpdate = false;
         }
@@ -49,7 +55,7 @@ export const autoUpdateTaskStatusByStartDate = async () => {
         const updated = await Task.findByIdAndUpdate(
           task._id,
           { 
-            status: 'in_progress',
+            status: TASK_STATUSES.IN_PROGRESS,
             updatedAt: new Date()
           },
           { new: true }
@@ -67,7 +73,7 @@ export const autoUpdateTaskStatusByStartDate = async () => {
     }
 
     if (updatedTasks.length > 0) {
-      console.log(`[Auto Status] Đã cập nhật ${updatedTasks.length} task sang "in_progress"`);
+      console.log(`[Auto Status] Đã cập nhật ${updatedTasks.length} task sang trạng thái "đã bắt đầu"`);
     }
 
     return { 

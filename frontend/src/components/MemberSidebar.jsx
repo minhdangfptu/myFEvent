@@ -148,7 +148,7 @@ export default function MemberSidebar({
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
-    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/member-tasks` },
     { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
     // Không có work-stats (thống kê tiến độ)
   ];

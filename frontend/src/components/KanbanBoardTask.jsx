@@ -48,11 +48,11 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
   // Map column title to backend status
   const getStatusFromColumn = (columnId) => {
     const statusMap = {
-      notStarted: 'todo',
-      inProgress: 'in_progress',
-      done: 'done',
+      notStarted: 'chua_bat_dau',
+      inProgress: 'da_bat_dau',
+      done: 'hoan_thanh',
     };
-    return statusMap[columnId] || 'todo';
+    return statusMap[columnId] || 'chua_bat_dau';
   };
 
   const handleDragStart = (event) => {
@@ -301,14 +301,14 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
               columnId="notStarted"
             />
             <Column
-              title="Đang làm"
+              title="Đã bắt đầu"
               count={items.inProgress.length}
               color="#ffa500"
               tasks={items.inProgress}
               columnId="inProgress"
             />
             <Column
-              title="Đã xong"
+              title="Hoàn thành"
               count={items.done.length}
               color="#28a745"
               tasks={items.done}

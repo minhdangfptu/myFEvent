@@ -280,7 +280,17 @@ export const removeMemberFromEvent = async (req, res) => {
       {
         eventId,
         assigneeId: memberId,
-        status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+        status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
+      },
+      {
+        $set: { assigneeId: null }
+      }
+    );
+    await Task.updateMany(
+      {
+        eventId,
+        assigneeId: memberId,
+        status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
       },
       {
         $set: { assigneeId: null }
@@ -417,7 +427,7 @@ export const leaveEvent = async (req, res) => {
       {
         eventId,
         assigneeId: membership._id,
-        status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+        status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
       },
       {
         $set: { assigneeId: null }
