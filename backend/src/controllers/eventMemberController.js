@@ -483,27 +483,3 @@ export const leaveEvent = async (req, res) => {
     return res.status(500).json({ message: 'Không thể rời sự kiện' });
   }
 };
-export const removeMemberFromEvent = async (req, res) => {
-  try {
-    const { eventId, memberId } = req.params;
-    const membership = await ensureEventRole(req.user.id, eventId, ['HoOC']);
-    if (!membership) return res.status(403).json({ message: 'Only HoOC can remove members' });
-    const member = await findEventMemberById( memberId);
-    if (!member) {
-      return res
-        .status(404)
-        .json({ message: "Member not found in this event" });
-    }
-    if (member.role === "HoOC") {
-      return res.status(400).json({ message: "Cannot deactivate HoOC" });
-    }
-    if (member.status === "Inactive") {
-      return res.status(400).json({ message: "Member already deactive" });
-    }
-    await inactiveEventMember(memberId);
-    return res.status(200).json({ message: 'Member removed from event successfully' });
-  } catch (error) {
-    console.log('removeMemberFromEvent error:', error.message);
-    return res.status(500).json({ message: 'Failed to remove member from event' });
-  }
-}

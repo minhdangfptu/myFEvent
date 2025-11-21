@@ -9,7 +9,6 @@ import {
     updateMemberRole,
     changeMemberDepartment,
     removeMemberFromEvent,
-    removeMemberFromEvent
 } from '../controllers/eventMemberController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
