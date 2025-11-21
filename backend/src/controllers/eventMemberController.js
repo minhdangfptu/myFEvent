@@ -7,6 +7,7 @@ import {
   getUnassignedMembersRaw,
   getMembersByDepartmentRaw,
   getEventMemberProfileById,
+  getMemberInformationForExport,
   findEventMemberById,
   inactiveEventMember
 } from '../services/eventMemberService.js';
@@ -481,5 +482,17 @@ export const leaveEvent = async (req, res) => {
   } catch (error) {
     console.error('leaveEvent error:', error);
     return res.status(500).json({ message: 'Không thể rời sự kiện' });
+  }
+};
+
+export const getEventMemberForExport = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    await ensureEventExists(eventId);
+    const eventmembers = await getMemberInformationForExport(eventId);
+    return res.status(200).json({ data: eventmembers });
+  } catch (error) {
+    console.error('eventmembers error:', error);
+    return res.status(500).json({ message: 'Failed to load core team members' });
   }
 };

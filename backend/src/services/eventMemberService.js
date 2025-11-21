@@ -95,6 +95,20 @@ export const countDepartmentMembersExcludingHoOC = async (departmentId) => {
   return await EventMember.countDocuments({ departmentId, role: { $ne: 'HoOC' }, status: { $ne: 'deactive' } });
 };
 
+export const countDepartmentMembersIncludingHoOC = async (departmentId) => {
+  return await EventMember.countDocuments({ departmentId });
+};
+
+export const getMemberInformationForExport = async (eventId) => {
+  return await EventMember.find({ eventId })
+    .populate([
+      { path: 'userId', select: 'fullName email phone' },
+      { path: 'departmentId', select: 'name' }
+    ])
+    .sort({ createdAt: -1 })
+    .lean();
+};
+
 export const getEventMemberProfileById = async (memberId) => {
   return await EventMember.findOne({ _id: memberId, status: { $ne: 'deactive' } })
     .populate('userId', 'fullName email avatarUrl phone status bio highlight tags verified')

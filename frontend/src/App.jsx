@@ -87,6 +87,9 @@ import BudgetStatistics from "./pages/Budget/BudgetStatistics";
 import MemberExpensePage from "./pages/Budget/MemberExpensePage";
 import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
 import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
+import DataExportPage from "./pages/HoOC/ExportData/DataExportPage";
+import DataTemplatePage from "./pages/HoOC/ExportData/DataTemplatePage";
+import DataExportPreviewModal from "./components/DataExportPreviewModal";
 import AdminDashboard from "./pages/Admin/AdminDashBoard";
 import { User } from "lucide-react";
 import UserManagement from "./pages/Admin/UserManagement";
@@ -579,6 +582,115 @@ export default function App() {
                 <MemberExpensePage />
               </ProtectedRoute>
             }
+          />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            }
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/events/:eventId/export/data" 
+            element={
+              <ProtectedRoute>
+                <DataExportPage/>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/export/templates" 
+            element={
+              <ProtectedRoute>
+                <DataTemplatePage />
+              </ProtectedRoute>
+            } 
           />
           
           {/* Admin Routes */}

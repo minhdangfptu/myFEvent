@@ -8,6 +8,8 @@ import riskRoute from './riskRoute.js';
 import aiRoute from './aiRoute.js';
 import { getAllBudgetsForEvent, getBudgetStatistics } from '../controllers/budgetController.js';
 import calendarRoute from './calendarRoute.js';
+import exportRoute from './exportRoute.js'
+
 
 const router = express.Router();
 
@@ -22,6 +24,7 @@ router.use('/:eventId/members', eventMemberRoute);
 router.use('/:eventId/risks', riskRoute);
 router.use('/:eventId/ai', aiRoute);
 router.use('/:eventId/calendars',calendarRoute);
+router.use('/:eventId/exports', exportRoute );
 
 // Public events
 router.get('/public', listPublicEvents);
