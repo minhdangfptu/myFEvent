@@ -237,127 +237,127 @@ export const changeMemberDepartment = async (req, res) => {
   }
 };
 
-// DELETE /api/events/:eventId/members/:memberId
-export const removeMemberFromEvent = async (req, res) => {
-  try {
-    const { eventId, memberId } = req.params;
+// // DELETE /api/events/:eventId/members/:memberId
+// export const removeMemberFromEvent = async (req, res) => {
+//   try {
+//     const { eventId, memberId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(memberId)) {
-      return res.status(400).json({ message: 'Member ID không hợp lệ' });
-    }
+//     if (!mongoose.Types.ObjectId.isValid(memberId)) {
+//       return res.status(400).json({ message: 'Member ID không hợp lệ' });
+//     }
 
-    const requesterMembership = await ensureEventRole(req.user?.id, eventId, ['HoOC', 'HoD']);
-    if (!requesterMembership) {
-      return res.status(403).json({ message: 'Bạn không có quyền xoá thành viên' });
-    }
+//     const requesterMembership = await ensureEventRole(req.user?.id, eventId, ['HoOC', 'HoD']);
+//     if (!requesterMembership) {
+//       return res.status(403).json({ message: 'Bạn không có quyền xoá thành viên' });
+//     }
 
-    const member = await EventMember.findOne({
-      _id: memberId,
-      eventId,
-      status: { $ne: 'deactive' }
-    })
-      .populate('userId', 'fullName email')
-      .populate('departmentId', 'name')
-      .lean();
+//     const member = await EventMember.findOne({
+//       _id: memberId,
+//       eventId,
+//       status: { $ne: 'deactive' }
+//     })
+//       .populate('userId', 'fullName email')
+//       .populate('departmentId', 'name')
+//       .lean();
 
-    if (!member) {
-      return res.status(404).json({ message: 'Không tìm thấy thành viên' });
-    }
+//     if (!member) {
+//       return res.status(404).json({ message: 'Không tìm thấy thành viên' });
+//     }
 
-    if (member.role === 'HoOC') {
-      return res.status(400).json({ message: 'Không thể xóa HoOC khỏi sự kiện' });
-    }
+//     if (member.role === 'HoOC') {
+//       return res.status(400).json({ message: 'Không thể xóa HoOC khỏi sự kiện' });
+//     }
 
-    if (requesterMembership.role === 'HoD') {
-      const requesterDeptId = requesterMembership.departmentId?.toString();
-      const memberDeptId = member.departmentId?._id?.toString() || member.departmentId?.toString();
-      if (!requesterDeptId || requesterDeptId !== memberDeptId) {
-        return res.status(403).json({ message: 'HoD chỉ được quản lý thành viên trong ban của mình' });
-      }
-      if (member.role !== 'Member') {
-        return res.status(403).json({ message: 'HoD không thể xóa HoD khác' });
-      }
-    }
+//     if (requesterMembership.role === 'HoD') {
+//       const requesterDeptId = requesterMembership.departmentId?.toString();
+//       const memberDeptId = member.departmentId?._id?.toString() || member.departmentId?.toString();
+//       if (!requesterDeptId || requesterDeptId !== memberDeptId) {
+//         return res.status(403).json({ message: 'HoD chỉ được quản lý thành viên trong ban của mình' });
+//       }
+//       if (member.role !== 'Member') {
+//         return res.status(403).json({ message: 'HoD không thể xóa HoD khác' });
+//       }
+//     }
 
-    await Task.updateMany(
-      {
-        eventId,
-        assigneeId: memberId,
-        status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
-      },
-      {
-        $set: { assigneeId: null }
-      }
-    );
+//     await Task.updateMany(
+//       {
+//         eventId,
+//         assigneeId: memberId,
+//         status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+//       },
+//       {
+//         $set: { assigneeId: null }
+//       }
+//     );
 
-    await EventMember.updateOne(
-      { _id: memberId },
-      { $set: { status: 'deactive', departmentId: null } }
-    );
+//     await EventMember.updateOne(
+//       { _id: memberId },
+//       { $set: { status: 'deactive', departmentId: null } }
+//     );
 
-    const event = await Event.findById(eventId).select('name').lean();
-    const notifyUsers = [];
-    const departmentId = member.departmentId?._id || member.departmentId;
+//     const event = await Event.findById(eventId).select('name').lean();
+//     const notifyUsers = [];
+//     const departmentId = member.departmentId?._id || member.departmentId;
 
-    if (departmentId) {
-      const hod = await EventMember.findOne({
-        eventId,
-        departmentId,
-        role: 'HoD',
-        status: { $ne: 'deactive' }
-      }).populate('userId', '_id').lean();
+//     if (departmentId) {
+//       const hod = await EventMember.findOne({
+//         eventId,
+//         departmentId,
+//         role: 'HoD',
+//         status: { $ne: 'deactive' }
+//       }).populate('userId', '_id').lean();
 
-      if (hod?.userId?._id) {
-        notifyUsers.push(hod.userId._id);
-      }
-    }
+//       if (hod?.userId?._id) {
+//         notifyUsers.push(hod.userId._id);
+//       }
+//     }
 
-    const hoocMembers = await EventMember.find({
-      eventId,
-      role: 'HoOC',
-      status: { $ne: 'deactive' }
-    }).populate('userId', '_id').lean();
+//     const hoocMembers = await EventMember.find({
+//       eventId,
+//       role: 'HoOC',
+//       status: { $ne: 'deactive' }
+//     }).populate('userId', '_id').lean();
 
-    hoocMembers.forEach(m => {
-      if (m.userId?._id) {
-        notifyUsers.push(m.userId._id);
-      }
-    });
+//     hoocMembers.forEach(m => {
+//       if (m.userId?._id) {
+//         notifyUsers.push(m.userId._id);
+//       }
+//     });
 
-    const uniqueUserIds = [...new Set(notifyUsers.map(id => id.toString()))];
+//     const uniqueUserIds = [...new Set(notifyUsers.map(id => id.toString()))];
 
-    if (uniqueUserIds.length > 0) {
-      const memberName = member.userId?.fullName || 'Một thành viên';
-      const deptName = member.departmentId?.name || 'ban';
-      const eventName = event?.name || 'sự kiện';
+//     if (uniqueUserIds.length > 0) {
+//       const memberName = member.userId?.fullName || 'Một thành viên';
+//       const deptName = member.departmentId?.name || 'ban';
+//       const eventName = event?.name || 'sự kiện';
 
-      await createNotificationsForUsers(uniqueUserIds, {
-        eventId,
-        category: 'THÀNH VIÊN',
-        title: `${memberName} đã bị xoá khỏi ${deptName} của ${eventName}`,
-        icon: 'bi bi-person-dash',
-        color: '#ef4444',
-        unread: true
-      });
-    }
+//       await createNotificationsForUsers(uniqueUserIds, {
+//         eventId,
+//         category: 'THÀNH VIÊN',
+//         title: `${memberName} đã bị xoá khỏi ${deptName} của ${eventName}`,
+//         icon: 'bi bi-person-dash',
+//         color: '#ef4444',
+//         unread: true
+//       });
+//     }
 
-    if (member.userId?._id) {
-      await createNotification({
-        userId: member.userId._id,
-        eventId,
-        category: 'THÀNH VIÊN',
-        title: 'Bạn đã bị xoá khỏi sự kiện',
-        icon: 'bi bi-exclamation-triangle',
-        color: '#ef4444'
-      });
-    }
+//     if (member.userId?._id) {
+//       await createNotification({
+//         userId: member.userId._id,
+//         eventId,
+//         category: 'THÀNH VIÊN',
+//         title: 'Bạn đã bị xoá khỏi sự kiện',
+//         icon: 'bi bi-exclamation-triangle',
+//         color: '#ef4444'
+//       });
+//     }
 
-    return res.status(200).json({ message: 'Đã xóa thành viên khỏi sự kiện' });
-  } catch (error) {
-    console.error('removeMemberFromEvent error:', error);
-    return res.status(500).json({ message: 'Không thể xóa thành viên' });
-  }
-};
+//     return res.status(200).json({ message: 'Đã xóa thành viên khỏi sự kiện' });
+//   } catch (error) {
+//     console.error('removeMemberFromEvent error:', error);
+//     return res.status(500).json({ message: 'Không thể xóa thành viên' });
+//   }
+// };
 
 export const getMemberRawForRisk = async (req, res) => {
   try {
@@ -496,3 +496,28 @@ export const getEventMemberForExport = async (req, res) => {
     return res.status(500).json({ message: 'Failed to load core team members' });
   }
 };
+
+export const removeMemberFromEvent = async (req, res) => {
+  try {
+    const { eventId, memberId } = req.params;
+    const membership = await ensureEventRole(req.user.id, eventId, ['HoOC']);
+    if (!membership) return res.status(403).json({ message: 'Only HoOC can remove members' });
+    const member = await findEventMemberById( memberId);
+    if (!member) {
+      return res
+        .status(404)
+        .json({ message: "Member not found in this event" });
+    }
+    if (member.role === "HoOC") {
+      return res.status(400).json({ message: "Cannot deactivate HoOC" });
+    }
+    if (member.status === "Inactive") {
+      return res.status(400).json({ message: "Member already deactive" });
+    }
+    await inactiveEventMember(memberId);
+    return res.status(200).json({ message: 'Member removed from event successfully' });
+  } catch (error) {
+    console.log('removeMemberFromEvent error:', error.message);
+    return res.status(500).json({ message: 'Failed to remove member from event' });
+  }
+}
