@@ -16,6 +16,19 @@ function toDMY(value) {
   return d.toLocaleDateString("vi-VN").replace(/\//g, "-");
 }
 
+function formatDateTimeForInput(value) {
+  if (!value) return "";
+  let d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  // Format: yyyy-MM-ddTHH:mm for datetime-local input
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function HoOCEventDetail() {
   const { eventId } = useParams();
   const { user } = useAuth();
@@ -1357,17 +1370,37 @@ export default function HoOCEventDetail() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div className="form-group">
                     <label className="form-label-modern">Ngày bắt đầu</label>
-                    <input type="date" className="form-control-modern" value={editing ? formatDateForInput(editForm.eventStartDate) : formatDateForInput(event.eventStartDate)} onChange={(e) => setEditForm({ ...editForm, eventStartDate: e.target.value })} disabled={!editing} />
+                    <input 
+                      type="datetime-local" 
+                      className="form-control-modern" 
+                      value={editing ? formatDateTimeForInput(editForm.eventStartDate) : formatDateTimeForInput(event.eventStartDate)} 
+                      onChange={(e) => {
+                        // Convert datetime-local value to ISO string
+                        const dateValue = e.target.value ? new Date(e.target.value).toISOString() : "";
+                        setEditForm({ ...editForm, eventStartDate: dateValue });
+                      }} 
+                      disabled={!editing} 
+                    />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {toDMY(editing ? editForm.eventStartDate : event.eventStartDate) || "Chưa có"}
+                      Hiển thị: {editing ? (editForm.eventStartDate ? new Date(editForm.eventStartDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventStartDate ? new Date(event.eventStartDate).toLocaleString("vi-VN") : "Chưa có")}
                     </small>
                   </div>
 
                   <div className="form-group">
                     <label className="form-label-modern">Ngày kết thúc</label>
-                    <input type="date" className="form-control-modern" value={editing ? formatDateForInput(editForm.eventEndDate) : formatDateForInput(event.eventEndDate)} onChange={(e) => setEditForm({ ...editForm, eventEndDate: e.target.value })} disabled={!editing} />
+                    <input 
+                      type="datetime-local" 
+                      className="form-control-modern" 
+                      value={editing ? formatDateTimeForInput(editForm.eventEndDate) : formatDateTimeForInput(event.eventEndDate)} 
+                      onChange={(e) => {
+                        // Convert datetime-local value to ISO string
+                        const dateValue = e.target.value ? new Date(e.target.value).toISOString() : "";
+                        setEditForm({ ...editForm, eventEndDate: dateValue });
+                      }} 
+                      disabled={!editing} 
+                    />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {toDMY(editing ? editForm.eventEndDate : event.eventEndDate) || "Chưa có"}
+                      Hiển thị: {editing ? (editForm.eventEndDate ? new Date(editForm.eventEndDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventEndDate ? new Date(event.eventEndDate).toLocaleString("vi-VN") : "Chưa có")}
                     </small>
                   </div>
                 </div>

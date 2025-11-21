@@ -31,21 +31,24 @@ export default async function recalcParentsUpward(parentId, eventId) {
         parent.progressPct = 0;
     } else {
         const completedCount = children.filter(c => c.status === 'hoan_thanh').length;
-        const startedCount = children.filter(c => c.status !== 'chua_bat_dau').length;
+        const startedCount = children.filter(c => c.status === 'da_bat_dau' || c.status === 'hoan_thanh').length;
         const avgProgress = Math.round(children.reduce((s, c) => s + (Number(c.progressPct) || 0), 0) / total);
 
         // Epic task tự động chuyển sang hoan_thanh khi tất cả normal tasks hoàn thành
         if (completedCount === total) {
             parent.status = 'hoan_thanh';
+            parent.progressPct = 100;
         } else if (startedCount > 0) {
             parent.status = 'da_bat_dau';
+            parent.progressPct = avgProgress;
         } else {
             parent.status = 'chua_bat_dau';
+            parent.progressPct = avgProgress;
         }
-
-        parent.progressPct = avgProgress;
     }
 
     await parent.save();
+    
     // Không đệ quy lên nữa vì chỉ có 1 cấp epic -> normal
+    console.log(`Recalculated Epic Task ${parent._id}: ${parent.status} (${parent.progressPct}%)`);
 }

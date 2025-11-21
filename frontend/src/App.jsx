@@ -60,6 +60,7 @@ import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import HoDTaskPage from "./pages/Task/HoDTaskPage";
+import MemberTaskPage from "./pages/Task/MemberTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
@@ -338,7 +339,7 @@ export default function App() {
           <Route 
             path="events/:eventId/tasks" 
             element={
-              <ProtectedRoute requiredRole="user">
+              <ProtectedRoute requiredRole="user" requiredEventRoles={["HoOC"]}>
                 <EventTaskPage />
               </ProtectedRoute>
             } 
@@ -348,6 +349,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <HoDTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/member-tasks" 
+            element={
+              <ProtectedRoute>
+                <MemberTaskPage />
               </ProtectedRoute>
             } 
           />

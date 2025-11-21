@@ -11,12 +11,35 @@ import {
 } from '../services/notificationService.js';
 import mongoose from 'mongoose';
 import eventMember from '../models/eventMember.js';
+import recalcParentsUpward from '../utils/recalcParentTask.js';
+
+const TASK_TYPES = {
+    EPIC: 'epic',
+    NORMAL: 'normal'
+};
+
+const TASK_STATUSES = {
+    NOT_STARTED: 'chua_bat_dau',
+    IN_PROGRESS: 'da_bat_dau',
+    DONE: 'hoan_thanh',
+    CANCELLED: 'huy'
+};
+
+const STATUS_TRANSITIONS = {
+    [TASK_STATUSES.NOT_STARTED]: [TASK_STATUSES.IN_PROGRESS, TASK_STATUSES.CANCELLED],
+    [TASK_STATUSES.IN_PROGRESS]: [TASK_STATUSES.DONE, TASK_STATUSES.CANCELLED],
+    [TASK_STATUSES.DONE]: [],
+    [TASK_STATUSES.CANCELLED]: []
+};
+
+const isEpicTask = (task) => task?.taskType === TASK_TYPES.EPIC;
+const isNormalTask = (task) => task?.taskType === TASK_TYPES.NORMAL;
 // GET /api/tasks/:eventId?departmentId=...: (HoOC/HoD/Mem)
 //http://localhost:8080/api/tasks/68fd264703c943724fa8cbff?departmentId=6500000000000000000000a1
 export const listTasksByEventOrDepartment = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const { departmentId, search, status } = req.query;
+        const { departmentId, search, status, taskType } = req.query;
         // Check quyền
         const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
         if (!member) return res.status(403).json({ message: 'Không có quyền xem task' });
@@ -25,7 +48,10 @@ export const listTasksByEventOrDepartment = async (req, res) => {
         if (departmentId) filter.departmentId = departmentId;
         if (search) filter.title = { $regex: search, $options: 'i' };
         if (status) filter.status = status;
-        // Add populate for assigneeId and departmentId (with name fields)
+        if (taskType && Object.values(TASK_TYPES).includes(taskType)) {
+            filter.taskType = taskType;
+        }
+        // Add populate for assigneeId, departmentId, and createdBy (with name fields)
         const tasks = await Task.find(filter)
             .sort({ createdAt: -1 })
             .populate([
@@ -36,7 +62,8 @@ export const listTasksByEventOrDepartment = async (req, res) => {
                         { path: 'userId', model: 'User', select: 'fullName' }
                     ]
                 },
-                { path: 'departmentId', select: 'name' }
+                { path: 'departmentId', select: 'name' },
+                { path: 'createdBy', model: 'User', select: 'fullName' }
             ])
             .lean();
         return res.status(200).json({ data: tasks });
@@ -118,18 +145,36 @@ export const createTask = async (req, res) => {
 
         const {
             title, description, departmentId, assigneeId,
-            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId, dependencies,
-            suggestedTeamSize
+            startDate, dueDate, estimate, estimateUnit, milestoneId, parentId,
+            dependencies = [], suggestedTeamSize, taskType = TASK_TYPES.NORMAL
         } = req.body;
 
         if (!departmentId) return res.status(400).json({ message: 'Thiếu departmentId' });
 
         // Gom lỗi
         const errors = [];
+        const normalizedTaskType = Object.values(TASK_TYPES).includes(taskType) ? taskType : TASK_TYPES.NORMAL;
+        const isEpic = normalizedTaskType === TASK_TYPES.EPIC;
+        const isNormal = normalizedTaskType === TASK_TYPES.NORMAL;
+
+        if (isEpic && member.role !== 'HoOC') {
+            return res.status(403).json({ message: 'Chỉ HoOC được tạo Epic task.' });
+        }
+        if (isNormal && !['HoOC', 'HoD'].includes(member.role)) {
+            return res.status(403).json({ message: 'Chỉ HoOC hoặc HoD được tạo công việc thường.' });
+        }
 
         // Không cho parent nằm trong dependencies
-        if (parentId && dependencies.includes(String(parentId))) {
+        const dependencyIds = Array.isArray(dependencies) ? dependencies.map(String) : [];
+        if (parentId && dependencyIds.includes(String(parentId))) {
             errors.push('parentId không được xuất hiện trong dependencies');
+        }
+
+        if (isEpic) {
+            if (assigneeId) errors.push('Epic task không thể gán trực tiếp cho cá nhân');
+            if (parentId) errors.push('Epic task không thể thuộc một epic khác');
+        } else {
+            if (!parentId) errors.push('Task thường bắt buộc phải thuộc một Epic task');
         }
 
         // Lấy thông tin sự kiện để kiểm tra validate thời gian
@@ -162,31 +207,45 @@ export const createTask = async (req, res) => {
         if (errors.length) return res.status(400).json({ message: 'Dữ liệu không hợp lệ', errors });
 
         // Kiểm tra tồn tại & cùng event
-        const checks = await Promise.all([
-            // Department thuộc event
-            Department.exists({ _id: departmentId, eventId }),
-            // Assignee (EventMember) thuộc event
-            assigneeId ? EventMember.exists({ _id: assigneeId, eventId, status: { $ne: 'deactive' } }) : Promise.resolve(true),
-            // Milestone thuộc event
+        const [
+            departmentDoc,
+            assigneeDoc,
+            milestoneOk,
+            parentDoc,
+            depFound
+        ] = await Promise.all([
+            Department.findOne({ _id: departmentId, eventId }).lean(),
+            assigneeId ? EventMember.findOne({ _id: assigneeId, eventId, status: { $ne: 'deactive' } }).select('departmentId').lean() : null,
             milestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
-            // Parent task thuộc event
-            parentId ? Task.exists({ _id: parentId, eventId }) : Promise.resolve(true),
-            // Dependencies: tất cả tasks phải thuộc event
-            dependencies.length
-                ? Task.find({ _id: { $in: dependencies }, eventId }).select('_id').lean()
+            parentId ? Task.findOne({ _id: parentId, eventId }).lean() : null,
+            dependencyIds.length
+                ? Task.find({ _id: { $in: dependencyIds }, eventId }).select('_id taskType').lean()
                 : Promise.resolve([])
         ]);
 
-        const [deptOk, assigneeOk, milestoneOk, parentOk, depFound] = checks;
-
-        if (!deptOk) errors.push('departmentId không tồn tại trong event này');
-        if (!assigneeOk) errors.push('assigneeId không tồn tại trong event này');
+        if (!departmentDoc) errors.push('departmentId không tồn tại trong event này');
+        if (assigneeId && !assigneeDoc) errors.push('assigneeId không tồn tại trong event này');
         if (!milestoneOk) errors.push('milestoneId không tồn tại trong event này');
-        if (!parentOk) errors.push('parentId không tồn tại trong event này');
+        if (parentId && !parentDoc) errors.push('parentId không tồn tại trong event này');
+
+        if (assigneeDoc && assigneeDoc.departmentId) {
+            if (String(assigneeDoc.departmentId?._id || assigneeDoc.departmentId) !== String(departmentId)) {
+                errors.push('Người được giao phải thuộc cùng ban với công việc');
+            }
+        }
+
+        if (parentDoc) {
+            if (!isEpicTask(parentDoc)) {
+                errors.push('parentId phải là một Epic task');
+            }
+            if (String(parentDoc.departmentId) !== String(departmentId)) {
+                errors.push('Epic task và task con phải thuộc cùng ban');
+            }
+        }
 
         if (Array.isArray(depFound)) {
             const foundIds = new Set(depFound.map(d => String(d._id)));
-            const missing = dependencies.filter(id => !foundIds.has(String(id)));
+            const missing = dependencyIds.filter(id => !foundIds.has(String(id)));
             if (missing.length) errors.push(`dependencies không hợp lệ hoặc không thuộc event: ${missing.join(', ')}`);
         }
 
@@ -198,25 +257,31 @@ export const createTask = async (req, res) => {
             description,
             eventId,
             departmentId,
-            assigneeId: assigneeId || undefined,
+            taskType: normalizedTaskType,
+            assigneeId: isEpic ? undefined : (assigneeId || undefined),
             startDate: startDate || undefined,
             dueDate,
             estimate,
             estimateUnit,
             milestoneId: milestoneId || undefined,
-            parentId: parentId || undefined,
-            dependencies: dependencies,
-            suggestedTeamSize: suggestedTeamSize || undefined
+            parentId: isEpic ? undefined : (parentId || undefined),
+            dependencies: dependencyIds,
+            suggestedTeamSize: suggestedTeamSize || undefined,
+            createdBy: req.user.id
         });
 
         // Thông báo khi giao việc cho Member
-        if (assigneeId) {
+        if (!isEpic && assigneeId) {
             try {
                 await notifyTaskAssigned(eventId, t._id, assigneeId);
             } catch (notifyErr) {
                 console.error('Error sending notification:', notifyErr);
                 // Không fail request nếu notification lỗi
             }
+        }
+
+        if (isNormal && parentId) {
+            await recalcParentsUpward(parentId, eventId);
         }
 
         return res.status(201).json({ data: t });
@@ -238,19 +303,49 @@ export const editTask = async (req, res) => {
         const currentTask = await Task.findOne({ _id: taskId, eventId });
         if (!currentTask) return res.status(404).json({ message: 'Task không tồn tại' });
 
-        // Nếu task status không phải "todo", không cho phép edit
-        if (currentTask.status !== 'todo') {
-            return res.status(403).json({ 
-                message: 'Không thể chỉnh sửa task khi trạng thái không phải "todo". Chỉ có thể cập nhật trạng thái thông qua API updateTaskProgress.' 
+        const isEpic = isEpicTask(currentTask);
+        const isNormal = isNormalTask(currentTask);
+
+        if (isEpic && member.role !== 'HoOC') {
+            return res.status(403).json({ message: 'Chỉ HoOC có quyền chỉnh sửa Epic task.' });
+        }
+        if (isNormal && member.role !== 'HoD') {
+            return res.status(403).json({ message: 'Chỉ HoD có quyền chỉnh sửa task thường.' });
+        }
+
+        if (isNormal && currentTask.status !== TASK_STATUSES.NOT_STARTED) {
+            return res.status(403).json({
+                message: 'Không thể chỉnh sửa task thường sau khi đã bắt đầu. Vui lòng cập nhật trạng thái thông qua API updateTaskProgress.'
             });
         }
 
-        const update = req.body;
+        const update = { ...(req.body || {}) };
         if (!update) return res.status(404).json({ message: "Chưa có thông tin cập nhật" })
+
+        // Không cho chỉnh sửa các trường nhạy cảm
+        delete update.taskType;
+        delete update.status;
+        delete update.progressPct;
+        delete update.createdBy;
+        if (isEpic) {
+            delete update.assigneeId;
+            delete update.parentId;
+            delete update.dependencies;
+        }
+
+        if (isNormal && update.departmentId && String(update.departmentId) !== String(currentTask.departmentId)) {
+            errors.push('Không thể chuyển task thường sang ban khác');
+        }
 
         const errors = [];
 
         const deps = Array.isArray(update.dependencies) ? update.dependencies.map(String) : [];
+        const targetDepartmentId = update.departmentId || currentTask.departmentId;
+        const targetParentId = update.parentId || currentTask.parentId;
+
+        if (isNormal && !targetParentId) {
+            errors.push('Task thường phải thuộc một Epic task');
+        }
 
         if (update.parentId && deps.includes(String(update.parentId))) {
             errors.push('parentId không được xuất hiện trong dependencies');
@@ -315,7 +410,7 @@ export const editTask = async (req, res) => {
 
         // Kiểm tra startDate < dueDate
         // Nếu cả hai đều được update, kiểm tra. Nếu chỉ một trong hai được update, cần lấy giá trị hiện tại của task
-        const taskForValidation = update.startDate || update.dueDate ? await Task.findOne({ _id: taskId, eventId }).lean() : null;
+        const taskForValidation = (update.startDate || update.dueDate) ? currentTask : null;
         const finalStartDate = update.startDate ? new Date(update.startDate) : (taskForValidation?.startDate ? new Date(taskForValidation.startDate) : null);
         const finalDueDate = update.dueDate ? new Date(update.dueDate) : (taskForValidation?.dueDate ? new Date(taskForValidation.dueDate) : null);
         
@@ -324,23 +419,47 @@ export const editTask = async (req, res) => {
         }
         // Validate tồn tại/cùng event
         const [
-            deptOk,
-            assigneeOk,
+            deptDoc,
+            assigneeDoc,
             milestoneOk,
-            parentOk,
+            parentDoc,
             depFound
         ] = await Promise.all([
-            update.departmentId ? Department.exists({ _id: update.departmentId, eventId }) : Promise.resolve(true),
-            update.assigneeId ? EventMember.exists({ _id: update.assigneeId, eventId, status: { $ne: 'deactive' } }) : Promise.resolve(true),
+            update.departmentId ? Department.findOne({ _id: update.departmentId, eventId }).lean() : null,
+            update.assigneeId ? EventMember.findOne({ _id: update.assigneeId, eventId, status: { $ne: 'deactive' } }).select('departmentId').lean() : null,
             update.milestoneId ? Milestone.exists({ _id: update.milestoneId, eventId }) : Promise.resolve(true),
-            update.parentId ? Task.exists({ _id: update.parentId, eventId }) : Promise.resolve(true),
-            deps.length ? Task.find({ _id: { $in: deps }, eventId }).select('_id').lean() : Promise.resolve([])
+            update.parentId ? Task.findOne({ _id: update.parentId, eventId }).lean() : null,
+            deps.length ? Task.find({ _id: { $in: deps }, eventId }).select('_id taskType').lean() : Promise.resolve([])
         ]);
 
-        if (!deptOk) errors.push('departmentId không tồn tại trong event này');
-        if (!assigneeOk) errors.push('assigneeId không tồn tại trong event này');
+        if (update.departmentId && !deptDoc) errors.push('departmentId không tồn tại trong event này');
+        if (update.assigneeId && !assigneeDoc) errors.push('assigneeId không tồn tại trong event này');
         if (!milestoneOk) errors.push('milestoneId không tồn tại trong event này');
-        if (!parentOk) errors.push('parentId không tồn tại trong event này');
+        if (update.parentId && !parentDoc) errors.push('parentId không tồn tại trong event này');
+
+        if (assigneeDoc && targetDepartmentId) {
+            if (String(assigneeDoc.departmentId) !== String(targetDepartmentId)) {
+                errors.push('Người được giao phải thuộc cùng ban với công việc');
+            }
+        }
+
+        let effectiveParentDoc = parentDoc;
+        if (!effectiveParentDoc && targetParentId && !update.parentId && currentTask.parentId) {
+            effectiveParentDoc = await Task.findOne({ _id: currentTask.parentId, eventId }).lean();
+        }
+
+        if (isNormal) {
+            if (!effectiveParentDoc) {
+                errors.push('parentId không tồn tại trong event này');
+            } else {
+                if (!isEpicTask(effectiveParentDoc)) {
+                    errors.push('parentId phải là một Epic task');
+                }
+                if (String(effectiveParentDoc.departmentId) !== String(targetDepartmentId)) {
+                    errors.push('Epic task và task con phải thuộc cùng ban');
+                }
+            }
+        }
 
         if (Array.isArray(depFound)) {
             const foundIds = new Set(depFound.map(d => String(d._id)));
@@ -348,7 +467,6 @@ export const editTask = async (req, res) => {
             if (missing.length) {
                 errors.push(`dependencies không hợp lệ hoặc không thuộc event: ${missing.join(', ')}`);
             }
-            // Chặn tự phụ thuộc
             if (deps.includes(String(taskId))) {
                 errors.push('Task không thể phụ thuộc vào chính nó');
             }
@@ -383,10 +501,20 @@ export const deleteTask = async (req, res) => {
         const task = await Task.findOne({ _id: taskId, eventId });
         if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
         
-        // Không cho phép xóa task khi status là "in_progress"
-        if (task.status === 'in_progress') {
+        const isEpic = isEpicTask(task);
+        const isNormal = isNormalTask(task);
+
+        if (isEpic && member.role !== 'HoOC') {
+            return res.status(403).json({ message: 'Chỉ HoOC được xóa Epic task.' });
+        }
+        if (isNormal && member.role !== 'HoD') {
+            return res.status(403).json({ message: 'Chỉ HoD được xóa task thường.' });
+        }
+
+        // Không cho phép xóa task khi status là "đã bắt đầu"
+        if (task.status === TASK_STATUSES.IN_PROGRESS) {
             return res.status(403).json({ 
-                message: 'Không thể xóa task khi đang ở trạng thái "in_progress".' 
+                message: 'Không thể xóa task khi đang ở trạng thái "đã bắt đầu".' 
             });
         }
         
@@ -402,6 +530,9 @@ export const deleteTask = async (req, res) => {
         
         // Xóa task
         await Task.findOneAndDelete({ _id: taskId, eventId });
+        if (task.parentId) {
+            await recalcParentsUpward(task.parentId, eventId);
+        }
         return res.status(200).json({ message: 'Đã xoá task thành công.' });
     } catch (err) { return res.status(500).json({ message: 'Xoá task thất bại' }); }
 };
@@ -416,15 +547,20 @@ export const updateTaskProgress = async (req, res) => {
         if (!member) return res.status(403).json({ message: 'Không có quyền cập nhật tiến độ.' });
 
         const { status, progressPct } = req.body || {};
-        const ALLOWED = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
+        const ALLOWED = Object.values(TASK_STATUSES);
 
         // 1) Lấy task
         const task = await Task.findOne({ _id: taskId, eventId });
         if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
 
-        // 2) Parent task (assigneeId = null) không cho chỉnh trực tiếp
+        const isEpic = isEpicTask(task);
+        if (isEpic) {
+            return res.status(403).json({ message: 'Epic task tự động cập nhật trạng thái dựa trên task con, không thể chỉnh thủ công.' });
+        }
+
+        // 2) Task chưa được assign không cho chỉnh
         if (!task.assigneeId) {
-            return res.status(403).json({ message: 'Task giao cho ban không được chỉnh trực tiếp. Trạng thái/tiến độ tự tính theo task con.' });
+            return res.status(403).json({ message: 'Task chưa được giao cho thành viên nên không thể cập nhật trạng thái.' });
         }
 
         // 3) Quyền - người được assign (dù vai trò nào) mới được cập nhật trạng thái task
@@ -449,56 +585,42 @@ export const updateTaskProgress = async (req, res) => {
 
         // 5) Ràng buộc dependency (prerequisites)
         let depsNotDone = 0;
-        if (status && (status === 'in_progress' || status === 'done')) {
+        if (status && (status === TASK_STATUSES.IN_PROGRESS || status === TASK_STATUSES.DONE)) {
             const deps = task.dependencies || [];
             if (deps.length) {
                 depsNotDone = await Task.countDocuments({
                     _id: { $in: deps },     // chỉ các task có _id nằm trong danh sách dependencies
                     eventId,                // thuộc cùng event (tránh đếm nhầm event khác)
-                    status: { $ne: 'done' } // có trạng thái KHÁC 'done'  → nghĩa là chưa xong
+                    status: { $ne: TASK_STATUSES.DONE } // có trạng thái KHÁC 'hoan_thanh'  → nghĩa là chưa xong
                 });
             }
         }
 
-        const isStarting = status === 'in_progress' && (task.status === 'todo' || task.status === 'blocked');
-        const isFinishing = status === 'done';
+        const isStarting = status === TASK_STATUSES.IN_PROGRESS && task.status === TASK_STATUSES.NOT_STARTED;
+        const isFinishing = status === TASK_STATUSES.DONE;
 
-        // Assignee phải tuân thủ deps
         if ((isStarting || isFinishing) && depsNotDone > 0) {
-            return res.status(409).json({ message: 'Chưa thể thực hiện: còn task phụ thuộc chưa done.' });
+            return res.status(409).json({ message: 'Chưa thể thực hiện: còn task phụ thuộc chưa hoàn thành.' });
         }
-        
-        // Assignee không được cancel
-        if (status === 'cancelled') {
-            return res.status(403).json({ message: 'Assignee không được đặt trạng thái cancelled.' });
-        }
-        
-        // Kiểm soát chuyển trạng thái cho assignee
-        const NEXT = {
-            todo: ['in_progress'],
-            in_progress: ['blocked', 'done'],
-            blocked: ['in_progress'],
-            done: [],
-            cancelled: []
-        };
-        if (status && !NEXT[task.status]?.includes(status)) {
+
+        if (status && !STATUS_TRANSITIONS[task.status]?.includes(status)) {
             return res.status(409).json({ message: `Không thể chuyển từ ${task.status} → ${status} với vai trò hiện tại.` });
         }
 
         // 6) Áp trạng thái
         if (status) {
             task.status = status;
-            if (status === 'done' && typeof progressPct === 'undefined') task.progressPct = 100;
+            if (status === TASK_STATUSES.DONE && typeof progressPct === 'undefined') task.progressPct = 100;
+            if (status === TASK_STATUSES.CANCELLED && typeof progressPct === 'undefined') task.progressPct = 0;
         }
 
         await task.save();
 
         // 7) Recalculate parent theo rule parent
-        const recalcParentsUpward = (await import('../utils/recalcParentTask.js')).default;
         await recalcParentsUpward(task.parentId, eventId);
 
         // 8) Thông báo khi task hoàn thành
-        if (status === 'done') {
+        if (status === TASK_STATUSES.DONE) {
             try {
                 await notifyTaskCompleted(eventId, taskId);
                 
@@ -530,12 +652,18 @@ export const assignTask = async (req, res) => {
         const { assigneeId } = req.body;
         if (!assigneeId) return res.status(404).json({ message: 'Thiếu thông tin người assign' })
         // Kiểm tra EventMember thuộc đúng event
-        const assigneeExists = await EventMember.exists({ _id: assigneeId, eventId, status: { $ne: 'deactive' } });
-        if (!assigneeExists) {
+        const assigneeDoc = await EventMember.findOne({ _id: assigneeId, eventId, status: { $ne: 'deactive' } }).select('departmentId').lean();
+        if (!assigneeDoc) {
             return res.status(404).json({ message: 'Người được gán không tồn tại trong sự kiện này' });
         }
         const task = await Task.findOne({ _id: taskId, eventId });
         if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
+        if (isEpicTask(task)) {
+            return res.status(400).json({ message: 'Không thể gán Epic task cho thành viên.' });
+        }
+        if (assigneeDoc.departmentId && task.departmentId && String(assigneeDoc.departmentId) !== String(task.departmentId)) {
+            return res.status(403).json({ message: 'Người được gán phải thuộc cùng ban với task.' });
+        }
         task.assigneeId = assigneeId;
         await task.save();
         
@@ -561,6 +689,9 @@ export const unassignTask = async (req, res) => {
       // Tìm task
       const task = await Task.findOne({ _id: taskId, eventId });
       if (!task) return res.status(404).json({ message: 'Task không tồn tại' });
+      if (isEpicTask(task)) {
+        return res.status(400).json({ message: 'Epic task không có assignee để huỷ.' });
+      }
       if (!task.parentId && !task.assigneeId) {
         return res.status(400).json({ message: 'Task parent (giao cho ban) vốn không có assignee. Không thể huỷ gán.' });
       }
@@ -676,7 +807,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                     }
                                 },
                                 completedTasks: {
-                                    $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] }
+                                    $sum: { $cond: [{ $eq: ['$status', TASK_STATUSES.DONE] }, 1, 0] }
                                 },
                                 // Major tasks đã hoàn thành
                                 completedMajorTasks: {
@@ -690,7 +821,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                                             { $eq: [{ $type: '$assigneeId' }, 'missing'] }
                                                         ]
                                                     }, 
-                                                    { $eq: ['$status', 'done'] }
+                                                    { $eq: ['$status', TASK_STATUSES.DONE] }
                                                 ] 
                                             },
                                             1,
@@ -710,7 +841,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                                             { $ne: [{ $type: '$assigneeId' }, 'missing'] }
                                                         ]
                                                     }, 
-                                                    { $eq: ['$status', 'done'] }
+                                                    { $eq: ['$status', TASK_STATUSES.DONE] }
                                                 ] 
                                             },
                                             1,
@@ -757,7 +888,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                                             { $eq: [{ $type: '$assigneeId' }, 'missing'] }
                                                         ]
                                                     }, 
-                                                    { $eq: ['$status', 'done'] }
+                                                    { $eq: ['$status', TASK_STATUSES.DONE] }
                                                 ] 
                                             },
                                             1,
@@ -810,7 +941,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                                             { $ne: [{ $type: '$assigneeId' }, 'missing'] }
                                                         ]
                                                     }, 
-                                                    { $ne: ['$status', 'done'] }
+                                                    { $ne: ['$status', TASK_STATUSES.DONE] }
                                                 ] 
                                             },
                                             1,
@@ -820,7 +951,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                                 },
                                 totalTasks: { $sum: 1 },
                                 completedTasks: {
-                                    $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] }
+                                    $sum: { $cond: [{ $eq: ['$status', TASK_STATUSES.DONE] }, 1, 0] }
                                 },
                                 // Major task IDs (for child task lookup if needed later)
                                 majorTaskIds: {
@@ -890,7 +1021,7 @@ export const getTaskStatisticsByMilestone = async (req, res) => {
                         _id: '$departmentId',
                         totalChildTasks: { $sum: 1 },
                         remainingChildTasks: {
-                            $sum: { $cond: [{ $ne: ['$status', 'done'] }, 1, 0] }
+                            $sum: { $cond: [{ $ne: ['$status', TASK_STATUSES.DONE] }, 1, 0] }
                         }
                     }
                 }
@@ -1114,7 +1245,7 @@ export const getBurnupChartData = async (req, res) => {
   
         // Tasks completed by this date
         const completedTasksByDate = majorTasks.filter(task => {
-          const isCompleted = task.status === 'done';
+          const isCompleted = task.status === TASK_STATUSES.DONE;
           const wasCreatedByDate = new Date(task.createdAt) <= targetDate;
           
           // For completed tasks, check if completed by target date
@@ -1148,12 +1279,12 @@ export const getBurnupChartData = async (req, res) => {
       // ✅ 8. Current summary stats
       const currentStats = {
         totalMajorTasks: majorTasks.length,
-        completedMajorTasks: majorTasks.filter(t => t.status === 'done').length,
-        inProgressMajorTasks: majorTasks.filter(t => t.status === 'in_progress').length,
-        todoMajorTasks: majorTasks.filter(t => t.status === 'todo').length,
-        blockedMajorTasks: majorTasks.filter(t => t.status === 'blocked').length,
+        completedMajorTasks: majorTasks.filter(t => t.status === TASK_STATUSES.DONE).length,
+        inProgressMajorTasks: majorTasks.filter(t => t.status === TASK_STATUSES.IN_PROGRESS).length,
+        todoMajorTasks: majorTasks.filter(t => t.status === TASK_STATUSES.NOT_STARTED).length,
+        blockedMajorTasks: majorTasks.filter(t => t.status === TASK_STATUSES.CANCELLED).length,
         overallProgress: majorTasks.length > 0 
-          ? Math.round((majorTasks.filter(t => t.status === 'done').length / majorTasks.length) * 100)
+          ? Math.round((majorTasks.filter(t => t.status === TASK_STATUSES.DONE).length / majorTasks.length) * 100)
           : 0
       };
   
@@ -1289,10 +1420,10 @@ export const getBurnupChartData = async (req, res) => {
       // ✅ Calculate stats với đúng status values
       const departmentStats = Object.values(tasksByDept).map(dept => {
         const totalTasks = dept.tasks.length;
-        const completedTasks = dept.tasks.filter(t => t.status === 'done').length;
-        const inProgressTasks = dept.tasks.filter(t => t.status === 'in_progress').length;
-        const todoTasks = dept.tasks.filter(t => t.status === 'todo').length;
-        const blockedTasks = dept.tasks.filter(t => t.status === 'blocked').length;
+        const completedTasks = dept.tasks.filter(t => t.status === TASK_STATUSES.DONE).length;
+        const inProgressTasks = dept.tasks.filter(t => t.status === TASK_STATUSES.IN_PROGRESS).length;
+        const notStartedTasks = dept.tasks.filter(t => t.status === TASK_STATUSES.NOT_STARTED).length;
+        const cancelledTasks = dept.tasks.filter(t => t.status === TASK_STATUSES.CANCELLED).length;
         
         return {
           departmentId: dept.departmentId,
@@ -1300,8 +1431,8 @@ export const getBurnupChartData = async (req, res) => {
           majorTasksTotal: totalTasks,
           majorTasksCompleted: completedTasks,
           majorTasksInProgress: inProgressTasks,
-          majorTasksTodo: todoTasks,
-          majorTasksBlocked: blockedTasks,
+          majorTasksTodo: notStartedTasks,
+          majorTasksBlocked: cancelledTasks,
           majorTasksProgress: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
           tasks: dept.tasks.map(task => ({
             id: task._id,
@@ -1351,13 +1482,13 @@ export const getBurnupChartData = async (req, res) => {
       console.log(`📊 Found ${majorTasks.length} major tasks for department ${departmentId}`);
   
       // ✅ Group by status với correct enum values
+      const cancelledTasks = majorTasks.filter(t => t.status === TASK_STATUSES.CANCELLED);
       const tasksByStatus = {
-        done: majorTasks.filter(t => t.status === 'done'),
-        in_progress: majorTasks.filter(t => t.status === 'in_progress'),
-        todo: majorTasks.filter(t => t.status === 'todo'),
-        blocked: majorTasks.filter(t => t.status === 'blocked'),
-        suggested: majorTasks.filter(t => t.status === 'suggested'),
-        cancelled: majorTasks.filter(t => t.status === 'cancelled')
+        done: majorTasks.filter(t => t.status === TASK_STATUSES.DONE),
+        in_progress: majorTasks.filter(t => t.status === TASK_STATUSES.IN_PROGRESS),
+        todo: majorTasks.filter(t => t.status === TASK_STATUSES.NOT_STARTED),
+        blocked: cancelledTasks,
+        cancelled: cancelledTasks
       };
   
       // ✅ Calculate progress stats
@@ -1366,7 +1497,7 @@ export const getBurnupChartData = async (req, res) => {
         completed: tasksByStatus.done.length,
         inProgress: tasksByStatus.in_progress.length,
         todo: tasksByStatus.todo.length,
-        blocked: tasksByStatus.blocked.length,
+        cancelled: tasksByStatus.cancelled.length,
         completionRate: majorTasks.length > 0 
           ? Math.round((tasksByStatus.done.length / majorTasks.length) * 100)
           : 0

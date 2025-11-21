@@ -3,10 +3,21 @@ import ensureEventRole from '../utils/ensureEventRole.js';
 import Event from '../models/event.js';
 import Department from '../models/department.js';
 import EventMember from '../models/eventMember.js';
-import Epic from '../models/epic.js';
 import Task from '../models/task.js';
 import Risk from '../models/risk.js';
 import ConversationHistory from '../models/conversationHistory.js';
+
+const TASK_TYPES = {
+  EPIC: 'epic',
+  NORMAL: 'normal'
+};
+
+const TASK_STATUSES = {
+  NOT_STARTED: 'chua_bat_dau',
+  IN_PROGRESS: 'da_bat_dau',
+  DONE: 'hoan_thanh',
+  CANCELLED: 'huy'
+};
 
 /**
  * POST /api/events/:eventId/ai/generate-wbs
@@ -276,6 +287,8 @@ export const applyWBS = async (req, res) => {
       risksCreated: 0,
       errors: [],
     };
+    const epicMapByDept = new Map(); // deptId -> array of epic taskIds
+    const epicMapByDeptName = new Map(); // `${deptId}:${nameLower}` -> taskId
 
     // Create Epics and assign to HODs
     for (const epicData of epics) {
@@ -290,15 +303,25 @@ export const applyWBS = async (req, res) => {
 
         const assignedToId = hodMap.get(deptId.toString());
 
-        const epic = await Epic.create({
-          name: epicData.name,
+        const epicTask = await Task.create({
+          title: epicData.name,
           description: epicData.description || '',
           eventId,
           departmentId: deptId,
-          assignedToId: assignedToId || undefined,
+          taskType: TASK_TYPES.EPIC,
+          status: TASK_STATUSES.NOT_STARTED,
           startDate: epicData['start-date'] ? new Date(epicData['start-date']) : undefined,
-          endDate: epicData['end-date'] ? new Date(epicData['end-date']) : undefined,
+          dueDate: epicData['end-date'] ? new Date(epicData['end-date']) : undefined,
+          createdBy: userId,
         });
+
+        const deptKey = deptId.toString();
+        if (!epicMapByDept.has(deptKey)) {
+          epicMapByDept.set(deptKey, []);
+        }
+        epicMapByDept.get(deptKey).push(epicTask._id);
+        const epicNameKey = `${deptKey}:${(epicData.name || '').toLowerCase()}`;
+        epicMapByDeptName.set(epicNameKey, epicTask._id);
 
         results.epicsCreated++;
       } catch (error) {
@@ -306,7 +329,7 @@ export const applyWBS = async (req, res) => {
       }
     }
 
-    // Create Tasks with status "suggested"
+    // Create normal tasks (con của epic)
     for (const taskData of tasks) {
       try {
         const deptName = taskData.department || taskData.departmentName;
@@ -317,16 +340,46 @@ export const applyWBS = async (req, res) => {
           continue;
         }
 
+        const deptKey = deptId.toString();
+        let parentEpicId = null;
+        const requestedEpicName = (taskData.epic || taskData.epicName || '').toLowerCase();
+        if (requestedEpicName) {
+          const epicNameKey = `${deptKey}:${requestedEpicName}`;
+          parentEpicId = epicMapByDeptName.get(epicNameKey) || null;
+        }
+        if (!parentEpicId) {
+          const availableEpics = epicMapByDept.get(deptKey);
+          if (availableEpics && availableEpics.length > 0) {
+            parentEpicId = availableEpics[0];
+          } else {
+            const fallbackEpic = await Task.findOne({
+              eventId,
+              departmentId: deptId,
+              taskType: TASK_TYPES.EPIC
+            }).select('_id').lean();
+            if (fallbackEpic) {
+              parentEpicId = fallbackEpic._id;
+            }
+          }
+        }
+
+        if (!parentEpicId) {
+          results.errors.push(`Không tìm thấy Epic task phù hợp cho task "${taskData.name}" thuộc ban "${deptName}"`);
+          continue;
+        }
+
         const task = await Task.create({
           title: taskData.name,
           description: taskData.description || '',
           eventId,
           departmentId: deptId,
-          status: 'suggested', // Suggested status
+          taskType: TASK_TYPES.NORMAL,
+          parentId: parentEpicId,
+          status: TASK_STATUSES.NOT_STARTED,
           startDate: taskData['start-date'] ? new Date(taskData['start-date']) : undefined,
           dueDate: taskData.deadline ? new Date(taskData.deadline) : undefined,
-          suggestedTeamSize: taskData.suggested_team_size || taskData.suggestedTeamSize || undefined, // Số lượng người dự kiến từ AI
-          // Note: assigneeId will be set by HOD later
+          suggestedTeamSize: taskData.suggested_team_size || taskData.suggestedTeamSize || undefined,
+          createdBy: userId
         });
 
         results.tasksCreated++;

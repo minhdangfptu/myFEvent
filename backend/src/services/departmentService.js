@@ -111,12 +111,12 @@ export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, 
 
 export const removeMemberFromDepartmentDoc = async (eventId, departmentId, memberId) => {
   // ✅ Xử lý tasks: chỉ unassign các task chưa hoàn thành
-  // Giữ nguyên các task đã done, chỉ unassign các task todo/in_progress/blocked
+  // Giữ nguyên các task đã hoàn thành, chỉ unassign task ở trạng thái chưa bắt đầu/đã bắt đầu
   await Task.updateMany(
     {
       eventId,
       assigneeId: memberId,
-      status: { $in: ['todo', 'in_progress', 'blocked', 'suggested'] }
+      status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
     },
     {
       $set: { assigneeId: null }
