@@ -279,26 +279,26 @@ export const changeMemberDepartment = async (req, res) => {
 //       }
 //     }
 
-    await Task.updateMany(
-      {
-        eventId,
-        assigneeId: memberId,
-        status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
-      },
-      {
-        $set: { assigneeId: null }
-      }
-    );
-    await Task.updateMany(
-      {
-        eventId,
-        assigneeId: memberId,
-        status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
-      },
-      {
-        $set: { assigneeId: null }
-      }
-    );
+    // await Task.updateMany(
+    //   {
+    //     eventId,
+    //     assigneeId: memberId,
+    //     status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
+    //   },
+    //   {
+    //     $set: { assigneeId: null }
+    //   }
+    // );
+    // await Task.updateMany(
+    //   {
+    //     eventId,
+    //     assigneeId: memberId,
+    //     status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
+    //   },
+    //   {
+    //     $set: { assigneeId: null }
+    //   }
+    // );
 
 //     await EventMember.updateOne(
 //       { _id: memberId },
