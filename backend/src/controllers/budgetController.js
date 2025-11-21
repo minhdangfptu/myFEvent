@@ -994,12 +994,47 @@ export const updateCategories = async (req, res) => {
 export const getBudgetStatistics = async (req, res) => {
   try {
     const { eventId } = req.params;
+    const { departmentId } = req.query || {};
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     await ensureEventExists(eventId);
 
-    const budgets = await EventBudgetPlan.find({
+    let membership = null;
+    if (userId) {
+      try {
+        membership = await getRequesterMembership(eventId, userId);
+      } catch (error) {
+        console.warn('getBudgetStatistics: unable to load membership', error?.message);
+      }
+    }
+
+    let effectiveDepartmentId = departmentId;
+    const membershipDeptId = membership?.departmentId?._id || membership?.departmentId;
+
+    if (membership && membership.role && membership.role !== 'HoOC') {
+      if (!membershipDeptId) {
+        return res.status(403).json({ message: 'Bạn không thuộc ban nào để xem thống kê' });
+      }
+
+      if (effectiveDepartmentId && membershipDeptId?.toString() !== effectiveDepartmentId) {
+        return res.status(403).json({ message: 'Bạn chỉ được xem thống kê của ban mình' });
+      }
+
+      effectiveDepartmentId = membershipDeptId?.toString();
+    }
+
+    const filter = {
       eventId: new mongoose.Types.ObjectId(eventId)
-    })
+    };
+
+    if (effectiveDepartmentId) {
+      if (!mongoose.Types.ObjectId.isValid(effectiveDepartmentId)) {
+        return res.status(400).json({ message: 'departmentId không hợp lệ' });
+      }
+      filter.departmentId = new mongoose.Types.ObjectId(effectiveDepartmentId);
+    }
+
+    const budgets = await EventBudgetPlan.find(filter)
       .populate('departmentId', 'name')
       .lean();
 
