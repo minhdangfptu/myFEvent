@@ -28,12 +28,6 @@ app.get('/test', (req, res) => {
   res.send('<h1>Hello World!</h1>');
 });
 
-// // Request logging middleware
-// app.use((req, res, next) => {
-//   console.log(`Request: ${req.method} ${req.url}`);
-//   next();
-// });
-
 // Validation error handler
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {

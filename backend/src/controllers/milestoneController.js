@@ -44,7 +44,6 @@ export const createMilestone = async (req, res) => {
         // Không throw error, chỉ log
       }
       
-      console.log(`✅ Created agenda for milestone ${milestone._id}:`, agenda._id);
       
       // Return milestone with agenda info
       return res.status(201).json({ 

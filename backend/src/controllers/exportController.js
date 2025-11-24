@@ -578,10 +578,7 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
       return isMatch;
     });
 
-    console.log(`📋 Filtered agendas count: ${filteredAgendas.length}`);
-
     if (filteredAgendas.length === 0) {
-      console.log('⚠️ No matching agendas - creating empty sheet');
       const worksheet = workbook.addWorksheet('Agenda - Không khớp');
       createEmptyAgendaSheet(worksheet);
       return;
@@ -595,17 +592,12 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
         sheetName = `Moc_${idx + 1}`;
       }
 
-      console.log(`📄 Creating sheet: ${sheetName}`);
       createSingleAgendaSheet(workbook, agendaData, sheetName);
     });
 
     await createMainAgendaSheet(workbook, filteredAgendas, "Agenda - Cac moc da chon");
-
-    console.log(`✅ Created ${filteredAgendas.length} selected agenda sheets`);
     return;
   }
-
-  console.log('📋 Creating sheets for all milestones');
   agendas.forEach((agendaData, idx) => {
     let sheetName;
     if (agendaData.milestoneId && agendaData.milestoneId.name) {
@@ -617,7 +609,6 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
   });
 
   await createMainAgendaSheet(workbook, agendas, "Agenda Tong hop Su kien");
-  console.log(`✅ Created all ${agendas.length} agenda sheets`);
 };
 
 const createSingleAgendaSheet = async (workbook, agendaData, sheetName) => {
@@ -685,7 +676,6 @@ const createSingleAgendaSheet = async (workbook, agendaData, sheetName) => {
     }
   });
 
-  console.log(`✅ Created agenda sheet: ${sheetName} with ${agendaItems.length} items`);
 };
 
 const createIncidentSheets = async (workbook, eventId, subItems) => {
@@ -790,8 +780,6 @@ const createIncidentSheets = async (workbook, eventId, subItems) => {
       top: { style: 'thin' }, bottom: { style: 'thin' },
       left: { style: 'thin' }, right: { style: 'thin' }
     };
-
-    console.log(`✅ Created incidents sheet with ${incidents.length} incidents`);
   }
 };
 
@@ -870,7 +858,6 @@ const createTimelineSheets = async (workbook, eventId, subItems) => {
         }
       }
     });
-    console.log(`✅ Created timeline sheet with ${milestones.length} milestones`);
   }
 };
 
@@ -905,47 +892,26 @@ const createBudgetSheets = async (workbook, eventId, subItems = []) => {
 };
 
 const createFeedbackSheets = async (workbook, eventId, subItems = []) => {
-  console.log('🎯 createFeedbackSheets called with:');
-  console.log('- eventId:', eventId);
-  console.log('- subItems:', subItems, 'type:', typeof subItems, 'isArray:', Array.isArray(subItems));
 
   const { eventName, forms } = await getFeedbackFormsForExport(eventId);
-  console.log('📋 Total forms found:', forms?.length);
-
   if (!forms || forms.length === 0) {
-    console.log('⚠️ No forms found - creating empty sheet');
     const worksheet = workbook.addWorksheet('Phản hồi - Trống');
     createEmptyFeedbackSheet(worksheet, eventName);
     return;
   }
-
-  forms.forEach((form, idx) => {
-    console.log(`📋 Form ${idx}:`, {
-      id: form.id,
-      name: form.name,
-      responsesCount: form.responses?.length
-    });
-  });
-
   const selectedFormIds = Array.isArray(subItems)
     ? subItems.map(id => id.toString())
     : [];
 
   if (selectedFormIds.length > 0) {
-    console.log('📋 Filtering forms by selected IDs...');
 
     const filteredForms = forms.filter(form => {
       const formIdStr = form.id?.toString();
       const isMatch = formIdStr && selectedFormIds.includes(formIdStr);
-
-      console.log(`🔍 Checking form ${formIdStr}: ${isMatch ? 'MATCH' : 'NO MATCH'}`);
       return isMatch;
     });
 
-    console.log(`📋 Filtered forms count: ${filteredForms.length}`);
-
     if (filteredForms.length === 0) {
-      console.log('⚠️ No matching forms - creating empty sheet');
       const worksheet = workbook.addWorksheet('Phản hồi - Không khớp');
       createEmptyFeedbackSheet(worksheet, eventName);
       return;
@@ -953,23 +919,16 @@ const createFeedbackSheets = async (workbook, eventId, subItems = []) => {
 
     filteredForms.forEach((form, idx) => {
       const sheetName = sanitizeFeedbackSheetName(form.name, idx);
-      console.log(`📄 Creating sheet: ${sheetName}`);
       const worksheet = workbook.addWorksheet(sheetName);
       createFeedbackWorksheet(worksheet, eventName, form, idx);
     });
-
-    console.log(`✅ Created ${filteredForms.length} selected feedback sheets`);
     return;
   }
-
-  console.log('📋 Creating sheets for all forms');
   forms.forEach((form, idx) => {
     const sheetName = sanitizeFeedbackSheetName(form.name, idx);
     const worksheet = workbook.addWorksheet(sheetName);
     createFeedbackWorksheet(worksheet, eventName, form, idx);
   });
-
-  console.log(`✅ Created all ${forms.length} feedback sheets`);
 };
 
 const createFeedbackWorksheet = (worksheet, eventName, form, formIndex) => {
@@ -1042,7 +1001,6 @@ const createFeedbackWorksheet = (worksheet, eventName, form, formIndex) => {
     emptyCell.border = {
       top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
     };
-    console.log(`✅ Created feedback sheet "${form.name}" với 0 phản hồi`);
     return;
   }
 
@@ -1305,12 +1263,10 @@ const createEmptyAgendaSheet = (worksheet) => {
 
 const getIncidentData = async (eventId) => {
   try {
-    console.log(`🔍 Fetching incident data for event: ${eventId}`);
 
     const result = await getAllOccurredRisksByEvent(eventId);
 
     if (!result.success || !result.data) {
-      console.log('⚠️ No incident data found');
       return [];
     }
 
@@ -1331,7 +1287,6 @@ const getIncidentData = async (eventId) => {
       note: incident.note || ''
     }));
 
-    console.log(`✅ Processed ${formattedIncidents.length} incidents for export`);
     return formattedIncidents;
 
   } catch (error) {
@@ -1606,10 +1561,7 @@ export const downloadExportedFile = async (req, res) => {
     const { filename } = req.params;
     const filePath = path.join(process.cwd(), 'exports', filename);
 
-    console.log(`📥 Download request for: ${filename}`);
-
     if (!fs.existsSync(filePath)) {
-      console.log(`❌ File not found: ${filename}`);
       return res.status(404).json({ error: 'File không tồn tại' });
     }
 
@@ -1630,7 +1582,6 @@ export const downloadExportedFile = async (req, res) => {
     });
 
     fileStream.on('end', () => {
-      console.log(`✅ Download completed: ${filename}`);
     });
 
     fileStream.pipe(res);
@@ -1802,8 +1753,6 @@ const createTaskWorksheet = (worksheet, title, tasks = []) => {
     top: { style: 'thin' }, bottom: { style: 'thin' },
     left: { style: 'thin' }, right: { style: 'thin' }
   };
-
-  console.log(`✅ Created task sheet "${title}" với ${tasks.length} công việc`);
 };
 
 const BUDGET_FILTER_MAP = {
@@ -1993,7 +1942,6 @@ const createBudgetWorksheet = (worksheet, title, items = []) => {
   summaryNoteCell.border = {
     top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
   };
-  console.log(`✅ Created budget sheet "${title}" với ${items.length} mục kinh phí`);
 };
 const formatTaskStatusText = (status) => TASK_STATUS_LABELS[status] || 'Không xác định';
 const formatTaskTypeText = (taskType) => (taskType === 'epic' ? 'Lớn' : 'Nhỏ');
@@ -2026,7 +1974,6 @@ const getMilestoneData = async (eventId) => {
       sortDir: 1
     });
     if (!result.items || result.items.length === 0) {
-      console.log('⚠️ No milestone data found');
       return [];
     }
 
@@ -2069,7 +2016,6 @@ export const cleanupOldFiles = async (req, res) => {
       if (now - stats.mtime.getTime() > maxAge) {
         fs.unlinkSync(filePath);
         deletedCount++;
-        console.log(`🗑️ Deleted old file: ${file}`);
       }
     });
 
