@@ -12,7 +12,9 @@ import {
   getAvailableFormsForMember,
   submitResponse,
   getFormSummary,
-  exportFormResponses
+  exportFormResponses,
+  getAllEventFeedback,
+  listFormsNameByEvent
 } from '../controllers/feedbackController.js';
 
 const router = express.Router();
@@ -22,6 +24,7 @@ router.use(authenticateToken);
 
 // HoOC routes - Form management
 router.get('/event/:eventId/forms', listFormsByEvent);
+router.get('/event/:eventId/forms-name', listFormsNameByEvent);
 router.post('/event/:eventId/forms', createForm);
 router.get('/event/:eventId/forms/:formId', getFormDetail);
 router.patch('/event/:eventId/forms/:formId', updateForm);
@@ -36,6 +39,8 @@ router.post('/event/:eventId/forms/:formId/submit', submitResponse);
 router.get('/event/:eventId/forms/:formId/summary', getFormSummary);
 router.get('/event/:eventId/forms/:formId/export', exportFormResponses);
 
+// HoOC route - Export all feedback for an event
+router.get('/event/:eventId/all', getAllEventFeedback);
 export default router;
 
 

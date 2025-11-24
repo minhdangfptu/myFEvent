@@ -25,6 +25,15 @@ export const listFormsByEvent = (req, res) =>
     return { status: 200, ...result };
   });
 
+export const listFormsNameByEvent = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId } = req.params;
+    const { page, limit } = req.query;
+    const result = await feedbackService.listFormsNameByEvent({ userId, eventId, page, limit });
+    return { status: 200, ...result };
+  });
+
 // POST /api/feedback/event/:eventId/forms
 export const createForm = (req, res) =>
   handle(res, async () => {
@@ -121,5 +130,13 @@ export const exportFormResponses = (req, res) =>
     const userId = req.user?.id;
     const { eventId, formId } = req.params;
     const result = await feedbackService.exportFormResponses({ userId, eventId, formId });
+    return { status: 200, ...result };
+  });
+
+export const getAllEventFeedback = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId } = req.params;
+    const result = await feedbackService.getAllEventFeedback({ userId, eventId });
     return { status: 200, ...result };
   });

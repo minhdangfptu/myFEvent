@@ -3,6 +3,7 @@ import FeedbackResponse from '../models/feedbackResponse.js';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import mongoose from 'mongoose';
 
 const HOURS_TO_EXTEND_WHEN_REOPEN = 72;
 
@@ -74,6 +75,41 @@ export const feedbackService = {
 
     const forms = await FeedbackForm.find({ eventId })
       .populate('createdBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .lean();
+
+    const total = await FeedbackForm.countDocuments({ eventId });
+
+    return {
+      data: forms,
+      pagination: {
+        page: p,
+        limit: lim,
+        total,
+        totalPages: Math.ceil(total / lim)
+      }
+    };
+  },
+
+  async listFormsNameByEvent({ userId, eventId, page = 1, limit = 10 }) {
+    // Check if user is HoOC
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền truy cập');
+      err.status = 403;
+      throw err;
+    }
+
+    const p = Math.max(parseInt(page, 10), 1);
+    const lim = Math.min(Math.max(parseInt(limit, 10), 1), 100);
+    const skip = (p - 1) * lim;
+
+    await autoCloseExpiredForms(eventId);
+
+    const forms = await FeedbackForm.find({ eventId })
+      .select('name description createAt status')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(lim)
@@ -363,12 +399,12 @@ export const feedbackService = {
       .select('name description questions openTime closeTime targetAudience status createdAt')
       .sort({ createdAt: -1 })
       .lean();
-    
+
     console.log(`[getAvailableFormsForMember] Query result: Found ${allMatchingForms.length} forms for role ${member.role}`);
-    console.log(`[getAvailableFormsForMember] All matching forms:`, allMatchingForms.map(f => ({ 
-      _id: f._id, 
-      name: f.name, 
-      status: f.status, 
+    console.log(`[getAvailableFormsForMember] All matching forms:`, allMatchingForms.map(f => ({
+      _id: f._id,
+      name: f.name,
+      status: f.status,
       targetAudience: f.targetAudience,
       openTime: f.openTime,
       closeTime: f.closeTime
@@ -574,7 +610,7 @@ export const feedbackService = {
         const ratings = questionResponses.map(r => parseInt(r.answer)).filter(r => !isNaN(r));
         const sum = ratings.reduce((a, b) => a + b, 0);
         const avg = ratings.length > 0 ? (sum / ratings.length).toFixed(1) : 0;
-        
+
         const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
         ratings.forEach(r => {
           if (r >= 1 && r <= 5) distribution[r]++;
@@ -643,7 +679,7 @@ export const feedbackService = {
           totalResponses,
           totalInvited,
           completionRate: parseFloat(completionRate),
-          lastUpdated: responses.length > 0 
+          lastUpdated: responses.length > 0
             ? responses.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0].submittedAt
             : form.updatedAt
         },
@@ -723,6 +759,100 @@ export const feedbackService = {
     });
 
     return { data: exportData, formName: form.name };
+  },
+
+  // Get all feedback for an event (HoOC only)
+  async getAllEventFeedback({ userId, eventId }) {
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền truy cập');
+      err.status = 403;
+      throw err;
+    }
+
+    // Get event info
+    const event = await Event.findById(eventId).select('name').lean();
+    if (!event) {
+      const err = new Error('Không tìm thấy sự kiện');
+      err.status = 404;
+      throw err;
+    }
+
+    // Get all forms for this event
+    const forms = await FeedbackForm.find({ eventId })
+      .populate('createdBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (forms.length === 0) {
+      return {
+        data: {
+          eventName: event.name,
+          eventId,
+          totalForms: 0,
+          forms: []
+        }
+      };
+    }
+
+    // Get all responses for all forms
+    const formIds = forms.map(f => f._id);
+    const allResponses = await FeedbackResponse.find({
+      formId: { $in: formIds }
+    })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: -1 })
+      .lean();
+
+    // Group responses by formId
+    const responsesByForm = {};
+    formIds.forEach(id => {
+      responsesByForm[id.toString()] = [];
+    });
+
+    allResponses.forEach(response => {
+      const formIdStr = response.formId.toString();
+      if (responsesByForm[formIdStr]) {
+        responsesByForm[formIdStr].push(response);
+      }
+    });
+
+    // Build data structure
+    const formsWithResponses = forms.map(form => {
+      const formIdStr = form._id.toString();
+      const responses = responsesByForm[formIdStr] || [];
+
+      return {
+        _id: form._id,
+        name: form.name,
+        description: form.description,
+        status: form.status,
+        openTime: form.openTime,
+        closeTime: form.closeTime,
+        targetAudience: form.targetAudience,
+        createdBy: form.createdBy,
+        createdAt: form.createdAt,
+        updatedAt: form.updatedAt,
+        questions: form.questions,
+        responses: responses.map(r => ({
+          _id: r._id,
+          userId: r.userId,
+          responses: r.responses,
+          submittedAt: r.submittedAt
+        })),
+        totalResponses: responses.length
+      };
+    });
+
+    return {
+      data: {
+        eventName: event.name,
+        eventId,
+        totalForms: forms.length,
+        totalResponses: allResponses.length,
+        forms: formsWithResponses
+      }
+    };
   }
 };
 

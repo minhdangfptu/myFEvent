@@ -3,6 +3,7 @@ import "./DataExportPage.css";
 import UserLayout from "~/components/UserLayout";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { getAgendaName } from "~/apis/agendaApi";
+import { feedbackApi } from "~/apis/feedbackApi";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
@@ -13,7 +14,6 @@ import {
   downloadExportedFile,
 } from "~/apis/exportApi";
 
-// Component cho item options
 const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
   const [selectedSubItems, setSelectedSubItems] = useState({});
 
@@ -41,13 +41,13 @@ const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
   };
 
   const handleDownload = () => {
-    const selected = Object.keys(selectedSubItems).filter(
-      (key) => selectedSubItems[key]
-    );
+    const selected = Object.keys(selectedSubItems).filter(key => selectedSubItems[key]);
+    
     if (selected.length === 0) {
       toast.error("Vui lòng chọn ít nhất một mục!");
       return;
     }
+
     onDownload(item.id, selected);
   };
 
@@ -96,7 +96,7 @@ const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
         </button>
         <button
           className="data-export-page__btn data-export-page__btn--primary"
-          onClick={handleDownload}
+          onClick={handleDownload} // ✅ Gọi function đã fix
           disabled={getSelectedCount() === 0}
         >
           <i className="bi bi-download me-2"></i>
@@ -114,11 +114,13 @@ export default function DataExportPage() {
   const [downloadingItems, setDownloadingItems] = useState(new Set());
   const [agendaSubItems, setAgendaSubItems] = useState([]);
   const [loadingAgendas, setLoadingAgendas] = useState(true);
+   const [feedbackSubItems, setFeedbackSubItems] = useState([]); 
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(true); 
   const [exportedFiles, setExportedFiles] = useState([]);
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  // Fetch agenda data on component mount
+  // Fetch agenda và feedback data on component mount
   useEffect(() => {
     const fetchAgendas = async () => {
       try {
@@ -126,7 +128,6 @@ export default function DataExportPage() {
         const response = await getAgendaName(eventId);
 
         if (response.success && response.data) {
-          // Filter out agendas with null milestoneId and transform to subItems format
           const validAgendas = response.data
             .filter(
               (agenda) =>
@@ -150,6 +151,28 @@ export default function DataExportPage() {
       }
     };
 
+    const fetchFeedbackForms = async () => {
+      try {
+        setLoadingFeedbacks(true);
+        const response = await feedbackApi.listFormsNameByEvent(eventId, 1, 100); 
+
+        if (response.status === 200 && response.data) {
+          const formattedForms = response.data.map((form) => ({
+            id: form._id,
+            title: form.name,
+            description: form.description || 'Không có mô tả',
+          }));
+
+          setFeedbackSubItems(formattedForms);
+        }
+      } catch (error) {
+        console.error("Error fetching feedback forms:", error);
+        setFeedbackSubItems([]);
+      } finally {
+        setLoadingFeedbacks(false);
+      }
+    };
+
     const fetchExportedFiles = async () => {
       try {
         const response = await getExportedFiles(eventId);
@@ -161,9 +184,12 @@ export default function DataExportPage() {
 
     if (eventId) {
       fetchAgendas();
+      fetchFeedbackForms(); 
       fetchExportedFiles();
     }
   }, [eventId]);
+
+  
 
   const exportItems = [
     {
@@ -257,29 +283,19 @@ export default function DataExportPage() {
       color: "#f3f3f3",
       iconColor: "#F9A825",
       description:
-        "Xuất phản hồi từ khách: Người phản hồi, Nội dung, Đánh giá, Ghi chú",
-      subItems: [
-        {
-          id: "feedback-all",
-          title: "Tất cả phản hồi",
-          description: "Toàn bộ feedback từ khách",
-        },
-        {
-          id: "feedback-positive",
-          title: "Phản hồi tích cực",
-          description: "Các đánh giá cao",
-        },
-        {
-          id: "feedback-negative",
-          title: "Phản hồi tiêu cực",
-          description: "Các góp ý cần cải thiện",
-        },
-        {
-          id: "feedback-suggestions",
-          title: "Đề xuất cải tiến",
-          description: "Các ý tưởng từ khách hàng",
-        },
-      ],
+        "Xuất phản hồi từ người tham gia: Câu hỏi, Câu trả lời, Đánh giá",
+      // ✅ Cập nhật subItems với data động
+      subItems: loadingFeedbacks
+        ? [{ id: "loading", title: "Đang tải...", description: "Vui lòng đợi" }]
+        : feedbackSubItems.length > 0
+        ? feedbackSubItems
+        : [
+            {
+              id: "no-feedback",
+              title: "Chưa có biểu mẫu",
+              description: "Chưa có biểu mẫu phản hồi nào được tạo cho sự kiện này",
+            },
+          ],
     },
     {
       id: "budget",
@@ -362,8 +378,8 @@ export default function DataExportPage() {
   };
 
   const handleShowItemOptions = (itemId) => {
-    setShowOptionsModal(itemId);
-  };
+  setShowOptionsModal(String(itemId)); // Ensure string
+};
 
   const handleCloseItemOptions = () => {
     setShowOptionsModal(null);
@@ -391,7 +407,6 @@ export default function DataExportPage() {
     setDownloadingItems((prev) => new Set(prev).add(itemId));
 
     try {
-      console.log("🚀 Starting export for:", itemId);
 
       // Gọi API export, axios trả về file blob
       const response = await exportItem(eventId, itemId, subItems);
@@ -546,11 +561,25 @@ export default function DataExportPage() {
     }
   };
 
-  const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
-    console.log("Downloading item with options:", itemId, selectedSubItems);
-    await handleDownload(itemId, selectedSubItems);
-    setShowOptionsModal(null);
-  };
+  // Trong DataExportPage.jsx - Cập nhật handleDownloadItemOptions
+const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
+  console.log("🔍 Debug handleDownloadItemOptions:");
+  console.log("- itemId:", itemId, "type:", typeof itemId);
+  console.log("- selectedSubItems:", selectedSubItems, "type:", typeof selectedSubItems);
+  
+  // Ensure itemId is string
+  const cleanItemId = String(itemId);
+  
+  // Ensure selectedSubItems is array
+  const cleanSubItems = Array.isArray(selectedSubItems) ? selectedSubItems : [];
+  
+  console.log("🔧 Cleaned values:");
+  console.log("- cleanItemId:", cleanItemId);
+  console.log("- cleanSubItems:", cleanSubItems);
+  
+  await handleDownload(cleanItemId, cleanSubItems);
+  setShowOptionsModal(null);
+};
 
   const handleDownloadAll = async () => {
     setDownloadingItems((prev) => new Set(prev).add('all'));

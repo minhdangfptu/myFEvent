@@ -9,7 +9,7 @@ export const exportItem = async (eventId, itemId, subItems = []) => {
     { subItems },
     { 
       responseType: 'blob',
-      timeout: 120000 // 2 phút (120 giây) - đủ thời gian để generate file Excel lớn
+      timeout: 120000 
     }
   );
 };
@@ -20,7 +20,7 @@ export const exportAllItemsZip = async (eventId) => {
     `/api/events/${eventId}/exports/items/zip-all`,
     { 
       responseType: 'blob',
-      timeout: 300000 // 5 phút (300 giây) - đủ thời gian để generate và nén nhiều file Excel
+      timeout: 300000 
     }
   );
 };
@@ -32,7 +32,7 @@ export const exportSelectedItemsZip = async (eventId, itemIds) => {
     { itemIds },
     { 
       responseType: 'blob',
-      timeout: 300000 // 5 phút (300 giây) - đủ thời gian để generate và nén nhiều file Excel
+      timeout: 300000
     }
   );
 };
@@ -58,7 +58,7 @@ export const downloadExportedFile = async (filename) => {
       throw new Error(`Download failed: ${response.status}`);
     }
 
-    return response; // Return response for blob processing in component
+    return response;
     
   } catch (error) {
     console.error("Download API error:", error);

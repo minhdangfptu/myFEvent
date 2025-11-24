@@ -8,6 +8,13 @@ export const feedbackApi = {
     });
     return response.data;
   },
+  // HoOC - List all forms for an event
+  listFormsNameByEvent: async (eventId, page = 1, limit = 10) => {
+    const response = await axiosClient.get(`/api/feedback/event/${eventId}/forms-name`, {
+      params: { page, limit }
+    });
+    return response.data;
+  },
 
   // HoOC - Create a new form
   createForm: async (eventId, formData) => {

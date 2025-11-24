@@ -520,9 +520,8 @@ const setDeleteEventOtp = (email) => {
 export const sendDeleteOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    // Bảo vệ: chỉ user đang đăng nhập mới gửi otp cho chính email đó
     if (!req.user || req.user.email !== email) {
-      return res.status(403).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const code = setDeleteEventOtp(email);
@@ -552,7 +551,6 @@ export const verifyDeleteOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ message: 'Thiếu email hoặc mã otp.' });
-    // Bảo vệ: chỉ user đăng nhập được xác nhận
     if (!req.user || req.user.email !== email) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
