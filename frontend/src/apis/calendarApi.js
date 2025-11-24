@@ -31,6 +31,22 @@ const calendarApi = {
   updateParticipateStatus: (eventId, calendarId, data) => {
     const url = `/api/events/${eventId}/calendars/${calendarId}/participate-status`;
     return axiosClient.patch(url, data);
+  },
+  getAvailableMembers: (eventId, calendarId) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/available-members`;
+    return axiosClient.get(url);
+  },
+  addParticipants: (eventId, calendarId, memberIds) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/participants`;
+    return axiosClient.post(url, { memberIds });
+  },
+  removeParticipant: (eventId, calendarId, memberId) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/participants/${memberId}`;
+    return axiosClient.delete(url);
+  },
+  sendReminder: (eventId, calendarId, target) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/reminders`;
+    return axiosClient.post(url, { target });
   }
 
 };

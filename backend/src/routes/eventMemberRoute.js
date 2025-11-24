@@ -9,7 +9,6 @@ import {
     updateMemberRole,
     changeMemberDepartment,
     removeMemberFromEvent,
-    removeMemberFromEvent
 } from '../controllers/eventMemberController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
@@ -24,7 +23,6 @@ router.get('/:memberId', authenticateToken, getMemberDetail);
 router.delete('/me', authenticateToken, leaveEvent);
 router.patch('/:memberId/role', authenticateToken, updateMemberRole);
 router.patch('/:memberId/department', authenticateToken, changeMemberDepartment);
-router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
 router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
 
 export default router;
