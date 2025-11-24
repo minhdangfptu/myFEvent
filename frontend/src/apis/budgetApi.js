@@ -21,6 +21,12 @@ export const budgetApi = {
     return unwrapResponse(res.data);
   },
 
+  // Lấy budget của department theo budgetId
+  getDepartmentBudgetById: async (eventId, departmentId, budgetId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+    return unwrapResponse(res.data);
+  },
+
   // Tạo budget mới
   createBudget: async (eventId, departmentId, data) => {
     const res = await axiosClient.post(`/api/events/${eventId}/departments/${departmentId}/budget`, data);
@@ -48,6 +54,16 @@ export const budgetApi = {
   // Xóa draft
   deleteDraft: async (eventId, departmentId, budgetId) => {
     const res = await axiosClient.delete(`/api/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+    return unwrapResponse(res.data);
+  },
+
+  // HoD: Lấy tất cả budgets của department
+  getAllBudgetsForDepartment: async (eventId, departmentId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/budget/budgets?${queryParams.toString()}`);
     return unwrapResponse(res.data);
   },
 

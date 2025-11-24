@@ -90,7 +90,8 @@ const EventBudgetPlanSchema = new Schema({
   }]
 }, { timestamps: true, versionKey: false });
 
-EventBudgetPlanSchema.index({ eventId: 1, departmentId: 1 }, { unique: true });
+// Removed unique constraint to allow multiple budgets per department
+EventBudgetPlanSchema.index({ eventId: 1, departmentId: 1 });
 EventBudgetPlanSchema.index({ eventId: 1, status: 1 });
 
 

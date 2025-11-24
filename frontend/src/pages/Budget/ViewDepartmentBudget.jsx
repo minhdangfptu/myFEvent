@@ -10,7 +10,7 @@ import ConfirmModal from "../../components/ConfirmModal";
 import { useAuth } from "../../contexts/AuthContext";
 
 const ViewDepartmentBudget = () => {
-  const { eventId, departmentId } = useParams();
+  const { eventId, departmentId, budgetId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,7 @@ const ViewDepartmentBudget = () => {
 
   useEffect(() => {
     fetchData();
-  }, [eventId, departmentId]);
+  }, [eventId, departmentId, budgetId]);
 
   const fetchData = async () => {
     if (!departmentId || departmentId === "current" || departmentId === "") {
@@ -140,8 +140,14 @@ const ViewDepartmentBudget = () => {
 
     try {
       setLoading(true);
+      
+      // Nếu có budgetId, sử dụng API getDepartmentBudgetById, ngược lại dùng getDepartmentBudget
+      const budgetPromise = budgetId 
+        ? budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetId)
+        : budgetApi.getDepartmentBudget(eventId, departmentId);
+      
       const [budgetData, deptData, membersData] = await Promise.all([
-        budgetApi.getDepartmentBudget(eventId, departmentId),
+        budgetPromise,
         departmentService.getDepartmentDetail(eventId, departmentId),
         departmentService.getMembersByDepartment(eventId, departmentId).catch(() => []),
       ]);
@@ -479,22 +485,35 @@ const ViewDepartmentBudget = () => {
         {/* Title Section */}
         <div className="mb-4 d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-              Budget Ban
-            </h2>
+            <div className="d-flex align-items-center gap-3 mb-2">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={() => navigate(`/events/${eventId}/budgets/departments`)}
+                style={{ borderRadius: "8px" }}
+                title="Quay lại danh sách budgets"
+              >
+                <i className="bi bi-arrow-left me-2"></i>
+                Quay lại
+              </button>
+              <h2 className="fw-bold mb-0" style={{ fontSize: "28px", color: "#111827" }}>
+                Budget Ban
+              </h2>
+            </div>
             <div className="d-flex align-items-center gap-2 text-muted">
               <i className="bi bi-people-fill"></i>
               <span>Ban: {department?.name || "Đang tải..."}</span>
             </div>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate(`/events/${eventId}/departments/${departmentId}/budget/create`)}
-            style={{ borderRadius: "8px" }}
-          >
-            <i className="bi bi-plus-circle me-2"></i>
-            Tạo Budget mới
-          </button>
+          {!budgetId && (
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate(`/events/${eventId}/departments/${departmentId}/budget/create`)}
+              style={{ borderRadius: "8px" }}
+            >
+              <i className="bi bi-plus-circle me-2"></i>
+              Tạo Budget mới
+            </button>
+          )}
         </div>
 
         {/* Budget Overview Card */}

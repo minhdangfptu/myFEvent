@@ -5,12 +5,17 @@ import { departmentService } from "../../services/departmentService";
 import { budgetApi } from "../../apis/budgetApi";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 const DepartmentBudgetsListPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const { fetchEventRole } = useEvents();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
+  const [hodDepartmentId, setHodDepartmentId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -19,40 +24,60 @@ const DepartmentBudgetsListPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const depts = await departmentService.getDepartments(eventId);
-      const departmentsList = Array.isArray(depts) ? depts : (depts?.items || depts?.data || []);
       
-      // Lấy thông tin budget cho mỗi department
-      const departmentsWithBudget = await Promise.all(
-        departmentsList.map(async (dept) => {
-          try {
-            const budget = await budgetApi.getDepartmentBudget(eventId, dept._id || dept.id);
-            return {
-              ...dept,
-              budget: budget || null,
-              hasBudget: !!budget,
-              budgetStatus: budget?.status || null,
-              totalItems: budget?.items?.length || 0,
-              totalCost: budget?.items?.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0) || 0,
-            };
-          } catch (error) {
-            // Nếu không có budget, trả về department không có budget
-            return {
-              ...dept,
-              budget: null,
-              hasBudget: false,
-              budgetStatus: null,
-              totalItems: 0,
-              totalCost: 0,
-            };
-          }
-        })
-      );
+      // Kiểm tra role và lấy department của HOD
+      const role = await fetchEventRole(eventId);
       
-      setDepartments(departmentsWithBudget);
+      if (role === 'HoD' && user) {
+        // Lấy department mà user là leader
+        const depts = await departmentService.getDepartments(eventId);
+        const departmentsList = Array.isArray(depts) ? depts : (depts?.items || depts?.data || []);
+        const userId = user._id || user.id;
+        
+        const userDepartment = departmentsList.find(dept => {
+          const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+          return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
+        });
+        
+        if (userDepartment) {
+          const deptId = userDepartment._id || userDepartment.id;
+          setHodDepartmentId(deptId);
+          
+          // Lấy tất cả budgets của department (bao gồm cả draft và submitted)
+          const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, deptId, {
+            page: 1,
+            limit: 1000
+          });
+          
+          const budgetsList = Array.isArray(budgetsResponse) 
+            ? budgetsResponse 
+            : (budgetsResponse?.data || budgetsResponse?.budgets || []);
+          
+          // Format budgets để hiển thị
+          const formattedBudgets = budgetsList.map((budget) => ({
+            budgetId: budget._id || budget.id,
+            departmentId: budget.departmentId || deptId,
+            departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
+            budgetStatus: budget.status || null,
+            totalItems: budget.totalItems || 0,
+            totalCost: budget.totalCost || 0,
+            createdAt: budget.createdAt,
+            submittedAt: budget.submittedAt,
+          }));
+          
+          setDepartments(formattedBudgets);
+        } else {
+          toast.error("Không tìm thấy ban mà bạn là trưởng ban");
+          setDepartments([]);
+        }
+      } else {
+        // Nếu không phải HoD, không hiển thị gì
+        setDepartments([]);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Không thể tải dữ liệu");
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
@@ -97,11 +122,45 @@ const DepartmentBudgetsListPage = () => {
     >
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         {/* Title Section */}
-        <div className="mb-4">
-          <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-            Danh sách Ngân sách của Ban
-          </h2>
-          <p className="text-muted">Xem tổng quan ngân sách của tất cả các ban trong sự kiện</p>
+        <div className="mb-4 d-flex justify-content-between align-items-start">
+          <div>
+            <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
+              Danh sách Ngân sách của Ban
+            </h2>
+            <p className="text-muted">Danh sách tất cả các đơn budget của ban bạn</p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              try {
+                if (hodDepartmentId) {
+                  navigate(`/events/${eventId}/departments/${hodDepartmentId}/budget/create`);
+                } else {
+                  const depts = await departmentService.getDepartments(eventId);
+                  const departmentsList = Array.isArray(depts) ? depts : (depts?.items || depts?.data || []);
+                  
+                  if (departmentsList.length > 0) {
+                    const firstDept = departmentsList[0];
+                    const deptId = firstDept._id || firstDept.id;
+                    if (deptId) {
+                      navigate(`/events/${eventId}/departments/${deptId}/budget/create`);
+                    } else {
+                      toast.error("Không tìm thấy ban để tạo budget");
+                    }
+                  } else {
+                    toast.error("Chưa có ban nào trong sự kiện");
+                  }
+                }
+              } catch (error) {
+                console.error("Error fetching departments:", error);
+                toast.error("Không thể tải danh sách ban");
+              }
+            }}
+            style={{ borderRadius: "8px" }}
+          >
+            <i className="bi bi-plus-circle me-2"></i>
+            Tạo Budget mới
+          </button>
         </div>
 
         {/* Departments List */}
@@ -115,7 +174,7 @@ const DepartmentBudgetsListPage = () => {
         >
           {departments.length === 0 ? (
             <div className="text-center py-5">
-              <p className="text-muted">Chưa có ban nào trong sự kiện</p>
+              <p className="text-muted">Chưa có budget nào</p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -135,57 +194,113 @@ const DepartmentBudgetsListPage = () => {
                       Tổng ngân sách (VNĐ)
                     </th>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
+                      Ngày tạo
+                    </th>
+                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                       Hành động
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {departments.map((dept) => (
-                    <tr key={dept._id || dept.id}>
-                      <td style={{ padding: "12px" }}>
-                        <span className="fw-semibold" style={{ fontSize: "16px" }}>
-                          {dept.name || "Chưa có tên"}
-                        </span>
+                  {departments.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-4 text-muted">
+                        Chưa có budget nào
                       </td>
-                      <td style={{ padding: "12px" }}>
-                        {dept.hasBudget ? (
+                    </tr>
+                  ) : (
+                    departments.map((budget) => (
+                      <tr key={budget.budgetId}>
+                        <td style={{ padding: "12px" }}>
+                          <span className="fw-semibold" style={{ fontSize: "16px" }}>
+                            {budget.departmentName}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px" }}>
                           <span
                             className="badge px-3 py-2"
                             style={{
-                              background: getStatusColor(dept.budgetStatus) + "22",
-                              color: getStatusColor(dept.budgetStatus),
+                              background: getStatusColor(budget.budgetStatus) + "22",
+                              color: getStatusColor(budget.budgetStatus),
                               fontSize: "14px",
                               fontWeight: "600",
                             }}
                           >
-                            {getStatusLabel(dept.budgetStatus)}
+                            {getStatusLabel(budget.budgetStatus)}
                           </span>
-                        ) : (
-                          <span className="text-muted">Chưa có budget</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <span className="fw-semibold">
-                          {dept.totalItems}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <span className="fw-semibold" style={{ color: "#3B82F6" }}>
-                          {formatCurrency(dept.totalCost)}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => navigate(`/events/${eventId}/departments/${dept._id || dept.id}/budget`)}
-                          style={{ borderRadius: "8px" }}
-                        >
-                          <i className="bi bi-eye me-1"></i>
-                          Chi tiết
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          <span className="fw-semibold">
+                            {budget.totalItems}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          <span className="fw-semibold" style={{ color: "#3B82F6" }}>
+                            {formatCurrency(budget.totalCost)}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          <span className="text-muted" style={{ fontSize: "14px" }}>
+                            {budget.createdAt 
+                              ? new Date(budget.createdAt).toLocaleDateString('vi-VN')
+                              : '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => navigate(`/events/${eventId}/departments/${budget.departmentId}/budget/${budget.budgetId}`)}
+                              style={{ borderRadius: "8px" }}
+                            >
+                              <i className="bi bi-eye me-1"></i>
+                              Chi tiết
+                            </button>
+                            {/* Nút "Gửi cho HoOC" chỉ hiển thị cho draft */}
+                            {budget.budgetStatus === 'draft' && (
+                              <button
+                                className="btn btn-success btn-sm"
+                                onClick={async () => {
+                                  try {
+                                    await budgetApi.submitBudget(eventId, budget.departmentId, budget.budgetId);
+                                    toast.success("Gửi cho HoOC duyệt thành công!");
+                                    fetchData(); // Refresh danh sách
+                                  } catch (error) {
+                                    toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
+                                  }
+                                }}
+                                style={{ borderRadius: "8px" }}
+                              >
+                                <i className="bi bi-send me-1"></i>
+                                Gửi cho HoOC
+                              </button>
+                            )}
+                            {/* Nút "Xóa" chỉ cho draft, không cho xóa khi status là submitted (chờ duyệt) */}
+                            {budget.budgetStatus === 'draft' && (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={async () => {
+                                  if (window.confirm(`Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác.`)) {
+                                    try {
+                                      await budgetApi.deleteDraft(eventId, budget.departmentId, budget.budgetId);
+                                      toast.success("Xóa budget thành công!");
+                                      fetchData(); // Refresh danh sách
+                                    } catch (error) {
+                                      toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
+                                    }
+                                  }
+                                }}
+                                style={{ borderRadius: "8px" }}
+                              >
+                                <i className="bi bi-trash me-1"></i>
+                                Xóa
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

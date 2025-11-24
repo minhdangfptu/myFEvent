@@ -568,7 +568,7 @@ const CreateDepartmentBudget = () => {
                       ) : (
                         <select
                           className="form-select form-select-sm"
-                          value={item.category}
+                          value={item.category || ""}
                           onChange={(e) => handleItemChange(item.id, "category", e.target.value)}
                           disabled={!isEditable}
                           required
@@ -580,15 +580,12 @@ const CreateDepartmentBudget = () => {
                             fontSize: "14px",
                           }}
                         >
-                          {categories.length === 0 ? (
-                            <option value="">Chưa có hạng mục</option>
-                          ) : (
-                            categories.map((cat, idx) => (
-                              <option key={idx} value={cat}>
-                                {cat}
-                              </option>
-                            ))
-                          )}
+                          <option value="">{categories.length === 0 ? "Chưa có hạng mục" : "Chọn hạng mục"}</option>
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
                         </select>
                       )}
                     </td>

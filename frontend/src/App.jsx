@@ -526,6 +526,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/events/:eventId/departments/:departmentId/budget" 
             element={
               <ProtectedRoute>
@@ -615,6 +623,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
               </ProtectedRoute>
             } 
           />
