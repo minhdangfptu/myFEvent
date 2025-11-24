@@ -146,6 +146,24 @@ export const getAllOccurredRisksByEvent = async (eventId) => {
     try {
         const risks = await Risk.find({ eventId: new Types.ObjectId(eventId) })
             .populate('departmentId', 'name')
+            .populate({
+                path: 'occurred_risk.resolve_personId',
+                model: 'EventMember',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    select: 'fullName'
+                }
+            })
+            .populate({
+                path: 'occurred_risk.update_personId',
+                model: 'EventMember',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    select: 'fullName'
+                }
+            })
             .lean();
 
         const occurredRisks = [];
@@ -162,6 +180,8 @@ export const getAllOccurredRisksByEvent = async (eventId) => {
                         occurred_status: occurred.occurred_status,
                         resolve_action: occurred.resolve_action,
                         departmentName: risk.departmentId?.name || 'Chưa phân công',
+                        resolve_personName: occurred.resolve_personId?.userId?.fullName || 'Chưa xác định',
+                        update_personName: occurred.update_personId?.userId?.fullName || 'Chưa xác định',
                         riskName: risk.name,
                         risk_id: risk._id
                     });
@@ -299,7 +319,7 @@ export const getAllRisksByEventWithoutPagination = async (eventId, filters = {})
         }
 
         const risks = await Risk.find(query)
-            .populate('departmentId', 'name description')
+            .populate('departmentId', 'name')
             .sort({ impact: -1, likelihood: -1, createdAt: -1 })
             .lean();
 

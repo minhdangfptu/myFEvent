@@ -36,7 +36,7 @@ export const findMilestoneDetail = async (eventId, milestoneId) => {
 
 export const getEventMembership = async (eventId, userId) => {
   if (!userId) return null;
-  return await EventMember.findOne({ eventId, userId }).lean();
+  return await EventMember.findOne({ eventId, userId, status: { $ne: 'deactive' } }).lean();
 };
 
 export const updateMilestoneDoc = async (eventId, milestoneId, updates) => {
@@ -60,6 +60,9 @@ export const softDeleteMilestoneIfNoTasks = async (eventId, milestoneId) => {
 export const getMilestoneById = async (milestoneId) => {
   return await Milestone.findById(milestoneId).lean();
 }
+
+
+
 
 
 

@@ -1,11 +1,10 @@
-"use client"
-
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { eventApi } from "../../apis/eventApi"
 import { taskApi } from "../../apis/taskApi"
 import { milestoneService } from "../../services/milestoneService"
+import calendarService from "../../services/calendarService"
 import Loading from "../../components/Loading"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
@@ -52,6 +51,28 @@ const parseDate = (value) => {
   const date = new Date(value)
   if (!Number.isNaN(date.getTime())) return date
   return null
+}
+
+const normalizeCalendars = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.calendars)) return data.calendars
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  return []
+}
+
+const parseCalendarEventStart = (calendar) => {
+  if (!calendar) return null
+  const candidate =
+    calendar.startAt ||
+    (calendar.meetingDate
+      ? `${calendar.meetingDate}T${calendar.startTime || "00:00"}`
+      : null)
+  if (!candidate) return null
+  const date = new Date(candidate)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
@@ -111,6 +132,7 @@ export default function MemberDashBoard() {
   const [eventData, setEventData] = useState(null)
   const [tasks, setTasks] = useState([])
   const [milestones, setMilestones] = useState([])
+  const [calendarEvents, setCalendarEvents] = useState([])
   const [eventRole, setEventRole] = useState("")
   const [hoveredDay, setHoveredDay] = useState(null)
   
@@ -153,14 +175,15 @@ export default function MemberDashBoard() {
         setLoading(true)
 
         // Fetch event data, tasks, milestones, and members
-        const [eventResponse, tasksResponse, milestonesResponse, membersResponse] = await Promise.all([
+        const [eventResponse, tasksResponse, milestonesResponse, membersResponse, calendarsResponse] = await Promise.all([
           eventApi.getById(eventId),
           taskApi.getTaskByEvent(eventId),
           milestoneService.listMilestones(eventId, {
             sortBy: "targetDate",
             sortDir: "asc"
           }),
-          eventApi.getMembersByEvent(eventId)
+          eventApi.getMembersByEvent(eventId),
+          calendarService.getCalendarsByEventId(eventId)
         ])
 
         if (cancelled) return
@@ -229,6 +252,7 @@ export default function MemberDashBoard() {
             return da.getTime() - db.getTime()
           })
         if (!cancelled) setMilestones(sortedMilestones)
+        if (!cancelled) setCalendarEvents(normalizeCalendars(calendarsResponse))
       } catch (error) {
         if (!cancelled) {
           console.error("Error fetching dashboard data:", error)
@@ -331,7 +355,26 @@ export default function MemberDashBoard() {
   )
 
   // Calendar data (current month)
-  const calendarDays = generateCalendarDays()
+  const calendarDays = useMemo(() => {
+    const baseDays = generateCalendarDays()
+    if (!calendarEvents.length) return baseDays
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const highlights = new Set()
+
+    calendarEvents.forEach((event) => {
+      const startDate = parseCalendarEventStart(event)
+      if (!startDate) return
+      if (startDate.getFullYear() !== year || startDate.getMonth() !== month) return
+      highlights.add(startDate.getDate())
+    })
+
+    return baseDays.map((day) => ({
+      ...day,
+      highlight: highlights.has(day.day)
+    }))
+  }, [calendarEvents])
 
   // Get events for a specific day
   const getEventsForDay = useMemo(() => {
@@ -341,21 +384,16 @@ export default function MemberDashBoard() {
     
     return (day) => {
       if (!day) return []
-      const targetDate = new Date(year, month, day)
-      
-      return milestones.filter((milestone) => {
-        const milestoneDate = parseDate(milestone?.targetDate || milestone?.dueDate)
-        if (!milestoneDate) return false
-        
-        // Compare only year, month, day (ignore time)
-        return (
-          milestoneDate.getFullYear() === targetDate.getFullYear() &&
-          milestoneDate.getMonth() === targetDate.getMonth() &&
-          milestoneDate.getDate() === targetDate.getDate()
-        )
-      })
+      return calendarEvents
+        .map((event) => {
+          const startDate = parseCalendarEventStart(event)
+          return startDate ? { event, startDate } : null
+        })
+        .filter(Boolean)
+        .filter(({ startDate }) => startDate.getFullYear() === year && startDate.getMonth() === month && startDate.getDate() === day)
+        .map(({ event }) => event)
     }
-  }, [milestones])
+  }, [calendarEvents])
 
   const milestoneCompletionPercent = milestones.length > 0
     ? Math.round((milestones.filter((m) => isCompletedStatus(m?.status)).length / milestones.length) * 100)
@@ -621,37 +659,31 @@ export default function MemberDashBoard() {
                             const dayData = calendarDays[weekIndex * 7 + dayIndex]
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
-                            
-                            // Check if this day has milestones
-                            const hasMilestone = dayEvents.length > 0
+                            const hasEvents = dayEvents.length > 0
                             
                             return (
                               <td
                                 key={dayIndex}
                                 className={`text-center ${
-                                  dayData?.today ? "text-white rounded" : dayData?.highlight ? "fw-semibold" : ""
+                                  dayData?.today ? "text-white rounded" : hasEvents ? "fw-semibold" : ""
                                 }`}
                                 style={{
                                   fontSize: "13px",
                                   backgroundColor: dayData?.today
                                     ? "#dc2626"
-                                    : hasMilestone && !dayData?.today
-                                    ? "#fef3c7"
-                                    : isHovered
-                                    ? "#fee2e2"
-                                    : dayData?.highlight
+                                    : isHovered && hasEvents
+                                    ? "#ffe4e6"
+                                    : hasEvents
                                     ? "#fee2e2"
                                     : "transparent",
                                   color: dayData?.today 
                                     ? "white" 
-                                    : hasMilestone && !dayData?.today
-                                    ? "#92400e"
-                                    : isHovered 
-                                    ? "#dc2626" 
-                                    : dayData?.highlight 
-                                    ? "#dc2626" 
+                                    : hasEvents
+                                    ? "#991b1b"
                                     : "#374151",
+                                  border: hasEvents ? "1px solid #fecdd3" : "1px solid transparent",
                                   padding: "8px 4px",
+                                  borderRadius: "8px",
                                   cursor: dayData?.day ? "pointer" : "default",
                                   transition: "all 0.2s ease",
                                 }}
@@ -667,36 +699,61 @@ export default function MemberDashBoard() {
                     </tbody>
                   </table>
 
-                  {hoveredDay && getEventsForDay(hoveredDay).length > 0 ? (
-                    <div className="mt-4 pt-3 border-top">
-                      {getEventsForDay(hoveredDay).map((event, index) => {
-                        const eventDate = parseDate(event?.targetDate || event?.dueDate)
-                        const timeStr = eventDate ? eventDate.toLocaleTimeString('vi-VN', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        }) : ''
-                        
-                        return (
-                          <div key={index} className={index > 0 ? "mt-3" : ""}>
-                            <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                              {event?.name || "Cột mốc"}
-                            </div>
-                            {timeStr && (
-                              <div className="text-muted" style={{ fontSize: "13px" }}>
-                                {timeStr}
+                  {(() => {
+                    const hoveredEvents = hoveredDay ? getEventsForDay(hoveredDay) : []
+                    if (hoveredDay && hoveredEvents.length > 0) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          {hoveredEvents.map((event, index) => {
+                            const startDate = parseCalendarEventStart(event)
+                            const endCandidate =
+                              event?.endAt ||
+                              (event?.meetingDate && event?.endTime
+                                ? `${event.meetingDate}T${event.endTime}`
+                                : null)
+                            const endDate = endCandidate ? new Date(endCandidate) : null
+                            const timeStr = startDate
+                              ? startDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                              : ""
+                            const endStr =
+                              endDate && !Number.isNaN(endDate.getTime())
+                                ? endDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                                : ""
+                            const timeDisplay = endStr && timeStr ? `${timeStr} - ${endStr}` : timeStr
+
+                            return (
+                              <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                                  {event?.name || "Lịch họp"}
+                                </div>
+                                {timeDisplay && (
+                                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                                    {timeDisplay}
+                                  </div>
+                                )}
+                                {event?.location && (
+                                  <div className="text-muted" style={{ fontSize: "12px" }}>
+                                    {event.location}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+
+                    if (hoveredDay) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          <div className="text-muted" style={{ fontSize: "13px" }}>
+                            Không có lịch họp
                           </div>
-                        )
-                      })}
-                    </div>
-                  ) : hoveredDay ? (
-                    <div className="mt-4 pt-3 border-top">
-                      <div className="text-muted" style={{ fontSize: "13px" }}>
-                        Không có sự kiện
-                      </div>
-                    </div>
-                  ) : milestones.length > 0 && (() => {
+                        </div>
+                      )
+                    }
+
+                    if (milestones.length === 0) return null
                     // Show next upcoming milestone
                     const upcomingMilestone = milestones.find(m => !isCompletedStatus(m?.status))
                     if (!upcomingMilestone) return null

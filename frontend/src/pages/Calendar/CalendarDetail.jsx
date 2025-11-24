@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
 import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Trash, Users, X, XCircle } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
+import Loading from "~/components/Loading";
 
 export default function CalendarDetail() {
     const navigate = useNavigate();
@@ -74,12 +75,7 @@ export default function CalendarDetail() {
     if (loading) {
         return (
             <UserLayout sidebarType={eventRole}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-                        <p style={{ fontSize: '16px', color: '#6b7280' }}>Đang tải thông tin cuộc họp...</p>
-                    </div>
-                </div>
+                <Loading/>
             </UserLayout>
         );
     }
@@ -203,7 +199,7 @@ export default function CalendarDetail() {
             if (response) {
                 const updatedResponse = await calendarService.getCalendarEventDetail(eventId, calendarId);
                 setCalendar(updatedResponse.data);
-                toast.success('Cập nhật trạng thái tham gia thành công');
+                toast.success('Cập nhật trạng thái tham gia thành công');
             }
         } catch (error) {
             console.error('Error updating participation status:', error);
@@ -238,14 +234,14 @@ export default function CalendarDetail() {
     };
 
     return (
-        <UserLayout sidebarType={eventRole}>
+        <UserLayout sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{ margin: 0, padding: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
                 <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
                     {/* Header */}
                     <div style={{ backgroundColor: 'white', padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, color: '#dc2626', fontSize: '16px', fontWeight: 600 }}>Chi tiết cuộc họp</h3>
-                        
+
                         {!isPastMeeting && user?.id === calendar?.createdBy?.userId?._id && (
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <Link
@@ -272,20 +268,33 @@ export default function CalendarDetail() {
                     <div style={{ padding: '24px' }}>
                         {/* Meeting Title */}
                         <div style={{ marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                 <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 600, color: '#1f2937' }}>{calendar.name}</h1>
-                                {currentUserStatus === 'confirmed' ? (
-                                    <span style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ✓ Đã xác nhận tham gia
+                                
+                                {/* Badge hiển thị cuộc họp đã qua */}
+                                {isPastMeeting && (
+                                    <span style={{ backgroundColor: '#e5e7eb', color: '#4b5563', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                        🕐 Cuộc họp đã kết thúc
                                     </span>
-                                ) : currentUserStatus === 'absent' ? (
-                                    <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ✖ Đã từ chối
-                                    </span>
-                                ) : (
-                                    <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                                        ⏳ Chưa phản hồi
-                                    </span>
+                                )}
+                                
+                                {/* Badge trạng thái tham gia của user */}
+                                {!isPastMeeting && (
+                                    <>
+                                        {currentUserStatus === 'confirmed' ? (
+                                            <span style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ✓ Đã xác nhận tham gia
+                                            </span>
+                                        ) : currentUserStatus === 'absent' ? (
+                                            <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ✖ Đã từ chối
+                                            </span>
+                                        ) : (
+                                            <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+                                                ⏳ Chưa phản hồi
+                                            </span>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>

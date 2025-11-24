@@ -60,6 +60,7 @@ import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import HoDTaskPage from "./pages/Task/HoDTaskPage";
+import MemberTaskPage from "./pages/Task/MemberTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
@@ -72,9 +73,30 @@ import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
 import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
 import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+import MemberFeedbackListPage from "./pages/Feedback/MemberFeedbackListPage";
+import SubmitFeedbackResponsePage from "./pages/Feedback/SubmitFeedbackResponsePage";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
+import DepartmentBudgetEmpty from "./pages/Budget/DepartmentBudgetEmpty";
+import CreateDepartmentBudget from "./pages/Budget/CreateDepartmentBudget";
+import ViewDepartmentBudget from "./pages/Budget/ViewDepartmentBudget";
+import ListBudgetsPage from "./pages/Budget/ListBudgetsPage";
+import DepartmentBudgetsListPage from "./pages/Budget/DepartmentBudgetsListPage";
+import ViewDeptBudgetDetailHoOC from "./pages/Budget/ViewDeptBudgetDetailHoOC";
+import BudgetStatistics from "./pages/Budget/BudgetStatistics";
+import MemberExpensePage from "./pages/Budget/MemberExpensePage";
+import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
+import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
+import DataExportPage from "./pages/HoOC/ExportData/DataExportPage";
+import DataTemplatePage from "./pages/HoOC/ExportData/DataTemplatePage";
+import DataExportPreviewModal from "./components/DataExportPreviewModal";
+import AdminDashboard from "./pages/Admin/AdminDashBoard";
+import { User } from "lucide-react";
+import UserManagement from "./pages/Admin/UserManagement";
+import EventDetailManagement from "./pages/Admin/EventDetailManagement";
+import UserDetailManagement from "./pages/Admin/UserDetailManagement";
+import EventManagement from "./pages/Admin/EventManagement";
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -317,7 +339,7 @@ export default function App() {
           <Route 
             path="events/:eventId/tasks" 
             element={
-              <ProtectedRoute requiredRole="user">
+              <ProtectedRoute requiredRole="user" requiredEventRoles={["HoOC"]}>
                 <EventTaskPage />
               </ProtectedRoute>
             } 
@@ -331,6 +353,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="events/:eventId/member-tasks" 
+            element={
+              <ProtectedRoute>
+                <MemberTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="events/:eventId/tasks/:taskId" 
             element={
               <ProtectedRoute requiredRole="user">
@@ -338,12 +368,27 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          
+          <Route 
+            path="events/:eventId/tasks/hod-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoDTaskStatisticPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="events/:eventId/tasks/gantt" 
             element={
               <ProtectedRoute requiredRole="user">
                 <GanttChartTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/tasks/hooc-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoOCTaskStatisticPage />
               </ProtectedRoute>
             } 
           />
@@ -454,13 +499,263 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            }
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            }
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/events/:eventId/export/data" 
+            element={
+              <ProtectedRoute>
+                <DataExportPage/>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/export/templates" 
+            element={
+              <ProtectedRoute>
+                <DataTemplatePage />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Admin Routes */}
           <Route
-            path="/admin"
+            path="/admin/dashboard"
             element={
               <ProtectedRoute requiredRole="admin">
-                <div>Admin Page (Replace with your component)</div>
+                <AdminDashboard/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/event-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/event-management/:eventId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventDetailManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management/:userId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserDetailManagement/>
               </ProtectedRoute>
             }
           />

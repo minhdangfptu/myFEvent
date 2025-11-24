@@ -66,10 +66,11 @@ const startServer = async () => {
     const { startTaskAutoStatusScheduler } = await import('./src/services/taskAutoStatusService.js');
     startTaskAutoStatusScheduler();
     
-    app.listen(config.PORT, () => {
+    const server = app.listen(config.PORT, () => {
       console.log(`Server is running at http://localhost:${config.PORT}`);
       console.log(`Environment: ${config.NODE_ENV}`);
     });
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

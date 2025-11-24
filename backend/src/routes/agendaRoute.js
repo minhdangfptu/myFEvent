@@ -13,6 +13,7 @@ import {
     removeDayItem,
     batchUpdateItems,
     batchRemoveItems,
+    getAgendaByEvent
 } from '../controllers/agendaController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -22,6 +23,8 @@ const router = express.Router({ mergeParams: true });
 
 // GET /api/events/:eventId/milestones/:milestoneId/agenda - Lấy agenda theo milestone
 router.get('/', authenticateToken, getAgendasByMilestone);
+
+router.get('/by-event', authenticateToken, getAgendaByEvent);
 
 // GET /api/events/:eventId/milestones/:milestoneId/agenda/items - Lấy flattened items
 router.get('/items', authenticateToken, getFlattenedAgendaItems);

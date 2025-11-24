@@ -35,6 +35,15 @@ export const createMilestone = async (req, res) => {
       
       const agenda = await agendaService.createAgendaDoc(agendaPayload);
       
+      // Thông báo khi tạo lịch họp
+      try {
+        const { notifyAgendaCreated } = await import('../services/notificationService.js');
+        await notifyAgendaCreated(eventId, agenda._id, milestone._id);
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError);
+        // Không throw error, chỉ log
+      }
+      
       console.log(`✅ Created agenda for milestone ${milestone._id}:`, agenda._id);
       
       // Return milestone with agenda info

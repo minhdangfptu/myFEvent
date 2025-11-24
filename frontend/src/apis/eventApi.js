@@ -85,6 +85,30 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
+  updateMemberRole: async (eventId, memberId, role) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/members/${memberId}/role`, { role });
+    return res.data;
+  },
+  changeMemberDepartment: async (eventId, memberId, departmentId) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/members/${memberId}/department`, { departmentId });
+    return res.data;
+  },
+  removeMemberFromEvent: async (eventId, memberId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/${memberId}`);
+    return res.data;
+  },
+  leaveEvent: async (eventId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/me`);
+    return res.data;
+  },
+  getCoreTeamList: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
+    return res.data;
+  },
+  removeMemberFromEvent: async (eventId, memberId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/${memberId}`);
+    return res.data;
+  },
   
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import UserLayout from "~/components/UserLayout";
@@ -6,11 +6,56 @@ import { useEvents } from "~/contexts/EventContext";
 import calendarService from "~/services/calendarService";
 import { departmentService } from "~/services/departmentService";
 
+const toMinutes = (timeStr) => {
+	const [hours, minutes] = (timeStr || "").split(":").map(Number);
+	if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+	return hours * 60 + minutes;
+};
+
+const isTimeBefore = (timeA, timeB) => {
+	const minutesA = toMinutes(timeA);
+	const minutesB = toMinutes(timeB);
+	if (minutesA == null || minutesB == null) return false;
+	return minutesA < minutesB;
+};
+
+const getSafeNowInfo = () => {
+	const now = new Date();
+	now.setSeconds(0, 0);
+	now.setMilliseconds(0);
+	now.setMinutes(now.getMinutes() + 1);
+	return {
+		date: now.toISOString().split("T")[0],
+		time: now.toTimeString().slice(0, 5)
+	};
+};
+
+const sanitizeMeetingTimes = (meetingDate, startTime, endTime, safeInfo = getSafeNowInfo()) => {
+	let sanitizedStart = startTime;
+	let sanitizedEnd = endTime;
+
+	if (meetingDate === safeInfo.date) {
+		if (!sanitizedStart || isTimeBefore(sanitizedStart, safeInfo.time)) {
+			sanitizedStart = safeInfo.time;
+		}
+
+		if (sanitizedEnd && !isTimeBefore(sanitizedStart, sanitizedEnd)) {
+			sanitizedEnd = "";
+		}
+	}
+
+	return {
+		startTime: sanitizedStart,
+		endTime: sanitizedEnd
+	};
+};
+
 export default function CreateDepartmentCalendarPage() {
 	const navigate = useNavigate();
 	const { eventId, departmentId } = useParams();
 	const { fetchEventRole } = useEvents();
 	const [eventRole, setEventRole] = useState("");
+	const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
 	useEffect(() => {
 		let mounted = true;
@@ -64,7 +109,21 @@ export default function CreateDepartmentCalendarPage() {
 
 	const handleChange = (e) => {
 		const { name, value } = e.target;
-		setFormData(prev => ({ ...prev, [name]: value }));
+		const safeInfo = getSafeNowInfo();
+		setFormData(prev => {
+			const updated = { ...prev, [name]: value };
+			if (["meetingDate", "startTime", "endTime"].includes(name)) {
+				const sanitized = sanitizeMeetingTimes(
+					updated.meetingDate,
+					updated.startTime,
+					updated.endTime,
+					safeInfo
+				);
+				updated.startTime = sanitized.startTime;
+				updated.endTime = sanitized.endTime;
+			}
+			return updated;
+		});
 	};
 
 	const handleParticipantTypeChange = (type) => {
@@ -164,7 +223,7 @@ export default function CreateDepartmentCalendarPage() {
 	};
 
 	return (
-		<UserLayout sidebarType={eventRole} activePage="work-timeline">
+		<UserLayout sidebarType={eventRole} activePage="calendar">
 			<div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", padding: "24px" }}>
 				<div style={{ maxWidth: "1200px", margin: "0 auto", backgroundColor: "white", borderRadius: "12px", padding: "32px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
 					<h1 style={{ margin: "0 0 32px 0", fontSize: "24px", fontWeight: "600", color: "#ef4444" }}>
@@ -225,7 +284,7 @@ export default function CreateDepartmentCalendarPage() {
 								</label>
 								<div style={{ marginBottom: "12px" }}>
 									<div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Ngày họp</div>
-									<input type="date" name="meetingDate" value={formData.meetingDate} onChange={handleChange} style={{ width: "100%", padding: "10px 12px", fontSize: "14px", border: "1px solid #d1d5db", borderRadius: "6px", outline: "none", backgroundColor: "white" }} onFocus={(e) => e.target.style.borderColor = "#4285f4"} onBlur={(e) => e.target.style.borderColor = "#d1d5db"} />
+									<input type="date" name="meetingDate" value={formData.meetingDate} onChange={handleChange} min={todayISODate} style={{ width: "100%", padding: "10px 12px", fontSize: "14px", border: "1px solid #d1d5db", borderRadius: "6px", outline: "none", backgroundColor: "white" }} onFocus={(e) => e.target.style.borderColor = "#4285f4"} onBlur={(e) => e.target.style.borderColor = "#d1d5db"} />
 								</div>
 								<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "8px" }}>
 									<div>
@@ -324,5 +383,8 @@ export default function CreateDepartmentCalendarPage() {
 		</UserLayout>
 	);
 }
+
+
+
 
 

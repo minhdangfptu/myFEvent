@@ -13,6 +13,7 @@ import {
 import {getMembersByDepartment} from "../controllers/eventMemberController.js"
 import { createCalendarForDepartment } from "../controllers/calendarController.js";
 import { authenticateToken } from '../middlewares/authMiddleware.js';
+import budgetRoute from './budgetRoute.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -27,5 +28,8 @@ router.delete('/:departmentId/members/:memberId', authenticateToken, removeMembe
 router.patch('/:departmentId', authenticateToken, editDepartment);
 // Calendar endpoints for a department (HoD)
 router.post('/:departmentId/calendars/create-calendar-for-department', authenticateToken, createCalendarForDepartment);
+
+// Budget routes
+router.use('/:departmentId/budget', budgetRoute);
 
 export default router;

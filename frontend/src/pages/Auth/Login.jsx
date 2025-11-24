@@ -29,19 +29,24 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/home-page", {
-        replace: true,
-        state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-      });
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/home-page", {
+          replace: true,
+          state: { toast: { type: "success", message: "Đăng nhập thành công" } },
+        });
+      }
     } catch (error) {
       console.error("Login error:", error);
-      if (error?.response?.status === 403) {
+      const errorCode = error?.response?.data?.code;
+      if (error?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
         return;
       }
       setError(
-        error.response?.data?.message ||
-          "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+        error?.response?.data?.message ||
+        "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
     } finally {
       setLoading(false);
@@ -93,10 +98,15 @@ export default function LoginPage() {
       });
     } catch (err) {
       console.error("Google login error:", err);
+      const errorCode = err?.response?.data?.code;
+      if (err?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
+        navigate("/email-confirmation", { state: { email } });
+        return;
+      }
       setError(
         err?.response?.data?.message ||
-          err?.message ||
-          "Đăng nhập Google thất bại."
+        err?.message ||
+        "Đăng nhập Google thất bại."
       );
     } finally {
       setLoading(false);

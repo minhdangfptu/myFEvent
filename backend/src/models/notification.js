@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ["CÔNG VIỆC", "LỊCH HỌP", "CỘT MỐC", "KHÁC"],
+      enum: ["CÔNG VIỆC", "LỊCH HỌP", "CỘT MỐC", "THÀNH VIÊN", "KHÁC"],
       default: "KHÁC",
     },
     title: {
@@ -52,6 +52,10 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Agenda",
     },
+    relatedCalendarId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Calendar",
+    }
   },
   {
     timestamps: true,

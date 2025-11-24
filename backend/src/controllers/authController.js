@@ -131,11 +131,17 @@ export const login = async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
 
-    if ( user.status == 'pending') {
-      return res.status(403).json({ message: 'Account is not active' });
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Account is not active',
+        code: 'ACCOUNT_PENDING'
+      });
     }
-    if ( user.status == 'banned') {
-      return res.status(403).json({ message: 'Account is banned' });
+    if (user.status === 'banned') {
+      return res.status(403).json({
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+        code: 'ACCOUNT_BANNED'
+      });
     }
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
@@ -222,6 +228,20 @@ export const loginWithGoogle = async (req, res) => {
         if (!user.fullName && name) user.fullName = name;
         if (!user.avatarUrl && picture) user.avatarUrl = picture;
         await user.save();
+      }
+
+      if (user.status === 'pending') {
+        return res.status(403).json({
+          message: 'Account is not active',
+          code: 'ACCOUNT_PENDING'
+        });
+      }
+
+      if (user.status === 'banned') {
+        return res.status(403).json({
+          message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+          code: 'ACCOUNT_BANNED'
+        });
       }
 
        const accessToken = jwt.sign(
@@ -500,9 +520,8 @@ const setDeleteEventOtp = (email) => {
 export const sendDeleteOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    // Bảo vệ: chỉ user đang đăng nhập mới gửi otp cho chính email đó
     if (!req.user || req.user.email !== email) {
-      return res.status(403).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const code = setDeleteEventOtp(email);
@@ -532,7 +551,6 @@ export const verifyDeleteOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ message: 'Thiếu email hoặc mã otp.' });
-    // Bảo vệ: chỉ user đăng nhập được xác nhận
     if (!req.user || req.user.email !== email) {
       return res.status(403).json({ message: 'Unauthorized' });
     }

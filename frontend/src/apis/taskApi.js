@@ -44,4 +44,36 @@ export const taskApi = {
     return res.data;
   },
 
+  getTaskStatisticsByMilestone: async (eventId, milestoneId) => {
+    if (!milestoneId) {
+      throw new Error('Milestone ID is required');
+    }
+    const url = `/api/tasks/${eventId}/statistics/${milestoneId}`;
+    try {
+      const res = await axiosClient.get(url);
+      if (res.data && res.data.data) {
+        return res.data; // Return { data: { summary, milestone, ... } }
+      } else if (res.data && res.data.summary) {
+        return res.data; // Return { summary, milestone, ... }
+      } else {
+        console.log('❌ Unexpected response structure');
+        console.log('Available keys:', res.data ? Object.keys(res.data) : 'none');
+        return res.data;
+      }
+    } catch (error) {
+      console.error('❌ Axios error:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
+  },
+
+  getBurnupData: async (eventId, milestoneId) => {
+    const res = await axiosClient.get(`/api/tasks/${eventId}/burnup-data/${milestoneId}`);
+    return res.data;
+  },
+  getDepartmentBurnupData: async (eventId, milestoneId) => {
+    const res = await axiosClient.patch(`/api/tasks/${eventId}/burnup-data/${milestoneId}`);
+    return res.data;
+  },
+
 }

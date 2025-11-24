@@ -65,4 +65,12 @@ export const eventService = {
             throw error;
         }
     },
+    removeMemberFromEvent: async (eventId, memberId) => {
+        try {
+            const response = await eventApi.removeMemberFromEvent(eventId, memberId);
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
 };

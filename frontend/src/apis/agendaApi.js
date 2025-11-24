@@ -2,6 +2,11 @@ import axiosClient from './axiosClient.js';
 
 // === AGENDA CRUD APIs ===
 
+// GET http://localhost:8080/api/events/68fe711d991b5b8a0d013cab/exports/raw/agenda/list-name
+export const getAgendaName = async (eventId, milestoneId) => {
+  const res = await axiosClient.get(`/api/events/${eventId}/exports/raw/agenda/list-name`);
+  return res.data;
+};
 // GET /api/events/:eventId/milestones/:milestoneId/agenda - Lấy agenda theo milestone
 export const getAgendaByMilestone = async (eventId, milestoneId) => {
   const res = await axiosClient.get(`/api/events/${eventId}/milestones/${milestoneId}/agenda`);

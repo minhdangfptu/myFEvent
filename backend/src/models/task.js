@@ -5,7 +5,8 @@ const TaskSchema = new Schema({
   title: { type: String, required: true },
   description: String,
 
-  status: { type: String, enum: ['suggested','todo','in_progress','blocked','done','cancelled'], default: 'todo' },
+  taskType: { type: String, enum: ['epic', 'normal'], default: 'normal' }, // epic = epic task, normal = task thường
+  status: { type: String, enum: ['chua_bat_dau', 'da_bat_dau', 'hoan_thanh', 'huy'], default: 'chua_bat_dau' },
   progressPct: { type: Number, min: 0, max: 100, default: 0 },
 
   estimate: Number,
@@ -22,8 +23,9 @@ const TaskSchema = new Schema({
   eventId:      { type: Types.ObjectId, ref: 'Event' },       // (O) như ERD
   departmentId: { type: Types.ObjectId, ref: 'Department' },  // (O)
   milestoneId:  { type: Types.ObjectId, ref: 'Milestone' },
-  parentId:     { type: Types.ObjectId, ref: 'Task' },
-  dependencies: [{ type: Types.ObjectId, ref: 'Task' }]
+  parentId:     { type: Types.ObjectId, ref: 'Task' }, // Cho normal task: parentId = epicTaskId
+  dependencies: [{ type: Types.ObjectId, ref: 'Task' }],
+  createdBy:    { type: Types.ObjectId, ref: 'User' } // Người tạo task (để kiểm tra quyền chỉnh sửa)
 }, { timestamps: true, versionKey: false });
 
 TaskSchema.index({ eventId: 1, departmentId: 1, dueDate: 1 });

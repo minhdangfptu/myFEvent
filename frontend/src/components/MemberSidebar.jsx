@@ -9,6 +9,9 @@ export default function MemberSidebar({
   activePage = "home",
   eventId, // Nhận eventId qua props
 }) {
+  const STORAGE_KEY = 'sidebar_state_member';
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -21,10 +24,62 @@ export default function MemberSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
+
   // Sử dụng eventId từ props thay vì lấy từ URL
   const { events, loading } = useEvents();
   const event = events.find(e => (e._id || e.id) === eventId);
   const hasEvents = !!event;
+  const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
@@ -93,7 +148,7 @@ export default function MemberSidebar({
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
-    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/member-tasks` },
     { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
     // Không có work-stats (thống kê tiến độ)
   ];
@@ -101,8 +156,7 @@ export default function MemberSidebar({
   // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
+    { id: "expenses", label: "Chi tiêu", path: `/events/${eventId || ''}/expenses` },
     // Không có finance-stats (thống kê thu chi)
   ];
   const risksSubItems = [
@@ -397,6 +451,19 @@ export default function MemberSidebar({
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
+
+            {hasEvents && (
+              <button
+                className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                onClick={() => navigate(`/events/${eventId || ''}/feedback/member`)}
+                title="Phản hồi sự kiện"
+              >
+                <div className="d-flex align-items-center">
+                  <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                  {sidebarOpen && <span>Feedback</span>}
+                </div>
+              </button>
+            )}
 
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
