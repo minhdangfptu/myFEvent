@@ -280,6 +280,9 @@ export default function HoDSideBar({
   const hasEvent = !!currentEvent;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((currentEvent?.status || '').toLowerCase());
 
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = ctxLoading && ctxEvents.length === 0;
+
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
       <style>{`
@@ -336,8 +339,8 @@ export default function HoDSideBar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
@@ -396,19 +399,23 @@ export default function HoDSideBar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {ctxLoading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(255,255,255,0.75)",
+              background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={40} />
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>

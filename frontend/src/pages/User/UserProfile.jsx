@@ -34,6 +34,34 @@ export default function UserProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ fullName: '', phone: '', bio: '', highlight: '', tags: [] });
+  const [phoneError, setPhoneError] = useState('');
+
+  // Validate phone number (Vietnamese format)
+  const validatePhone = (phone) => {
+    if (!phone || phone.trim() === '') {
+      return ''; // Empty is allowed
+    }
+
+    // Remove spaces and dashes
+    const cleanPhone = phone.replace(/[\s-]/g, '');
+
+    // Vietnamese phone: starts with 0 and has 10 digits, or +84 with 11-12 digits
+    const vnPhoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
+    const intlPhoneRegex = /^\+84[3|5|7|8|9][0-9]{8}$/;
+
+    if (!vnPhoneRegex.test(cleanPhone) && !intlPhoneRegex.test(cleanPhone)) {
+      return 'Số điện thoại không hợp lệ. VD: 0912345678 hoặc +84912345678';
+    }
+
+    return '';
+  };
+
+  const handlePhoneChange = (value) => {
+    // Only allow numbers, +, spaces, and dashes
+    const filtered = value.replace(/[^0-9+\s-]/g, '');
+    setForm({ ...form, phone: filtered });
+    setPhoneError(validatePhone(filtered));
+  };
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -97,6 +125,15 @@ export default function UserProfilePage() {
   // Lưu toàn bộ hồ sơ (bao gồm avatar nếu có)
   const handleSave = async () => {
     if (saving) return;
+
+    // Validate phone before saving
+    const phoneValidationError = validatePhone(form.phone);
+    if (phoneValidationError) {
+      setPhoneError(phoneValidationError);
+      notify('error', 'Vui lòng kiểm tra lại số điện thoại.');
+      return;
+    }
+
     setSaving(true);
     try {
       // Đảm bảo gửi đầy đủ các field, kể cả khi chúng là empty string
@@ -373,14 +410,31 @@ export default function UserProfilePage() {
                           <span>{row.icon}</span>
                           <div className="small text-muted fw-medium">{row.label}</div>
                         </div>
-                        {editing && (row.key === 'fullName' || row.key === 'phone') ? (
+                        {editing && row.key === 'fullName' && (
                           <input
                             className="form-control"
-                            value={form[row.key]}
-                            onChange={(e) => setForm({ ...form, [row.key]: e.target.value })}
-                            placeholder={`Nhập ${row.label.toLowerCase()}`}
+                            value={form.fullName}
+                            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                            placeholder="Nhập họ và tên"
                           />
-                        ) : (
+                        )}
+                        {editing && row.key === 'phone' && (
+                          <>
+                            <input
+                              className={`form-control ${phoneError ? 'is-invalid' : ''}`}
+                              value={form.phone}
+                              onChange={(e) => handlePhoneChange(e.target.value)}
+                              placeholder="Nhập số điện thoại (VD: 0912345678)"
+                              maxLength={15}
+                            />
+                            {phoneError && (
+                              <div className="invalid-feedback d-block">
+                                {phoneError}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {(!editing || (row.key !== 'fullName' && row.key !== 'phone')) && (
                           <div className="fw-medium">{row.value || <span className="text-muted">Chưa cập nhật</span>}</div>
                         )}
                       </div>
@@ -493,6 +547,7 @@ export default function UserProfilePage() {
                           className="btn btn-outline-secondary px-4"
                           onClick={() => {
                             setEditing(false);
+                            setPhoneError('');
                             if (profile) {
                               setForm({
                                 fullName: profile.fullName || '',
@@ -510,7 +565,7 @@ export default function UserProfilePage() {
                         >
                           Hủy
                         </button>
-                        <button className="btn btn-danger px-4" onClick={handleSave} disabled={saving}>
+                        <button className="btn btn-danger px-4" onClick={handleSave} disabled={saving || !!phoneError}>
                           {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
                         </button>
                       </div>

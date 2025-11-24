@@ -209,7 +209,7 @@ export const loginWithGoogle = async (req, res) => {
       let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
   
       if (!user) {
-
+        // Create new user with Google - mark as verified since Google already verified the email
         user = await User.create({
           email,
           fullName: name,
@@ -218,15 +218,22 @@ export const loginWithGoogle = async (req, res) => {
           authProvider: 'google',
           status: 'active',
           isFirstLogin: true,
+          verified: true, // Google accounts are pre-verified
         });
       } else {
-
+        // Update existing user
         if (!user.googleId) {
           user.googleId = sub;
         }
 
         if (!user.fullName && name) user.fullName = name;
         if (!user.avatarUrl && picture) user.avatarUrl = picture;
+
+        // Mark as verified if logging in with Google (Google already verified the email)
+        if (!user.verified) {
+          user.verified = true;
+        }
+
         await user.save();
       }
 

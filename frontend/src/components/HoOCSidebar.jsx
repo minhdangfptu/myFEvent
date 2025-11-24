@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
@@ -80,11 +80,14 @@ export default function HoOCSidebar({
     }
   }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
 
-  // Sử dụng eventId từ props
+  // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
   const { events, loading } = useEvents();
-  const event = events.find(e => (e._id || e.id) === eventId);
+  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
   const hasEvent = !!event;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
   const navigate = useNavigate();
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
@@ -187,8 +190,8 @@ export default function HoOCSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
@@ -229,7 +232,7 @@ export default function HoOCSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {loading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
@@ -237,12 +240,15 @@ export default function HoOCSidebar({
               background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={100} />
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>

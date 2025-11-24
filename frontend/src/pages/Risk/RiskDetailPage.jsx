@@ -7,6 +7,7 @@ import { riskApiWithErrorHandling, getFullMember } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
+import Loading from "../../components/Loading";
 
 export default function RiskDetailPage() {
   const { t } = useTranslation();
@@ -18,11 +19,22 @@ export default function RiskDetailPage() {
   // ====== API States ======
   const [risk, setRisk] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
 
   // ====== Edit States ======
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({});
+  const [editForm, setEditForm] = useState({
+    name: "",
+    departmentId: "",
+    risk_category: "others",
+    impact: "medium",
+    likelihood: "medium",
+    risk_mitigation_plan: "",
+    risk_response_plan: "",
+  });
   const [savingChanges, setSavingChanges] = useState(false);
+  const [editErrors, setEditErrors] = useState({});
 
   // ====== Occurred Risk States ======
   const [showOccurredModal, setShowOccurredModal] = useState(false);
@@ -99,11 +111,6 @@ export default function RiskDetailPage() {
   // ====== Helper Functions ======
   const mapImpactToLevel = (impact) => impactLabels[impact] || "Trung bình";
 
-  const mapLevelToImpact = (level) => {
-    const reverseMap = Object.entries(impactLabels).find(([_, label]) => label === level);
-    return reverseMap ? reverseMap[0] : "medium";
-  };
-
   const transformApiRiskToComponent = (apiRisk) => ({
     id: apiRisk._id,
     name: apiRisk.name,
@@ -168,6 +175,20 @@ export default function RiskDetailPage() {
   };
 
   // ====== API Calls ======
+  const fetchDepartments = useCallback(async () => {
+    try {
+      setLoadingDepartments(true);
+      const response = await departmentApi.getDepartments(eventId);
+      const departmentsList = response?.data || [];
+      setDepartments(departmentsList);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      setDepartments([]);
+    } finally {
+      setLoadingDepartments(false);
+    }
+  }, [eventId]);
+
   const fetchRisk = useCallback(async () => {
     try {
       setLoading(true);
@@ -175,12 +196,16 @@ export default function RiskDetailPage() {
 
       if (response.success) {
         const transformedRisk = transformApiRiskToComponent(response.data);
+        const originalData = response.data;
         setRisk(transformedRisk);
         setEditForm({
-          name: transformedRisk.name,
-          description: transformedRisk.description || "",
-          mitigation: transformedRisk.mitigation || "",
-          level: transformedRisk.level,
+          name: originalData.name || "",
+          departmentId: originalData.departmentId?._id || "",
+          risk_category: originalData.risk_category || "others",
+          impact: originalData.impact || "medium",
+          likelihood: originalData.likelihood || "medium",
+          risk_mitigation_plan: originalData.risk_mitigation_plan || "",
+          risk_response_plan: originalData.risk_response_plan || "",
         });
       } else {
         toast.error("Không thể tải thông tin rủi ro");
@@ -195,8 +220,28 @@ export default function RiskDetailPage() {
   }, [eventId, riskId, navigate]);
 
   const updateRisk = async () => {
-    if (!editForm.name.trim()) {
-      toast.error("Tên rủi ro không được để trống");
+    // Validate and get errors
+    const errors = {};
+    if (!editForm.name?.trim()) {
+      errors.name = "Tên rủi ro không được để trống";
+    }
+    if (!editForm.departmentId) {
+      errors.departmentId = "Vui lòng chọn ban phụ trách";
+    }
+    if (!editForm.risk_mitigation_plan?.trim()) {
+      errors.risk_mitigation_plan = "Kế hoạch giảm thiểu không được để trống";
+    }
+    if (!editForm.risk_response_plan?.trim()) {
+      errors.risk_response_plan = "Kế hoạch ứng phó không được để trống";
+    }
+
+    setEditErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      const errorMessages = Object.values(errors).filter(Boolean);
+      if (errorMessages.length > 0) {
+        toast.error(errorMessages[0]);
+      }
       return;
     }
 
@@ -204,23 +249,20 @@ export default function RiskDetailPage() {
       setSavingChanges(true);
       const updateData = {
         name: editForm.name,
-        risk_mitigation_plan: editForm.description,
-        risk_response_plan: editForm.mitigation,
-        impact: mapLevelToImpact(editForm.level),
+        departmentId: editForm.departmentId,
+        risk_category: editForm.risk_category,
+        impact: editForm.impact,
+        likelihood: editForm.likelihood,
+        risk_mitigation_plan: editForm.risk_mitigation_plan,
+        risk_response_plan: editForm.risk_response_plan,
       };
 
       const response = await riskApiWithErrorHandling.updateRisk(eventId, riskId, updateData);
 
       if (response.success) {
         toast.success("Cập nhật thành công!");
-        setRisk(prev => ({
-          ...prev,
-          name: editForm.name,
-          description: editForm.description,
-          mitigation: editForm.mitigation,
-          level: editForm.level,
-        }));
         setIsEditing(false);
+        setEditErrors({});
         await fetchRisk();
       } else {
         toast.error(response.error || "Không thể cập nhật");
@@ -247,8 +289,25 @@ export default function RiskDetailPage() {
   };
 
   const handleOccurredSubmit = async () => {
+    // Validate required fields (all except description)
     if (!occurredForm.occurred_name.trim()) {
       toast.error("Tên sự cố không được để trống");
+      return;
+    }
+    if (!occurredForm.occurred_location.trim()) {
+      toast.error("Địa điểm không được để trống");
+      return;
+    }
+    if (!occurredForm.occurred_date) {
+      toast.error("Thời gian không được để trống");
+      return;
+    }
+
+    // Validate occurred_date must not be in the future
+    const occurredDateTime = new Date(occurredForm.occurred_date);
+    const now = new Date();
+    if (occurredDateTime > now) {
+      toast.error("Thời gian sự cố không được là thời gian trong tương lai");
       return;
     }
 
@@ -330,12 +389,24 @@ export default function RiskDetailPage() {
 
   // ====== Event Handlers ======
   const resetForm = () => {
-    setEditForm({
-      name: risk.name,
-      description: risk.description || "",
-      mitigation: risk.mitigation || "",
-      level: risk.level,
-    });
+    if (risk?.originalData) {
+      const originalData = risk.originalData;
+      setEditForm({
+        name: originalData.name || "",
+        departmentId: originalData.departmentId?._id || "",
+        risk_category: originalData.risk_category || "others",
+        impact: originalData.impact || "medium",
+        likelihood: originalData.likelihood || "medium",
+        risk_mitigation_plan: originalData.risk_mitigation_plan || "",
+        risk_response_plan: originalData.risk_response_plan || "",
+      });
+    }
+    setEditErrors({});
+  };
+
+  const handleStartEditing = () => {
+    fetchDepartments();
+    setIsEditing(true);
   };
 
   const resetOccurredForm = () => {
@@ -436,10 +507,7 @@ export default function RiskDetailPage() {
     return (
       <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()}>
         <div className="container-fluid d-flex justify-content-center align-items-center" style={{ height: "60vh" }}>
-          <div className="text-center">
-            <div className="loading-spinner mb-3"></div>
-            <div className="text-muted">Đang tải thông tin rủi ro...</div>
-          </div>
+          <Loading />
         </div>
       </UserLayout>
     );
@@ -633,17 +701,22 @@ export default function RiskDetailPage() {
             <div className="row align-items-center">
               <div className="col-md-8">
                 {isEditing ? (
-                  <input
-                    className="form-control form-control-lg"
-                    style={{ background: "rgba(255,255,255,0.9)", border: "none" }}
-                    value={editForm.name || ""}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Tên rủi ro..."
-                  />
+                  <div>
+                    <input
+                      className={`form-control form-control-lg ${editErrors.name ? 'is-invalid' : ''}`}
+                      style={{ background: "rgba(255,255,255,0.9)", border: editErrors.name ? "2px solid #dc3545" : "none" }}
+                      value={editForm.name || ""}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Tên rủi ro *"
+                    />
+                    {editErrors.name && <small className="text-warning mt-1 d-block">{editErrors.name}</small>}
+                  </div>
                 ) : (
-                  <h2 className="mb-2">{risk.name}</h2>
+                  <> <h2 className="mb-2">{risk.name}</h2>
+                  <p className="mb-0 opacity-75 mt-2">{risk.category} • {risk.owner}</p></>
+                 
                 )}
-                <p className="mb-0 opacity-75">{risk.category} • {risk.owner}</p>
+                
               </div>
               <div className="col-md-4 text-md-end">
                 <div className="d-flex flex-column gap-4">
@@ -655,95 +728,206 @@ export default function RiskDetailPage() {
           </div>
 
           <div className="p-4">
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group">
-                  <label>Kế hoạch giảm thiểu</label>
-                  {isEditing ? (
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={editForm.description || ""}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Mô tả kế hoạch giảm thiểu rủi ro…"
-                    />
-                  ) : (
-                    <div className="info-box">{risk.description || "Chưa có mô tả"}</div>
-                  )}
+            {isEditing ? (
+              <>
+                {/* Row 1: Ban phụ trách & Danh mục */}
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Ban phụ trách *</label>
+                      <select
+                        className={`form-select ${editErrors.departmentId ? 'is-invalid' : ''}`}
+                        value={editForm.departmentId || ""}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, departmentId: e.target.value }))}
+                        disabled={loadingDepartments}
+                      >
+                        <option value="">Chọn ban phụ trách</option>
+                        {departments.map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                      {loadingDepartments && <small className="text-muted">Đang tải danh sách ban...</small>}
+                      {editErrors.departmentId && <div className="invalid-feedback">{editErrors.departmentId}</div>}
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Danh mục</label>
+                      <select
+                        className="form-select"
+                        value={editForm.risk_category || "others"}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, risk_category: e.target.value }))}
+                      >
+                        {Object.entries(categoryLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group">
-                  <label>Kế hoạch ứng phó</label>
-                  {isEditing ? (
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={editForm.mitigation || ""}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, mitigation: e.target.value }))}
-                      placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
-                    />
-                  ) : (
-                    <div className="info-box">{risk.mitigation || "Chưa có kế hoạch"}</div>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-3">
-                <div className="form-group">
-                  <label>Mức độ tác động</label>
-                  {isEditing ? (
-                    <select
-                      className="form-select"
-                      value={editForm.level || "Trung bình"}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, level: e.target.value }))}
-                    >
-                      <option value="Cao">Cao</option>
-                      <option value="Trung bình">Trung bình</option>
-                      <option value="Thấp">Thấp</option>
-                    </select>
-                  ) : (
-                    <div className="info-box">{risk.level}</div>
-                  )}
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group">
-                  <label>Khả năng xảy ra</label>
-                  <div className="info-box">{risk.likelihoodLabel}</div>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group">
-                  <label>Trạng thái</label>
-                  <div className="d-flex align-items-center gap-2">
-                    <span
-                      className="status-badge"
-                      style={{
-                        ...getStatusStyle(risk.statusKey),
-                        background: getStatusStyle(risk.statusKey).bg,
-                        borderColor: getStatusStyle(risk.statusKey).border,
-                      }}
-                    >
-                      {risk.status}
-                    </span>
+                {/* Row 2: Mức độ tác động & Khả năng xảy ra */}
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Mức độ tác động</label>
+                      <select
+                        className="form-select"
+                        value={editForm.impact || "medium"}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, impact: e.target.value }))}
+                      >
+                        <option value="high">Cao</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="low">Thấp</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Khả năng xảy ra</label>
+                      <select
+                        className="form-select"
+                        value={editForm.likelihood || "medium"}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, likelihood: e.target.value }))}
+                      >
+                        <option value="very_high">Rất cao</option>
+                        <option value="high">Cao</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="low">Thấp</option>
+                        <option value="very_low">Rất thấp</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group">
-                  <label>Sự cố</label>
-                  <div className="info-box">
-                    {risk.occurredCount} sự cố
-                    {risk.resolvingOccurred > 0 && (
-                      <span className="text-warning ms-2">({risk.resolvingOccurred} chờ xử lý)</span>
-                    )}
+
+                {/* Row 3: Kế hoạch giảm thiểu & Kế hoạch ứng phó */}
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Kế hoạch giảm thiểu *</label>
+                      <textarea
+                        className={`form-control ${editErrors.risk_mitigation_plan ? 'is-invalid' : ''}`}
+                        rows={4}
+                        value={editForm.risk_mitigation_plan || ""}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, risk_mitigation_plan: e.target.value }))}
+                        placeholder="Mô tả kế hoạch giảm thiểu rủi ro…"
+                      />
+                      {editErrors.risk_mitigation_plan && <div className="invalid-feedback">{editErrors.risk_mitigation_plan}</div>}
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Kế hoạch ứng phó *</label>
+                      <textarea
+                        className={`form-control ${editErrors.risk_response_plan ? 'is-invalid' : ''}`}
+                        rows={4}
+                        value={editForm.risk_response_plan || ""}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, risk_response_plan: e.target.value }))}
+                        placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
+                      />
+                      {editErrors.risk_response_plan && <div className="invalid-feedback">{editErrors.risk_response_plan}</div>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+
+                {/* Row 4: Trạng thái & Sự cố (read-only) */}
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Trạng thái</label>
+                      <div className="d-flex align-items-center gap-2">
+                        <span
+                          className="status-badge"
+                          style={{
+                            ...getStatusStyle(risk.statusKey),
+                            background: getStatusStyle(risk.statusKey).bg,
+                            borderColor: getStatusStyle(risk.statusKey).border,
+                          }}
+                        >
+                          {risk.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Sự cố</label>
+                      <div className="info-box">
+                        {risk.occurredCount} sự cố
+                        {risk.resolvingOccurred > 0 && (
+                          <span className="text-warning ms-2">({risk.resolvingOccurred} chờ xử lý)</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Display mode */}
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Kế hoạch giảm thiểu</label>
+                      <div className="info-box">{risk.description || "Chưa có mô tả"}</div>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Kế hoạch ứng phó</label>
+                      <div className="info-box">{risk.mitigation || "Chưa có kế hoạch"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label>Mức độ tác động</label>
+                      <div className="info-box">{risk.level}</div>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label>Khả năng xảy ra</label>
+                      <div className="info-box">{risk.likelihoodLabel}</div>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label>Trạng thái</label>
+                      <div className="d-flex align-items-center gap-2">
+                        <span
+                          className="status-badge"
+                          style={{
+                            ...getStatusStyle(risk.statusKey),
+                            background: getStatusStyle(risk.statusKey).bg,
+                            borderColor: getStatusStyle(risk.statusKey).border,
+                          }}
+                        >
+                          {risk.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group">
+                      <label>Sự cố</label>
+                      <div className="info-box">
+                        {risk.occurredCount} sự cố
+                        {risk.resolvingOccurred > 0 && (
+                          <span className="text-warning ms-2">({risk.resolvingOccurred} chờ xử lý)</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Action Buttons */}
             <div className="action-buttons mt-4">
@@ -770,7 +954,7 @@ export default function RiskDetailPage() {
                   </button>
                   
                   {canEdit() && (
-                    <button className="btn btn-primary" onClick={() => setIsEditing(true)}>
+                    <button className="btn btn-primary" onClick={handleStartEditing}>
                       <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
                   )}
@@ -1061,7 +1245,7 @@ export default function RiskDetailPage() {
               <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Địa điểm</label>
+                    <label>Địa điểm *</label>
                     <input
                       type="text"
                       className="form-control"
@@ -1073,7 +1257,7 @@ export default function RiskDetailPage() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Thời gian</label>
+                    <label>Thời gian *</label>
                     <input
                       type="datetime-local"
                       className="form-control"

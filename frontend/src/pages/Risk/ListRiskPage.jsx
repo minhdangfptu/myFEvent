@@ -7,6 +7,7 @@ import { riskApiWithErrorHandling } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
+import Loading from "../../components/Loading";
 
 export default function ListRiskPage() {
   const { t } = useTranslation();
@@ -331,9 +332,10 @@ export default function ListRiskPage() {
     if (
       !newRisk.name ||
       !newRisk.risk_mitigation_plan ||
-      !newRisk.departmentId
+      !newRisk.departmentId ||
+      !newRisk.risk_response_plan 
     ) {
-      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      toast.error(`Vui lòng điền đầy đủ thông tin cho ${newRisk.name ? "" : "tên rủi ro,"}${newRisk.risk_mitigation_plan ? "" : " kế hoạch giảm thiểu,"}${newRisk.departmentId ? "" : " ban phụ trách,"}${newRisk.risk_response_plan ? "" : " kế hoạch ứng phó"}`);
       return;
     }
 
@@ -968,8 +970,7 @@ export default function ListRiskPage() {
                 {loading ? (
                   <tr>
                     <td colSpan="6" className="text-center py-5">
-                      <div className="loading-spinner"></div>
-                      <div className="mt-2 text-muted">Đang tải...</div>
+                      <Loading />
                     </td>
                   </tr>
                 ) : risks.length === 0 ? (
@@ -1272,7 +1273,7 @@ export default function ListRiskPage() {
               </div>
 
               <div className="form-group">
-                <label>Kế hoạch ứng phó</label>
+                <label>Kế hoạch ứng phó *</label>
                 <textarea
                   className="form-control"
                   rows={4}
