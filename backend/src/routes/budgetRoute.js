@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getDepartmentBudget,
+  getDepartmentBudgetById,
   createDepartmentBudget,
   updateDepartmentBudget,
   submitBudget,
@@ -15,10 +16,17 @@ import {
   assignItem,
   submitExpense,
   undoSubmitExpense,
+  getAllBudgetsForDepartment,
 } from '../controllers/budgetController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
+
+// GET /api/events/:eventId/departments/:departmentId/budgets - Get all budgets for department
+router.get('/budgets', authenticateToken, getAllBudgetsForDepartment);
+
+// GET /api/events/:eventId/departments/:departmentId/budget/:budgetId - Get specific budget by ID
+router.get('/:budgetId', authenticateToken, getDepartmentBudgetById);
 
 // GET /api/events/:eventId/departments/:departmentId/budget
 router.get('/', authenticateToken, getDepartmentBudget);

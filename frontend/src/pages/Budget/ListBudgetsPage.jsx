@@ -15,7 +15,7 @@ const ListBudgetsPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState([]);
-  const [activeTab, setActiveTab] = useState("submitted"); // submitted, approved, changes_requested, completed
+  const [activeTab, setActiveTab] = useState("all"); // all, submitted, approved, changes_requested, completed
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -89,28 +89,53 @@ const ListBudgetsPage = () => {
       if (!eventId || checkingRole) return;
       
       try {
-        // Nếu là HoD, chỉ check budget của department của họ
+        // Nếu là HoD, check tất cả budgets của department của họ
         if (eventRole === 'HoD' && hodDepartmentId) {
           try {
-            const budgetData = await budgetApi.getDepartmentBudget(eventId, hodDepartmentId).catch(() => null);
-            setHasAnyBudgets(!!budgetData);
+            const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, hodDepartmentId, { page: 1, limit: 1 }).catch(() => ({ data: [] }));
+            const budgetsList = Array.isArray(budgetsResponse) 
+              ? budgetsResponse 
+              : (budgetsResponse?.data || budgetsResponse?.budgets || []);
+            setHasAnyBudgets(budgetsList.length > 0);
           } catch (error) {
             setHasAnyBudgets(false);
           }
         } else if (eventRole === 'HoOC') {
           // HoOC: check tất cả budgets
           const [submitted, approved, rejected, completed] = await Promise.all([
-            budgetApi.getAllBudgetsForEvent(eventId, { status: 'submitted', page: 1, limit: 1 }).catch(() => ({ data: [] })),
-            budgetApi.getAllBudgetsForEvent(eventId, { status: 'approved', page: 1, limit: 1 }).catch(() => ({ data: [] })),
-            budgetApi.getAllBudgetsForEvent(eventId, { status: 'changes_requested', page: 1, limit: 1 }).catch(() => ({ data: [] })),
-            budgetApi.getAllBudgetsForEvent(eventId, { status: 'completed', page: 1, limit: 1 }).catch(() => ({ data: [] })),
+            budgetApi.getAllBudgetsForEvent(eventId, { status: 'submitted', page: 1, limit: 1 }).catch(() => ({ data: [], pagination: {} })),
+            budgetApi.getAllBudgetsForEvent(eventId, { status: 'approved', page: 1, limit: 1 }).catch(() => ({ data: [], pagination: {} })),
+            budgetApi.getAllBudgetsForEvent(eventId, { status: 'changes_requested', page: 1, limit: 1 }).catch(() => ({ data: [], pagination: {} })),
+            budgetApi.getAllBudgetsForEvent(eventId, { status: 'completed', page: 1, limit: 1 }).catch(() => ({ data: [], pagination: {} })),
           ]);
           
+          // Response có thể là { data: [...], pagination: {...} } hoặc array sau khi unwrap
+          const getBudgetsArray = (response) => {
+            if (Array.isArray(response)) return response;
+            if (response?.data && Array.isArray(response.data)) return response.data;
+            if (response?.items && Array.isArray(response.items)) return response.items;
+            if (response?.budgets && Array.isArray(response.budgets)) return response.budgets;
+            return [];
+          };
+          
+          const submittedBudgets = getBudgetsArray(submitted);
+          const approvedBudgets = getBudgetsArray(approved);
+          const rejectedBudgets = getBudgetsArray(rejected);
+          const completedBudgets = getBudgetsArray(completed);
+          
           const hasData = 
-            (Array.isArray(submitted) ? submitted.length > 0 : (submitted?.data?.length > 0 || submitted?.items?.length > 0)) ||
-            (Array.isArray(approved) ? approved.length > 0 : (approved?.data?.length > 0 || approved?.items?.length > 0)) ||
-            (Array.isArray(rejected) ? rejected.length > 0 : (rejected?.data?.length > 0 || rejected?.items?.length > 0)) ||
-            (Array.isArray(completed) ? completed.length > 0 : (completed?.data?.length > 0 || completed?.items?.length > 0));
+            submittedBudgets.length > 0 ||
+            approvedBudgets.length > 0 ||
+            rejectedBudgets.length > 0 ||
+            completedBudgets.length > 0;
+          
+          console.log('checkAllBudgets result:', {
+            submitted: submittedBudgets.length,
+            approved: approvedBudgets.length,
+            rejected: rejectedBudgets.length,
+            completed: completedBudgets.length,
+            hasData
+          });
           
           setHasAnyBudgets(hasData);
         }
@@ -128,54 +153,58 @@ const ListBudgetsPage = () => {
       setLoading(true);
       let response;
       
-      // Nếu là HoD, chỉ lấy budget của department của họ
+      // Nếu là HoD, lấy tất cả budgets của department của họ
       if (eventRole === 'HoD' && hodDepartmentId) {
-        // Lấy budget của department cụ thể
-        try {
-          const [budgetData, deptData] = await Promise.all([
-            budgetApi.getDepartmentBudget(eventId, hodDepartmentId).catch(() => null),
-            departmentService.getDepartmentDetail(eventId, hodDepartmentId).catch(() => null)
-          ]);
-          
-          // Format để phù hợp với cấu trúc dữ liệu
-          const formattedBudget = budgetData ? [{
-            _id: budgetData._id,
-            id: budgetData._id,
-            departmentId: budgetData.departmentId || hodDepartmentId,
-            departmentName: deptData?.name || "Ban của tôi",
-            creatorName: "Trưởng ban",
-            totalCost: budgetData.items?.reduce((sum, item) => sum + (parseFloat(item.total?.toString() || 0)), 0) || 0,
-            status: budgetData.status,
-            submittedAt: budgetData.submittedAt || budgetData.createdAt,
-            createdAt: budgetData.createdAt,
-            submittedCount: budgetData.items?.filter(item => item.submittedStatus === 'submitted').length || 0,
-            totalItems: budgetData.items?.length || 0,
-            allItemsSubmitted: budgetData.items?.every(item => item.submittedStatus === 'submitted') || false
-          }].filter(b => {
-            // Filter theo activeTab
-            if (activeTab === 'submitted') return b.status === 'submitted';
-            if (activeTab === 'approved') return b.status === 'approved';
-            if (activeTab === 'changes_requested') return b.status === 'changes_requested';
-            if (activeTab === 'completed') return b.status === 'sent_to_members' && b.allItemsSubmitted;
-            return true;
-          }) : [];
-          
-          response = { data: formattedBudget, pagination: { totalPages: 1 } };
-        } catch (error) {
-          // Nếu không tìm thấy budget, trả về mảng rỗng
-          if (error?.response?.status === 404) {
-            response = { data: [], pagination: { totalPages: 1 } };
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        // HoOC: lấy tất cả budgets
-        response = await budgetApi.getAllBudgetsForEvent(eventId, {
-          status: activeTab,
+        // Lấy tất cả budgets của department (không filter theo status)
+        const rawResponse = await budgetApi.getAllBudgetsForDepartment(eventId, hodDepartmentId, {
           page: currentPage,
           limit: itemsPerPage,
         });
+        
+        // Format để phù hợp với cấu trúc dữ liệu
+        const budgetsList = Array.isArray(rawResponse) 
+          ? rawResponse 
+          : (rawResponse?.data || rawResponse?.budgets || []);
+        
+        const formattedBudgets = budgetsList.map(budget => ({
+          _id: budget._id || budget.id,
+          id: budget._id || budget.id,
+          budgetId: budget._id || budget.id,
+          departmentId: budget.departmentId || hodDepartmentId,
+          departmentName: budget.departmentName || "Ban của tôi",
+          creatorName: "Trưởng ban",
+          totalCost: budget.totalCost || 0,
+          status: budget.status,
+          submittedAt: budget.submittedAt || budget.createdAt,
+          createdAt: budget.createdAt,
+          totalItems: budget.totalItems || 0,
+        }));
+        
+        response = { 
+          data: formattedBudgets, 
+          pagination: rawResponse?.pagination || { totalPages: 1, total: formattedBudgets.length } 
+        };
+      } else {
+        // HoOC: lấy tất cả budgets của tất cả departments
+        const rawResponse = await budgetApi.getAllBudgetsForEvent(eventId, {
+          status: activeTab === 'all' ? undefined : activeTab, // Nếu 'all' thì không filter
+          page: currentPage,
+          limit: itemsPerPage,
+        });
+        response = rawResponse;
+      }
+      
+      // Filter budgets theo activeTab cho HoD (nếu cần)
+      if (eventRole === 'HoD' && response?.data) {
+        if (activeTab !== 'all') {
+          response.data = response.data.filter(b => {
+            if (activeTab === 'submitted') return b.status === 'submitted';
+            if (activeTab === 'approved') return b.status === 'approved';
+            if (activeTab === 'changes_requested') return b.status === 'changes_requested';
+            if (activeTab === 'completed') return b.status === 'sent_to_members';
+            return true;
+          });
+        }
       }
       
       console.log('fetchBudgets response:', {
@@ -187,18 +216,39 @@ const ListBudgetsPage = () => {
         responseType: typeof response,
         isArray: Array.isArray(response),
         hasData: response?.data,
-        hasItems: response?.items
+        hasItems: response?.items,
+        hasBudgets: response?.budgets,
+        responseKeys: response && typeof response === 'object' && !Array.isArray(response) ? Object.keys(response) : []
       });
       
       if (response) {
-        // Response có thể là { data: [...], pagination: {...} } hoặc array trực tiếp
-        const budgetsData = Array.isArray(response) ? response : (response.data || response.items || []);
-        const paginationData = response.pagination || {};
+        // Response có thể là { data: [...], pagination: {...} } hoặc array trực tiếp sau khi unwrap
+        let budgetsData = [];
+        let paginationData = {};
+        
+        if (Array.isArray(response)) {
+          budgetsData = response;
+        } else if (response.data && Array.isArray(response.data)) {
+          budgetsData = response.data;
+          paginationData = response.pagination || {};
+        } else if (response.items && Array.isArray(response.items)) {
+          budgetsData = response.items;
+          paginationData = response.pagination || {};
+        } else if (response.budgets && Array.isArray(response.budgets)) {
+          budgetsData = response.budgets;
+          paginationData = response.pagination || {};
+        } else {
+          // Fallback: thử lấy từ response trực tiếp nếu có
+          budgetsData = [];
+        }
         
         console.log('fetchBudgets processed:', {
           budgetsDataLength: budgetsData.length,
           budgetsData: budgetsData.map(b => ({ id: b._id || b.id, departmentName: b.departmentName, status: b.status })),
-          paginationData
+          paginationData,
+          responseType: typeof response,
+          isArray: Array.isArray(response),
+          responseKeys: response && typeof response === 'object' ? Object.keys(response) : []
         });
         
         setBudgets(budgetsData);
@@ -538,50 +588,62 @@ const ListBudgetsPage = () => {
                 padding: "24px",
               }}
             >
-            {/* Status Tabs */}
-            <div className="d-flex gap-2 mb-4 flex-wrap">
-              <button
-                className={`btn ${activeTab === "submitted" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => {
-                  setActiveTab("submitted");
-                  setCurrentPage(1);
-                }}
-                style={{ borderRadius: "8px" }}
-              >
-                Chờ duyệt
-              </button>
-              <button
-                className={`btn ${activeTab === "approved" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => {
-                  setActiveTab("approved");
-                  setCurrentPage(1);
-                }}
-                style={{ borderRadius: "8px" }}
-              >
-                Đã duyệt
-              </button>
-              <button
-                className={`btn ${activeTab === "changes_requested" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => {
-                  setActiveTab("changes_requested");
-                  setCurrentPage(1);
-                }}
-                style={{ borderRadius: "8px" }}
-              >
-                Bị từ chối
-              </button>
-              <button
-                className={`btn ${activeTab === "completed" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => {
-                  setActiveTab("completed");
-                  setCurrentPage(1);
-                }}
-                style={{ borderRadius: "8px" }}
-              >
-                <i className="bi bi-check-circle me-1"></i>
-                Đã hoàn thành
-              </button>
-            </div>
+            {/* Status Tabs - Chỉ hiển thị cho HoOC, HoD xem tất cả */}
+            {eventRole === 'HoOC' && (
+              <div className="d-flex gap-2 mb-4 flex-wrap">
+                <button
+                  className={`btn ${activeTab === "all" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => {
+                    setActiveTab("all");
+                    setCurrentPage(1);
+                  }}
+                  style={{ borderRadius: "8px" }}
+                >
+                  Tất cả
+                </button>
+                <button
+                  className={`btn ${activeTab === "submitted" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => {
+                    setActiveTab("submitted");
+                    setCurrentPage(1);
+                  }}
+                  style={{ borderRadius: "8px" }}
+                >
+                  Chờ duyệt
+                </button>
+                <button
+                  className={`btn ${activeTab === "approved" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => {
+                    setActiveTab("approved");
+                    setCurrentPage(1);
+                  }}
+                  style={{ borderRadius: "8px" }}
+                >
+                  Đã duyệt
+                </button>
+                <button
+                  className={`btn ${activeTab === "changes_requested" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => {
+                    setActiveTab("changes_requested");
+                    setCurrentPage(1);
+                  }}
+                  style={{ borderRadius: "8px" }}
+                >
+                  Bị từ chối
+                </button>
+                <button
+                  className={`btn ${activeTab === "completed" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => {
+                    setActiveTab("completed");
+                    setCurrentPage(1);
+                  }}
+                  style={{ borderRadius: "8px" }}
+                >
+                  <i className="bi bi-check-circle me-1"></i>
+                  Đã hoàn thành
+                </button>
+              </div>
+            )}
 
             {/* Search Bar */}
             <div className="mb-4">
@@ -644,7 +706,7 @@ const ListBudgetsPage = () => {
                     <tr>
                       <td colSpan={activeTab === "completed" ? 8 : 7} className="text-center text-muted py-4">
                         {isEmpty && hasAnyBudgets 
-                          ? `Không có ngân sách nào ở tab "${activeTab === 'submitted' ? 'Chờ duyệt' : activeTab === 'approved' ? 'Đã duyệt' : activeTab === 'changes_requested' ? 'Bị từ chối' : 'Đã hoàn thành'}", vui lòng chuyển sang tab khác.`
+                          ? `Không có ngân sách nào ở tab "${activeTab === 'all' ? 'Tất cả' : activeTab === 'submitted' ? 'Chờ duyệt' : activeTab === 'approved' ? 'Đã duyệt' : activeTab === 'changes_requested' ? 'Bị từ chối' : 'Đã hoàn thành'}", vui lòng chuyển sang tab khác.`
                           : "Không tìm thấy ngân sách nào"}
                       </td>
                     </tr>
@@ -680,13 +742,59 @@ const ListBudgetsPage = () => {
                           </td>
                         )}
                         <td style={{ padding: "12px" }}>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleViewDetail(budget.departmentId || budget.department?._id)}
-                            style={{ borderRadius: "8px" }}
-                          >
-                            Xem chi tiết
-                          </button>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleViewDetail(budget.departmentId || budget.department?._id || budget.departmentId)}
+                              style={{ borderRadius: "8px" }}
+                            >
+                              Xem chi tiết
+                            </button>
+                            {/* Nút "Gửi cho HoOC" chỉ hiển thị cho HoD và budget draft */}
+                            {eventRole === 'HoD' && budget.status === 'draft' && (
+                              <button
+                                className="btn btn-success btn-sm"
+                                onClick={async () => {
+                                  try {
+                                    const budgetId = budget._id || budget.id || budget.budgetId;
+                                    const deptId = budget.departmentId || hodDepartmentId;
+                                    await budgetApi.submitBudget(eventId, deptId, budgetId);
+                                    toast.success("Gửi cho HoOC duyệt thành công!");
+                                    fetchBudgets(); // Refresh danh sách
+                                  } catch (error) {
+                                    toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
+                                  }
+                                }}
+                                style={{ borderRadius: "8px" }}
+                              >
+                                <i className="bi bi-send me-1"></i>
+                                Gửi cho HoOC
+                              </button>
+                            )}
+                            {/* Nút "Xóa" cho draft và submitted, nhưng không cho xóa khi status là submitted (chờ duyệt) */}
+                            {eventRole === 'HoD' && budget.status === 'draft' && (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={async () => {
+                                  if (window.confirm(`Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác.`)) {
+                                    try {
+                                      const budgetId = budget._id || budget.id || budget.budgetId;
+                                      const deptId = budget.departmentId || budget.department?._id || hodDepartmentId;
+                                      await budgetApi.deleteDraft(eventId, deptId, budgetId);
+                                      toast.success("Xóa budget thành công!");
+                                      fetchBudgets(); // Refresh danh sách
+                                    } catch (error) {
+                                      toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
+                                    }
+                                  }
+                                }}
+                                style={{ borderRadius: "8px" }}
+                              >
+                                <i className="bi bi-trash me-1"></i>
+                                Xóa
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
