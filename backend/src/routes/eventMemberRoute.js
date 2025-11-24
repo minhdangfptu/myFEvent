@@ -26,7 +26,6 @@ router.delete('/me', authenticateToken, leaveEvent);
 router.patch('/:memberId/role', authenticateToken, updateMemberRole);
 router.patch('/:memberId/department', authenticateToken, changeMemberDepartment);
 router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
-router.delete('/:memberId', authenticateToken, removeMemberFromEvent);
 
 export default router;
 
