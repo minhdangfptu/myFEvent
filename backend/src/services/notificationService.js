@@ -375,3 +375,94 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
   }
 };
 
+export const notifyAddedToCalendar = async (eventId, calendarId, memberIds, calendarName) => {
+  try {
+    const eventMembers = await EventMember.find({ 
+      _id: { $in: memberIds } 
+    })
+      .populate('userId', '_id fullName')
+      .lean();
+    
+    if (eventMembers.length === 0) {
+      console.log('No members found to notify');
+      return 0;
+    }
+
+    const userIds = eventMembers
+      .filter(member => member.userId)
+      .map(member => member.userId._id);
+
+    if (userIds.length === 0) {
+      console.log('No valid userIds to notify');
+      return 0;
+    }
+
+    await createNotificationsForUsers(userIds, {
+      eventId,
+      category: 'LỊCH HỌP',
+      title: `Bạn đã được thêm vào cuộc họp "${calendarName}"`,
+      icon: 'bi bi-calendar-event',
+      color: '#3b82f6',
+      relatedCalendarId: calendarId,
+      unread: true,
+    });
+
+    console.log(`Notification sent to ${userIds.length} users for being added to calendar:`, calendarName);
+    return userIds.length;
+  } catch (error) {
+    console.error('Error notifying added to calendar:', error);
+    return 0;
+  }
+};
+
+export const notifyRemovedFromCalendar = async (eventId, calendarId, userId, calendarName) => {
+  try {
+    await createNotification({
+      userId,
+      eventId,
+      category: 'LỊCH HỌP',
+      title: `Bạn đã bị xóa khỏi cuộc họp "${calendarName}"`,
+      icon: 'bi bi-calendar-x',
+      color: '#ef4444',
+      relatedCalendarId: calendarId,
+    });
+
+    console.log('Notification sent to user for being removed from calendar:', userId);
+    return 1;
+  } catch (error) {
+    console.error('Error notifying removed from calendar:', error);
+    return 0;
+  }
+};
+
+export const notifyMeetingReminder = async (eventId, calendarId, participants, calendarName, startAt) => {
+  try {
+    const meetingDate = new Date(startAt).toLocaleDateString('vi-VN');
+    
+    const userIds = participants
+      .filter(p => p.member && p.member.userId)
+      .map(p => p.member.userId._id);
+
+    if (userIds.length === 0) {
+      console.log('No valid participants to send reminder');
+      return 0;
+    }
+
+    await createNotificationsForUsers(userIds, {
+      eventId,
+      category: 'LỊCH HỌP',
+      title: `Nhắc nhở: Cuộc họp "${calendarName}" vào ${meetingDate}`,
+      icon: 'bi bi-bell',
+      color: '#f59e0b',
+      relatedCalendarId: calendarId,
+      unread: true,
+    });
+
+    console.log(`Reminder notification sent to ${userIds.length} users for calendar:`, calendarName);
+    return userIds.length;
+  } catch (error) {
+    console.error('Error notifying meeting reminder:', error);
+    return 0;
+  }
+};
+

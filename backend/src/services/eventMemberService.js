@@ -131,3 +131,25 @@ export const createEventMember = async (userId, eventId) => {
     status: 'Active'
   });
 };
+export const getActiveEventMembers = async (eventId) => {
+  return await EventMember.find({ 
+    eventId: eventId,
+    status: 'active'
+  })
+    .populate('userId', 'fullName email avatarUrl')
+    .lean();
+};
+
+export const getEventMemberById = async (memberId) => {
+  return await EventMember.findById(memberId)
+    .populate('userId', '_id fullName')
+    .lean();
+};
+export const getEventMembersByIds = async (memberIds) => {
+  return await EventMember.find({ 
+    _id: { $in: memberIds } 
+  })
+    .populate('userId', '_id fullName')
+    .lean();
+};
+
