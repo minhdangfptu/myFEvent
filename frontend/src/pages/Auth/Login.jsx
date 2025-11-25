@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -201,17 +202,29 @@ export default function LoginPage() {
                 <label htmlFor="password" className="form-label">
                   Mật khẩu
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  className="form-control login-input"
-                  autoComplete="current-password"
-                  placeholder="Nhập mật khẩu của bạn"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                  required
-                />
+                <div className="position-relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control login-input"
+                    autoComplete="current-password"
+                    placeholder="Nhập mật khẩu của bạn"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    required
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
                 <div className="mt-2">
                   <a href="/forgot-password" className="text-decoration-none">
                     Quên mật khẩu?

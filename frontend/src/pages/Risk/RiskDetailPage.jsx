@@ -26,6 +26,7 @@ export default function RiskDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
+    scope: "department",
     departmentId: "",
     risk_category: "others",
     impact: "medium",
@@ -114,7 +115,8 @@ export default function RiskDetailPage() {
   const transformApiRiskToComponent = (apiRisk) => ({
     id: apiRisk._id,
     name: apiRisk.name,
-    owner: apiRisk.departmentId?.name || "Chưa phân công",
+    scope: apiRisk.scope || "department",
+    owner: apiRisk.scope === "event" || !apiRisk.departmentId ? "Toàn BTC" : (apiRisk.departmentId?.name || "Chưa phân công"),
     ownerId: apiRisk.departmentId?._id,
     status: statusLabels[apiRisk.risk_status] || "Chưa xảy ra",
     statusKey: apiRisk.risk_status,
@@ -200,6 +202,7 @@ export default function RiskDetailPage() {
         setRisk(transformedRisk);
         setEditForm({
           name: originalData.name || "",
+          scope: originalData.scope || "department",
           departmentId: originalData.departmentId?._id || "",
           risk_category: originalData.risk_category || "others",
           impact: originalData.impact || "medium",
@@ -225,7 +228,8 @@ export default function RiskDetailPage() {
     if (!editForm.name?.trim()) {
       errors.name = "Tên rủi ro không được để trống";
     }
-    if (!editForm.departmentId) {
+    // Only require departmentId when scope is "department"
+    if (editForm.scope === "department" && !editForm.departmentId) {
       errors.departmentId = "Vui lòng chọn ban phụ trách";
     }
     if (!editForm.risk_mitigation_plan?.trim()) {
@@ -249,13 +253,18 @@ export default function RiskDetailPage() {
       setSavingChanges(true);
       const updateData = {
         name: editForm.name,
-        departmentId: editForm.departmentId,
+        scope: editForm.scope,
         risk_category: editForm.risk_category,
         impact: editForm.impact,
         likelihood: editForm.likelihood,
         risk_mitigation_plan: editForm.risk_mitigation_plan,
         risk_response_plan: editForm.risk_response_plan,
       };
+
+      // Only include departmentId when scope is "department"
+      if (editForm.scope === "department") {
+        updateData.departmentId = editForm.departmentId;
+      }
 
       const response = await riskApiWithErrorHandling.updateRisk(eventId, riskId, updateData);
 
@@ -393,6 +402,7 @@ export default function RiskDetailPage() {
       const originalData = risk.originalData;
       setEditForm({
         name: originalData.name || "",
+        scope: originalData.scope || "department",
         departmentId: originalData.departmentId?._id || "",
         risk_category: originalData.risk_category || "others",
         impact: originalData.impact || "medium",
@@ -730,18 +740,39 @@ export default function RiskDetailPage() {
           <div className="p-4">
             {isEditing ? (
               <>
-                {/* Row 1: Ban phụ trách & Danh mục */}
+                {/* Row 1: Phạm vi & Ban phụ trách */}
                 <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">
-                      <label>Ban phụ trách *</label>
+                      <label>Phạm vi rủi ro *</label>
+                      <select
+                        className="form-select"
+                        value={editForm.scope || "department"}
+                        onChange={(e) => {
+                          const newScope = e.target.value;
+                          setEditForm(prev => ({
+                            ...prev,
+                            scope: newScope,
+                            // Clear departmentId if scope changes to event
+                            departmentId: newScope === "event" ? "" : prev.departmentId
+                          }));
+                        }}
+                      >
+                        <option value="department">Theo ban</option>
+                        <option value="event">Toàn BTC</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Ban phụ trách {editForm.scope === "department" ? "*" : ""}</label>
                       <select
                         className={`form-select ${editErrors.departmentId ? 'is-invalid' : ''}`}
                         value={editForm.departmentId || ""}
                         onChange={(e) => setEditForm(prev => ({ ...prev, departmentId: e.target.value }))}
-                        disabled={loadingDepartments}
+                        disabled={loadingDepartments || editForm.scope === "event"}
                       >
-                        <option value="">Chọn ban phụ trách</option>
+                        <option value="">{editForm.scope === "event" ? "Không áp dụng" : "Chọn ban phụ trách"}</option>
                         {departments.map((dept) => (
                           <option key={dept._id} value={dept._id}>
                             {dept.name}
@@ -749,9 +780,18 @@ export default function RiskDetailPage() {
                         ))}
                       </select>
                       {loadingDepartments && <small className="text-muted">Đang tải danh sách ban...</small>}
+                      {editForm.scope === "event" && (
+                        <small className="text-muted">
+                          Rủi ro này áp dụng cho toàn bộ BTC
+                        </small>
+                      )}
                       {editErrors.departmentId && <div className="invalid-feedback">{editErrors.departmentId}</div>}
                     </div>
                   </div>
+                </div>
+
+                {/* Row 2: Danh mục */}
+                <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">
                       <label>Danh mục</label>
@@ -770,7 +810,7 @@ export default function RiskDetailPage() {
                   </div>
                 </div>
 
-                {/* Row 2: Mức độ tác động & Khả năng xảy ra */}
+                {/* Row 3: Mức độ tác động & Khả năng xảy ra */}
                 <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">
@@ -804,7 +844,7 @@ export default function RiskDetailPage() {
                   </div>
                 </div>
 
-                {/* Row 3: Kế hoạch giảm thiểu & Kế hoạch ứng phó */}
+                {/* Row 4: Kế hoạch giảm thiểu & Kế hoạch ứng phó */}
                 <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">
@@ -834,7 +874,7 @@ export default function RiskDetailPage() {
                   </div>
                 </div>
 
-                {/* Row 4: Trạng thái & Sự cố (read-only) */}
+                {/* Row 5: Trạng thái & Sự cố (read-only) */}
                 <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">

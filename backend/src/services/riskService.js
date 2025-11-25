@@ -101,31 +101,51 @@ export const createRisk = async (eventId, riskData) => {
         const eventIdError = validateObjectId(eventId, 'event ID');
         if (eventIdError) return eventIdError;
 
-        // Validate required fields
-        if (!riskData.name || !riskData.departmentId || !riskData.risk_category ||
+        // Set default scope if not provided
+        const scope = riskData.scope || 'department';
+
+        // Validate required fields based on scope
+        if (!riskData.name || !riskData.risk_category ||
             !riskData.impact || !riskData.likelihood || !riskData.risk_mitigation_plan) {
             return {
                 success: false,
-                message: 'Missing required fields: name, departmentId, risk_category, impact, likelihood, risk_mitigation_plan'
+                message: 'Missing required fields: name, risk_category, impact, likelihood, risk_mitigation_plan'
             };
         }
 
-        // Validate departmentId
-        const departmentIdError = validateObjectId(riskData.departmentId, 'department ID');
-        if (departmentIdError) return departmentIdError;
+        // Validate departmentId only if scope is 'department'
+        if (scope === 'department') {
+            if (!riskData.departmentId) {
+                return {
+                    success: false,
+                    message: 'departmentId is required when scope is "department"'
+                };
+            }
+            const departmentIdError = validateObjectId(riskData.departmentId, 'department ID');
+            if (departmentIdError) return departmentIdError;
+        }
 
-        const risk = new Risk({
+        // Prepare risk data
+        const riskObj = {
             ...riskData,
             eventId: new Types.ObjectId(eventId),
-            departmentId: new Types.ObjectId(riskData.departmentId),
+            scope: scope,
             occurred_risk: [],
             risk_status: riskData.risk_status || 'not_yet'
-        });
+        };
 
+        // Add departmentId only if scope is 'department'
+        if (scope === 'department') {
+            riskObj.departmentId = new Types.ObjectId(riskData.departmentId);
+        }
+
+        const risk = new Risk(riskObj);
         await risk.save();
 
-        // Populate department info
-        await risk.populate('departmentId', 'name description');
+        // Populate department info only if departmentId exists
+        if (risk.departmentId) {
+            await risk.populate('departmentId', 'name description');
+        }
 
         return {
             success: true,
@@ -179,7 +199,7 @@ export const getAllOccurredRisksByEvent = async (eventId) => {
                         occurred_description: occurred.occurred_description,
                         occurred_status: occurred.occurred_status,
                         resolve_action: occurred.resolve_action,
-                        departmentName: risk.departmentId?.name || 'Chưa phân công',
+                        departmentName: risk.scope === "event" || !risk.departmentId ? "Toàn BTC" : (risk.departmentId?.name || "Chưa phân công"),
                         resolve_personName: occurred.resolve_personId?.userId?.fullName || 'Chưa xác định',
                         update_personName: occurred.update_personId?.userId?.fullName || 'Chưa xác định',
                         riskName: risk.name,
@@ -227,7 +247,8 @@ export const getRisksByEvent = async (eventId, options = {}) => {
             impact,
             likelihood,
             risk_status,
-            departmentId
+            departmentId,
+            scope
         } = options;
 
         // Build query
@@ -238,6 +259,9 @@ export const getRisksByEvent = async (eventId, options = {}) => {
         if (impact) query.impact = impact;
         if (likelihood) query.likelihood = likelihood;
         if (risk_status) query.risk_status = risk_status;
+        if (scope) query.scope = scope;
+
+        // Filter by departmentId only if provided and valid
         if (departmentId && Types.ObjectId.isValid(departmentId)) {
             query.departmentId = new Types.ObjectId(departmentId);
         }
@@ -314,6 +338,7 @@ export const getAllRisksByEventWithoutPagination = async (eventId, filters = {})
         if (filters.impact) query.impact = filters.impact;
         if (filters.likelihood) query.likelihood = filters.likelihood;
         if (filters.risk_status) query.risk_status = filters.risk_status;
+        if (filters.scope) query.scope = filters.scope;
         if (filters.departmentId && Types.ObjectId.isValid(filters.departmentId)) {
             query.departmentId = new Types.ObjectId(filters.departmentId);
         }
@@ -406,16 +431,47 @@ export const updateRisk = async (eventId, riskId, updateData) => {
         const riskIdError = validateObjectId(riskId, 'risk ID');
         if (riskIdError) return riskIdError;
 
-        // Validate departmentId if being updated
-        if (updateData.departmentId) {
-            const departmentIdError = validateObjectId(updateData.departmentId, 'department ID');
-            if (departmentIdError) return departmentIdError;
+        // Get current risk to check existing scope
+        const currentRisk = await Risk.findOne({
+            _id: new Types.ObjectId(riskId),
+            eventId: new Types.ObjectId(eventId)
+        });
+
+        if (!currentRisk) {
+            return {
+                success: false,
+                message: 'Risk not found'
+            };
         }
 
-        // Convert departmentId to ObjectId if provided
+        // Determine scope (use existing or new)
+        const newScope = updateData.scope || currentRisk.scope;
+
+        // Validate scope and departmentId relationship
+        if (newScope === 'department') {
+            // If changing to department scope or already department scope with departmentId update
+            if (updateData.departmentId) {
+                const departmentIdError = validateObjectId(updateData.departmentId, 'department ID');
+                if (departmentIdError) return departmentIdError;
+            } else if (!currentRisk.departmentId && !updateData.departmentId) {
+                // Changing to department scope but no departmentId provided
+                return {
+                    success: false,
+                    message: 'departmentId is required when scope is "department"'
+                };
+            }
+        }
+
+        // Prepare update data
         const processedUpdateData = { ...updateData };
-        if (updateData.departmentId) {
+
+        // Handle departmentId conversion and removal
+        if (newScope === 'department' && updateData.departmentId) {
             processedUpdateData.departmentId = new Types.ObjectId(updateData.departmentId);
+        } else if (newScope === 'event') {
+            // Remove departmentId when scope is 'event'
+            processedUpdateData.$unset = { departmentId: "" };
+            delete processedUpdateData.departmentId;
         }
 
         const risk = await Risk.findOneAndUpdate(
@@ -427,19 +483,18 @@ export const updateRisk = async (eventId, riskId, updateData) => {
                 $set: {
                     ...processedUpdateData,
                     updatedAt: new Date()
-                }
+                },
+                ...(processedUpdateData.$unset && { $unset: processedUpdateData.$unset })
             },
             {
                 new: true,
                 runValidators: true
             }
-        ).populate('departmentId', 'name description');
+        );
 
-        if (!risk) {
-            return {
-                success: false,
-                message: 'Risk not found'
-            };
+        // Populate department info only if departmentId exists
+        if (risk.departmentId) {
+            await risk.populate('departmentId', 'name description');
         }
 
         return {
@@ -884,7 +939,12 @@ export const getRiskStatistics = async (eventId) => {
         // 4. Tần suất xảy ra các rủi ro theo ban (Horizontal Bar Chart)
         const riskByDepartment = {};
         risks.forEach(risk => {
-            const dept = risk.departmentId?.name || 'Chưa phân công';
+            let dept;
+            if (risk.scope === 'event' || !risk.departmentId) {
+                dept = 'Toàn BTC'; // Event-level risks
+            } else {
+                dept = risk.departmentId?.name || 'Chưa phân công';
+            }
             riskByDepartment[dept] = (riskByDepartment[dept] || 0) + 1;
         });
 
@@ -896,11 +956,17 @@ export const getRiskStatistics = async (eventId) => {
         // 5. Số lượng sự cố xảy ra theo ban (Stacked Bar Chart)
         const departmentOccurred = {};
         risks.forEach(risk => {
-            const dept = risk.departmentId?.name || 'Chưa phân công';
+            let dept;
+            if (risk.scope === 'event' || !risk.departmentId) {
+                dept = 'Toàn BTC'; // Event-level risks
+            } else {
+                dept = risk.departmentId?.name || 'Chưa phân công';
+            }
+
             if (!departmentOccurred[dept]) {
                 departmentOccurred[dept] = { predicted: 0, unexpected: 0 };
             }
-            
+
             if (risk.occurred_risk?.length > 0) {
                 // Giả sử 70% là predicted, 30% là unexpected
                 const total = risk.occurred_risk.length;
@@ -919,15 +985,22 @@ export const getRiskStatistics = async (eventId) => {
         // Find risk with most occurred incidents
         let riskWithMostIncidents = null;
         let maxIncidents = 0;
-        
+
         risks.forEach(risk => {
             const incidentCount = risk.occurred_risk?.length || 0;
             if (incidentCount > maxIncidents) {
                 maxIncidents = incidentCount;
+                let dept;
+                if (risk.scope === 'event' || !risk.departmentId) {
+                    dept = 'Toàn BTC';
+                } else {
+                    dept = risk.departmentId?.name || 'Chưa phân công';
+                }
+
                 riskWithMostIncidents = {
                     name: risk.name,
                     category: categoryLabels[risk.risk_category] || risk.risk_category,
-                    department: risk.departmentId?.name || 'Chưa phân công',
+                    department: dept,
                     incidentCount: incidentCount
                 };
             }

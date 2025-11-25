@@ -10,8 +10,19 @@ const OccurredRiskSchema = new Schema({
     update_personId: { type: Types.ObjectId, ref: 'EventMember' },
 })
 const RiskSchema = new Schema({
-    eventId: { type: Types.ObjectId, ref: 'Event', required: true },
-    departmentId: { type: Types.ObjectId, ref: 'Department', required: true },
+    eventId: { type: Types.ObjectId, ref: 'Event', required: true }, 
+    scope: {
+        type: String,
+        enum: ["event", "department"],
+        default: "department",
+    },
+    departmentId: {
+        type: Types.ObjectId,
+        ref: "Department",
+        required: function () {
+            return this.scope === "department";
+        },
+    },
     risk_category: {
         type: String,
         enum: [

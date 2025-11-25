@@ -1450,7 +1450,7 @@ const getRiskData = async (eventId) => {
       _id: risk._id,
       name: risk.name,
       risk_category: risk.risk_category,
-      departmentName: risk.departmentId?.name || null,
+      departmentName: risk.scope === "event" || !risk.departmentId ? "Toàn BTC" : (risk.departmentId?.name || "Chưa phân công"),
       impact: risk.impact,
       likelihood: risk.likelihood,
       risk_mitigation_plan: risk.risk_mitigation_plan,

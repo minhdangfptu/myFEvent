@@ -116,7 +116,7 @@ describe('authController.login', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Email or password is incorrect' }),
+      expect.objectContaining({ message: 'Email hoặc mật khẩu không đúng' }),
     );
   });
 
@@ -132,7 +132,7 @@ describe('authController.login', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Email or password is incorrect' }),
+      expect.objectContaining({ message: 'Email hoặc mật khẩu không đúng' }),
     );
   });
 

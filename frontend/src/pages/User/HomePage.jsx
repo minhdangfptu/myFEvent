@@ -791,9 +791,7 @@ export default function HomePage() {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
-                            navigate(
-                              `/member-event-detail/${eid}?eventId=${eid}`
-                            );
+                            navigate(`/member-dashboard?eventId=${eid}`);
                             return;
                           }
                           if (role === "HoOC") {

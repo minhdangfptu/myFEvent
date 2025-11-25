@@ -33,7 +33,12 @@ export default function RiskStatisticsPage() {
   // Get unique departments for filter dropdown
   const uniqueDepartments = [
     ...new Set(occurredRisks.map((risk) => risk.departmentName)),
-  ].filter(Boolean);
+  ].filter(Boolean).sort((a, b) => {
+    // Sort with "Toàn BTC" first if it exists, then alphabetically
+    if (a === "Toàn BTC") return -1;
+    if (b === "Toàn BTC") return 1;
+    return a.localeCompare(b, 'vi');
+  });
 
   // Filter and sort data
   const filteredData = occurredRisks
@@ -372,13 +377,13 @@ export default function RiskStatisticsPage() {
             </p>
           </div>
           <div className="d-flex gap-2">
-            <button className="btn btn-success d-flex align-items-center gap-2">
+            {/* <button className="btn btn-success d-flex align-items-center gap-2">
               <i className="bi bi-file-earmark-excel"></i>
               Xuất Excel
-            </button>
-            <button className="btn btn-danger d-flex align-items-center gap-2">
+            </button> */}
+            <button onClick={()=>navigate(`/events/${eventId}/export/data`)} className="btn btn-danger d-flex align-items-center gap-2">
               <i className="bi bi-file-earmark-pdf"></i>
-              Xuất PDF
+              Xuất tài liệu
             </button>
           </div>
         </div>
@@ -423,6 +428,9 @@ export default function RiskStatisticsPage() {
                     {statisticsData?.summary?.riskWithMostIncidents
                       ?.incidentCount || 0}
                   </h3>
+                  {/* <small className="text-muted">
+                    {statisticsData?.summary?.riskWithMostIncidents?.department}
+                  </small> */}
                   <div className="mt-2" style={{ fontSize: "20px" }}>
                     🚨
                   </div>
