@@ -293,7 +293,7 @@ const ViewDepartmentBudget = () => {
           "Đơn Vị Tính": item.unit || "",
           "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
           "Ghi Chú": item.note || "",
-          "Phản hồi từ HoOC": item.feedback || ""
+          "Phản hồi từ TBTC": item.feedback || ""
         }));
 
         const wsHooc = XLSX.utils.json_to_sheet(hoocData);
@@ -396,7 +396,7 @@ const ViewDepartmentBudget = () => {
       console.error('Assign error:', error);
       const errorMessage = error?.response?.data?.message || 
                           error?.response?.data?.error || 
-                          (error?.response?.status === 403 ? "Bạn không có quyền thực hiện thao tác này. Chỉ trưởng ban (HoD) mới có quyền phân công." :
+                          (error?.response?.status === 403 ? "Bạn không có quyền thực hiện thao tác này. Chỉ trưởng ban mới có quyền phân công." :
                            error?.response?.status === 401 ? "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." :
                            "Phân công thất bại!");
       toast.error(errorMessage);
@@ -641,7 +641,7 @@ const ViewDepartmentBudget = () => {
               style={{ borderRadius: "8px" }}
             >
               <i className="bi bi-send me-2"></i>
-              Bảng gửi HoOC
+              Bảng gửi TBTC
             </button>
             {(isApproved || isSentToMembers) && (
               <button
@@ -683,7 +683,7 @@ const ViewDepartmentBudget = () => {
                       Ghi Chú
                     </th>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "250px" }}>
-                      Phản hồi từ HoOC
+                      Phản hồi từ TBTC
                     </th>
                   </tr>
                 </thead>

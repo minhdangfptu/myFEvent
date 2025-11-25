@@ -16,8 +16,8 @@ import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
 
 const TASK_TYPE_LABELS = {
-  epic: "Epic task",
-  normal: "Công việc thường",
+  epic: "Công việc lớn",
+  normal: "Công việc",
 };
 
 const STATUS_OPTIONS = [
@@ -178,7 +178,7 @@ export default function HoDTaskPage() {
             assigneeId: task?.assigneeId?._id || task?.assigneeId || null,
             milestone: task?.milestoneId || "Chưa có",
             parentId: task?.parentId ? String(task.parentId) : null,
-            parentName: task?.parentId ? titleMap.get(String(task.parentId)) || "Epic task" : null,
+            parentName: task?.parentId ? titleMap.get(String(task.parentId)) || "Công việc lớn" : null,
             due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
             statusCode,
             status: STATUS_LABEL_MAP[statusCode] || "Không xác định",
@@ -382,8 +382,6 @@ export default function HoDTaskPage() {
       const taskIds = epicTasks.map((task) => task.id);
       if (taskIds.length === 0) return;
       
-      console.log("Select all for epic:", epicId, "Tasks:", taskIds);
-      
       const allSelected = taskIds.every((id) =>
         selectedTaskIds.includes(id)
       );
@@ -490,16 +488,16 @@ export default function HoDTaskPage() {
     const totalSelected = selectedTaskIds.length + selectedEpicIds.length;
     
     if (totalDeletable === 0) {
-      toast.warning("Không có công việc nào có thể xóa. Các công việc do HoOC tạo không thể xóa.");
+      toast.warning("Không có công việc nào có thể xóa. Các công việc do TBTC tạo không thể xóa.");
       return;
     }
     
     const message = deletableEpicIds.length > 0 && deletableTaskIds.length > 0
-      ? `Bạn có chắc chắn muốn xóa ${deletableEpicIds.length} epic task và ${deletableTaskIds.length} task? (Xóa epic task sẽ xóa luôn tất cả task trong epic đó)`
+      ? `Bạn có chắc chắn muốn xóa ${deletableEpicIds.length} công việc lớn và ${deletableTaskIds.length} công việc? (Xóa công việc lớn sẽ xóa luôn tất cả công việc trong epic đó)`
       : deletableEpicIds.length > 0
-      ? `Bạn có chắc chắn muốn xóa ${deletableEpicIds.length} epic task? (Sẽ xóa luôn tất cả task trong epic đó)`
+      ? `Bạn có chắc chắn muốn xóa ${deletableEpicIds.length} công việc lớn? (Sẽ xóa luôn tất cả công việc trong epic đó)`
       : totalDeletable < totalSelected
-      ? `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn? (${totalSelected - totalDeletable} công việc do HoOC tạo sẽ không được xóa)`
+      ? `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn? (${totalSelected - totalDeletable} công việc do TBTC tạo sẽ không được xóa)`
       : `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn?`;
     
     setConfirmModal({
@@ -626,7 +624,7 @@ export default function HoDTaskPage() {
       return;
     }
     if (addTaskForm.taskType === "normal" && !addTaskForm.parentId) {
-      setAddTaskError("Task thường phải thuộc một Epic task.");
+      setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
     }
   
@@ -697,7 +695,7 @@ export default function HoDTaskPage() {
       >
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Không tìm thấy ban</h5>
-          <p>Bạn chưa được phân công vào ban nào. Vui lòng liên hệ HoOC để được phân công.</p>
+          <p>Bạn chưa được phân công vào ban nào. Vui lòng liên hệ TBTC để được phân công.</p>
         </div>
       </UserLayout>
     );
@@ -910,8 +908,8 @@ export default function HoDTaskPage() {
                   onChange={(e) => setFilterType(e.target.value)}
                 >
                   <option value="all">Tất cả loại</option>
-                  <option value="epic">Epic task</option>
-                  <option value="normal">Công việc thường</option>
+                  <option value="epic">Công việc lớn</option>
+                  <option value="normal">Công việc</option>
                 </select>
 
                 <select
@@ -970,7 +968,7 @@ export default function HoDTaskPage() {
                                   onChange={(e) => {
                                     e.stopPropagation();
                                     if (!canDeleteTask(epic)) {
-                                      toast.warning("Không thể xóa epic task do HoOC tạo");
+                                      toast.warning("Không thể xóa epic task do TBTC tạo");
                                       return;
                                     }
                                     
@@ -1071,7 +1069,7 @@ export default function HoDTaskPage() {
                                                 if (isDeletable) {
                                                   handleSelectTask(task.id);
                                                 } else {
-                                                  toast.warning("Không thể xóa công việc do HoOC tạo");
+                                                  toast.warning("Không thể xóa công việc do TBTC tạo");
                                                 }
                                               }}
                                               disabled={!isDeletable}
@@ -1095,7 +1093,7 @@ export default function HoDTaskPage() {
                                               value={task.assigneeId || ""}
                                               onChange={async (e) => {
                                                 if (!canEditTask(task)) {
-                                                  toast.warning("Không thể sửa công việc do HoOC giao");
+                                                  toast.warning("Không thể sửa công việc do TBTC giao");
                                                   return;
                                                 }
                                                 const newAssigneeId = e.target.value;
@@ -1171,7 +1169,7 @@ export default function HoDTaskPage() {
               {totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center mt-3">
                   <div className="text-muted small">
-                    Hiển thị {startIndex + 1}-{Math.min(endIndex, groupedEpics.length)} trong tổng số {groupedEpics.length} Epic task
+                    Hiển thị {startIndex + 1}-{Math.min(endIndex, groupedEpics.length)} trong tổng số {groupedEpics.length} công việc lớn
                   </div>
                   <nav>
                     <ul className="pagination mb-0">

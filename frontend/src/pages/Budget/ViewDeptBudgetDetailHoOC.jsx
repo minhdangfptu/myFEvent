@@ -271,7 +271,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                 </div>
                 <h4 className="empty-state-title">Không có quyền truy cập</h4>
                 <p className="empty-state-text">
-                  Chỉ Trưởng Ban Tổ Chức (HoOC) mới có thể xem trang này.
+                  Chỉ Trưởng Ban Tổ Chức mới có thể xem trang này.
                 </p>
               </div>
             </div>
@@ -450,7 +450,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                     Trạng Thái
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
-                    Phản hồi từ HoOC
+                    Phản hồi từ TBTC
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Thao tác

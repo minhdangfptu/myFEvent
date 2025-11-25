@@ -9,23 +9,25 @@ import Loading from "~/components/Loading";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function FPTEvent_Landing() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isAuthenticated, user, loading: authLoading } = useAuth();
-  
+
   //time 1s loaidng
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(t);
   }, []);
-  
+
   useEffect(() => {
     const toastType = searchParams.get("toast");
     if (toastType === "logout-success") {
       toast.success("Đăng xuất thành công");
+      // Clear query params to prevent showing toast again on back
+      setSearchParams({});
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {

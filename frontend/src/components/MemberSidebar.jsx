@@ -739,30 +739,73 @@ export default function MemberSidebar({
         )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
+      {/* Footer: Version & Logo Bộ Công Thương */}
       <div
         className="p-2"
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div
-            className="theme-toggle"
-            style={{ paddingBottom: 10, margin: 0 }}
-          >
-            <button
-              className={`theme-option ${theme === "light" ? "active" : ""}`}
-              onClick={() => setTheme("light")}
+          <div style={{ paddingBottom: 10, margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <i className="bi bi-sun"></i>
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <i className="bi bi-moon"></i>
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
             >
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button
-              className={`theme-option ${theme === "dark" ? "active" : ""}`}
-              onClick={() => setTheme("dark")}
-            >
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Version 1.0.0
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.webp"
+                alt="Đã thông báo Bộ Công Thương"
+                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
           <button
@@ -776,6 +819,7 @@ export default function MemberSidebar({
           </button>
         )}
       </div>
+
     </div>
   );
 }

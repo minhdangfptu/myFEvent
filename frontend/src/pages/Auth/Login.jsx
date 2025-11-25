@@ -44,10 +44,7 @@ export default function LoginPage() {
       if (user?.role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else {
-        navigate("/home-page", {
-          replace: true,
-          state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-        });
+        navigate("/home-page", { replace: true, state: { loginSuccess: true } });
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -104,10 +101,7 @@ export default function LoginPage() {
       // } else {
       //   navigate('/user-landing-page', { replace: true });
       // }
-      navigate("/home-page", {
-        replace: true,
-        state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-      });
+      navigate("/home-page", { replace: true, state: { loginSuccess: true } });
     } catch (err) {
       console.error("Google login error:", err);
       const errorCode = err?.response?.data?.code;

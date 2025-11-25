@@ -355,7 +355,7 @@ const ListBudgetsPage = () => {
                 </div>
                 <h4 className="empty-state-title">Không có quyền truy cập</h4>
                 <p className="empty-state-text">
-                  Chỉ Trưởng Ban Tổ Chức (HoOC) hoặc Trưởng Ban (HoD) mới có thể xem trang này.
+                  Chỉ Trưởng Ban Tổ Chức hoặc Trưởng Ban mới có thể xem trang này.
                 </p>
               </div>
             </div>
@@ -759,7 +759,7 @@ const ListBudgetsPage = () => {
                                     const budgetId = budget._id || budget.id || budget.budgetId;
                                     const deptId = budget.departmentId || hodDepartmentId;
                                     await budgetApi.submitBudget(eventId, deptId, budgetId);
-                                    toast.success("Gửi cho HoOC duyệt thành công!");
+                                    toast.success("Gửi cho TBC duyệt thành công!");
                                     fetchBudgets(); // Refresh danh sách
                                   } catch (error) {
                                     toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
@@ -768,7 +768,7 @@ const ListBudgetsPage = () => {
                                 style={{ borderRadius: "8px" }}
                               >
                                 <i className="bi bi-send me-1"></i>
-                                Gửi cho HoOC
+                                Gửi cho TBTC
                               </button>
                             )}
                             {/* Nút "Xóa" cho draft và submitted, nhưng không cho xóa khi status là submitted (chờ duyệt) */}

@@ -163,7 +163,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
                 textTransform: 'capitalize',
               }}
             >
-              {tab === 'epics' ? 'Epic' : tab === 'tasks' ? 'Công việc' : 'Rủi ro'}
+              {tab === 'epics' ? 'Công việc lớn' : tab === 'tasks' ? 'Công việc' : 'Rủi ro'}
             </button>
           ))}
         </div>
@@ -176,7 +176,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
         }}>
           {activeTab === 'epics' && (
             <div>
-              <h3 style={{ marginBottom: 16 }}>Epic ({editedWBS.epics?.length || 0})</h3>
+              <h3 style={{ marginBottom: 16 }}>Công việc lớn ({editedWBS.epics?.length || 0})</h3>
               
               {/* Excel-like Table */}
               <div style={{
@@ -199,7 +199,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
                   top: 0,
                   zIndex: 10,
                 }}>
-                  <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Mã Epic</div>
+                  <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Mã công việc lớn</div>
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Tên</div>
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Mô tả</div>
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Ban</div>
@@ -247,7 +247,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
                         }}
                         onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
                         onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
-                        placeholder="Tên epic"
+                        placeholder="Tên công việc lớn"
                       />
                     </div>
                     
@@ -342,7 +342,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
                   textAlign: 'center',
                   color: '#6B7280',
                 }}>
-                  Không có epic nào
+                  Không có công việc lớn nào
                 </div>
               )}
             </div>

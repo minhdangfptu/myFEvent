@@ -538,7 +538,7 @@ const CreateDepartmentBudget = () => {
                   </th>
                   {isEditMode && budget?.status === "changes_requested" && (
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "200px" }}>
-                      Phản hồi từ HoOC
+                      Phản hồi từ TBTC
                     </th>
                   )}
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "120px" }}>

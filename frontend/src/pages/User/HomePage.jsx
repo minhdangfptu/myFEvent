@@ -113,7 +113,6 @@ export default function HomePage() {
     images: [],
   });
   const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [createError, setCreateError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [imageInputType, setImageInputType] = useState("url");
@@ -190,6 +189,15 @@ export default function HomePage() {
     fetchBlogs(1, '', '');
   }, []);
 
+  // Show login success toast once
+  useEffect(() => {
+    if (location.state?.loginSuccess) {
+      toast.success("Đăng nhập thành công!");
+      // Clear the state to prevent showing toast again on refresh/back
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
   // ===== Image handling functions =====
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -197,13 +205,13 @@ export default function HomePage() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setCreateError("Vui lòng chọn file hình ảnh hợp lệ");
+      toast.error("Vui lòng chọn file hình ảnh hợp lệ");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setCreateError("Kích thước file không được vượt quá 5MB");
+      toast.error("Kích thước file không được vượt quá 5MB");
       return;
     }
 
@@ -220,7 +228,7 @@ export default function HomePage() {
 
   const handleUrlAdd = () => {
     if (!imageUrl.trim()) {
-      setCreateError("Vui lòng nhập URL hình ảnh");
+      toast.error("Vui lòng nhập URL hình ảnh");
       return;
     }
 
@@ -228,7 +236,7 @@ export default function HomePage() {
     try {
       new URL(imageUrl);
     } catch {
-      setCreateError("URL không hợp lệ");
+      toast.error("URL không hợp lệ");
       return;
     }
 
@@ -237,7 +245,6 @@ export default function HomePage() {
       images: [...prev.images, imageUrl.trim()],
     }));
     setImageUrl("");
-    setCreateError("");
   };
 
   const removeImage = (index) => {
@@ -310,19 +317,6 @@ export default function HomePage() {
         return new Date(a.eventStartDate) - new Date(b.eventStartDate);
       return 0;
     });
-
-  // ===== Toast router state =====
-  const toastShown = useRef(false);
-  useEffect(() => {
-    const toastData = location.state?.toast;
-    if (toastData && !toastShown.current) {
-      toast.dismiss();
-      const fn = toast[toastData.type] || toast.success;
-      fn(toastData.message);
-      toastShown.current = true;
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location, navigate]);
 
   // Chỉ chờ authLoading, eventsLoading sẽ hiển thị loading trong section
   if (authLoading) {
@@ -458,7 +452,7 @@ export default function HomePage() {
         .blog-img { height:160px; background:#f3f4f6; position:relative; }
         .blog-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
         .blog-body { padding:16px; }
-        .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; }
+        .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
         .blog-meta { display:flex; flex-wrap:wrap; gap:6px; color:#6B7280; font-size:12px; }
         .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; margin-bottom:16px; flex-wrap:wrap; }
         .section-title { color:red; margin:0; font-size:18px; font-weight:700; }
@@ -691,6 +685,10 @@ export default function HomePage() {
                           maxHeight: 48,
                           overflow: "hidden",
                           lineHeight: "24px",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: "vertical",
+                          textOverflow: "ellipsis",
                         }}
                       >
                         {event.name}
@@ -1164,7 +1162,6 @@ export default function HomePage() {
                       images: [],
                     });
                     setImageUrl("");
-                    setCreateError("");
                   }}
                 />
               </div>
@@ -1172,62 +1169,63 @@ export default function HomePage() {
                 <div className="text-muted mb-3" style={{ fontSize: 14 }}>
                   Hãy tạo sự kiện mới của riêng mình thôi!
                 </div>
-                {createError && (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {createError}
-                  </div>
-                )}
 
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    setCreateError("");
 
                     // Validation
-                    if (!createForm.name.trim())
-                      return setCreateError("Vui lòng nhập tên sự kiện");
-                    if (!createForm.organizerName.trim())
-                      return setCreateError(
-                        "Vui lòng nhập tên CLB/Đội nhóm/Người đại diện tổ chức"
-                      );
-                    if (!createForm.eventStartDate)
-                      return setCreateError("Vui lòng chọn ngày bắt đầu");
-                    if (!createForm.eventEndDate)
-                      return setCreateError("Vui lòng chọn ngày kết thúc");
-                    if (!createForm.location.trim())
-                      return setCreateError("Vui lòng nhập địa điểm");
-                    if (!createForm.description.trim())
-                      return setCreateError("Vui lòng nhập mô tả sự kiện");
+                    if (!createForm.name.trim()) {
+                      toast.error("Vui lòng nhập tên sự kiện");
+                      return;
+                    }
+                    if (!createForm.organizerName.trim()) {
+                      toast.error("Vui lòng nhập tên CLB/Đội nhóm/Người đại diện tổ chức");
+                      return;
+                    }
+                    if (!createForm.eventStartDate) {
+                      toast.error("Vui lòng chọn ngày bắt đầu");
+                      return;
+                    }
+                    if (!createForm.eventEndDate) {
+                      toast.error("Vui lòng chọn ngày kết thúc");
+                      return;
+                    }
+                    if (!createForm.location.trim()) {
+                      toast.error("Vui lòng nhập địa điểm");
+                      return;
+                    }
+                    if (!createForm.description.trim()) {
+                      toast.error("Vui lòng nhập mô tả sự kiện");
+                      return;
+                    }
 
                     // Kiểm tra ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai
                     const now = new Date();
                     const startDate = new Date(createForm.eventStartDate);
                     const endDate = new Date(createForm.eventEndDate);
-                    
+
                     // So sánh chỉ ngày (không tính giờ/phút) để tránh lỗi timezone
                     const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
                     const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                    
+
                     // Cho phép ngày hôm nay hoặc ngày trong tương lai
                     if (startDateOnly < nowDateOnly) {
-                      return setCreateError(
-                        "Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai"
-                      );
+                      toast.error("Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai");
+                      return;
                     }
-                    
+
                     if (endDateOnly < nowDateOnly) {
-                      return setCreateError(
-                        "Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai"
-                      );
+                      toast.error("Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai");
+                      return;
                     }
-                    
-                    // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
-                    if (endDateOnly <= startDateOnly) {
-                      return setCreateError(
-                        "Ngày kết thúc phải sau ngày bắt đầu"
-                      );
-                    }
+
+                    // // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
+                    // if (endDateOnly <= startDateOnly) {
+                    //   toast.error("Ngày kết thúc phải sau ngày bắt đầu");
+                    //   return;
+                    // }
 
                     try {
                       setCreateSubmitting(true);
@@ -1256,7 +1254,6 @@ export default function HomePage() {
                         err?.message ||
                         "Tạo sự kiện thất bại";
                       toast.error(msg);
-                      setCreateError(msg);
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -1508,7 +1505,6 @@ export default function HomePage() {
                           images: [],
                         });
                         setImageUrl("");
-                        setCreateError("");
                       }}
                     >
                       Hủy
@@ -1732,9 +1728,9 @@ export default function HomePage() {
                 style={{
                   fontSize: '36px',
                   fontWeight: 700,
-                  letterSpacing: '6px',
+                  letterSpacing: '2px',
                   color: '#dc2626',
-                  fontFamily: 'monospace',
+                  fontFamily: 'roboto',  
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
               >
@@ -1789,7 +1785,7 @@ export default function HomePage() {
                 style={{
                   flex: 1,
                   padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -1800,16 +1796,14 @@ export default function HomePage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
                   transition: 'all 0.2s',
+                  boxShadow: 'none',
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.4)';
+                  e.target.style.background = '#a41c1cff';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                  e.target.style.background = '#dc2626';
                 }}
               >
                 <i className="bi bi-copy"></i>
