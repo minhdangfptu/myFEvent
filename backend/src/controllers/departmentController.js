@@ -28,11 +28,11 @@ export const listDepartmentsByEvent = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const skip = (page - 1) * limit;
     const search = (req.query.search || '').trim();
-    const { items, total } = await findDepartmentsByEvent(eventId, { search, skip, limit });
+    const { items, total, memberCounts } = await findDepartmentsByEvent(eventId, { search, skip, limit });
 
     // Format data for frontend
-    const formattedItems = await Promise.all(items.map(async (dept) => {
-      const memberCount = await countDepartmentMembersExcludingHoOC(dept._id);
+    const formattedItems = items.map((dept) => {
+      const memberCount = memberCounts?.[dept._id?.toString()] ?? 0;
 
       return {
         _id: dept._id,
@@ -42,11 +42,11 @@ export const listDepartmentsByEvent = async (req, res) => {
         leaderId: dept.leaderId,
         leader: dept.leaderId,
         leaderName: dept.leaderId?.fullName || 'Chưa có',
-        memberCount: memberCount,
+        memberCount,
         createdAt: dept.createdAt,
         updatedAt: dept.updatedAt
       };
-    }));
+    });
 
     return res.status(200).json({
       data: formattedItems,

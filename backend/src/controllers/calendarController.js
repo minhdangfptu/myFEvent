@@ -28,6 +28,7 @@ import {
     notifyRemovedFromCalendar,
     notifyAddedToCalendar
 } from "../services/notificationService.js";
+import EventMember from '../models/eventMember.js';
 
 const toIdString = (value) => {
     if (!value) return null;
@@ -182,11 +183,20 @@ export const createCalendarForEvent = async (req, res) => {
         let participants = [];
         if (participantType) {
             if (participantType === 'all') {
-                const allMembers = await getMembersByEventRaw(eventId);
+                const allMembers = await EventMember.find({
+                    eventId,
+                    status: { $ne: 'deactive' }
+                }).select('_id').lean();
                 participants = allMembers.map(member => ({
                     member: member._id,
-                    participateStatus: 'unconfirmed'
+                    participateStatus: member._id?.toString() === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
                 }));
+                if (ownerMemberid && !participants.some(p => p.member?.toString() === ownerMemberid.toString())) {
+                    participants.unshift({
+                        member: ownerMemberid,
+                        participateStatus: 'confirmed'
+                    });
+                }
             } else if (participantType === 'departments') {
                 if (!departments) {
                     return res.status(400).json({ message: 'departments is required when participantType is "departments"' });
@@ -211,13 +221,11 @@ export const createCalendarForEvent = async (req, res) => {
                 if (!Array.isArray(departmentIds) || departmentIds.length === 0) {
                     return res.status(400).json({ message: 'departments must be a non-empty array' });
                 }
-                const departmentIdSet = new Set(departmentIds.map(id => id?.toString()));
-                const allMembers = await getMembersByEventRaw(eventId);
-                
-                const selectedMembers = allMembers.filter(member => {
-                    const depIdStr = member?.departmentId?._id ? member.departmentId._id.toString() : null;
-                    return depIdStr && departmentIdSet.has(depIdStr);
-                });
+                const selectedMembers = await EventMember.find({
+                    eventId,
+                    departmentId: { $in: departmentIds },
+                    status: { $ne: 'deactive' }
+                }).select('_id').lean();
                 
                 const seen = new Set();
                 participants = selectedMembers.map(member => {
@@ -225,10 +233,10 @@ export const createCalendarForEvent = async (req, res) => {
                     seen.add(idStr);
                     return {
                         member: member._id,
-                        participateStatus: idStr === ownerMemberid.toString() ? 'confirmed' : 'unconfirmed'
+                        participateStatus: idStr === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
                     };
                 });
-                if (!seen.has(ownerMemberid.toString())) {
+                if (ownerMemberid && !seen.has(ownerMemberid.toString())) {
                     participants.unshift({
                         member: ownerMemberid,
                         participateStatus: 'confirmed'
@@ -373,12 +381,14 @@ export const createCalendarForDepartment = async (req, res) => {
 
 		let participants = [];
 		if (participantType === 'all') {
-			const allMembers = await getMembersByDepartmentRaw(departmentId);
+			const allMembers = await EventMember.find({
+				departmentId,
+				status: { $ne: 'deactive' }
+			}).select('_id').lean();
 			participants = allMembers.map(member => ({
 				member: member._id,
 				participateStatus: (member._id?.toString() === ownerMemberid?.toString()) ? 'confirmed' : 'unconfirmed'
 			}));
-			// Ensure owner is included and confirmed
 			const ownerIncluded = participants.some(p => p.member?.toString() === ownerMemberid?.toString());
 			if (!ownerIncluded && ownerMemberid) {
 				participants.unshift({
