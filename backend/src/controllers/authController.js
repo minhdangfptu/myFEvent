@@ -130,7 +130,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Email hoặc mật khẩu không đúng' });
+    if (!user) return res.status(404).json({ message: 'Tài khoản không tồn tại' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng' });

@@ -473,12 +473,12 @@ export default function HoOCDashBoard() {
   }
 
   return (
-    <UserLayout title="Dashboard tổng" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+    <UserLayout title="Dashboard Trưởng ban Tổ chức" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
       <div className="bg-light" style={{ minHeight: "100vh", padding: "20px" }}>
         <div className="container-fluid px-0" style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
-          <h1 className="mb-4" style={{ color: "#ff5757", fontSize: "24px", fontWeight: 600 }}>
-            {eventData.name} - Dashboard tổng
+          <h1 className="mb-4" style={{ color: "#ff5757", fontSize: "24px", fontWeight: 700 }}>
+            {eventData.name} 
           </h1>
 
           {/* Stats Cards */}

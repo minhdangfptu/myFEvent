@@ -267,12 +267,12 @@ export default function DataExportPage() {
       color: "#f3f3f3",
       iconColor: "#00ACC1",
       description:
-        "Xuất danh sách công việc lớn (epic): Tên công việc, Thời gian, Trạng thái, Ban phụ trách",
+        "Xuất danh sách công việc lớn: Tên công việc, Thời gian, Trạng thái, Ban phụ trách",
       subItems: [
         {
           id: "tasks-all",
-          title: "Tất cả công việc lớn (epic)",
-          description: "Danh sách đầy đủ các công việc loại epic",
+          title: "Tất cả công việc lớn",
+          description: "Danh sách đầy đủ các công việc lớn",
         },
       ],
     },

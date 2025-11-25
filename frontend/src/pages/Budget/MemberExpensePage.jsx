@@ -187,7 +187,7 @@ const MemberExpensePage = () => {
         } else {
           if (budget.status === 'approved') {
             setBudgets([]);
-            toast.info("Chưa có mục ngân sách nào được phân công cho bạn. Vui lòng đợi HoD phân công.");
+            toast.info("Chưa có mục ngân sách nào được phân công cho bạn. Vui lòng đợi Trưởng ban phân công.");
           } else {
             setBudgets([]);
           }
@@ -353,7 +353,7 @@ const MemberExpensePage = () => {
                 <i className="bi bi-inbox" style={{ fontSize: "4rem", color: "#9CA3AF" }}></i>
                 <h4 className="mt-3">Chưa có budget được gửi xuống</h4>
                 <p className="text-muted">
-                  HoD sẽ gửi budget xuống cho bạn sau khi được duyệt. Vui lòng quay lại sau.
+                  Trưởng ban sẽ gửi budget xuống cho bạn sau khi được duyệt. Vui lòng quay lại sau.
                 </p>
               </div>
             </div>

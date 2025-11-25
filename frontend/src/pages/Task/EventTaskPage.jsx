@@ -22,8 +22,8 @@ import { aiApi } from "~/apis/aiApi";
 import ConfirmModal from "../../components/ConfirmModal";
 
 const TASK_TYPE_LABELS = {
-  epic: "Epic task",
-  normal: "Công việc thường",
+  epic: "Công việc lớn",
+  normal: "Công việc",
 };
 
 const STATUS_OPTIONS = [
@@ -182,7 +182,7 @@ export default function EventTaskPage() {
             assigneeId: task?.assigneeId?._id || task?.assigneeId || null,
             milestone: task?.milestoneId || "Chưa có",
             parentId: task?.parentId ? String(task.parentId) : null,
-            parentName: task?.parentId ? titleMap.get(String(task.parentId)) || "Epic task" : null,
+            parentName: task?.parentId ? titleMap.get(String(task.parentId)) || "Công việc lớn" : null,
             due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
             statusCode,
             status: STATUS_LABEL_MAP[statusCode] || "Không xác định",
@@ -387,8 +387,6 @@ export default function EventTaskPage() {
       const taskIds = epicTasks.map((task) => task.id);
       if (taskIds.length === 0) return;
       
-      console.log("Select all for epic:", epicId, "Tasks:", taskIds);
-      
       const allSelected = taskIds.every((id) =>
         selectedTaskIds.includes(id)
       );
@@ -433,9 +431,9 @@ export default function EventTaskPage() {
     // Tổng số sẽ xóa: epic tasks + normal tasks (bao gồm cả task trong epic)
     const totalToDelete = selectedEpicIds.length + selectedTaskIds.length;
     const message = selectedEpicIds.length > 0 && selectedTaskIds.length > 0
-      ? `Bạn có chắc chắn muốn xóa ${selectedEpicIds.length} epic task và ${selectedTaskIds.length} task? (Xóa epic task sẽ xóa luôn tất cả task trong epic đó)`
+      ? `Bạn có chắc chắn muốn xóa ${selectedEpicIds.length} công việc lớn và ${selectedTaskIds.length} công việc? (Xóa công việc lớmn sẽ xóa luôn tất cả công việc trong công việc lớn đó)`
       : selectedEpicIds.length > 0
-      ? `Bạn có chắc chắn muốn xóa ${selectedEpicIds.length} epic task? (Sẽ xóa luôn tất cả task trong epic đó)`
+      ? `Bạn có chắc chắn muốn xóa ${selectedEpicIds.length} công việc lớn? (Sẽ xóa luôn tất cả công việc trong công việc lớn đó)`
       : `Bạn có chắc chắn muốn xóa ${selectedTaskIds.length} công việc đã chọn?`;
     
     setConfirmModal({
@@ -544,7 +542,7 @@ export default function EventTaskPage() {
       return;
     }
     if (addTaskForm.taskType === "normal" && !addTaskForm.parentId) {
-      setAddTaskError("Task thường phải thuộc một Epic task.");
+      setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
     }
   
@@ -909,8 +907,8 @@ export default function EventTaskPage() {
                   onChange={(e) => setFilterType(e.target.value)}
                 >
                   <option value="all">Tất cả loại</option>
-                  <option value="epic">Epic task</option>
-                  <option value="normal">Công việc thường</option>
+                  <option value="epic">Công việc lớn</option>
+                  <option value="normal">Công việc</option>
                 </select>
 
                 <select
@@ -1006,7 +1004,7 @@ export default function EventTaskPage() {
                                 />
                               )}
                               <div>
-                                <div className="fw-semibold">{epic?.name || "Task chưa thuộc Epic"}</div>
+                                <div className="fw-semibold">{epic?.name || "Công việc chưa thuộc Công việc lớn"}</div>
                                 <div className="text-muted small">
                                   Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"}
                                 </div>
@@ -1034,7 +1032,7 @@ export default function EventTaskPage() {
                           <div className="p-3 bg-white">
                             {group.tasks.length === 0 ? (
                               <div className="text-muted small text-center py-3">
-                                Chưa có công việc thường cho epic này.
+                                Chưa có công việc cho công việc lớn này.
                               </div>
                             ) : (
                               <div className="table-responsive">
@@ -1127,7 +1125,7 @@ export default function EventTaskPage() {
               {totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center mt-3">
                   <div className="text-muted small">
-                    Hiển thị {startIndex + 1}-{Math.min(endIndex, groupedEpics.length)} trong tổng số {groupedEpics.length} Epic task
+                    Hiển thị {startIndex + 1}-{Math.min(endIndex, groupedEpics.length)} trong tổng số {groupedEpics.length} công việc lớn
                   </div>
                   <nav>
                     <ul className="pagination mb-0">
@@ -1381,11 +1379,11 @@ export default function EventTaskPage() {
                         value={addTaskForm.taskType}
                         onChange={(e) => handleAddTaskInput("taskType", e.target.value)}
                       >
-                        <option value="epic">Epic task</option>
-                        <option value="normal">Công việc thường</option>
+                        <option value="epic">Công việc lớn</option>
+                        <option value="normal">Công việc</option>
                       </select>
                       <div className="form-text small text-muted">
-                        Epic task giao cho ban, không chọn người phụ trách. Chọn công việc thường để giao cho thành viên.
+                        Công việc lớn giao cho ban, không chọn người phụ trách. Chọn công việc để giao cho thành viên.
                       </div>
                     </div>
                     <div className="mb-3">
@@ -1495,7 +1493,7 @@ export default function EventTaskPage() {
                         </select>
                       </div>
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Thuộc Epic Task</label>
+                        <label className="form-label">Thuộc Công việc lớn</label>
                         <select
                           className="form-select"
                           value={addTaskForm.parentId}
@@ -1511,7 +1509,7 @@ export default function EventTaskPage() {
                         </select>
                         {addTaskForm.taskType === "epic" && (
                           <div className="form-text small text-muted">
-                            Epic task không thể chọn
+                            Công việc lớn không thể chọn người phụ trách
                           </div>
                         )}
                       </div>

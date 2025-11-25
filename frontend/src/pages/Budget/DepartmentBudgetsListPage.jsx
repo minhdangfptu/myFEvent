@@ -263,7 +263,7 @@ const DepartmentBudgetsListPage = () => {
                                 onClick={async () => {
                                   try {
                                     await budgetApi.submitBudget(eventId, budget.departmentId, budget.budgetId);
-                                    toast.success("Gửi cho HoOC duyệt thành công!");
+                                    toast.success("Gửi cho TBTC duyệt thành công!");
                                     fetchData(); // Refresh danh sách
                                   } catch (error) {
                                     toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
@@ -272,7 +272,7 @@ const DepartmentBudgetsListPage = () => {
                                 style={{ borderRadius: "8px" }}
                               >
                                 <i className="bi bi-send me-1"></i>
-                                Gửi cho HoOC
+                                Gửi
                               </button>
                             )}
                             {/* Nút "Xóa" chỉ cho draft, không cho xóa khi status là submitted (chờ duyệt) */}
