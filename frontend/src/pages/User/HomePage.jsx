@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
@@ -99,7 +99,8 @@ export default function HomePage() {
     CONFIG_BY_ROLE[user?.role] || CONFIG_BY_ROLE.User;
 
   // ===== UI states =====
-  const [searchQuery, setSearchQuery] = useState("");
+  const [myEventsSearch, setMyEventsSearch] = useState("");
+  const myEventsSearchTimeoutRef = useRef(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -121,27 +122,72 @@ export default function HomePage() {
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
 
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, pagination: myEventsPagination, changePage: changeMyEventsPage, refetchEvents } = useEvents();
   const myEvents = useMemo(() => dedupeById(events || []), [events]);
 
-  // ===== Fetch blogs and stop loading =====
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBlogs = async () => {
-      try {
-        const res = await eventService.fetchAllPublicEvents();
-        if (!cancelled) {
-          setBlogs(normalizeEventList(res));
-        }
-      } catch (err) {
-        console.error("fetch public events failed", err);
-        if (!cancelled) setBlogs([]);
+  // Debounce search for my events (server-side)
+  const handleMyEventsSearchChange = (value) => {
+    setMyEventsSearch(value);
+    if (myEventsSearchTimeoutRef.current) {
+      clearTimeout(myEventsSearchTimeoutRef.current);
+    }
+    myEventsSearchTimeoutRef.current = setTimeout(() => {
+      refetchEvents(1, myEventsPagination.limit, value);
+    }, 500);
+  };
+
+  // Pagination for public events (blogs)
+  const [blogsPagination, setBlogsPagination] = useState({
+    page: 1,
+    limit: 8,
+    total: 0,
+    totalPages: 0
+  });
+  const [blogsLoading, setBlogsLoading] = useState(false);
+  const [blogsSearch, setBlogsSearch] = useState("");
+  const [blogsStatusFilter, setBlogsStatusFilter] = useState("");
+
+  // ===== Fetch blogs with pagination, search and filter =====
+  const fetchBlogs = useCallback(async (page = 1, search = blogsSearch, status = blogsStatusFilter) => {
+    setBlogsLoading(true);
+    try {
+      const res = await eventService.fetchAllPublicEvents({
+        page,
+        limit: blogsPagination.limit,
+        search: search || '',
+        status: status || ''
+      });
+      setBlogs(normalizeEventList(res));
+      if (res?.pagination) {
+        setBlogsPagination(res.pagination);
       }
-    };
-    fetchBlogs();
-    return () => {
-      cancelled = true;
-    };
+    } catch (err) {
+      console.error("fetch public events failed", err);
+      setBlogs([]);
+    } finally {
+      setBlogsLoading(false);
+    }
+  }, [blogsPagination.limit, blogsSearch, blogsStatusFilter]);
+
+  // Debounce search for public events
+  const blogsSearchTimeoutRef = useRef(null);
+  const handleBlogsSearchChange = (value) => {
+    setBlogsSearch(value);
+    if (blogsSearchTimeoutRef.current) {
+      clearTimeout(blogsSearchTimeoutRef.current);
+    }
+    blogsSearchTimeoutRef.current = setTimeout(() => {
+      fetchBlogs(1, value, blogsStatusFilter);
+    }, 500);
+  };
+
+  const handleBlogsStatusChange = (status) => {
+    setBlogsStatusFilter(status);
+    fetchBlogs(1, blogsSearch, status);
+  };
+
+  useEffect(() => {
+    fetchBlogs(1, '', '');
   }, []);
 
   // ===== Image handling functions =====
@@ -246,19 +292,14 @@ export default function HomePage() {
     return () => document.removeEventListener("click", onClickOutside);
   }, []);
 
-  // ===== Filter + sort =====
-  const norm = (s) => (s || "").toLowerCase();
+  // ===== Filter + sort (search is now done server-side) =====
   const filteredEvents = myEvents
-    .filter(
-      (ev) =>
-        norm(ev.name).includes(norm(searchQuery)) ||
-        norm(ev.description).includes(norm(searchQuery))
-    )
     .filter((ev) => {
+      // Status filter (client-side) - search is done server-side
       if (statusFilter === STATUS.ALL) return true;
-      if (statusFilter === STATUS.UPCOMING) return ev.status === "Sắp diễn ra";
-      if (statusFilter === STATUS.ONGOING) return ev.status === "Đang diễn ra";
-      if (statusFilter === STATUS.PAST) return ev.status === "Đã kết thúc";
+      if (statusFilter === STATUS.UPCOMING) return ev.status === "scheduled";
+      if (statusFilter === STATUS.ONGOING) return ev.status === "ongoing";
+      if (statusFilter === STATUS.PAST) return ev.status === "completed";
       return true;
     })
     .sort((a, b) => {
@@ -283,22 +324,19 @@ export default function HomePage() {
     }
   }, [location, navigate]);
 
-  // Check cả authLoading và eventsLoading
-  if (authLoading || eventsLoading) {
+  // Chỉ chờ authLoading, eventsLoading sẽ hiển thị loading trong section
+  if (authLoading) {
     return (
       <UserLayout title={title} sidebarType={sidebarType}>
         <div
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            minHeight: "50vh",
           }}
         >
-          <Loading size={80} />
+          <Loading size={60} />
         </div>
       </UserLayout>
     );
@@ -308,8 +346,8 @@ export default function HomePage() {
     <UserLayout title={title} activePage="home" sidebarType={sidebarType}>
       {/* Search + actions */}
       <div className="bg-light border-bottom py-3 px-0 pt-0">
-        <div className="d-flex gap-3 align-items-center">
-          <div className="flex-grow-1">
+        <div className="d-flex gap-3 align-items-center flex-wrap">
+          <div className="flex-grow-1" style={{ minWidth: 200 }}>
             <div className="position-relative">
               <i
                 className="bi bi-search position-absolute"
@@ -320,11 +358,26 @@ export default function HomePage() {
                 type="text"
                 className="form-control soft-input ps-5"
                 placeholder={t("searchPlaceholder")}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={myEventsSearch}
+                onChange={(e) => handleMyEventsSearchChange(e.target.value)}
                 aria-label={t("searchPlaceholder")}
+                disabled={eventsLoading}
               />
             </div>
           </div>
+          {myEventsSearch && (
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => {
+                setMyEventsSearch("");
+                refetchEvents(1, myEventsPagination.limit, "");
+              }}
+              disabled={eventsLoading}
+            >
+              <i className="bi bi-x-lg me-1"></i>
+              Xóa tìm kiếm
+            </button>
+          )}
 
           {/* Create/Join (Bootstrap dropdown chạy bằng data-bs) */}
           <div className="dropdown">
@@ -537,7 +590,11 @@ export default function HomePage() {
           </div>
         </div>
 
-        {filteredEvents.length === 0 ? (
+        {eventsLoading ? (
+          <div className="d-flex justify-content-center align-items-center py-5">
+            <Loading size={50} />
+          </div>
+        ) : filteredEvents.length === 0 ? (
           <div className="d-flex flex-column justify-content-center align-items-center py-5">
             <img
               src={NoDataImg}
@@ -545,7 +602,9 @@ export default function HomePage() {
               style={{ width: 200, maxWidth: "50vw", opacity: 0.8 }}
             />
             <div className="text-muted mt-3" style={{ fontSize: 18 }}>
-              Chưa có sự kiện nào!
+              {myEventsSearch || statusFilter !== STATUS.ALL
+                ? "Không tìm thấy sự kiện phù hợp với bộ lọc"
+                : "Chưa có sự kiện nào!"}
             </div>
           </div>
         ) : (
@@ -732,9 +791,7 @@ export default function HomePage() {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
-                            navigate(
-                              `/member-event-detail/${eid}?eventId=${eid}`
-                            );
+                            navigate(`/member-dashboard?eventId=${eid}`);
                             return;
                           }
                           if (role === "HoOC") {
@@ -756,6 +813,70 @@ export default function HomePage() {
             })}
           </div>
         )}
+
+        {/* Pagination for My Events */}
+        {myEventsPagination && myEventsPagination.totalPages > 1 && (
+          <div className="d-flex justify-content-center mt-4">
+            <div className="d-flex align-items-center" style={{ gap: 16 }}>
+              <button
+                type="button"
+                onClick={() => changeMyEventsPage(myEventsPagination.page - 1, myEventsSearch)}
+                disabled={myEventsPagination.page <= 1 || eventsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              {Array.from({ length: myEventsPagination.totalPages }, (_, i) => i + 1).map(
+                (n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => changeMyEventsPage(n, myEventsSearch)}
+                    disabled={eventsLoading}
+                    className="btn"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: "1px solid " + (n === myEventsPagination.page ? "#EF4444" : "#e5e7eb"),
+                      background: n === myEventsPagination.page ? "#EF4444" : "#fff",
+                      color: n === myEventsPagination.page ? "#fff" : "#111827",
+                      padding: 0,
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => changeMyEventsPage(myEventsPagination.page + 1, myEventsSearch)}
+                disabled={myEventsPagination.page >= myEventsPagination.totalPages || eventsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ====== Blog ====== */}
@@ -765,6 +886,51 @@ export default function HomePage() {
             Sự kiện tại trường Đại học FPT Hà Nội
           </h4>
         </div>
+
+        {/* Search and Filter for Public Events */}
+        <div className="d-flex gap-3 mb-4 flex-wrap align-items-center">
+          <div className="position-relative flex-grow-1" style={{ maxWidth: 400 }}>
+            <i
+              className="bi bi-search position-absolute"
+              style={{ left: 12, top: 12, color: "#9CA3AF" }}
+            />
+            <input
+              type="text"
+              className="form-control soft-input ps-5"
+              placeholder="Tìm kiếm sự kiện công khai..."
+              value={blogsSearch}
+              onChange={(e) => handleBlogsSearchChange(e.target.value)}
+              disabled={blogsLoading}
+            />
+          </div>
+          <select
+            className="form-select soft-input"
+            style={{ width: 180 }}
+            value={blogsStatusFilter}
+            onChange={(e) => handleBlogsStatusChange(e.target.value)}
+            disabled={blogsLoading}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="scheduled">Sắp diễn ra</option>
+            <option value="ongoing">Đang diễn ra</option>
+            <option value="completed">Đã kết thúc</option>
+          </select>
+          {(blogsSearch || blogsStatusFilter) && (
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => {
+                setBlogsSearch("");
+                setBlogsStatusFilter("");
+                fetchBlogs(1, "", "");
+              }}
+              disabled={blogsLoading}
+            >
+              <i className="bi bi-x-lg me-1"></i>
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+
         <div className="row g-4">
           {blogs.map((blog, idx) => (
             <div
@@ -887,14 +1053,87 @@ export default function HomePage() {
               </div>
             </div>
           ))}
-          {blogs.length === 0 && (
+          {blogs.length === 0 && !blogsLoading && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                Chưa có sự kiện nào
+                {blogsSearch || blogsStatusFilter
+                  ? "Không tìm thấy sự kiện phù hợp với bộ lọc"
+                  : "Chưa có sự kiện nào"}
+              </div>
+            </div>
+          )}
+          {blogsLoading && (
+            <div className="col-12">
+              <div className="soft-card p-4 text-center">
+                <Loading size={40} />
               </div>
             </div>
           )}
         </div>
+
+        {/* Pagination for Public Events */}
+        {blogsPagination && blogsPagination.totalPages > 1 && (
+          <div className="d-flex justify-content-center mt-4">
+            <div className="d-flex align-items-center" style={{ gap: 16 }}>
+              <button
+                type="button"
+                onClick={() => fetchBlogs(blogsPagination.page - 1, blogsSearch, blogsStatusFilter)}
+                disabled={blogsPagination.page <= 1 || blogsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              {Array.from({ length: blogsPagination.totalPages }, (_, i) => i + 1).map(
+                (n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => fetchBlogs(n, blogsSearch, blogsStatusFilter)}
+                    disabled={blogsLoading}
+                    className="btn"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: "1px solid " + (n === blogsPagination.page ? "#EF4444" : "#e5e7eb"),
+                      background: n === blogsPagination.page ? "#EF4444" : "#fff",
+                      color: n === blogsPagination.page ? "#fff" : "#111827",
+                      padding: 0,
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => fetchBlogs(blogsPagination.page + 1, blogsSearch, blogsStatusFilter)}
+                disabled={blogsPagination.page >= blogsPagination.totalPages || blogsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ====== CREATE EVENT MODAL ====== */}

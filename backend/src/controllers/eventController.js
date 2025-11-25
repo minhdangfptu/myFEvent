@@ -72,7 +72,8 @@ export const getEventSummary = (req, res) =>
 export const listMyEvents = (req, res) =>
   handle(res, async () => {
     const userId = req.user?.id;
-    const result = await eventService.listMyEvents({ userId });
+    const { page, limit, search } = req.query;
+    const result = await eventService.listMyEvents({ userId, page, limit, search });
     return ok(res, 200, result);
   });
 

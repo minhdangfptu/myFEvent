@@ -17,10 +17,10 @@ const unwrapResponse = (payload) => {
 };
 
 export const eventService = {
-    fetchAllPublicEvents: async () => {
+    fetchAllPublicEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
         try {
-            const response = await eventApi.getAllPublicEvents();
-            return unwrapResponse(response);
+            const response = await eventApi.getAllPublicEvents({ page, limit, search, status });
+            return response; // Return full response including pagination
         } catch (error) {
             throw error;
         }
@@ -33,10 +33,10 @@ export const eventService = {
             throw error;
         }
     },
-    listMyEvents: async () => {
+    listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
         try {
-            const response = await eventApi.listMyEvents();
-            return unwrapResponse(response);
+            const response = await eventApi.listMyEvents({ page, limit, search });
+            return response; // Return full response including pagination
         } catch (error) {
             throw error;
         }

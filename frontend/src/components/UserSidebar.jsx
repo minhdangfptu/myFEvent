@@ -25,6 +25,9 @@ export default function UserSidebar({
   const { events, loading } = useEvents();
   const navigate = useNavigate();
 
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
+
   useEffect(() => {
     if (!sidebarOpen) {
       setWorkOpen(false);
@@ -113,8 +116,8 @@ export default function UserSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div
@@ -155,20 +158,23 @@ export default function UserSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {loading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(255,255,255,0.75)",
+              background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={40} />
-            
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>

@@ -1,7 +1,80 @@
+import { useState } from "react"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
+import { toast } from "react-toastify"
 
 export default function ContactPage() {
+  const [formData, setFormData] = useState({
+    user_name: '',
+    user_email: '',
+    subject: '',
+    message: ''
+  });
+
+  // Hàm kiểm tra email hợp lệ
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!formData.user_name || !formData.user_email || !formData.message) {
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      return;
+    }
+
+    if (!isValidEmail(formData.user_email)) {
+      toast.error('Email không hợp lệ!');
+      return;
+    }
+
+    // Tạo body email
+    const emailBody = `
+        ===========================================
+        THÔNG TIN LIÊN HỆ - MYFEVENT
+        ===========================================
+
+        👤 THÔNG TIN NGƯỜI GỬI
+        ----------------------
+        • Họ và tên: ${formData.user_name}
+        • Email: ${formData.user_email}
+
+        📝 NỘI DUNG TIN NHẮN
+        -------------------
+        ${formData.message}
+
+        ===========================================
+        Thời gian gửi: ${new Date().toLocaleString('vi-VN')}
+        ===========================================
+    `;
+
+    const subject = formData.subject
+      ? `[MYFEVENT - LIÊN HỆ] ${formData.subject}`
+      : '[MYFEVENT - LIÊN HỆ] Tin nhắn mới';
+
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=nookhanhtungf5@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    window.open(gmailUrl, '_blank');
+
+    toast.success('Đang mở Gmail...');
+
+    // Reset form
+    setFormData({
+      user_name: '',
+      user_email: '',
+      subject: '',
+      message: ''
+    });
+  };
+
   return (
     <>
       <Header />
@@ -17,24 +90,50 @@ export default function ContactPage() {
             <div className="card border-0 shadow-sm h-100">
               <div className="card-body p-4">
                 <h5 className="fw-bold mb-3" style={{ fontSize: 18 }}>Gửi tin nhắn cho chúng tôi</h5>
-                <form className="d-flex flex-column gap-3">
+                <form className="d-flex flex-column gap-3" onSubmit={handleSubmit}>
                   <div>
                     <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Tên của bạn *</div>
-                    <input className="form-control form-control-sm" placeholder="Nhập tên của bạn" />
+                    <input
+                      className="form-control form-control-sm"
+                      placeholder="Nhập tên của bạn"
+                      name="user_name"
+                      value={formData.user_name}
+                      onChange={handleChange}
+                    />
                   </div>
                   <div>
                     <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Email *</div>
-                    <input type="email" className="form-control form-control-sm" placeholder="example@gmail.com" />
+                    <input
+                      type="email"
+                      className="form-control form-control-sm"
+                      placeholder="example@gmail.com"
+                      name="user_email"
+                      value={formData.user_email}
+                      onChange={handleChange}
+                    />
                   </div>
                   <div>
                     <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Chủ đề</div>
-                    <input className="form-control form-control-sm" placeholder="Nhập chủ đề tin nhắn" />
+                    <input
+                      className="form-control form-control-sm"
+                      placeholder="Nhập chủ đề tin nhắn"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleChange}
+                    />
                   </div>
                   <div>
                     <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Nội dung tin nhắn *</div>
-                    <textarea className="form-control" rows="4" placeholder="Nhập nội dung tin nhắn của bạn..."></textarea>
+                    <textarea
+                      className="form-control"
+                      rows="4"
+                      placeholder="Nhập nội dung tin nhắn của bạn..."
+                      name="message"
+                      value={formData.message}
+                      onChange={handleChange}
+                    ></textarea>
                   </div>
-                  <button type="button" className="btn btn-danger w-100 fw-semibold py-2">Gửi ngay</button>
+                  <button type="submit" className="btn btn-danger w-100 fw-semibold py-2">Gửi ngay</button>
                 </form>
               </div>
             </div>

@@ -116,7 +116,11 @@ export const signup = async (req, res) => {
       email
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    if (error.message && error.message.includes('email')) {
+      return res.status(500).json({ 
+        message: 'Failed to send verification email. Please check email configuration.'
+      });
+    }
     return res.status(500).json({ message: 'Failed to signup!' });
   }
 };
@@ -126,10 +130,10 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Email or password is incorrect' });
+    if (!user) return res.status(404).json({ message: 'Email hoặc mật khẩu không đúng' });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Email or password is incorrect' });
+    if (!ok) return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng' });
 
     if (user.status === 'pending') {
       return res.status(403).json({
@@ -209,7 +213,7 @@ export const loginWithGoogle = async (req, res) => {
       let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
   
       if (!user) {
-
+        // Create new user with Google - mark as verified since Google already verified the email
         user = await User.create({
           email,
           fullName: name,
@@ -218,15 +222,22 @@ export const loginWithGoogle = async (req, res) => {
           authProvider: 'google',
           status: 'active',
           isFirstLogin: true,
+          verified: true, // Google accounts are pre-verified
         });
       } else {
-
+        // Update existing user
         if (!user.googleId) {
           user.googleId = sub;
         }
 
         if (!user.fullName && name) user.fullName = name;
         if (!user.avatarUrl && picture) user.avatarUrl = picture;
+
+        // Mark as verified if logging in with Google (Google already verified the email)
+        if (!user.verified) {
+          user.verified = true;
+        }
+
         await user.save();
       }
 

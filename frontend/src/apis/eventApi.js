@@ -1,9 +1,14 @@
 import axiosClient from './axiosClient';
 
 export const eventApi = {
-  getAllPublicEvents: async () => {
+  getAllPublicEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
     try {
-      const response = await axiosClient.get('/api/events/public');
+      const params = new URLSearchParams();
+      if (page) params.append('page', page);
+      if (limit) params.append('limit', limit);
+      if (search) params.append('search', search);
+      if (status) params.append('status', status);
+      const response = await axiosClient.get(`/api/events/public?${params.toString()}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -61,8 +66,12 @@ export const eventApi = {
     const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
     return res.data;
   },
-  listMyEvents: async () => {
-    const res = await axiosClient.get('/api/events/me/list');
+  listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (page) params.append('page', page);
+    if (limit) params.append('limit', limit);
+    if (search) params.append('search', search);
+    const res = await axiosClient.get(`/api/events/me/list?${params.toString()}`);
     return res.data;
   },
   getAllEventDetail: async (eventId) => {

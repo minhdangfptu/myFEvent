@@ -1,8 +1,12 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { toast } from "react-toastify";
+import { WifiOff } from "lucide-react";
+import { useAuth } from "./contexts/AuthContext";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -98,20 +102,157 @@ import EventDetailManagement from "./pages/Admin/EventDetailManagement";
 import UserDetailManagement from "./pages/Admin/UserDetailManagement";
 import EventManagement from "./pages/Admin/EventManagement";
 
+// Network Warning Overlay Component
+function NetworkWarningOverlay({ isVisible, onClose }) {
+  if (!isVisible) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(255, 255, 255, 0.9)",
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "16px",
+      }}
+    >
+      <WifiOff size={64} color="#ef4444" />
+      <h2 style={{ color: "#ef4444", margin: 0, fontSize: "24px" }}>
+        Mạng không ổn định
+      </h2>
+      <p style={{ color: "#6b7280", margin: 0, textAlign: "center" }}>
+        Kết nối mạng đang gặp sự cố. Vui lòng kiểm tra kết nối của bạn.
+      </p>
+      <button
+        onClick={onClose}
+        style={{
+          marginTop: "16px",
+          padding: "10px 24px",
+          backgroundColor: "#ef4444",
+          color: "white",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontSize: "16px",
+        }}
+      >
+        Đóng
+      </button>
+    </div>
+  );
+}
+
+function RootRedirect() {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border" role="status" aria-hidden="true"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    if (user?.role === 'admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/home-page" replace />;
+  }
+
+  return <Navigate to="/landingpage" replace />;
+}
+
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const toastIdRef = React.useRef(null);
+
+  // Detect online/offline status from browser and axios network errors
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    const handleNetworkOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("network:offline", handleNetworkOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("network:offline", handleNetworkOffline);
+    };
+  }, []);
+
+  const handleNetworkTimeout = useCallback(() => {
+    // Show overlay
+    setShowNetworkWarning(true);
+
+    // Show toast for 1 minute (60000ms) with icon
+    if (!toast.isActive(toastIdRef.current)) {
+      toastIdRef.current = toast.warning(
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <WifiOff size={20} />
+          <span>Mạng không ổn định! Vui lòng kiểm tra kết nối.</span>
+        </div>,
+        {
+          autoClose: 60000,
+          closeOnClick: false,
+          pauseOnHover: true,
+          draggable: false,
+          toastId: "network-timeout-toast",
+        }
+      );
+    }
+
+    setTimeout(() => {
+      setShowNetworkWarning(false);
+    }, 60000);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("network:timeout", handleNetworkTimeout);
+    return () => {
+      window.removeEventListener("network:timeout", handleNetworkTimeout);
+    };
+  }, [handleNetworkTimeout]);
+
+  const handleCloseOverlay = () => {
+    setShowNetworkWarning(false);
+    if (toastIdRef.current) {
+      toast.dismiss(toastIdRef.current);
+    }
+  };
+
+  // Show offline page when network is disconnected
+  if (isOffline) {
+    return <ErrorPageOffline />;
+  }
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
         <ToastContainer position="top-right" autoClose={3000} />
+        <NetworkWarningOverlay
+          isVisible={showNetworkWarning}
+          onClose={handleCloseOverlay}
+        />
         <NotificationsProvider>
           <EventProvider>
             <Routes>
               {/* Default Route */}
               <Route
                 path="/"
-                element={<Navigate to="/landingpage" replace />}
+                element={<RootRedirect />}
               />
 
               {/* Public Routes */}

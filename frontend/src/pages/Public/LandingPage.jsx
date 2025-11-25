@@ -1,26 +1,41 @@
 import React from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Loading from "~/components/Loading";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function FPTEvent_Landing() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  
   //time 1s loaidng
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(t);
   }, []);
+  
   useEffect(() => {
     const toastType = searchParams.get("toast");
     if (toastType === "logout-success") {
       toast.success("Đăng xuất thành công");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/home-page", { replace: true });
+      }
+    }
+  }, [isAuthenticated, authLoading, navigate, user]);
   return (
     <div className="min-vh-100 bg-white overflow-hidden">
       {/* Overlay loading */}

@@ -122,40 +122,75 @@ export default function EventsPage() {
 
           {error && <div className="text-danger mb-3">{error}</div>}
 
-          <div className="row row-cols-1 row-cols-md-3 g-3">
+          <div className="row row-cols-1 row-cols-md-3 g-4">
             {visible.map((event) => {
               const id = event._id || event.id;
               const title = event.name || event.title || 'Untitled';
-              const img = Array.isArray(event.image) ? event.image[0] : event.image || '/placeholder.png';
-              const dateText = event.eventDate ? formatDate(event.eventDate) : (event.date || '');
+              const img = Array.isArray(event.image) ? event.image[0] : event.image || '/default-events.jpg';
+              const images = Array.isArray(event.image) ? event.image : [];
               return (
                 <div className="col" key={id}>
                   <RouterLink to={`/events/${id}`} state={{ event }} className="text-decoration-none text-reset">
-                    <div className="card h-100 shadow-sm border-0">
-                      <img src={img} alt={title} className="card-img-top" style={{ height: 180, objectFit: 'cover', backgroundColor: '#e5e7eb' }} />
-                      <div className="card-body">
-                        <div className="fw-semibold mb-2" style={{ fontSize: 16, color: '#111827' }}>{title}</div>
-                        <div className="d-flex gap-2 mb-2 flex-wrap">
+                    <div className="blog-card h-100">
+                      <div className="blog-img-wrapper position-relative">
+                        <img
+                          src={img}
+                          alt={title}
+                          style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
+                          onError={(e) => {
+                            if (!e.target.dataset.fallback) {
+                              e.target.dataset.fallback = 'true';
+                              e.target.src = '/default-events.jpg';
+                            }
+                          }}
+                        />
+                        {/* Button Xem chi tiết */}
+                        <button
+                          className="position-absolute btn btn-light border soft-btn-top-right"
+                          style={{ top: 12, right: 12, zIndex: 2, fontSize: 14, fontWeight: 500 }}
+                          onClick={(e) => { e.preventDefault(); }}
+                        >
+                          Xem chi tiết
+                        </button>
+                        {/* Image count indicator */}
+                        {images.length > 1 && (
+                          <div className="position-absolute" style={{ top: 12, left: 12, zIndex: 1 }}>
+                            <span className="badge bg-dark bg-opacity-75 text-white">
+                              <i className="bi bi-images me-1"></i>
+                              {images.length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="blog-body">
+                        <div className="blog-title">{title}</div>
+                        <div className="blog-meta">
                           {event.status ? (
-                            <span className={`event-chip chip-status-${event.status}`}>
+                            <span className={`badge-soft chip-status-${event.status}`}>
                               <i className="bi bi-lightning-charge-fill me-1" />
                               {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
                             </span>
                           ) : null}
+                        </div>
+                        {event.description && (
+                          <div className="event-desc mt-2">{event.description}</div>
+                        )}
+                        {/* Location và Date info */}
+                        <div className="pt-2 pb-2 mt-auto">
                           {event.location && (
-                            <span className="event-chip chip-location">
-                              <i className="bi bi-geo-alt me-1" />{event.location}
-                            </span>
+                            <div style={{ fontSize: '14px' }} className="d-flex align-items-center">
+                              <i className="bi bi-geo-alt me-2 text-danger" style={{ fontSize: '12px', width: '12px' }} />
+                              <small className="text-muted fw-medium text-truncate">{event.location}</small>
+                            </div>
                           )}
-                          {event.eventStartDate && event.eventEndDate ? (
-                            <span className="event-chip chip-date">
-                              <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
-                            </span>
-                          ) : event.eventDate ? (
-                            <span className="event-chip chip-date">
-                              <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventDate)}
-                            </span>
-                          ) : null}
+                          {event.eventStartDate && event.eventEndDate && (
+                            <div style={{ fontSize: '14px' }} className="d-flex align-items-center">
+                              <i className="bi bi-calendar-event me-2 text-danger" style={{ fontSize: '12px', width: '12px' }} />
+                              <small className="text-muted fw-medium text-truncate">
+                                {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
+                              </small>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -185,8 +220,8 @@ export default function EventsPage() {
                   className="btn"
                   style={{
                     width: 44, height: 44, borderRadius: 12,
-                    border: '1px solid ' + (n === currentPage ? '#f97316' : '#e5e7eb'),
-                    background: n === currentPage ? '#f97316' : '#fff',
+                    border: '1px solid ' + (n === currentPage ? '#EF4444' : '#e5e7eb'),
+                    background: n === currentPage ? '#EF4444' : '#fff',
                     color: n === currentPage ? '#fff' : '#111827', padding: 0
                   }}
                 >
@@ -209,13 +244,29 @@ export default function EventsPage() {
 
       <Footer />
       <style>{`
-  .event-chip { border-radius:999px; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; }
+  .blog-card { border-radius:16px; overflow:hidden; border:1px solid #E5E7EB; background:#fff; transition:transform .2s, box-shadow .2s; box-shadow:0 8px 24px rgba(0, 0, 0, 0.04) }
+  .blog-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(0, 0, 0, 0.08); }
+  .blog-img-wrapper { height:160px; background:#f3f4f6; overflow:hidden; }
+  .blog-img-wrapper img { width:100%; height:100%; object-fit:cover; }
+  .blog-body { padding:16px; }
+  .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; }
+  .blog-meta { display:flex; flex-wrap:wrap; gap:6px; color:#6B7280; font-size:12px; }
+  .event-desc {
+    color:#6B7280;
+    font-size:14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge-soft { border-radius:999px; padding:6px 10px; font-size:12px; border:1px solid #E5E7EB; background:#F9FAFB; color:#374151; display:inline-flex; align-items:center; }
+  .soft-btn-top-right{box-shadow:0 2px 6px rgba(0,0,0,0.04);transition:.1s;border-radius:8px;padding:6px 15px;}
+  .soft-btn-top-right:hover{background:#fee2e2 !important;color:#dc2626 !important;border:1px solid #dc2626;}
   .chip-status-scheduled { background:#dcfce7 !important; color:#22c55e !important; border:1px solid #bbf7d0; }
   .chip-status-ongoing   { background:#fff7ed !important; color:#f59e42 !important; border:1px solid #fed7aa; }
   .chip-status-completed { background:#f3f4f6 !important; color:#6b7280 !important; border:1px solid #e5e7eb; }
   .chip-status-cancelled { background:#fef2f2 !important; color:#dc2626 !important; border:1px solid #fecaca; }
-  .chip-date             { background:#eff6ff !important; color:#2563eb !important; border:1px solid #bae6fd; }
-  .chip-location         { background:#f3e8ff !important; color:#9333ea !important; border:1px solid #e9d5ff; }
 `}</style>
     </>
   )

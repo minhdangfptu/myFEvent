@@ -16,7 +16,6 @@
     "start": "node --no-warnings ./build/server.js",
     "production": "npm run build && npm run start",
     "dev": "nodemon --no-warnings ./server.js",
-    "send:test-mail": "node ./sendTestMail.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

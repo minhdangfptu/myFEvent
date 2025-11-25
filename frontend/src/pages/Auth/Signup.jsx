@@ -18,6 +18,8 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // FE password validation
   const validatePassword = (password) => {
@@ -164,16 +166,28 @@ export default function SignupPage() {
 
               <div className="mb-3">
                 <label className="form-label">Mật khẩu</label>
-                <input
-                  className="form-control"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="Nhập mật khẩu"
-                  required
-                  disabled={loading}
-                />
+                <div className="position-relative">
+                  <input
+                    className="form-control"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="Nhập mật khẩu"
+                    required
+                    disabled={loading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
                 {passwordError && (
                   <small className="text-danger">{passwordError}</small>
                 )}
@@ -181,16 +195,28 @@ export default function SignupPage() {
 
               <div className="mb-3">
                 <label className="form-label">Xác nhận mật khẩu</label>
-                <input
-                  className="form-control"
-                  name="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  placeholder="Nhập lại mật khẩu"
-                  required
-                  disabled={loading}
-                />
+                <div className="position-relative">
+                  <input
+                    className="form-control"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    placeholder="Nhập lại mật khẩu"
+                    required
+                    disabled={loading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-danger w-100 mb-3" disabled={loading}>

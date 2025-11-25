@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { eventApi } from "../apis/eventApi";
+import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
+import Loading from "./Loading";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -77,10 +77,13 @@ export default function MemberSidebar({
 
   // Sử dụng eventId từ props thay vì lấy từ URL
   const { events, loading } = useEvents();
-  const event = events.find(e => (e._id || e.id) === eventId);
+  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
   const hasEvents = !!event;
   const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
 
@@ -235,8 +238,8 @@ export default function MemberSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div
@@ -309,6 +312,26 @@ export default function MemberSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content pt-0">
+        {showLoading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+            }}
+          >
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : (
+        <>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
           <div className="d-flex flex-column gap-1">
@@ -712,6 +735,8 @@ export default function MemberSidebar({
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Theme toggle hoặc Expand button */}

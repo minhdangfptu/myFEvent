@@ -35,7 +35,7 @@ const genJoinCode = async () => {
 
 export const eventService = {
   // GET /api/events/public
-  async listPublicEvents({ page = 1, limit = 12, search = '', status = '' }) {
+  async listPublicEvents({ page = 1, limit = 8, search = '', status = '' }) {
     const p = Math.max(parseInt(page, 10), 1);
     const lim = Math.min(Math.max(parseInt(limit, 10), 1), 100);
     const skip = (p - 1) * lim;
@@ -230,22 +230,52 @@ export const eventService = {
   },
 
   // GET /api/events/me/list
-  async listMyEvents({ userId }) {
-    // Tối ưu: Bỏ populate userId vì không cần thiết, chỉ cần role và eventId
-    const memberships = await EventMember.find({ userId, status: { $ne: 'deactive' } })
+  async listMyEvents({ userId, page = 1, limit = 8, search = '' }) {
+    const p = Math.max(parseInt(page, 10) || 1, 1);
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const skip = (p - 1) * lim;
+
+    // Nếu có search, cần tìm events trước rồi filter memberships
+    let eventIdsFilter = null;
+    if (search && search.trim()) {
+      const matchingEvents = await Event.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id').lean();
+      eventIdsFilter = matchingEvents.map(e => e._id);
+    }
+
+    // Build membership filter
+    const memberFilter = { userId, status: { $ne: 'deactive' } };
+    if (eventIdsFilter !== null) {
+      memberFilter.eventId = { $in: eventIdsFilter };
+    }
+
+    // Đếm tổng số memberships (có filter theo search nếu có)
+    const total = await EventMember.countDocuments(memberFilter);
+
+    if (total === 0) {
+      return {
+        data: [],
+        pagination: { page: p, limit: lim, total: 0, totalPages: 0 }
+      };
+    }
+
+    // Lấy memberships với phân trang
+    const memberships = await EventMember.find(memberFilter)
       .select('eventId role _id')
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
       .lean();
-
-    if (memberships.length === 0) {
-      return { data: [] };
-    }
 
     const eventIds = memberships.map((m) => m.eventId);
 
     // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventStartDate eventEndDate joinCode image type description location organizerName')
+      .select('name status eventStartDate eventEndDate image description location')
       .lean();
 
     // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
@@ -284,7 +314,15 @@ export const eventService = {
       };
     });
 
-    return { data: eventsWithMembership };
+    return {
+      data: eventsWithMembership,
+      pagination: {
+        page: p,
+        limit: lim,
+        total,
+        totalPages: Math.ceil(total / lim)
+      }
+    };
   },
 
   // PATCH /api/events/:id

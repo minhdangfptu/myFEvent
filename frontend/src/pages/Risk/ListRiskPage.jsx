@@ -7,6 +7,7 @@ import { riskApiWithErrorHandling } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
+import Loading from "../../components/Loading";
 
 export default function ListRiskPage() {
   const { t } = useTranslation();
@@ -51,6 +52,7 @@ export default function ListRiskPage() {
   const [submitting, setSubmitting] = useState(false);
   const [newRisk, setNewRisk] = useState({
     name: "",
+    scope: "department",
     departmentId: "",
     risk_category: "others",
     impact: "medium",
@@ -118,7 +120,8 @@ export default function ListRiskPage() {
   const transformApiRiskToComponent = (apiRisk) => ({
     id: apiRisk._id,
     name: apiRisk.name,
-    owner: apiRisk.departmentId?.name || "Chưa phân công",
+    scope: apiRisk.scope || "department",
+    owner: apiRisk.scope === "event" || !apiRisk.departmentId ? "Toàn BTC" : (apiRisk.departmentId?.name || "Chưa phân công"),
     ownerId: apiRisk.departmentId?._id,
     status: getDisplayStatus(apiRisk),
     statusKey: apiRisk.risk_status,
@@ -328,12 +331,19 @@ export default function ListRiskPage() {
   }, [eventId]);
 
   const createRisk = async () => {
-    if (
-      !newRisk.name ||
-      !newRisk.risk_mitigation_plan ||
-      !newRisk.departmentId
-    ) {
-      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+    // Check required fields
+    const missingFields = [];
+    if (!newRisk.name) missingFields.push("tên rủi ro");
+    if (!newRisk.risk_mitigation_plan) missingFields.push("kế hoạch giảm thiểu");
+    if (!newRisk.risk_response_plan) missingFields.push("kế hoạch ứng phó");
+
+    // Only require departmentId when scope is "department"
+    if (newRisk.scope === "department" && !newRisk.departmentId) {
+      missingFields.push("ban phụ trách");
+    }
+
+    if (missingFields.length > 0) {
+      toast.error(`Vui lòng điền đầy đủ thông tin cho: ${missingFields.join(", ")}`);
       return;
     }
 
@@ -349,6 +359,7 @@ export default function ListRiskPage() {
         setShowAddModal(false);
         setNewRisk({
           name: "",
+          scope: "department",
           departmentId: departments.length > 0 ? departments[0]._id : "",
           risk_category: "others",
           impact: "medium",
@@ -421,6 +432,7 @@ export default function ListRiskPage() {
     setShowAddModal(false);
     setNewRisk({
       name: "",
+      scope: "department",
       departmentId: departments.length > 0 ? departments[0]._id : "",
       risk_category: "others",
       impact: "medium",
@@ -968,8 +980,7 @@ export default function ListRiskPage() {
                 {loading ? (
                   <tr>
                     <td colSpan="6" className="text-center py-5">
-                      <div className="loading-spinner"></div>
-                      <div className="mt-2 text-muted">Đang tải...</div>
+                      <Loading />
                     </td>
                   </tr>
                 ) : risks.length === 0 ? (
@@ -1172,16 +1183,37 @@ export default function ListRiskPage() {
               <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Ban phụ trách *</label>
+                    <label>Phạm vi rủi ro *</label>
+                    <select
+                      className="form-select"
+                      value={newRisk.scope}
+                      onChange={(e) => {
+                        const newScope = e.target.value;
+                        setNewRisk({
+                          ...newRisk,
+                          scope: newScope,
+                          // Clear departmentId if scope changes to event
+                          departmentId: newScope === "event" ? "" : newRisk.departmentId
+                        });
+                      }}
+                    >
+                      <option value="department">Theo ban</option>
+                      <option value="event">Toàn BTC</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Ban phụ trách {newRisk.scope === "department" ? "*" : ""}</label>
                     <select
                       className="form-select"
                       value={newRisk.departmentId}
                       onChange={(e) =>
                         setNewRisk({ ...newRisk, departmentId: e.target.value })
                       }
-                      disabled={loadingDepartments}
+                      disabled={loadingDepartments || newRisk.scope === "event"}
                     >
-                      <option value="">Chọn ban phụ trách</option>
+                      <option value="">{newRisk.scope === "event" ? "Không áp dụng" : "Chọn ban phụ trách"}</option>
                       {departments.map((dept) => (
                         <option key={dept._id} value={dept._id}>
                           {dept.name}
@@ -1193,8 +1225,16 @@ export default function ListRiskPage() {
                         Đang tải danh sách ban...
                       </small>
                     )}
+                    {newRisk.scope === "event" && (
+                      <small className="text-muted">
+                        Rủi ro này áp dụng cho toàn bộ BTC
+                      </small>
+                    )}
                   </div>
                 </div>
+              </div>
+
+              <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>Danh mục</label>
@@ -1272,7 +1312,7 @@ export default function ListRiskPage() {
               </div>
 
               <div className="form-group">
-                <label>Kế hoạch ứng phó</label>
+                <label>Kế hoạch ứng phó *</label>
                 <textarea
                   className="form-control"
                   rows={4}
@@ -1308,7 +1348,7 @@ export default function ListRiskPage() {
               <button
                 className="btn btn-primary"
                 onClick={createRisk}
-                disabled={submitting || !newRisk.departmentId}
+                disabled={submitting || (newRisk.scope === "department" && !newRisk.departmentId)}
               >
                 {submitting ? (
                   <>

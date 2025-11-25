@@ -104,3 +104,30 @@ export const getCalendarById = async (calendarId) => {
         })
         .lean();
 };
+
+
+export const addParticipantsToCalendar = async (calendarId, newParticipants) => {
+  const calendar = await Calendar.findById(calendarId);
+  if (!calendar) return null;
+  
+  calendar.participants.push(...newParticipants);
+  await calendar.save();
+  
+  return calendar;
+};
+
+export const removeParticipantFromCalendar = async (calendarId, memberId) => {
+  const calendar = await Calendar.findById(calendarId);
+  if (!calendar) return null;
+  
+  const participantIndex = calendar.participants.findIndex(
+    p => p.member.toString() === memberId
+  );
+  
+  if (participantIndex === -1) return null;
+  
+  calendar.participants.splice(participantIndex, 1);
+  await calendar.save();
+  
+  return calendar;
+};

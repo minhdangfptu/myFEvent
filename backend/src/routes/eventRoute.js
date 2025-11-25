@@ -28,6 +28,10 @@ router.use('/:eventId/exports', exportRoute );
 
 // Public events
 router.get('/public', listPublicEvents);
+
+// Events joined by current user    
+router.get('/me/list', authenticateToken, listMyEvents);
+
 router.get('/:id', getPublicEventDetail);
 
 // Private event detail (authenticated users) - TẠM THỜI BỎ PHÂN QUYỀN
@@ -44,9 +48,6 @@ router.post('/join', authenticateToken, joinEventByCode);
 
 // Event summary
 router.get('/:id/summary', authenticateToken, getEventSummary);
-
-// Events joined by current user
-router.get('/me/list', authenticateToken, listMyEvents);
 
 // Event management
 router.patch('/:id', authenticateToken, updateEvent);
