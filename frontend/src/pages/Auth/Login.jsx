@@ -8,7 +8,7 @@ import { authApi } from "../../apis/authApi";
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithGoogle, user } = useAuth();
+  const { login, loginWithGoogle, user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +22,17 @@ export default function LoginPage() {
       setInfo("Tài khoản của bạn đã được xác minh. Hãy đăng nhập.");
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      const from = location.state?.from?.pathname || "/home-page";
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
+  }, [isAuthenticated, authLoading, navigate, location.state, user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
