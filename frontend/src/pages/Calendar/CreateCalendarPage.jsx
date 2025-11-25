@@ -60,7 +60,10 @@ export default function CreateEventCalendarPage() {
     const { fetchEventRole } = useEvents();
     const [eventRole, setEventRole] = useState("");
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-
+    const todayISODate = useMemo(
+        () => new Date().toISOString().split("T")[0],
+        []
+    );
     useEffect(() => {
         let mounted = true
         const loadRole = async () => {
@@ -309,103 +312,142 @@ export default function CreateEventCalendarPage() {
                         Tạo cuộc họp mới
                     </h1>
 
-                        {error && (
+                    {error && (
+                        <div style={{
+                            backgroundColor: "#fee2e2",
+                            color: "#991b1b",
+                            padding: "12px 16px",
+                            borderRadius: "8px",
+                            marginBottom: "24px",
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px"
+                        }}>
+                            <span>⚠️</span>
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit}>
+                        {/* Grid 3 cột */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+
+                            {/* Box 1: Tên và Địa điểm */}
                             <div style={{
-                                backgroundColor: "#fee2e2",
-                                color: "#991b1b",
-                                padding: "12px 16px",
+                                border: "1px solid #e5e7eb",
                                 borderRadius: "8px",
-                                marginBottom: "24px",
-                                fontSize: "14px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px"
+                                padding: "20px",
+                                backgroundColor: "white"
                             }}>
-                                <span>⚠️</span>
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
-                            {/* Grid 3 cột */}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
-
-                                {/* Box 1: Tên và Địa điểm */}
-                                <div style={{
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "8px",
-                                    padding: "20px",
-                                    backgroundColor: "white"
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a"
                                 }}>
-                                    <label style={{
-                                        display: "block",
-                                        marginBottom: "16px",
-                                        fontSize: "15px",
-                                        fontWeight: "600",
-                                        color: "#1a1a1a"
-                                    }}>
-                                        Tên cuộc họp
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleChange}
-                                        placeholder="Nhập tên cuộc họp"
-                                        style={{
-                                            width: "100%",
-                                            padding: "10px 12px",
-                                            fontSize: "14px",
-                                            border: "1px solid #d1d5db",
-                                            borderRadius: "6px",
-                                            outline: "none",
-                                            backgroundColor: "white"
-                                        }}
-                                        onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                        onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                    />
-                                    <label style={{
-                                        display: "block",
-                                        marginBottom: "16px",
-                                        fontSize: "15px",
-                                        fontWeight: "600",
-                                        color: "#1a1a1a",
-                                        paddingTop: "20px"
-                                    }}>
-                                        Địa điểm
-                                    </label>
+                                    Tên cuộc họp
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    placeholder="Nhập tên cuộc họp"
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px 12px",
+                                        fontSize: "14px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        outline: "none",
+                                        backgroundColor: "white"
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                    onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                />
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a",
+                                    paddingTop: "20px"
+                                }}>
+                                    Địa điểm
+                                </label>
 
-                                    <div style={{ marginBottom: "12px", display: "flex", gap: "20px" }}>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                                            <input
-                                                type="radio"
-                                                name="locationType"
-                                                value="online"
-                                                checked={formData.locationType === "online"}
-                                                onChange={handleChange}
-                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                            />
-                                            <span style={{ fontSize: "14px", color: "#374151" }}>Online</span>
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                                            <input
-                                                type="radio"
-                                                name="locationType"
-                                                value="offline"
-                                                checked={formData.locationType === "offline"}
-                                                onChange={handleChange}
-                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                            />
-                                            <span style={{ fontSize: "14px", color: "#374151" }}>Offline</span>
-                                        </label>
-                                    </div>
+                                <div style={{ marginBottom: "12px", display: "flex", gap: "20px" }}>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="locationType"
+                                            value="online"
+                                            checked={formData.locationType === "online"}
+                                            onChange={handleChange}
+                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                        />
+                                        <span style={{ fontSize: "14px", color: "#374151" }}>Online</span>
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="locationType"
+                                            value="offline"
+                                            checked={formData.locationType === "offline"}
+                                            onChange={handleChange}
+                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                        />
+                                        <span style={{ fontSize: "14px", color: "#374151" }}>Offline</span>
+                                    </label>
+                                </div>
 
+                                <input
+                                    type="text"
+                                    name="location"
+                                    value={formData.location}
+                                    onChange={handleChange}
+                                    placeholder="Nhập địa điểm/link cuộc họp"
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px 12px",
+                                        fontSize: "14px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        outline: "none",
+                                        backgroundColor: "white"
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                    onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                />
+                            </div>
+
+                            {/* Box 2: Thời gian */}
+                            <div style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                backgroundColor: "white"
+                            }}>
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a"
+                                }}>
+                                    Thời gian
+                                </label>
+
+                                <div style={{ marginBottom: "12px" }}>
+                                    <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Ngày họp</div>
                                     <input
-                                        type="text"
-                                        name="location"
-                                        value={formData.location}
+                                        type="date"
+                                        name="meetingDate"
+                                        value={formData.meetingDate}
                                         onChange={handleChange}
-                                        placeholder="Nhập địa điểm/link cuộc họp"
+                                        min={todayISODate}
                                         style={{
                                             width: "100%",
                                             padding: "10px 12px",
@@ -420,31 +462,14 @@ export default function CreateEventCalendarPage() {
                                     />
                                 </div>
 
-                                {/* Box 2: Thời gian */}
-                                <div style={{
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "8px",
-                                    padding: "20px",
-                                    backgroundColor: "white"
-                                }}>
-                                    <label style={{
-                                        display: "block",
-                                        marginBottom: "16px",
-                                        fontSize: "15px",
-                                        fontWeight: "600",
-                                        color: "#1a1a1a"
-                                    }}>
-                                        Thời gian
-                                    </label>
-
-                                    <div style={{ marginBottom: "12px" }}>
-                                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Ngày họp</div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "8px" }}>
+                                    <div>
+                                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Giờ bắt đầu</div>
                                         <input
-                                            type="date"
-                                            name="meetingDate"
-                                            value={formData.meetingDate}
+                                            type="time"
+                                            name="startTime"
+                                            value={formData.startTime}
                                             onChange={handleChange}
-                                            min={todayISODate}
                                             style={{
                                                 width: "100%",
                                                 padding: "10px 12px",
@@ -458,209 +483,41 @@ export default function CreateEventCalendarPage() {
                                             onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
                                         />
                                     </div>
-
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "8px" }}>
-                                        <div>
-                                            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Giờ bắt đầu</div>
-                                            <input
-                                                type="time"
-                                                name="startTime"
-                                                value={formData.startTime}
-                                                onChange={handleChange}
-                                                style={{
-                                                    width: "100%",
-                                                    padding: "10px 12px",
-                                                    fontSize: "14px",
-                                                    border: "1px solid #d1d5db",
-                                                    borderRadius: "6px",
-                                                    outline: "none",
-                                                    backgroundColor: "white"
-                                                }}
-                                                onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                                onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                            />
-                                        </div>
-                                        <div>
-                                            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Giờ kết thúc</div>
-                                            <input
-                                                type="time"
-                                                name="endTime"
-                                                value={formData.endTime}
-                                                onChange={handleChange}
-                                                style={{
-                                                    width: "100%",
-                                                    padding: "10px 12px",
-                                                    fontSize: "14px",
-                                                    border: "1px solid #d1d5db",
-                                                    borderRadius: "6px",
-                                                    outline: "none",
-                                                    backgroundColor: "white"
-                                                }}
-                                                onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                                onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                            />
-                                        </div>
+                                    <div>
+                                        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>Giờ kết thúc</div>
+                                        <input
+                                            type="time"
+                                            name="endTime"
+                                            value={formData.endTime}
+                                            onChange={handleChange}
+                                            style={{
+                                                width: "100%",
+                                                padding: "10px 12px",
+                                                fontSize: "14px",
+                                                border: "1px solid #d1d5db",
+                                                borderRadius: "6px",
+                                                outline: "none",
+                                                backgroundColor: "white"
+                                            }}
+                                            onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                        />
                                     </div>
-
-                                    {calculateDuration() && (
-                                        <div style={{
-                                            fontSize: "12px",
-                                            color: "#6b7280",
-                                            marginTop: "4px"
-                                        }}>
-                                            {calculateDuration()}
-                                        </div>
-                                    )}
                                 </div>
 
-                                {/* Box 3: Đối tượng tham gia */}
-                                {eventRole === "HoOC" && (
+                                {calculateDuration() && (
                                     <div style={{
-                                        border: "1px solid #e5e7eb",
-                                        borderRadius: "8px",
-                                        padding: "20px",
-                                        backgroundColor: "white"
+                                        fontSize: "12px",
+                                        color: "#6b7280",
+                                        marginTop: "4px"
                                     }}>
-                                        <label style={{
-                                            display: "block",
-                                            marginBottom: "16px",
-                                            fontSize: "15px",
-                                            fontWeight: "600",
-                                            color: "#1a1a1a"
-                                        }}>
-                                            Đối tượng tham gia
-                                        </label>
-
-                                        {/* Radio buttons cho 3 options */}
-                                        <div style={{ marginBottom: "12px" }}>
-                                            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
-                                                <input
-                                                    type="radio"
-                                                    checked={formData.participantType === "all"}
-                                                    onChange={() => handleParticipantTypeChange("all")}
-                                                    style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                                />
-                                                <span style={{ fontSize: "14px", color: "#374151" }}>Toàn bộ thành viên BTC</span>
-                                            </label>
-
-                                            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
-                                                <input
-                                                    type="radio"
-                                                    checked={formData.participantType === "departments"}
-                                                    onChange={() => handleParticipantTypeChange("departments")}
-                                                    style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                                />
-                                                <span style={{ fontSize: "14px", color: "#374151" }}>Chọn ban</span>
-                                            </label>
-
-                                            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                                                <input
-                                                    type="radio"
-                                                    checked={formData.participantType === "coreteam"}
-                                                    onChange={() => handleParticipantTypeChange("coreteam")}
-                                                    style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                                />
-                                                <span style={{ fontSize: "14px", color: "#374151" }}>Họp riêng Core Team</span>
-                                            </label>
-                                        </div>
-
-                                        {/* Hiện danh sách ban khi chọn "Chọn ban" */}
-                                        {formData.participantType === "departments" && (
-                                            <div style={{
-                                                marginTop: "12px",
-                                                padding: "12px",
-                                                border: "1px solid #e5e7eb",
-                                                borderRadius: "6px",
-                                                maxHeight: "200px",
-                                                overflowY: "auto"
-                                            }}>
-                                                {loadingData ? (
-                                                    <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
-                                                        Đang tải...
-                                                    </div>
-                                                ) : departmentsList.length === 0 ? (
-                                                    <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
-                                                        Không có ban nào
-                                                    </div>
-                                                ) : (
-                                                    departmentsList.map(dept => (
-                                                        <label
-                                                            key={dept._id || dept.id}
-                                                            style={{
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                gap: "8px",
-                                                                padding: "6px 0",
-                                                                cursor: "pointer"
-                                                            }}
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={formData.selectedDepartments.includes(dept._id || dept.id)}
-                                                                onChange={() => handleDepartmentToggle(dept._id || dept.id)}
-                                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                                            />
-                                                            <span style={{ fontSize: "13px", color: "#374151" }}>
-                                                                {dept.name || dept.departmentName}
-                                                            </span>
-                                                        </label>
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Hiện danh sách core team khi chọn "Core Team" */}
-                                        {formData.participantType === "coreteam" && (
-                                            <div style={{
-                                                marginTop: "12px",
-                                                padding: "12px",
-                                                border: "1px solid #e5e7eb",
-                                                borderRadius: "6px",
-                                                maxHeight: "200px",
-                                                overflowY: "auto"
-                                            }}>
-                                                {loadingData ? (
-                                                    <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
-                                                        Đang tải...
-                                                    </div>
-                                                ) : coreTeamList.length === 0 ? (
-                                                    <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
-                                                        Không có thành viên core team
-                                                    </div>
-                                                ) : (
-                                                    coreTeamList.map(member => (
-                                                        <label
-                                                            key={member._id}
-                                                            style={{
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                gap: "8px",
-                                                                padding: "6px 0",
-                                                                cursor: "pointer"
-                                                            }}
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={formData.selectedCoreTeam.includes(member._id || member.id)}
-                                                                onChange={() => handleCoreTeamToggle(member._id || member.id)}
-                                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
-                                                            />
-                                                            <span style={{ fontSize: "13px", color: "#374151" }}>
-                                                                {member.userId.fullName}
-                                                            </span>
-                                                        </label>
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
+                                        {calculateDuration()}
                                     </div>
                                 )}
                             </div>
 
-                            {/* Grid 2 cột - Ghi chú và Tệp đính kèm */}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
-
-                                {/* Box 4: Ghi chú cuộc họp */}
+                            {/* Box 3: Đối tượng tham gia */}
+                            {eventRole === "HoOC" && (
                                 <div style={{
                                     border: "1px solid #e5e7eb",
                                     borderRadius: "8px",
@@ -674,31 +531,177 @@ export default function CreateEventCalendarPage() {
                                         fontWeight: "600",
                                         color: "#1a1a1a"
                                     }}>
-                                        Ghi chú cuộc họp
+                                        Đối tượng tham gia
                                     </label>
-                                    <textarea
-                                        name="notes"
-                                        value={formData.notes}
-                                        onChange={handleChange}
-                                        placeholder="Nhập nội dung ghi chú, chương trình nghị sự..."
-                                        rows={6}
-                                        style={{
-                                            width: "100%",
+
+                                    {/* Radio buttons cho 3 options */}
+                                    <div style={{ marginBottom: "12px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "all"}
+                                                onChange={() => handleParticipantTypeChange("all")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Toàn bộ thành viên BTC</span>
+                                        </label>
+
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: "8px" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "departments"}
+                                                onChange={() => handleParticipantTypeChange("departments")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Chọn ban</span>
+                                        </label>
+
+                                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                                            <input
+                                                type="radio"
+                                                checked={formData.participantType === "coreteam"}
+                                                onChange={() => handleParticipantTypeChange("coreteam")}
+                                                style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                            />
+                                            <span style={{ fontSize: "14px", color: "#374151" }}>Họp riêng Core Team</span>
+                                        </label>
+                                    </div>
+
+                                    {/* Hiện danh sách ban khi chọn "Chọn ban" */}
+                                    {formData.participantType === "departments" && (
+                                        <div style={{
+                                            marginTop: "12px",
                                             padding: "12px",
-                                            fontSize: "14px",
-                                            border: "1px solid #d1d5db",
+                                            border: "1px solid #e5e7eb",
                                             borderRadius: "6px",
-                                            outline: "none",
-                                            resize: "vertical",
-                                            fontFamily: "inherit",
-                                            lineHeight: "1.6",
-                                            backgroundColor: "white",
-                                            minHeight: "160px"
-                                        }}
-                                        onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                        onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                    />
+                                            maxHeight: "200px",
+                                            overflowY: "auto"
+                                        }}>
+                                            {loadingData ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Đang tải...
+                                                </div>
+                                            ) : departmentsList.length === 0 ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Không có ban nào
+                                                </div>
+                                            ) : (
+                                                departmentsList.map(dept => (
+                                                    <label
+                                                        key={dept._id || dept.id}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "8px",
+                                                            padding: "6px 0",
+                                                            cursor: "pointer"
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.selectedDepartments.includes(dept._id || dept.id)}
+                                                            onChange={() => handleDepartmentToggle(dept._id || dept.id)}
+                                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                                        />
+                                                        <span style={{ fontSize: "13px", color: "#374151" }}>
+                                                            {dept.name || dept.departmentName}
+                                                        </span>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Hiện danh sách core team khi chọn "Core Team" */}
+                                    {formData.participantType === "coreteam" && (
+                                        <div style={{
+                                            marginTop: "12px",
+                                            padding: "12px",
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: "6px",
+                                            maxHeight: "200px",
+                                            overflowY: "auto"
+                                        }}>
+                                            {loadingData ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Đang tải...
+                                                </div>
+                                            ) : coreTeamList.length === 0 ? (
+                                                <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+                                                    Không có thành viên core team
+                                                </div>
+                                            ) : (
+                                                coreTeamList.map(member => (
+                                                    <label
+                                                        key={member._id}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "8px",
+                                                            padding: "6px 0",
+                                                            cursor: "pointer"
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.selectedCoreTeam.includes(member._id || member.id)}
+                                                            onChange={() => handleCoreTeamToggle(member._id || member.id)}
+                                                            style={{ width: "16px", height: "16px", accentColor: "#3b82f6", cursor: "pointer" }}
+                                                        />
+                                                        <span style={{ fontSize: "13px", color: "#374151" }}>
+                                                            {member.userId.fullName}
+                                                        </span>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Grid 2 cột - Ghi chú và Tệp đính kèm */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+
+                            {/* Box 4: Ghi chú cuộc họp */}
+                            <div style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                backgroundColor: "white"
+                            }}>
+                                <label style={{
+                                    display: "block",
+                                    marginBottom: "16px",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    color: "#1a1a1a"
+                                }}>
+                                    Ghi chú cuộc họp
+                                </label>
+                                <textarea
+                                    name="notes"
+                                    value={formData.notes}
+                                    onChange={handleChange}
+                                    placeholder="Nhập nội dung ghi chú, chương trình nghị sự..."
+                                    rows={6}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px",
+                                        fontSize: "14px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        outline: "none",
+                                        resize: "vertical",
+                                        fontFamily: "inherit",
+                                        lineHeight: "1.6",
+                                        backgroundColor: "white",
+                                        minHeight: "160px"
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                    onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                />
+                            </div>
 
                             {/* Box 5: Attachments */}
                             <div style={{
@@ -717,76 +720,76 @@ export default function CreateEventCalendarPage() {
                                     Link tài liệu cuộc họp <span style={{ color: "" }}>(vui lòng share quyền truy cập)</span>
                                 </label>
 
-                                    {formData.attachments?.map((attachment, index) => (
-                                        <div key={index} style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                            marginBottom: "10px"
-                                        }}>
-                                            <input
-                                                type="text"
-                                                value={attachment}
-                                                onChange={(e) => {
-                                                    const newAttachments = [...formData.attachments];
-                                                    newAttachments[index] = e.target.value;
-                                                    setFormData(prev => ({ ...prev, attachments: newAttachments }));
-                                                }}
-                                                placeholder="Nhập link tài liệu (Google Drive, Docs, v.v.)"
-                                                style={{
-                                                    flex: 1,
-                                                    padding: "10px 12px",
-                                                    fontSize: "14px",
-                                                    border: "1px solid #d1d5db",
-                                                    borderRadius: "6px",
-                                                    outline: "none",
-                                                    backgroundColor: "white"
-                                                }}
-                                                onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                                onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newAttachments = formData.attachments.filter((_, i) => i !== index);
-                                                    setFormData(prev => ({ ...prev, attachments: newAttachments }));
-                                                }}
-                                                style={{
-                                                    background: "transparent",
-                                                    border: "none",
-                                                    color: "#ef4444",
-                                                    cursor: "pointer",
-                                                    fontSize: "18px",
-                                                    padding: "4px 8px"
-                                                }}
-                                            >
-                                                🗑
-                                            </button>
-                                        </div>
-                                    ))}
+                                {formData.attachments?.map((attachment, index) => (
+                                    <div key={index} style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        marginBottom: "10px"
+                                    }}>
+                                        <input
+                                            type="text"
+                                            value={attachment}
+                                            onChange={(e) => {
+                                                const newAttachments = [...formData.attachments];
+                                                newAttachments[index] = e.target.value;
+                                                setFormData(prev => ({ ...prev, attachments: newAttachments }));
+                                            }}
+                                            placeholder="Nhập link tài liệu (Google Drive, Docs, v.v.)"
+                                            style={{
+                                                flex: 1,
+                                                padding: "10px 12px",
+                                                fontSize: "14px",
+                                                border: "1px solid #d1d5db",
+                                                borderRadius: "6px",
+                                                outline: "none",
+                                                backgroundColor: "white"
+                                            }}
+                                            onFocus={(e) => e.target.style.borderColor = "#4285f4"}
+                                            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newAttachments = formData.attachments.filter((_, i) => i !== index);
+                                                setFormData(prev => ({ ...prev, attachments: newAttachments }));
+                                            }}
+                                            style={{
+                                                background: "transparent",
+                                                border: "none",
+                                                color: "#ef4444",
+                                                cursor: "pointer",
+                                                fontSize: "18px",
+                                                padding: "4px 8px"
+                                            }}
+                                        >
+                                            🗑
+                                        </button>
+                                    </div>
+                                ))}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({
-                                            ...prev,
-                                            attachments: [...(prev.attachments || []), ""]
-                                        }))}
-                                        style={{
-                                            marginTop: "8px",
-                                            padding: "8px 16px",
-                                            backgroundColor: "#f3f4f6",
-                                            border: "1px solid #d1d5db",
-                                            borderRadius: "6px",
-                                            cursor: "pointer",
-                                            fontSize: "14px",
-                                            color: "#374151",
-                                            fontWeight: "500"
-                                        }}
-                                    >
-                                        ➕ Thêm link
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({
+                                        ...prev,
+                                        attachments: [...(prev.attachments || []), ""]
+                                    }))}
+                                    style={{
+                                        marginTop: "8px",
+                                        padding: "8px 16px",
+                                        backgroundColor: "#f3f4f6",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                        fontWeight: "500"
+                                    }}
+                                >
+                                    ➕ Thêm link
+                                </button>
                             </div>
+                        </div>
 
                         {/* Buttons */}
                         <div style={{

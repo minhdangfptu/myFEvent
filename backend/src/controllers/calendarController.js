@@ -5,6 +5,9 @@ import {
 	updateCalendar,
 	getCalendarById,
 	getCalendarsInEventScope,
+    addParticipantsToCalendar,
+    removeParticipantFromCalendar
+
 } from "../services/calendarService.js";
 import {
     findEventById
@@ -15,13 +18,59 @@ import {
 import {
     getRequesterMembership,
     getMembersByEventRaw,
-    getMembersByDepartmentRaw
+    getMembersByDepartmentRaw,
+    getEventMemberById,
+    getActiveEventMembers
+
 } from "../services/eventMemberService.js";
+import {
+    notifyMeetingReminder,
+    notifyRemovedFromCalendar,
+    notifyAddedToCalendar
+} from "../services/notificationService.js";
+
+const toIdString = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+        if (value._id) return value._id.toString();
+        if (typeof value.toString === 'function') return value.toString();
+    }
+    return null;
+};
+
+const resolveCalendarEventId = async (calendar) => {
+    if (!calendar) return { eventId: null, department: null };
+    if (calendar.eventId) {
+        return { eventId: calendar.eventId.toString(), department: null };
+    }
+    const departmentId = toIdString(calendar.departmentId);
+    if (!departmentId) return { eventId: null, department: null };
+    const department = await findDepartmentById(departmentId);
+    return { eventId: department?.eventId?.toString() || null, department };
+};
+
+const isCalendarCreator = (calendar, membershipId) => {
+    const creatorId = toIdString(calendar?.createdBy);
+    if (!creatorId || !membershipId) return false;
+    return creatorId === membershipId.toString();
+};
+
+const toParticipantMemberId = (participant) => {
+    const memberField = participant?.member;
+    if (!memberField) return null;
+    if (typeof memberField === 'string') return memberField;
+    if (typeof memberField === 'object') {
+        if (memberField._id) return memberField._id.toString();
+        if (typeof memberField.toString === 'function') return memberField.toString();
+    }
+    return null;
+};
 
 export const getCalendarsForEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const event = findEventById(eventId);
+        const event = await findEventById(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
@@ -59,7 +108,7 @@ export const createCalendarForEntity = async (req, res) => {
                 return res.status(404).json({ message: 'Event not found' });
             };
             const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            isHoOC = requesterMembership?.role === 'HoOC';
+            const isHoOC = requesterMembership?.role === 'HoOC';
             if (!isHoOC) {
                 return res.status(403).json({ message: 'Only HoOC can create calendar for event!' });
             }
@@ -72,7 +121,7 @@ export const createCalendarForEntity = async (req, res) => {
                 return res.status(404).json({ message: 'Department not found' });
             }
             const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId.toString() === entityId;
+            const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId.toString() === entityId;
             if (!isHoDOfDepartment) {
                 return res.status(403).json({ message: 'Only HoD of this department can create calendar for this department!' });
             }
@@ -441,7 +490,7 @@ export const updateCalendarForEvent = async (req, res) => {
 				return res.status(404).json({ message: 'Department not found' });
 			}
 			const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
-			isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
+			const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
 			ownerMemberid = requesterMembership?._id;
             if (!isHoDOfDepartment) {
                 return res.status(403).json({ message: 'Only HoD of this department can update calendar for this department!' });
@@ -752,4 +801,240 @@ export const getCalendarDetail = async (req, res) => {
     }
 }
 
-// deleteCalendar functionality reverted
+export const getAvailableMembers = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền quản lý người tham gia' });
+    }
+
+    const allMembers = await getActiveEventMembers(calendarEventId);
+    const currentMemberIds = new Set(
+      (calendar.participants || [])
+        .map(toParticipantMemberId)
+        .filter(Boolean)
+    );
+    const availableMembers = allMembers.filter(
+      member => !currentMemberIds.has(member._id.toString())
+    );
+
+    return res.status(200).json({
+      message: 'Lấy danh sách thành viên thành công',
+      data: availableMembers
+    });
+  } catch (error) {
+    console.error('Error in getAvailableMembers:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi lấy danh sách thành viên'
+    });
+  }
+};
+
+export const addParticipants = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+    const { memberIds } = req.body;
+
+    if (!Array.isArray(memberIds) || memberIds.length === 0) {
+      return res.status(400).json({
+        message: 'memberIds phải là array và không được rỗng'
+      });
+    }
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền thêm người tham gia' });
+    }
+
+    const existingMemberIds = new Set(
+      (calendar.participants || [])
+        .map(toParticipantMemberId)
+        .filter(Boolean)
+    );
+    const newMemberIds = memberIds
+      .map(id => id?.toString())
+      .filter(id => id && !existingMemberIds.has(id));
+
+    if (newMemberIds.length === 0) {
+      return res.status(400).json({
+        message: 'Tất cả thành viên đã có trong lịch họp'
+      });
+    }
+
+    const newParticipants = newMemberIds.map(memberId => ({
+      member: memberId,
+      participateStatus: 'unconfirmed',
+    }));
+
+    await addParticipantsToCalendar(calendarId, newParticipants);
+
+    await notifyAddedToCalendar(
+      eventId,
+      calendarId,
+      newMemberIds,
+      calendar.name
+    );
+
+    const updatedCalendar = await getCalendarById(calendarId);
+
+    return res.status(200).json({
+      message: `Đã thêm ${newMemberIds.length} người tham gia`,
+      data: updatedCalendar
+    });
+  } catch (error) {
+    console.error('Error in addParticipants:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi thêm người tham gia'
+    });
+  }
+};
+
+export const removeParticipant = async (req, res) => {
+  try {
+    const { eventId, calendarId, memberId } = req.params;
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa người tham gia' });
+    }
+
+    const creatorId = toIdString(calendar.createdBy);
+    if (creatorId === memberId) {
+      return res.status(400).json({
+        message: 'Không thể xóa người tạo cuộc họp'
+      });
+    }
+
+    const participantExists = (calendar.participants || []).some(
+      participant => toParticipantMemberId(participant) === memberId
+    );
+
+    if (!participantExists) {
+      return res.status(404).json({
+        message: 'Không tìm thấy người tham gia trong lịch họp'
+      });
+    }
+
+    const eventMember = await getEventMemberById(memberId);
+
+    await removeParticipantFromCalendar(calendarId, memberId);
+
+    if (eventMember && eventMember.userId) {
+      await notifyRemovedFromCalendar(
+        eventId,
+        calendarId,
+        toIdString(eventMember.userId),
+        calendar.name
+      );
+    }
+
+    const updatedCalendar = await getCalendarById(calendarId);
+
+    return res.status(200).json({
+      message: 'Đã xóa người tham gia',
+      data: updatedCalendar
+    });
+  } catch (error) {
+    console.error('Error in removeParticipant:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi xóa người tham gia'
+    });
+  }
+};
+
+export const sendReminder = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+    const { target } = req.body;
+
+    if (!['unconfirmed', 'all'].includes(target)) {
+      return res.status(400).json({
+        message: 'Target phải là "unconfirmed" hoặc "all"'
+      });
+    }
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền gửi nhắc nhở' });
+    }
+
+    let targetParticipants = calendar.participants || [];
+    if (target === 'unconfirmed') {
+      targetParticipants = targetParticipants.filter(
+        participant => participant.participateStatus === 'unconfirmed'
+      );
+    }
+
+    if (targetParticipants.length === 0) {
+      return res.status(400).json({
+        message: target === 'unconfirmed'
+          ? 'Không có người tham gia nào chưa phản hồi'
+          : 'Không có người tham gia nào'
+      });
+    }
+
+    await notifyMeetingReminder(
+      eventId,
+      calendarId,
+      targetParticipants,
+      calendar.name,
+      calendar.startAt
+    );
+
+    const targetText = target === 'all'
+      ? 'tất cả người tham gia'
+      : 'những người chưa phản hồi';
+
+    return res.status(200).json({
+      message: `Đã gửi nhắc nhở đến ${targetParticipants.length} ${targetText}`,
+      count: targetParticipants.length
+    });
+  } catch (error) {
+    console.error('Error in sendReminder:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi gửi nhắc nhở'
+    });
+  }
+};
