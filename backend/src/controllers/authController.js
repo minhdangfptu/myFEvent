@@ -116,7 +116,11 @@ export const signup = async (req, res) => {
       email
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    if (error.message && error.message.includes('email')) {
+      return res.status(500).json({ 
+        message: 'Failed to send verification email. Please check email configuration.'
+      });
+    }
     return res.status(500).json({ message: 'Failed to signup!' });
   }
 };

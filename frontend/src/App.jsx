@@ -6,6 +6,7 @@ import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { toast } from "react-toastify";
 import { WifiOff } from "lucide-react";
+import { useAuth } from "./contexts/AuthContext";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -148,6 +149,27 @@ function NetworkWarningOverlay({ isVisible, onClose }) {
   );
 }
 
+function RootRedirect() {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border" role="status" aria-hidden="true"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    if (user?.role === 'admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/home-page" replace />;
+  }
+
+  return <Navigate to="/landingpage" replace />;
+}
+
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
@@ -230,7 +252,7 @@ export default function App() {
               {/* Default Route */}
               <Route
                 path="/"
-                element={<Navigate to="/landingpage" replace />}
+                element={<RootRedirect />}
               />
 
               {/* Public Routes */}
