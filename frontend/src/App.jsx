@@ -104,14 +104,14 @@ export default function App() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
-        <ToastContainer position="top-right" autoClose={3000} />
+        <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
         <NotificationsProvider>
           <EventProvider>
             <Routes>
               {/* Default Route */}
               <Route
                 path="/"
-                element={<Navigate to="/landingpage" replace />}
+                element={<Navigate to="/home-page" replace />}
               />
 
               {/* Public Routes */}

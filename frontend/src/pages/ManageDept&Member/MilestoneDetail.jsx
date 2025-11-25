@@ -24,22 +24,6 @@ const MilestoneDetail = () => {
     fetchMilestoneDetail();
   }, [id]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Đã lên kế hoạch":
-        return "#3b82f6";
-      case "Đang thực hiện":
-        return "#f59e0b";
-      case "Đã hoàn thành":
-        return "#10b981";
-      case "Trễ hạn":
-        return "#dc2626";
-      case "Đã hủy":
-        return "#6b7280";
-      default:
-        return "#6b7280";
-    }
-  };
   // Load event role to decide sidebar and actions visibility
   useEffect(() => {
     let mounted = true;
@@ -87,38 +71,6 @@ const MilestoneDetail = () => {
         return "#dc2626";
       case "done":
         return "#10b981";
-      case "cancelled":
-        return "#6b7280";
-      default:
-        return "#6b7280";
-    }
-  };
-  const getMilestoneStatusLabel = (status) => {
-    switch (status) {
-      case "planned":
-        return "Sắp tới";
-      case "in_progress":
-        return "Đang làm";
-      case "completed":
-        return "Đã hoàn thành";
-      case "delayed":
-        return "Trễ hạn";
-      case "cancelled":
-        return "Đã hủy";
-      default:
-        return "Sắp tới";
-    }
-  };
-  const getMilestoneStatusColor = (status) => {
-    switch (status) {
-      case "planned":
-        return "#6b7280";
-      case "in_progress":
-        return "#f59e0b";
-      case "completed":
-        return "#10b981";
-      case "delayed":
-        return "#dc2626";
       case "cancelled":
         return "#6b7280";
       default:
@@ -216,23 +168,6 @@ const MilestoneDetail = () => {
                   {formatDate(milestone.date)}
                 </span>
               </div>
-
-              <div className="mb-3">
-                <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                  Trạng thái:{" "}
-                </span>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    backgroundColor: "#fef3c7",
-                    color: "#92400e",
-                    fontSize: "0.9rem",
-                    borderRadius: "20px",
-                  }}
-                >
-                  {getMilestoneStatusLabel(milestone.status)}
-                </span>
-              </div>
             </div>
           </div>
 
@@ -271,7 +206,7 @@ const MilestoneDetail = () => {
                 <span
                   className="badge px-3 py-2"
                   style={{
-                    backgroundColor: getStatusColor(task.status),
+                    backgroundColor: getTaskStatusColor(task.status),
                     color: "white",
                     fontSize: "0.9rem",
                     borderRadius: "20px",

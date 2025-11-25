@@ -170,7 +170,6 @@ export const deleteDepartment = async (req, res) => {
     }
     const department = await ensureDepartmentInEvent(eventId, departmentId);
     if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
-    // Kiểm tra quyền HooC
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     if (!requesterMembership || requesterMembership.role !== 'HooC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
