@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "~/contexts/EventContext";
+import { useAuth } from "~/contexts/AuthContext";
+import { toast } from "react-toastify";
 import Loading from "./Loading";
 
 export default function HoDSideBar({
@@ -9,10 +11,15 @@ export default function HoDSideBar({
   activePage = "home",
   eventId, // Nhận eventId qua props
 }) {
+  const STORAGE_KEY = 'sidebar_state_hod';
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize state với giá trị mặc định
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
-  const [overviewOpen, setOverviewOpen] = useState(false); // NEW: dropdown Tổng quan
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [theme, setTheme] = useState("light");
 
   // Hover popup (khi sidebar đóng)
@@ -21,12 +28,68 @@ export default function HoDSideBar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+        if (parsed.exportOpen !== undefined) {
+          setExportOpen(parsed.exportOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+      exportOpen,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportOpen]);
+
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
   // get context events (if needed) and loading flag
   const { events: ctxEvents, loading: ctxLoading } = useEvents();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -47,6 +110,7 @@ export default function HoDSideBar({
     return sortedList.map(e => ({
       id: e._id || e.id,
       name: e.name,
+      status: e.status,
       icon: "bi-calendar-event",
       membership: e.membership,
     }));
@@ -61,6 +125,7 @@ export default function HoDSideBar({
       setWorkOpen(false);
       setFinanceOpen(false);
       setOverviewOpen(false);
+      setExportOpen(false);
     }
   }, [sidebarOpen]);
 
@@ -92,25 +157,143 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: "/hod-dashboard" },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${selectedEvent || ''}/milestones` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/hod-tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
-    { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
-    { id: "work-stats", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
+    // { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
+    // { id: "work-stats", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hod-statistic` },
   ];
+  // Helper function để lấy userId từ user object hoặc localStorage
+  const getUserId = () => {
+    // Thử từ context trước
+    const userId = user?._id || user?.id || user?.userId?._id || user?.userId?.id;
+    if (userId) return userId;
+    
+    // Nếu không có trong context, thử từ localStorage
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        return parsedUser?._id || parsedUser?.id;
+      }
+    } catch (e) {
+      console.error("Error reading user from localStorage:", e);
+    }
+    
+    return null;
+  };
+
+  // Helper function để tìm department của user
+  const findUserDepartment = async (currentEventId, userId) => {
+    try {
+      const { departmentService } = await import("~/services/departmentService");
+      const departments = await departmentService.getDepartments(currentEventId);
+      
+      // Đảm bảo departments là array (service đã unwrap response)
+      const departmentsArray = Array.isArray(departments) ? departments : [];
+      
+      if (departmentsArray.length === 0) {
+        console.warn("No departments found for event:", currentEventId);
+        return null;
+      }
+      
+      // Tìm department mà user là HoD (leader)
+      let userDepartment = departmentsArray.find(dept => {
+        const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+        return leaderId === userId || leaderId?.toString() === userId?.toString();
+      });
+      
+      // Nếu không tìm thấy theo leader, tìm theo member
+      if (!userDepartment) {
+        for (const dept of departmentsArray) {
+          try {
+            const members = await departmentService.getMembersByDepartment(currentEventId, dept._id || dept.id);
+            // Service đã unwrap, nên members là array
+            const membersArray = Array.isArray(members) ? members : [];
+            const isMember = membersArray.some(member => {
+              const memberUserId = member.userId?._id || member.userId || member._id;
+              return memberUserId === userId || memberUserId?.toString() === userId?.toString();
+            });
+            if (isMember) {
+              userDepartment = dept;
+              break;
+            }
+          } catch (err) {
+            // Skip nếu không lấy được members
+            continue;
+          }
+        }
+      }
+      
+      return userDepartment;
+    } catch (error) {
+      console.error("Error in findUserDepartment:", error);
+      return null;
+    }
+  };
+
+  // Helper function để navigate đến budget của department hiện tại
+  const handleBudgetClick = async () => {
+    const currentEventId = eventId || selectedEvent;
+    if (!currentEventId) {
+      toast.error("Vui lòng chọn sự kiện trước");
+      return;
+    }
+    
+    // Đợi auth loading xong
+    if (authLoading) {
+      toast.info("Đang kiểm tra đăng nhập...");
+      return;
+    }
+    
+    // Lấy userId
+    const userId = getUserId();
+    if (!userId) {
+      console.warn("User not found or not logged in. User object:", user);
+      toast.error("Vui lòng đăng nhập để xem budget");
+      return;
+    }
+    
+    try {
+      // Tìm department của user
+      const userDepartment = await findUserDepartment(currentEventId, userId);
+      
+      if (userDepartment?._id || userDepartment?.id) {
+        navigate(`/events/${currentEventId}/budgets/departments`);
+      } else {
+        // Nếu không tìm thấy, điều hướng đến trang departments
+        navigate(`/events/${currentEventId}/departments`);
+        toast.info("Vui lòng chọn ban để xem budget");
+      }
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      // Fallback: điều hướng đến trang departments
+      navigate(`/events/${currentEventId}/departments`);
+      toast.error("Không thể tải thông tin ban. Vui lòng chọn ban từ danh sách.");
+    }
+  };
+
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
+    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || selectedEvent || ''}/budgets/statistics` },
+  ];
+
+  const exportSubItems = [
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId || selectedEvent || ''}/export/data` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId || selectedEvent || ''}/export/templates` },
   ];
 
   // find the event object (from myEvents)
   const currentEvent = myEvents.find(e => e.id === (eventId || selectedEvent));
   const hasEvent = !!currentEvent;
+  const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((currentEvent?.status || '').toLowerCase());
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = ctxLoading && ctxEvents.length === 0;
 
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
@@ -168,8 +351,8 @@ export default function HoDSideBar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
@@ -228,19 +411,23 @@ export default function HoDSideBar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {ctxLoading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(255,255,255,0.75)",
+              background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={40} />
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>
@@ -358,6 +545,17 @@ export default function HoDSideBar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
               <>
+                <button
+                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                  onClick={() => navigate(`/events/${eventId || selectedEvent || ''}/feedback/member`)}
+                  title="Phản hồi sự kiện"
+                >
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                    {sidebarOpen && <span>Feedback</span>}
+                  </div>
+                </button>
+
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
@@ -443,7 +641,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
+                          onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -457,7 +655,7 @@ export default function HoDSideBar({
                         <button
                           key={item.id}
                           className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                          onClick={() => navigate(item.path)}
+                          onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                         >
                           {item.label}
                         </button>
@@ -465,8 +663,7 @@ export default function HoDSideBar({
                     </div>
                   )}
                 </div>
-
-                {/* Rủi ro */}
+{/* Rủi ro */}
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("risk", e)}
@@ -520,6 +717,62 @@ export default function HoDSideBar({
                     </div>
                   )}
                 </div>
+                {/* Xuất dữ liệu */}
+                <div
+                  className="menu-item-hover"
+                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("export", e)}
+                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
+                >
+                  <button
+                    className={`btn-nav${activePage.startsWith("export") ? " active" : ""}`}
+                    onClick={() => sidebarOpen && setExportOpen((prev) => !prev)}
+                    style={{ cursor: "pointer", background: hoveredMenu === "export" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    title="Tải xuống"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-download me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Tải xuống</span>}
+                    </div>
+                    {sidebarOpen && (
+                      <i className={`bi ${exportOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    )}
+                  </button>
+
+                  {!sidebarOpen && hoveredMenu === "export" && (
+                    <div
+                      className="hover-submenu"
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      onMouseEnter={handlePopupMouseEnter}
+                      onMouseLeave={handlePopupMouseLeave}
+                    >
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {exportOpen && sidebarOpen && (
+                    <div className="ms-2">
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                
               </>
             )}
           </div>
@@ -547,25 +800,87 @@ export default function HoDSideBar({
         )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
-      <div className="p-2" style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}>
+      {/* Footer: Version & Logo Bộ Công Thương */}
+      <div
+        className="p-2"
+        style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
+      >
         {sidebarOpen ? (
-          <div className="theme-toggle" style={{ paddingBottom: 10, margin: 0 }}>
-            <button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+          <div style={{ paddingBottom: 10, margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <i className="bi bi-sun"></i>
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <i className="bi bi-moon"></i>
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Version 1.0.0
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.webp"
+                alt="Đã thông báo Bộ Công Thương"
+                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm w-100" onClick={() => setSidebarOpen(true)} style={{ padding: "5px", margin: "0 1.5px 0 2px" }} title="Mở rộng" aria-label="Mở/đóng thanh bên">
+          <button
+            className="btn btn-ghost btn-sm w-100"
+            onClick={() => setSidebarOpen(true)}
+            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
+            title="Mở rộng"
+            aria-label="Mở/đóng thanh bên"
+          >
             <i className="bi bi-list"></i>
           </button>
         )}
       </div>
+
     </div>
   );
 }

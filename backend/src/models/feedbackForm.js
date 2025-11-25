@@ -10,7 +10,7 @@ const FeedbackFormSchema = new Schema({
   targetAudience: { 
     type: [String], 
     enum: ['Member', 'HoD', 'HoOC', 'All'],
-    default: ['Member', 'HoD'] // Mặc định là Member và HoD
+    default: ['Member', 'HoD'] 
   },
   status: { 
     type: String, 
@@ -24,11 +24,11 @@ const FeedbackFormSchema = new Schema({
       enum: ['rating', 'multiple-choice', 'text', 'yes-no'],
       required: true 
     },
-    options: [{ type: String }], // For multiple-choice questions
+    options: [{ type: String }], 
     required: { type: Boolean, default: false },
     order: { type: Number, default: 0 }
   }],
-  tags: [{ type: String }], // For categorizing forms (e.g., "Ban Hậu cần", "Ban Truyền thông")
+  tags: [{ type: String }], 
 }, { timestamps: true, versionKey: false });
 
 FeedbackFormSchema.index({ eventId: 1, status: 1 });

@@ -244,7 +244,7 @@ export default function EventCalendar() {
   };
 
   return (
-    <UserLayout title="Event Calendar Page" sidebarType={eventRole} activePage="work-timeline">
+    <UserLayout title="Lịch sự kiện" sidebarType={eventRole} activePage="calendar">
       <ToastContainer position="top-right" autoClose={3000} />
       <div style={{ padding: "20px", backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
         <div style={{

@@ -15,6 +15,12 @@ export function EventProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [eventRoles, setEventRoles] = useState({});
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 8,
+    total: 0,
+    totalPages: 0
+  });
   const fetchingRef = useRef(false); // Track if we're currently fetching
 
   const extractEventArray = useCallback((payload) => {
@@ -32,7 +38,7 @@ export function EventProvider({ children }) {
     return [];
   }, []);
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (page = 1, limit = 8, search = '') => {
     if (authLoading) {
       setLoading(true);
       return;
@@ -54,9 +60,13 @@ export function EventProvider({ children }) {
     setLoading(true);
     setError("");
     try {
-      const res = await eventService.listMyEvents();
+      const res = await eventService.listMyEvents({ page, limit, search });
       const list = extractEventArray(res);
       setEvents(list);
+      // Update pagination if available
+      if (res?.pagination) {
+        setPagination(res.pagination);
+      }
     } catch (err) {
       setEvents([]);
       setError("Lỗi lấy dữ liệu sự kiện");
@@ -90,8 +100,23 @@ export function EventProvider({ children }) {
     return eventRoles[eventId] || "";
   }, [eventRoles]);
 
+  // Function to change page with search
+  const changePage = useCallback((newPage, search = '') => {
+    fetchEvents(newPage, pagination.limit, search);
+  }, [fetchEvents, pagination.limit]);
+
   return (
-    <EventContext.Provider value={{ events, loading, error, refetchEvents: fetchEvents, eventRoles, fetchEventRole, getEventRole }}>
+    <EventContext.Provider value={{
+      events,
+      loading,
+      error,
+      refetchEvents: fetchEvents,
+      eventRoles,
+      fetchEventRole,
+      getEventRole,
+      pagination,
+      changePage
+    }}>
       {children}
     </EventContext.Provider>
   );

@@ -54,6 +54,9 @@ export default function EventTaskDetailPage() {
     parent: null, // { id, title }
     dependencies: [], // [{ id, title }]
   });
+  const [tasksAll, setTasksAll] = useState([]);
+  const [claimingTask, setClaimingTask] = useState(false);
+  const [releasingSelf, setReleasingSelf] = useState(false);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
@@ -213,6 +216,11 @@ export default function EventTaskDetailPage() {
       .getMembersByDepartment(eventId, form.departmentId)
       .then((members) => setAssignees(members || []));
   }, [form.departmentId, eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    taskApi.getTaskByEvent(eventId).then(res => setTasksAll(res?.data || []));
+  }, [eventId, isEditing]);
 
   const statusMapToBackend = (s) =>
     s === "Đã xong"
@@ -489,6 +497,40 @@ export default function EventTaskDetailPage() {
     }
   };
 
+  const handleSelfAssign = async () => {
+    if (!currentMembershipId) {
+      toast.error("Không tìm thấy thông tin thành viên của bạn trong ban này");
+      return;
+    }
+    try {
+      setClaimingTask(true);
+      await taskApi.assignTask(eventId, taskId, currentMembershipId);
+      toast.success("Đã nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Không thể nhận công việc"
+      );
+    } finally {
+      setClaimingTask(false);
+    }
+  };
+
+  const handleSelfUnassign = async () => {
+    try {
+      setReleasingSelf(true);
+      await taskApi.unassignTask(eventId, taskId);
+      toast.success("Đã bỏ nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Không thể bỏ nhận công việc"
+      );
+    } finally {
+      setReleasingSelf(false);
+    }
+  };
+
   const assigneeName = useMemo(() => {
     const a = assignees.find(
       (x) =>
@@ -530,6 +572,39 @@ export default function EventTaskDetailPage() {
     }
     return [];
   }, [assignees, form.assigneeId, assigneeFallbackName]);
+
+  const currentUserId = user?._id || user?.id || user?.userId;
+
+  const currentMembership = useMemo(() => {
+    if (!currentUserId || !Array.isArray(assignees)) return null;
+    return assignees.find((member) => {
+      const memberUserId =
+        member?.userId?._id ||
+        member?.userId ||
+        member?.id ||
+        member?._id;
+      return (
+        memberUserId && String(memberUserId) === String(currentUserId)
+      );
+    });
+  }, [assignees, currentUserId]);
+
+  const currentMembershipId =
+    currentMembership?._id || currentMembership?.id || currentMembership?.userId;
+  const currentMembershipDeptId =
+    currentMembership?.departmentId?._id ||
+    currentMembership?.departmentId ||
+    form.departmentId;
+  const isSelfAssigned =
+    currentMembershipId &&
+    form.assigneeId &&
+    String(form.assigneeId) === String(currentMembershipId);
+  const canHoDClaim =
+    eventRole === "HoD" &&
+    !!currentMembershipId &&
+    (!!form.departmentId
+      ? String(form.departmentId) === String(currentMembershipDeptId || form.departmentId)
+      : true);
 
   // Kiểm tra xem có thể edit không (chỉ khi status = "todo"/"Chưa bắt đầu")
   const canEdit =
@@ -625,29 +700,59 @@ export default function EventTaskDetailPage() {
           </div>
         </div>
         <div className="col-md-6 mb-3">
-          <label className="form-label">Công việc cha (parentId)</label>
-          <input
-            type="text"
-            className="form-control"
-            value={form.parentId}
-            onChange={(e) => handleChange("parentId", e.target.value)}
-            placeholder="Nhập ID công việc cha"
-            disabled={!canEdit}
-          />
+          <label className="form-label">Công việc lớn</label>
+          {isEditing ? (
+            <select
+              className="form-select"
+              value={form.parentId}
+              onChange={e => handleChange('parentId', e.target.value)}
+              disabled={!canEdit}
+            >
+              <option value="">Không có</option>
+              {tasksAll.filter(
+                t => (!t.assigneeId) && String(t._id) !== String(taskId)
+              ).map(t => (
+                <option key={t._id} value={t._id}>{t.title}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              className="form-control"
+              value={form.parentId}
+              disabled
+            />
+          )}
         </div>
       </div>
       <div className="mb-3">
         <label className="form-label">
-          Phụ thuộc (dependencies, phân tách dấu phẩy)
+          Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})
         </label>
-        <input
-          type="text"
-          className="form-control"
-          value={form.dependenciesText}
-          onChange={(e) => handleChange("dependenciesText", e.target.value)}
-          placeholder="id1,id2,id3"
-          disabled={!canEdit}
-        />
+        {isEditing ? (
+          <select
+            multiple
+            className="form-select"
+            value={form.dependenciesText.split(',').filter(Boolean)}
+            onChange={e => handleChange('dependenciesText', Array.from(e.target.selectedOptions, o => o.value).join(','))}
+            disabled={!canEdit}
+            size={6}
+            style={{ minHeight: 160 }}
+          >
+            {tasksAll.filter(
+              t => t.assigneeId && String(t._id) !== String(taskId)
+            ).map(t => (
+              <option key={t._id} value={t._id}>{t.title}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            className="form-control"
+            value={form.dependenciesText}
+            disabled
+          />
+        )}
       </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
@@ -754,6 +859,33 @@ export default function EventTaskDetailPage() {
             >
               🗑
             </button>
+          </div>
+        )}
+        {canHoDClaim && (
+          <div className="d-flex flex-wrap gap-2 mt-2">
+            {!isSelfAssigned && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={handleSelfAssign}
+                disabled={claimingTask}
+              >
+                {claimingTask ? "Đang nhận..." : "Tôi sẽ thực hiện công việc này"}
+              </button>
+            )}
+            {isSelfAssigned && (
+              <>
+                <span className="text-success small fw-semibold d-flex align-items-center">
+                  Bạn đang phụ trách công việc này
+                </span>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={handleSelfUnassign}
+                  disabled={releasingSelf}
+                >
+                  {releasingSelf ? "Đang bỏ nhận..." : "Nhường lại"}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -955,7 +1087,7 @@ export default function EventTaskDetailPage() {
           )}
         </div>
         <div>
-          <div className="text-muted small mb-1">Công việc trước</div>
+          <div className="text-muted small mb-1">Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})</div>
           {relatedTasks.dependencies.length > 0 ? (
             <div className="fw-medium">
               {relatedTasks.dependencies.map((dep, idx) => (

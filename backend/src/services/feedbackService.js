@@ -3,6 +3,58 @@ import FeedbackResponse from '../models/feedbackResponse.js';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import mongoose from 'mongoose';
+
+const HOURS_TO_EXTEND_WHEN_REOPEN = 72;
+
+const autoCloseExpiredForms = async (eventId) => {
+  const now = new Date();
+  await FeedbackForm.updateMany(
+    { eventId, status: 'open', closeTime: { $lt: now } },
+    { $set: { status: 'closed' } }
+  );
+};
+
+const normalizeMultipleChoiceOptions = (options = [], index) => {
+  const cleaned = [];
+  const seen = new Set();
+  options
+    .map((opt) => (opt || '').trim())
+    .filter((opt) => opt !== '')
+    .forEach((opt) => {
+      const key = opt.toLowerCase();
+      if (!seen.has(key)) {
+        cleaned.push(opt);
+        seen.add(key);
+      }
+    });
+
+  if (cleaned.length < 2) {
+    const err = new Error(`Câu hỏi ${index + 1} (lựa chọn nhiều) phải có ít nhất 2 lựa chọn hợp lệ`);
+    err.status = 400;
+    throw err;
+  }
+  return cleaned;
+};
+
+const validateQuestionPayload = (questions = []) => {
+  questions.forEach((q, index) => {
+    if (!q.questionText || !q.questionText.trim()) {
+      const err = new Error(`Câu hỏi ${index + 1} thiếu nội dung`);
+      err.status = 400;
+      throw err;
+    }
+    if (!q.questionType) {
+      const err = new Error(`Câu hỏi ${index + 1} thiếu loại câu hỏi`);
+      err.status = 400;
+      throw err;
+    }
+    if (q.questionType === 'multiple-choice') {
+      q.options = normalizeMultipleChoiceOptions(q.options, index);
+    }
+  });
+  return questions;
+};
 
 export const feedbackService = {
   // Get all feedback forms for an event (HoOC only)
@@ -19,8 +71,45 @@ export const feedbackService = {
     const lim = Math.min(Math.max(parseInt(limit, 10), 1), 100);
     const skip = (p - 1) * lim;
 
+    await autoCloseExpiredForms(eventId);
+
     const forms = await FeedbackForm.find({ eventId })
       .populate('createdBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .lean();
+
+    const total = await FeedbackForm.countDocuments({ eventId });
+
+    return {
+      data: forms,
+      pagination: {
+        page: p,
+        limit: lim,
+        total,
+        totalPages: Math.ceil(total / lim)
+      }
+    };
+  },
+
+  async listFormsNameByEvent({ userId, eventId, page = 1, limit = 10 }) {
+    // Check if user is HoOC
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền truy cập');
+      err.status = 403;
+      throw err;
+    }
+
+    const p = Math.max(parseInt(page, 10), 1);
+    const lim = Math.min(Math.max(parseInt(limit, 10), 1), 100);
+    const skip = (p - 1) * lim;
+
+    await autoCloseExpiredForms(eventId);
+
+    const forms = await FeedbackForm.find({ eventId })
+      .select('name description createAt status')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(lim)
@@ -78,24 +167,20 @@ export const feedbackService = {
       throw err;
     }
 
+    const now = new Date();
+    if (new Date(openTime) < now) {
+      const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
+      err.status = 400;
+      throw err;
+    }
+    if (new Date(closeTime) <= now) {
+      const err = new Error('Thời gian đóng phải ở tương lai');
+      err.status = 400;
+      throw err;
+    }
+
     // Validate questions
-    questions.forEach((q, index) => {
-      if (!q.questionText || !q.questionText.trim()) {
-        const err = new Error(`Câu hỏi ${index + 1} thiếu nội dung`);
-        err.status = 400;
-        throw err;
-      }
-      if (!q.questionType) {
-        const err = new Error(`Câu hỏi ${index + 1} thiếu loại câu hỏi`);
-        err.status = 400;
-        throw err;
-      }
-      if (q.questionType === 'multiple-choice' && (!q.options || q.options.length < 2)) {
-        const err = new Error(`Câu hỏi ${index + 1} (multiple-choice) phải có ít nhất 2 lựa chọn`);
-        err.status = 400;
-        throw err;
-      }
-    });
+    const normalizedQuestions = validateQuestionPayload(questions);
 
     const form = new FeedbackForm({
       eventId,
@@ -105,10 +190,10 @@ export const feedbackService = {
       openTime: new Date(openTime),
       closeTime: new Date(closeTime),
       targetAudience: ['Member', 'HoD'], // Luôn set cho Member và HoD
-      questions: questions.map((q, index) => ({
+      questions: normalizedQuestions.map((q, index) => ({
         questionText: q.questionText.trim(),
         questionType: q.questionType,
-        options: q.options || [],
+        options: q.questionType === 'multiple-choice' ? q.options : (q.options || []),
         required: q.required !== undefined ? q.required : false,
         order: q.order !== undefined ? q.order : index
       })),
@@ -169,10 +254,32 @@ export const feedbackService = {
 
     const { name, description, openTime, closeTime, questions } = body;
 
+    const now = new Date();
+    const nextOpenTime = openTime !== undefined ? new Date(openTime) : form.openTime;
+    const nextCloseTime = closeTime !== undefined ? new Date(closeTime) : form.closeTime;
+
+    if (nextOpenTime >= nextCloseTime) {
+      const err = new Error('Thời gian đóng phải sau thời gian mở');
+      err.status = 400;
+      throw err;
+    }
+
+    if (openTime !== undefined && nextOpenTime < now) {
+      const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
+      err.status = 400;
+      throw err;
+    }
+
+    if (closeTime !== undefined && nextCloseTime <= now) {
+      const err = new Error('Thời gian đóng phải ở tương lai');
+      err.status = 400;
+      throw err;
+    }
+
     if (name !== undefined) form.name = name.trim();
     if (description !== undefined) form.description = description?.trim() || '';
-    if (openTime !== undefined) form.openTime = new Date(openTime);
-    if (closeTime !== undefined) form.closeTime = new Date(closeTime);
+    form.openTime = nextOpenTime;
+    form.closeTime = nextCloseTime;
     // Luôn set targetAudience là ['Member', 'HoD']
     form.targetAudience = ['Member', 'HoD'];
 
@@ -182,10 +289,11 @@ export const feedbackService = {
         err.status = 400;
         throw err;
       }
-      form.questions = questions.map((q, index) => ({
+      const normalized = validateQuestionPayload(questions);
+      form.questions = normalized.map((q, index) => ({
         questionText: q.questionText.trim(),
         questionType: q.questionType,
-        options: q.options || [],
+        options: q.questionType === 'multiple-choice' ? q.options : (q.options || []),
         required: q.required !== undefined ? q.required : false,
         order: q.order !== undefined ? q.order : index
       }));
@@ -255,9 +363,7 @@ export const feedbackService = {
 
     const now = new Date();
     if (now > form.closeTime) {
-      const err = new Error('Không thể mở lại biểu mẫu đã quá thời gian đóng');
-      err.status = 400;
-      throw err;
+      form.closeTime = new Date(now.getTime() + HOURS_TO_EXTEND_WHEN_REOPEN * 60 * 60 * 1000);
     }
 
     form.status = 'open';
@@ -268,51 +374,75 @@ export const feedbackService = {
   // Get available forms for member to submit (Member only, after event ends)
   async getAvailableFormsForMember({ userId, eventId }) {
     // Check if user is a member of the event
-    const member = await EventMember.findOne({ userId, eventId }).lean();
+    const member = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } }).lean();
     if (!member) {
       const err = new Error('Bạn không phải thành viên của sự kiện này');
       err.status = 403;
       throw err;
     }
 
-    // Check if event has ended
-    const event = await Event.findById(eventId).lean();
-    if (!event) {
-      const err = new Error('Không tìm thấy sự kiện');
-      err.status = 404;
-      throw err;
-    }
-
     const now = new Date();
-    if (event.eventEndDate && new Date(event.eventEndDate) > now) {
-      const err = new Error('Sự kiện chưa kết thúc');
-      err.status = 400;
-      throw err;
-    }
+    await autoCloseExpiredForms(eventId);
 
-    // Get open forms that match user's role or 'All'
-    const forms = await FeedbackForm.find({
+    // Get forms that match user's role or 'All'
+    // Include 'open' forms within time window, and 'closed' forms that user has submitted
+    // targetAudience is an array, so we check if it contains 'All' or the member's role
+    // In MongoDB, querying { field: value } on an array field will match if the array contains that value
+    const allMatchingForms = await FeedbackForm.find({
       eventId,
-      status: 'open',
-      openTime: { $lte: now },
-      closeTime: { $gte: now },
+      status: { $in: ['open', 'closed'] },
       $or: [
         { targetAudience: 'All' },
         { targetAudience: member.role }
       ]
     })
-      .select('name description questions openTime closeTime targetAudience')
+      .select('name description questions openTime closeTime targetAudience status createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
+    console.log(`[getAvailableFormsForMember] Query result: Found ${allMatchingForms.length} forms for role ${member.role}`);
+    console.log(`[getAvailableFormsForMember] All matching forms:`, allMatchingForms.map(f => ({
+      _id: f._id,
+      name: f.name,
+      status: f.status,
+      targetAudience: f.targetAudience,
+      openTime: f.openTime,
+      closeTime: f.closeTime
+    })));
+
     // Check which forms user has already submitted
     const submittedFormIds = await FeedbackResponse.find({
-      formId: { $in: forms.map(f => f._id) },
+      formId: { $in: allMatchingForms.map(f => f._id) },
       userId
     }).distinct('formId');
 
+    // Filter: show 'open' forms within time window, or 'closed' forms that user has submitted
+    // Also show 'open' forms that are not yet open (future) or already closed (past) for visibility
+    const forms = allMatchingForms.filter(form => {
+      if (form.status === 'open') {
+        // Show all open forms regardless of time window for visibility
+        // Frontend will handle enabling/disabling based on time window
+        const openTime = new Date(form.openTime);
+        const closeTime = new Date(form.closeTime);
+        const isWithinTime = openTime <= now && closeTime >= now;
+        console.log(`Form ${form.name} (${form._id}): status=open, isWithinTime=${isWithinTime}, openTime=${openTime}, closeTime=${closeTime}, now=${now}`);
+        return true; // Show all open forms
+      } else if (form.status === 'closed') {
+        // Show closed forms only if user has submitted
+        const hasSubmitted = submittedFormIds.some(id => id.toString() === form._id.toString());
+        console.log(`Form ${form.name} (${form._id}): status=closed, hasSubmitted=${hasSubmitted}`);
+        return hasSubmitted;
+      }
+      return false;
+    });
+
+    console.log(`[getAvailableFormsForMember] eventId=${eventId}, userId=${userId}, member.role=${member.role}`);
+    console.log(`[getAvailableFormsForMember] Found ${allMatchingForms.length} matching forms, ${forms.length} after filter`);
+    console.log(`[getAvailableFormsForMember] Final forms:`, forms.map(f => ({ name: f.name, status: f.status, targetAudience: f.targetAudience, openTime: f.openTime, closeTime: f.closeTime })));
+
     const formsWithStatus = forms.map(form => ({
       ...form,
+      status: form.status || 'open',
       submitted: submittedFormIds.some(id => id.toString() === form._id.toString())
     }));
 
@@ -322,27 +452,15 @@ export const feedbackService = {
   // Submit feedback response (Member only)
   async submitResponse({ userId, eventId, formId, body }) {
     // Check if user is a member
-    const member = await EventMember.findOne({ userId, eventId }).lean();
+    const member = await EventMember.findOne({ userId, eventId, status: { $ne: 'deactive' } }).lean();
     if (!member) {
       const err = new Error('Bạn không phải thành viên của sự kiện này');
       err.status = 403;
       throw err;
     }
 
-    // Check if event has ended
-    const event = await Event.findById(eventId).lean();
-    if (!event) {
-      const err = new Error('Không tìm thấy sự kiện');
-      err.status = 404;
-      throw err;
-    }
-
     const now = new Date();
-    if (event.eventEndDate && new Date(event.eventEndDate) > now) {
-      const err = new Error('Sự kiện chưa kết thúc');
-      err.status = 400;
-      throw err;
-    }
+    await autoCloseExpiredForms(eventId);
 
     // Get form
     const form = await FeedbackForm.findOne({ _id: formId, eventId }).lean();
@@ -469,7 +587,8 @@ export const feedbackService = {
     const totalResponses = responses.length;
     const totalInvited = await EventMember.countDocuments({
       eventId,
-      role: { $in: form.targetAudience.includes('All') ? ['Member', 'HoD', 'HoOC'] : form.targetAudience }
+      role: { $in: form.targetAudience.includes('All') ? ['Member', 'HoD', 'HoOC'] : form.targetAudience },
+      status: { $ne: 'deactive' }
     });
 
     const completionRate = totalInvited > 0 ? ((totalResponses / totalInvited) * 100).toFixed(1) : 0;
@@ -491,7 +610,7 @@ export const feedbackService = {
         const ratings = questionResponses.map(r => parseInt(r.answer)).filter(r => !isNaN(r));
         const sum = ratings.reduce((a, b) => a + b, 0);
         const avg = ratings.length > 0 ? (sum / ratings.length).toFixed(1) : 0;
-        
+
         const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
         ratings.forEach(r => {
           if (r >= 1 && r <= 5) distribution[r]++;
@@ -560,13 +679,263 @@ export const feedbackService = {
           totalResponses,
           totalInvited,
           completionRate: parseFloat(completionRate),
-          lastUpdated: responses.length > 0 
+          lastUpdated: responses.length > 0
             ? responses.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0].submittedAt
             : form.updatedAt
         },
         questionStats
       }
     };
+  },
+
+  // Delete form (HoOC only)
+  async deleteForm({ userId, eventId, formId }) {
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền xoá biểu mẫu');
+      err.status = 403;
+      throw err;
+    }
+
+    const form = await FeedbackForm.findOne({ _id: formId, eventId });
+    if (!form) {
+      const err = new Error('Không tìm thấy biểu mẫu');
+      err.status = 404;
+      throw err;
+    }
+
+    await FeedbackForm.deleteOne({ _id: formId });
+    await FeedbackResponse.deleteMany({ formId });
+
+    return { message: 'Đã xoá biểu mẫu' };
+  },
+
+  // Export form responses to Excel format (HoOC only)
+  async exportFormResponses({ userId, eventId, formId }) {
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền xuất dữ liệu');
+      err.status = 403;
+      throw err;
+    }
+
+    const form = await FeedbackForm.findOne({ _id: formId, eventId }).lean();
+    if (!form) {
+      const err = new Error('Không tìm thấy biểu mẫu');
+      err.status = 404;
+      throw err;
+    }
+
+    const responses = await FeedbackResponse.find({ formId })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: 1 })
+      .lean();
+
+    // Transform responses into flat structure for Excel
+    const exportData = [];
+    responses.forEach((response) => {
+      const user = response.userId || {};
+      response.responses.forEach((resp) => {
+        let answerText = '';
+        if (resp.questionType === 'rating') {
+          answerText = `${resp.answer} sao`;
+        } else if (resp.questionType === 'multiple-choice') {
+          answerText = Array.isArray(resp.answer) ? resp.answer.join(', ') : String(resp.answer);
+        } else if (resp.questionType === 'yes-no') {
+          answerText = resp.answer ? 'Có' : 'Không';
+        } else {
+          answerText = String(resp.answer || '');
+        }
+
+        exportData.push({
+          submittedAt: response.submittedAt,
+          userFullName: user.fullName || 'N/A',
+          userEmail: user.email || 'N/A',
+          questionText: resp.questionText || '',
+          questionType: resp.questionType || '',
+          answer: answerText
+        });
+      });
+    });
+
+    return { data: exportData, formName: form.name };
+  },
+
+  // Get all feedback for an event (HoOC only)
+  async getAllEventFeedback({ userId, eventId }) {
+    const membership = await ensureEventRole(userId, eventId, ['HoOC']);
+    if (!membership) {
+      const err = new Error('Bạn không có quyền truy cập');
+      err.status = 403;
+      throw err;
+    }
+
+    // Get event info
+    const event = await Event.findById(eventId).select('name').lean();
+    if (!event) {
+      const err = new Error('Không tìm thấy sự kiện');
+      err.status = 404;
+      throw err;
+    }
+
+    // Get all forms for this event
+    const forms = await FeedbackForm.find({ eventId })
+      .populate('createdBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (forms.length === 0) {
+      return {
+        data: {
+          eventName: event.name,
+          eventId,
+          totalForms: 0,
+          forms: []
+        }
+      };
+    }
+
+    // Get all responses for all forms
+    const formIds = forms.map(f => f._id);
+    const allResponses = await FeedbackResponse.find({
+      formId: { $in: formIds }
+    })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: -1 })
+      .lean();
+
+    // Group responses by formId
+    const responsesByForm = {};
+    formIds.forEach(id => {
+      responsesByForm[id.toString()] = [];
+    });
+
+    allResponses.forEach(response => {
+      const formIdStr = response.formId.toString();
+      if (responsesByForm[formIdStr]) {
+        responsesByForm[formIdStr].push(response);
+      }
+    });
+
+    // Build data structure
+    const formsWithResponses = forms.map(form => {
+      const formIdStr = form._id.toString();
+      const responses = responsesByForm[formIdStr] || [];
+
+      return {
+        _id: form._id,
+        name: form.name,
+        description: form.description,
+        status: form.status,
+        openTime: form.openTime,
+        closeTime: form.closeTime,
+        targetAudience: form.targetAudience,
+        createdBy: form.createdBy,
+        createdAt: form.createdAt,
+        updatedAt: form.updatedAt,
+        questions: form.questions,
+        responses: responses.map(r => ({
+          _id: r._id,
+          userId: r.userId,
+          responses: r.responses,
+          submittedAt: r.submittedAt
+        })),
+        totalResponses: responses.length
+      };
+    });
+
+    return {
+      data: {
+        eventName: event.name,
+        eventId,
+        totalForms: forms.length,
+        totalResponses: allResponses.length,
+        forms: formsWithResponses
+      }
+    };
+  }
+};
+
+export const getFeedbackFormsForExport = async (eventId) => {
+  try {
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return { eventName: '', forms: [] };
+    }
+
+    const eventObjectId = new mongoose.Types.ObjectId(eventId);
+    const [eventDoc, forms] = await Promise.all([
+      Event.findById(eventObjectId).select('name').lean(),
+      FeedbackForm.find({ eventId: eventObjectId })
+        .sort({ createdAt: 1 })
+        .lean()
+    ]);
+
+    if (!forms.length) {
+      return { eventName: eventDoc?.name || '', forms: [] };
+    }
+
+    const formIds = forms.map((form) => form._id);
+    const responses = await FeedbackResponse.find({ formId: { $in: formIds } })
+      .populate('userId', 'fullName email')
+      .sort({ submittedAt: 1 })
+      .lean();
+
+    const responseMap = new Map();
+    formIds.forEach((id) => responseMap.set(id.toString(), []));
+
+    responses.forEach((resp) => {
+      const key = resp.formId?.toString();
+      if (!key || !responseMap.has(key)) return;
+
+      const answerMap = {};
+      (resp.responses || []).forEach((answer) => {
+        if (!answer) return;
+        const answerKey = (answer.questionId ?? '').toString();
+        answerMap[answerKey] = answer.answer;
+      });
+
+      responseMap.get(key).push({
+        submittedAt: resp.submittedAt,
+        userName: resp.userId?.fullName || 'N/A',
+        userEmail: resp.userId?.email || 'N/A',
+        answers: answerMap
+      });
+    });
+
+    const formsWithResponses = forms.map((form) => {
+      const questions = (form.questions || []).map((question, index) => {
+        const questionOrder =
+          typeof question.order === 'number' ? question.order : index;
+        return {
+          questionId: index.toString(),
+          text: question.questionText || `Câu hỏi ${index + 1}`,
+          type: question.questionType || 'text',
+          order: questionOrder,
+          index
+        };
+      });
+
+      questions.sort((a, b) => {
+        if (a.order === b.order) return a.index - b.index;
+        return a.order - b.order;
+      });
+
+      return {
+        id: form._id?.toString(),
+        name: form.name || 'Biểu mẫu phản hồi',
+        description: form.description || '',
+        questions,
+        responses: responseMap.get(form._id?.toString()) || []
+      };
+    });
+
+    return {
+      eventName: eventDoc?.name || '',
+      forms: formsWithResponses
+    };
+  } catch (error) {
+    console.error('❌ Error fetching feedback forms for export:', error);
+    return { eventName: '', forms: [] };
   }
 };
 

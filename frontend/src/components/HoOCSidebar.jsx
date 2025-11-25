@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
@@ -10,44 +10,109 @@ export default function HoOCSidebar({
   eventId, // Nhận eventId qua props
   
 }) {
+  const STORAGE_KEY = 'sidebar_state_hooc';
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // UI state cho menu
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
+  const [exportsOpen, setExportsOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // Sử dụng eventId từ props
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+        if (parsed.exportsOpen !== undefined) {
+          setExportsOpen(parsed.exportsOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+      exportsOpen
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
+
+  // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
   const { events, loading } = useEvents();
-  const event = events.find(e => (e._id || e.id) === eventId);
+  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
   const hasEvent = !!event;
+  const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
   const navigate = useNavigate();
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hooc-dashboard?eventId=${eventId}` },
     { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` },
-    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
     { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
-    { id: "work-statitics", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-statitics", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hooc-statistic` },
   ];
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
+    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/statistics` },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
+  ];
+  const exportSubItems = [
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId}/export/data` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId}/export/templates` },
   ];
 
   // Hover handlers giữ nguyên
@@ -125,8 +190,8 @@ export default function HoOCSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
@@ -167,7 +232,7 @@ export default function HoOCSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {loading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
@@ -175,12 +240,15 @@ export default function HoOCSidebar({
               background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={100} />
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>
@@ -231,7 +299,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -245,7 +313,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -300,6 +368,19 @@ export default function HoOCSidebar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvent && (
               <>
+                {isEventCompleted && (
+                  <button
+                    className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                    onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                    title="Phản hồi sự kiện"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Feedback</span>}
+                    </div>
+                  </button>
+                )}
+
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
@@ -366,7 +447,7 @@ export default function HoOCSidebar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-camera me-3" style={{ width: 20 }} />
+                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
@@ -462,6 +543,61 @@ export default function HoOCSidebar({
                     </div>
                   )}
                 </div>
+                {/* Xuất */}
+                <div
+                  className="menu-item-hover"
+                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("export", e)}
+                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
+                >
+                  <button
+                    className={`btn-nav${activePage.startsWith("export") ? " active" : ""}`}
+                    onClick={() => sidebarOpen && setExportsOpen((prev) => !prev)}
+                    style={{ cursor: "pointer", background: hoveredMenu === "export" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    title="Tải xuống"
+                  >
+                    <div className="d-flex align-items-center">
+                      <i className="bi bi-database-down me-3" style={{ width: 20 }} />
+                      {sidebarOpen && <span>Tải xuống</span>}
+                    </div>
+                    {sidebarOpen && (
+                      <i className={`bi ${exportsOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    )}
+                  </button>
+
+                  {!sidebarOpen && hoveredMenu === "export" && (
+                    <div
+                      className="hover-submenu"
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      onMouseEnter={handlePopupMouseEnter}
+                      onMouseLeave={handlePopupMouseLeave}
+                    >
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {exportsOpen && sidebarOpen && (
+                    <div className="ms-2">
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
               </>
             )}
           </div>
@@ -489,25 +625,87 @@ export default function HoOCSidebar({
         )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
-      <div className="p-2" style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}>
+      {/* Footer: Version & Logo Bộ Công Thương */}
+      <div
+        className="p-2"
+        style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
+      >
         {sidebarOpen ? (
-          <div className="theme-toggle" style={{ paddingBottom: 10, margin: 0 }}>
-            <button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+          <div style={{ paddingBottom: 10, margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <i className="bi bi-sun"></i>
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <i className="bi bi-moon"></i>
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Version 1.0.0
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.webp"
+                alt="Đã thông báo Bộ Công Thương"
+                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm w-100" onClick={() => setSidebarOpen(true)} style={{ padding: "5px", margin: "0 1.5px 0 2px" }} title="Mở rộng" aria-label="Mở/đóng thanh bên">
+          <button
+            className="btn btn-ghost btn-sm w-100"
+            onClick={() => setSidebarOpen(true)}
+            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
+            title="Mở rộng"
+            aria-label="Mở/đóng thanh bên"
+          >
             <i className="bi bi-list"></i>
           </button>
         )}
       </div>
+
     </div>
   );
 }

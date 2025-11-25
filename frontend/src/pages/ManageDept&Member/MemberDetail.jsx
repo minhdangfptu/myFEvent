@@ -6,6 +6,7 @@ import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
 import { toast } from 'react-toastify';
 import { eventService } from '~/services/eventService';
+import { departmentService } from '~/services/departmentService';
 import { formatDate } from '~/utils/formatDate';
 import ConfirmModal from '../../components/ConfirmModal';
 
@@ -23,6 +24,15 @@ export default function MemberProfilePage() {
     pendingTasks: 0,
     joinedDate: null,
   });
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [departmentModalLoading, setDepartmentModalLoading] = useState(false);
+  const [departmentModalSaving, setDepartmentModalSaving] = useState(false);
+  const [departmentModalError, setDepartmentModalError] = useState('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('Member');
+  const [roleSaving, setRoleSaving] = useState(false);
   const { fetchEventRole } = useEvents();
 
   // Get member data from navigation state if available
@@ -108,6 +118,105 @@ export default function MemberProfilePage() {
     }
   };
 
+  const resolveMemberDepartmentId = (targetMember) => {
+    const source = targetMember || member;
+    if (!source) return '';
+    const dept = source.departmentId || source.department;
+    if (!dept) return '';
+    if (typeof dept === 'string') return dept;
+    if (dept?._id) return dept._id;
+    if (dept?.id) return dept.id;
+    return '';
+  };
+
+  const loadDepartmentOptions = async () => {
+    try {
+      setDepartmentModalLoading(true);
+      const departments = await departmentService.getDepartments(eventId);
+      setDepartmentOptions(Array.isArray(departments) ? departments : []);
+      setDepartmentModalError('');
+    } catch (error) {
+      console.error('Error loading departments:', error);
+      setDepartmentOptions([]);
+      setDepartmentModalError(error.response?.data?.message || 'Không thể tải danh sách ban');
+    } finally {
+      setDepartmentModalLoading(false);
+    }
+  };
+
+  const handleOpenDepartmentModal = async () => {
+    if (!member || member.role === 'HoOC') return;
+    setSelectedDepartmentId(resolveMemberDepartmentId(member));
+    setDepartmentModalError('');
+    setShowDepartmentModal(true);
+    await loadDepartmentOptions();
+  };
+
+  const handleConfirmChangeDepartment = async () => {
+    if (!member) return;
+    const memberObjectId = member._id || member.id;
+    if (!memberObjectId) return;
+
+    const nextDepartmentId = selectedDepartmentId || null;
+    const currentDepartmentId = resolveMemberDepartmentId(member) || null;
+    if ((currentDepartmentId || null) === (nextDepartmentId || null)) {
+      toast.info('Thành viên đã thuộc ban này');
+      return;
+    }
+
+    try {
+      setDepartmentModalSaving(true);
+      const response = await eventApi.changeMemberDepartment(eventId, memberObjectId, nextDepartmentId);
+      const updatedMember = response?.data || response;
+      if (updatedMember) {
+        setMember(prev => ({ ...prev, ...updatedMember }));
+      }
+      toast.success(response?.message || 'Cập nhật ban thành công!');
+      setShowDepartmentModal(false);
+    } catch (error) {
+      console.error('Error changing department:', error);
+      toast.error(error.response?.data?.message || 'Không thể chuyển ban');
+    } finally {
+      setDepartmentModalSaving(false);
+    }
+  };
+
+  const handleOpenRoleModal = () => {
+    if (!member) return;
+    const currentRole = member.role;
+    const fallbackRole = roleOptions.some((opt) => opt.value === currentRole)
+      ? currentRole
+      : 'Member';
+    setSelectedRole(fallbackRole);
+    setShowRoleModal(true);
+  };
+
+  const handleConfirmChangeRole = async () => {
+    if (!member) return;
+    const memberObjectId = member._id || member.id;
+    if (!memberObjectId) return;
+    if (!selectedRole || selectedRole === member.role) {
+      toast.info('Vai trò không thay đổi');
+      return;
+    }
+
+    try {
+      setRoleSaving(true);
+      const response = await eventApi.updateMemberRole(eventId, memberObjectId, selectedRole);
+      const updatedMember = response?.data || response;
+      if (updatedMember) {
+        setMember(prev => ({ ...prev, ...updatedMember }));
+      }
+      toast.success(response?.message || 'Cập nhật vai trò thành công!');
+      setShowRoleModal(false);
+    } catch (error) {
+      console.error('Error changing role:', error);
+      toast.error(error.response?.data?.message || 'Không thể thay đổi vai trò');
+    } finally {
+      setRoleSaving(false);
+    }
+  };
+
   // Handle remove member
   const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
   const handleRemoveMember = async () => {
@@ -182,6 +291,12 @@ export default function MemberProfilePage() {
 
   // Check if current user can manage this member
   const canManage = eventRole === 'HoOC' || eventRole === 'HoD';
+  const canChangeDepartment = canManage && memberRole !== 'HoOC';
+  const shouldShowDepartmentInfo = memberRole !== 'HoOC';
+  const roleOptions = [
+    { value: 'HoD', label: 'Trưởng ban', description: 'Điều phối kế hoạch và nhiệm vụ trong ban' },
+    { value: 'Member', label: 'Thành viên', description: 'Tham gia thực hiện nhiệm vụ được giao' },
+  ];
 
   return (
     <UserLayout 
@@ -326,6 +441,60 @@ export default function MemberProfilePage() {
         .action-btn-danger:hover {
           background: #fecaca;
         }
+        .custom-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          z-index: 2200;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 1rem;
+        }
+        .custom-modal-card {
+          width: 100%;
+          max-width: 420px;
+          background: #fff;
+          border-radius: 18px;
+          padding: 1.75rem;
+          box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+          animation: modalPop 0.25s ease forwards;
+        }
+        .custom-modal-card h5 {
+          font-weight: 700;
+        }
+        .custom-modal-card .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.75rem;
+          margin-top: 1.5rem;
+        }
+        .role-option {
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+          display: flex;
+          gap: 0.75rem;
+          cursor: pointer;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .role-option.active {
+          border-color: #ef4444;
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+        }
+        .role-option input {
+          margin-top: 0.35rem;
+        }
+        @keyframes modalPop {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
       `}</style>
 
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
@@ -407,31 +576,33 @@ export default function MemberProfilePage() {
           {/* Right Column - Actions & Stats */}
           <div className="col-lg-5">
             {/* Department Info */}
-            <div className="profile-card">
-              <h5 className="fw-bold mb-3">
-                <i className="bi bi-building me-2 text-danger"></i>
-                Thông tin chuyên môn chính
-              </h5>
-              
-              <div className="mb-3">
-                <div className="small text-muted mb-1">Chuyên môn chính</div>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="badge bg-light text-dark px-3 py-2">
-                    <i className="bi bi-star-fill text-warning me-1"></i>
-                    {memberDepartment}
-                  </span>
-                </div>
-              </div>
-
-              {memberStats.totalTasks !== undefined && (
-                <div className="mb-2">
-                  <div className="fw-bold text-dark">
-                    <i className="bi bi-list-task me-2 text-primary"></i>
-                    {memberStats.totalTasks} nhiệm vụ
+            {shouldShowDepartmentInfo && (
+              <div className="profile-card">
+                <h5 className="fw-bold mb-3">
+                  <i className="bi bi-building me-2 text-danger"></i>
+                  Thông tin chuyên môn chính
+                </h5>
+                
+                <div className="mb-3">
+                  <div className="small text-muted mb-1">Chuyên môn chính</div>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-light text-dark px-3 py-2">
+                      <i className="bi bi-star-fill text-warning me-1"></i>
+                      {memberDepartment}
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {memberStats.totalTasks !== undefined && (
+                  <div className="mb-2">
+                    <div className="fw-bold text-dark">
+                      <i className="bi bi-list-task me-2 text-primary"></i>
+                      {memberStats.totalTasks} nhiệm vụ
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             
 
@@ -447,7 +618,7 @@ export default function MemberProfilePage() {
             )}
 
             {/* Tags */}
-            {memberTags && memberTags.length > 0 && (
+            {shouldShowDepartmentInfo && memberTags && memberTags.length > 0 && (
               <div className="profile-card">
                 <h5 className="fw-bold mb-3">
                   <i className="bi bi-tags me-2 text-danger"></i>
@@ -491,18 +662,20 @@ export default function MemberProfilePage() {
                   Hành động
                 </h5>
                 <div className="d-grid gap-2">
-                  <button 
-                    className="action-btn action-btn-secondary"
-                    onClick={() => {/* Handle change department */}}
-                  >
-                    <i className="bi bi-arrow-left-right"></i>
-                    Chuyển ban
-                  </button>
+                  {canChangeDepartment && (
+                    <button 
+                      className="action-btn action-btn-secondary"
+                      onClick={handleOpenDepartmentModal}
+                    >
+                      <i className="bi bi-arrow-left-right"></i>
+                      Chuyển ban
+                    </button>
+                  )}
                   
                   {eventRole === 'HoOC' && (
                     <button 
                       className="action-btn action-btn-secondary"
-                      onClick={() => {/* Handle change role */}}
+                      onClick={handleOpenRoleModal}
                     >
                       <i className="bi bi-shield"></i>
                       Thay đổi vai trò
@@ -522,6 +695,124 @@ export default function MemberProfilePage() {
           </div>
         </div>
       </div>
+
+      {canChangeDepartment && showDepartmentModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-card">
+            <div className="d-flex align-items-center mb-3">
+              <i className="bi bi-arrow-left-right text-danger fs-5 me-2"></i>
+              <h5 className="mb-0">Chuyển ban</h5>
+            </div>
+            {departmentModalLoading ? (
+              <div className="text-center py-4">
+                <Loading size={60} />
+              </div>
+            ) : (
+              <>
+                <label className="form-label fw-semibold text-muted small">
+                  Chọn ban mới
+                </label>
+                <select
+                  className="form-select"
+                  value={selectedDepartmentId}
+                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                  disabled={departmentModalSaving}
+                >
+                  <option value="">Chưa phân ban</option>
+                  {departmentOptions.map((dept) => (
+                    <option key={dept._id || dept.id} value={dept._id || dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+                {departmentModalError && (
+                  <div className="alert alert-danger mt-3 py-2 mb-0">
+                    {departmentModalError}
+                  </div>
+                )}
+                {!departmentModalError && departmentOptions.length === 0 && (
+                  <div className="alert alert-warning mt-3 py-2 mb-0">
+                    Hiện chưa có ban nào trong sự kiện này
+                  </div>
+                )}
+                <div className="modal-actions">
+                  <button
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowDepartmentModal(false)}
+                    disabled={departmentModalSaving}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleConfirmChangeDepartment}
+                    disabled={departmentModalSaving || departmentModalLoading}
+                  >
+                    {departmentModalSaving && (
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                    )}
+                    Xác nhận
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showRoleModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-card">
+            <div className="d-flex align-items-center mb-3">
+              <i className="bi bi-shield text-danger fs-5 me-2"></i>
+              <h5 className="mb-0">Thay đổi vai trò</h5>
+            </div>
+            <p className="text-muted small mb-3">
+              Chọn vai trò phù hợp cho thành viên này trong sự kiện
+            </p>
+            <div className="d-flex flex-column gap-2">
+              {roleOptions.map((option) => (
+                <label
+                  key={option.value}
+                  className={`role-option ${selectedRole === option.value ? 'active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    className="form-check-input mt-1"
+                    value={option.value}
+                    checked={selectedRole === option.value}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    disabled={roleSaving}
+                  />
+                  <div>
+                    <div className="fw-semibold">{option.label}</div>
+                    <div className="text-muted small">{option.description}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={() => setShowRoleModal(false)}
+                disabled={roleSaving}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleConfirmChangeRole}
+                disabled={roleSaving}
+              >
+                {roleSaving && (
+                  <span className="spinner-border spinner-border-sm me-2"></span>
+                )}
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </UserLayout>
   );
 }

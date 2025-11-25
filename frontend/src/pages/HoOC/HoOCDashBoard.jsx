@@ -1,11 +1,10 @@
-"use client"
-
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useLocation } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { eventApi } from "../../apis/eventApi"
 import { milestoneService } from "../../services/milestoneService"
 import { departmentService } from "../../services/departmentService"
+import calendarService from "../../services/calendarService"
 import Loading from "../../components/Loading"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
@@ -107,6 +106,28 @@ const normalizeDepartments = (payload) => {
   return []
 }
 
+const normalizeCalendars = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.calendars)) return data.calendars
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  return []
+}
+
+const parseCalendarEventStart = (calendar) => {
+  if (!calendar) return null
+  const candidate =
+    calendar.startAt ||
+    (calendar.meetingDate
+      ? `${calendar.meetingDate}T${calendar.startTime || "00:00"}`
+      : null)
+  if (!candidate) return null
+  const date = new Date(candidate)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 const parseMilestoneDate = (value) => {
   if (!value) return null
   const date = new Date(value)
@@ -138,6 +159,7 @@ export default function HoOCDashBoard() {
   const [members, setMembers] = useState([])
   const [milestones, setMilestones] = useState([])
   const [departments, setDepartments] = useState([])
+  const [calendarEvents, setCalendarEvents] = useState([])
   const [eventRole, setEventRole] = useState("")
   const [hoveredDay, setHoveredDay] = useState(null)
   
@@ -175,14 +197,15 @@ export default function HoOCDashBoard() {
       try {
         setLoading(true)
 
-        const [eventResponse, membersResponse, milestonesResponse, departmentsResponse] = await Promise.all([
+        const [eventResponse, membersResponse, milestonesResponse, departmentsResponse, calendarsResponse] = await Promise.all([
           eventApi.getById(eventId),
           eventApi.getMembersByEvent(eventId),
           milestoneService.listMilestones(eventId, {
             sortBy: "targetDate",
             sortDir: "asc"
           }),
-          departmentService.getDepartments(eventId)
+          departmentService.getDepartments(eventId),
+          calendarService.getCalendarsByEventId(eventId)
         ])
 
         if (cancelled) return
@@ -203,6 +226,7 @@ export default function HoOCDashBoard() {
         setMilestones(sortedMilestones)
 
         setDepartments(normalizeDepartments(departmentsResponse))
+        setCalendarEvents(normalizeCalendars(calendarsResponse))
       } catch (error) {
         if (!cancelled) {
           console.error("Error fetching dashboard data:", error)
@@ -366,31 +390,47 @@ export default function HoOCDashBoard() {
   )
 
   // Calendar data (current month)
-  const calendarDays = generateCalendarDays()
+  const calendarDays = useMemo(() => {
+    const baseDays = generateCalendarDays()
+    if (!calendarEvents.length) return baseDays
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const highlightedDays = new Set()
+
+    calendarEvents.forEach((event) => {
+      const startDate = parseCalendarEventStart(event)
+      if (!startDate) return
+      if (startDate.getFullYear() !== year || startDate.getMonth() !== month) return
+      highlightedDays.add(startDate.getDate())
+    })
+
+    return baseDays.map((day) => ({
+      ...day,
+      highlight: highlightedDays.has(day.day)
+    }))
+  }, [calendarEvents])
 
   // Get events for a specific day
   const getEventsForDay = useMemo(() => {
     const today = new Date()
     const year = today.getFullYear()
     const month = today.getMonth()
+    const eventsWithDate = calendarEvents
+      .map((event) => {
+        const startDate = parseCalendarEventStart(event)
+        return startDate ? { event, startDate } : null
+      })
+      .filter(Boolean)
+      .filter(({ startDate }) => startDate.getFullYear() === year && startDate.getMonth() === month)
     
     return (day) => {
       if (!day) return []
-      const targetDate = new Date(year, month, day)
-      
-      return milestones.filter((milestone) => {
-        const milestoneDate = parseMilestoneDate(milestone?.targetDate || milestone?.dueDate)
-        if (!milestoneDate) return false
-        
-        // Compare only year, month, day (ignore time)
-        return (
-          milestoneDate.getFullYear() === targetDate.getFullYear() &&
-          milestoneDate.getMonth() === targetDate.getMonth() &&
-          milestoneDate.getDate() === targetDate.getDate()
-        )
-      })
+      return eventsWithDate
+        .filter(({ startDate }) => startDate.getDate() === day)
+        .map(({ event }) => event)
     }
-  }, [milestones])
+  }, [calendarEvents])
 
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc'
 
@@ -433,12 +473,12 @@ export default function HoOCDashBoard() {
   }
 
   return (
-    <UserLayout title="Dashboard tổng" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+    <UserLayout title="Dashboard Trưởng ban Tổ chức" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
       <div className="bg-light" style={{ minHeight: "100vh", padding: "20px" }}>
         <div className="container-fluid px-0" style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
-          <h1 className="mb-4" style={{ color: "#ff5757", fontSize: "24px", fontWeight: 600 }}>
-            {eventData.name} - Dashboard tổng
+          <h1 className="mb-4" style={{ color: "#ff5757", fontSize: "24px", fontWeight: 700 }}>
+            {eventData.name} 
           </h1>
 
           {/* Stats Cards */}
@@ -723,30 +763,31 @@ export default function HoOCDashBoard() {
                             const dayData = calendarDays[weekIndex * 7 + dayIndex]
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
+                            const hasEvents = dayEvents.length > 0
                             
                             return (
                               <td
                                 key={dayIndex}
                                 className={`text-center ${
-                                  dayData?.today ? "text-white rounded" : dayData?.highlight ? "fw-semibold" : ""
+                                  dayData?.today ? "text-white rounded" : hasEvents ? "fw-semibold" : ""
                                 }`}
                                 style={{
                                   fontSize: "13px",
                                   backgroundColor: dayData?.today
                                     ? "#dc2626"
-                                    : isHovered
-                                    ? "#fee2e2"
-                                    : dayData?.highlight
+                                    : isHovered && hasEvents
+                                    ? "#ffe4e6"
+                                    : hasEvents
                                     ? "#fee2e2"
                                     : "transparent",
                                   color: dayData?.today 
                                     ? "white" 
-                                    : isHovered 
-                                    ? "#dc2626" 
-                                    : dayData?.highlight 
-                                    ? "#dc2626" 
+                                    : hasEvents
+                                    ? "#991b1b"
                                     : "#374151",
+                                  border: hasEvents ? "1px solid #fecdd3" : "1px solid transparent",
                                   padding: "8px 4px",
+                                  borderRadius: "8px",
                                   cursor: dayData?.day ? "pointer" : "default",
                                   transition: "all 0.2s ease",
                                 }}
@@ -762,36 +803,68 @@ export default function HoOCDashBoard() {
                     </tbody>
                   </table>
 
-                  {hoveredDay && getEventsForDay(hoveredDay).length > 0 ? (
-                    <div className="mt-4 pt-3 border-top">
-                      {getEventsForDay(hoveredDay).map((event, index) => {
-                        const eventDate = parseMilestoneDate(event?.targetDate || event?.dueDate)
-                        const timeStr = eventDate ? eventDate.toLocaleTimeString('vi-VN', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        }) : ''
-                        
-                        return (
-                          <div key={index} className={index > 0 ? "mt-3" : ""}>
-                            <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                              {event?.name || "Cột mốc"}
-                            </div>
-                            {timeStr && (
-                              <div className="text-muted" style={{ fontSize: "13px" }}>
-                                {timeStr}
+                  {(() => {
+                    const hoveredEvents = hoveredDay ? getEventsForDay(hoveredDay) : []
+                    if (hoveredDay && hoveredEvents.length > 0) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          {hoveredEvents.map((event, index) => {
+                            const startDate = parseCalendarEventStart(event)
+                            const endDateCandidate =
+                              event?.endAt ||
+                              (event?.meetingDate && event?.endTime
+                                ? `${event.meetingDate}T${event.endTime}`
+                                : null)
+                            const endDate = endDateCandidate ? new Date(endDateCandidate) : null
+                            const timeStr = startDate
+                              ? startDate.toLocaleTimeString("vi-VN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                })
+                              : ""
+                            const endStr =
+                              endDate && !Number.isNaN(endDate.getTime())
+                                ? endDate.toLocaleTimeString("vi-VN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                  })
+                                : ""
+                            const timeDisplay = endStr && timeStr ? `${timeStr} - ${endStr}` : timeStr
+
+                            return (
+                              <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
+                                  {event?.name || "Lịch họp"}
+                                </div>
+                                {timeDisplay && (
+                                  <div className="text-muted" style={{ fontSize: "13px" }}>
+                                    {timeDisplay}
+                                  </div>
+                                )}
+                                {event?.location && (
+                                  <div className="text-muted" style={{ fontSize: "12px" }}>
+                                    {event.location}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+
+                    if (hoveredDay) {
+                      return (
+                        <div className="mt-4 pt-3 border-top">
+                          <div className="text-muted" style={{ fontSize: "13px" }}>
+                            Không có lịch họp
                           </div>
-                        )
-                      })}
-                    </div>
-                  ) : hoveredDay ? (
-                    <div className="mt-4 pt-3 border-top">
-                      <div className="text-muted" style={{ fontSize: "13px" }}>
-                        Không có sự kiện
-                      </div>
-                    </div>
-                  ) : null}
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })()}
                 </div>
               </div>
             </div>

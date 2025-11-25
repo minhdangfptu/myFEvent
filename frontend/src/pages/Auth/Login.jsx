@@ -8,13 +8,14 @@ import { authApi } from "../../apis/authApi";
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginWithGoogle, user } = useAuth();
+  const { login, loginWithGoogle, user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -23,25 +24,38 @@ export default function LoginPage() {
     }
   }, [location.search]);
 
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      const from = location.state?.from?.pathname || "/home-page";
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
+  }, [isAuthenticated, authLoading, navigate, location.state, user]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/home-page", {
-        replace: true,
-        state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-      });
+      if (user?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/home-page", { replace: true, state: { loginSuccess: true } });
+      }
     } catch (error) {
       console.error("Login error:", error);
-      if (error?.response?.status === 403) {
+      const errorCode = error?.response?.data?.code;
+      if (error?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
         return;
       }
       setError(
-        error.response?.data?.message ||
-          "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+        error?.response?.data?.message ||
+        "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
     } finally {
       setLoading(false);
@@ -87,16 +101,18 @@ export default function LoginPage() {
       // } else {
       //   navigate('/user-landing-page', { replace: true });
       // }
-      navigate("/home-page", {
-        replace: true,
-        state: { toast: { type: "success", message: "Đăng nhập thành công" } },
-      });
+      navigate("/home-page", { replace: true, state: { loginSuccess: true } });
     } catch (err) {
       console.error("Google login error:", err);
+      const errorCode = err?.response?.data?.code;
+      if (err?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
+        navigate("/email-confirmation", { state: { email } });
+        return;
+      }
       setError(
         err?.response?.data?.message ||
-          err?.message ||
-          "Đăng nhập Google thất bại."
+        err?.message ||
+        "Đăng nhập Google thất bại."
       );
     } finally {
       setLoading(false);
@@ -191,17 +207,29 @@ export default function LoginPage() {
                 <label htmlFor="password" className="form-label">
                   Mật khẩu
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  className="form-control login-input"
-                  autoComplete="current-password"
-                  placeholder="Nhập mật khẩu của bạn"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                  required
-                />
+                <div className="position-relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control login-input"
+                    autoComplete="current-password"
+                    placeholder="Nhập mật khẩu của bạn"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    required
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
                 <div className="mt-2">
                   <a href="/forgot-password" className="text-decoration-none">
                     Quên mật khẩu?

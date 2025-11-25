@@ -14,9 +14,6 @@ axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
-    
-    // If data is FormData, let axios set Content-Type automatically (multipart/form-data)
-    // Don't override Content-Type for FormData
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -30,6 +27,21 @@ axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Detect timeout error FIRST (before offline check)
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      window.dispatchEvent(new CustomEvent('network:timeout'));
+      return Promise.reject(error);
+    }
+
+    // Detect network error (offline) - only if not a timeout
+    if (
+      error.code === 'ERR_NETWORK' ||
+      error.message === 'Network Error'
+    ) {
+      window.dispatchEvent(new CustomEvent('network:offline'));
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;

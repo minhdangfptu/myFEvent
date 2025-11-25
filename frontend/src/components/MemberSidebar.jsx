@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { eventApi } from "../apis/eventApi";
+import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
+import Loading from "./Loading";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -9,6 +9,9 @@ export default function MemberSidebar({
   activePage = "home",
   eventId, // Nhận eventId qua props
 }) {
+  const STORAGE_KEY = 'sidebar_state_member';
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -21,11 +24,66 @@ export default function MemberSidebar({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
+
   // Sử dụng eventId từ props thay vì lấy từ URL
   const { events, loading } = useEvents();
-  const event = events.find(e => (e._id || e.id) === eventId);
+  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
   const hasEvents = !!event;
+  const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
 
@@ -93,7 +151,7 @@ export default function MemberSidebar({
 
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
-    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
+    { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/member-tasks` },
     { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
     // Không có work-stats (thống kê tiến độ)
   ];
@@ -101,8 +159,7 @@ export default function MemberSidebar({
   // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
+    { id: "expenses", label: "Chi tiêu", path: `/events/${eventId || ''}/expenses` },
     // Không có finance-stats (thống kê thu chi)
   ];
   const risksSubItems = [
@@ -181,8 +238,8 @@ export default function MemberSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
+            onClick={() => navigate("/home-page")}
+            style={{ cursor: "pointer" }}
           >
             <div className="logo-content d-flex align-items-center ">
               <div
@@ -255,6 +312,26 @@ export default function MemberSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content pt-0">
+        {showLoading ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+            }}
+          >
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : (
+        <>
         <div className="mb-4">
           {sidebarOpen && <div className="group-title">ĐIỀU HƯỚNG</div>}
           <div className="d-flex flex-column gap-1">
@@ -397,6 +474,19 @@ export default function MemberSidebar({
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
+
+            {hasEvents && (
+              <button
+                className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                onClick={() => navigate(`/events/${eventId || ''}/feedback/member`)}
+                title="Phản hồi sự kiện"
+              >
+                <div className="d-flex align-items-center">
+                  <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                  {sidebarOpen && <span>Feedback</span>}
+                </div>
+              </button>
+            )}
 
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvents && (
@@ -645,32 +735,77 @@ export default function MemberSidebar({
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
+      {/* Footer: Version & Logo Bộ Công Thương */}
       <div
         className="p-2"
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div
-            className="theme-toggle"
-            style={{ paddingBottom: 10, margin: 0 }}
-          >
-            <button
-              className={`theme-option ${theme === "light" ? "active" : ""}`}
-              onClick={() => setTheme("light")}
+          <div style={{ paddingBottom: 10, margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <i className="bi bi-sun"></i>
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <i className="bi bi-moon"></i>
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
             >
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button
-              className={`theme-option ${theme === "dark" ? "active" : ""}`}
-              onClick={() => setTheme("dark")}
-            >
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Version 1.0.0
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.webp"
+                alt="Đã thông báo Bộ Công Thương"
+                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
           <button
@@ -684,6 +819,7 @@ export default function MemberSidebar({
           </button>
         )}
       </div>
+
     </div>
   );
 }

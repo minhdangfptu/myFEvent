@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./AgendaPage.css";
 import { toast, ToastContainer } from "react-toastify";
 import { useEvents } from "~/contexts/EventContext";
@@ -44,9 +42,9 @@ export default function AgendaPage({ milestoneName = "" }) {
     content: "",
   });
 
-  const [newDate, setNewDate] = useState("");
-  const [showAddDateModal, setShowAddDateModal] = useState(false);
-  const [newDateInput, setNewDateInput] = useState("");
+const [newDate, setNewDate] = useState("");
+const [showAddDateModal, setShowAddDateModal] = useState(false);
+const [newDateInput, setNewDateInput] = useState("");
   
   // Confirm modal states
   const [showDeleteScheduleModal, setShowDeleteScheduleModal] = useState(false);
@@ -289,7 +287,9 @@ export default function AgendaPage({ milestoneName = "" }) {
     return { valid: true };
   };
 
-  const validateDate = (dateString) => {
+const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+const validateDate = (dateString) => {
     if (!dateString || !dateString.trim()) {
       return { valid: false, message: "Vui lòng chọn ngày" };
     }
@@ -298,6 +298,14 @@ export default function AgendaPage({ milestoneName = "" }) {
     if (isNaN(date.getTime())) {
       return { valid: false, message: "Định dạng ngày không hợp lệ" };
     }
+
+  const today = new Date(todayISODate);
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+
+  if (date < today) {
+    return { valid: false, message: "Không thể chọn ngày trong quá khứ" };
+  }
 
     return { valid: true };
   };
@@ -571,7 +579,7 @@ export default function AgendaPage({ milestoneName = "" }) {
 
   // Modal handlers
   const handleShowAddDateModal = () => {
-    setNewDateInput("");
+  setNewDateInput(todayISODate);
     setShowAddDateModal(true);
   };
 
@@ -812,6 +820,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                       <input
                         type="date"
                         value={editingDate.date}
+                      min={todayISODate}
                         onChange={(e) =>
                           setEditingDate({
                             ...editingDate,
@@ -891,6 +900,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                         type="date"
                         className="form-control mt-2"
                         value={newDateInput}
+                        min={todayISODate}
                         onChange={(e) => setNewDateInput(e.target.value)}
                         style={{ maxWidth: 250 }}
                       />

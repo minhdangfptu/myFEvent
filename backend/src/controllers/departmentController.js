@@ -318,6 +318,15 @@ export const addMemberToDepartment = async (req, res) => {
     const roleToSet = targetMembership.role === 'HoD' ? 'HoD' : 'Member';
     const updatedMembership = await addMemberToDepartmentDoc(eventId, departmentId, memberId, roleToSet);
 
+    // Thông báo khi thành viên tham gia
+    try {
+      const { notifyMemberJoined } = await import('../services/notificationService.js');
+      await notifyMemberJoined(eventId, departmentId, memberId);
+    } catch (notifError) {
+      console.error('Error sending notification:', notifError);
+      // Không throw error, chỉ log
+    }
+
 		return res.status(200).json({ data: updatedMembership });
 	} catch (error) {
 		console.error('addMemberToDepartment error:', error.message);

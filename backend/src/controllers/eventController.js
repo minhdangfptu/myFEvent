@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 // controllers/eventController.js
+import { getUserById } from '../services/userService.js';
 import { eventService } from '../services/eventService.js';
 
 const ok = (res, status, body) => res.status(status).json(body);
@@ -71,7 +72,8 @@ export const getEventSummary = (req, res) =>
 export const listMyEvents = (req, res) =>
   handle(res, async () => {
     const userId = req.user?.id;
-    const result = await eventService.listMyEvents({ userId });
+    const { page, limit, search } = req.query;
+    const result = await eventService.listMyEvents({ userId, page, limit, search });
     return ok(res, 200, result);
   });
 
@@ -131,3 +133,28 @@ export const getAllEventDetail = (req, res) =>
     const result = await eventService.getAllEventDetail({ userId, id });
     return ok(res, 200, result);
   });
+export const inviteMemberToEvent = async (req, res) => {
+  try {
+    const { eventId, userId } = req.params;
+    const event = await findEventById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Check if the user is already a member of the event
+    const existingMember = await EventMember.findOne({ eventId, userId });
+    if (existingMember) {
+      return res.status(400).json({ message: 'User is already a member of the event' });
+    }
+    // Create a new EventMember document
+    const newMember = await createEventMember(userId, eventId);
+    return res.status(201).json({ message: 'User invited successfully', data: newMember });
+  }catch (error) {
+    console.error('inviteMemberToEvent error:', error);
+    return res.status(500).json({ message: 'Failed to invite member' });
+  }
+}
+  

@@ -8,6 +8,13 @@ export const feedbackApi = {
     });
     return response.data;
   },
+  // HoOC - List all forms for an event
+  listFormsNameByEvent: async (eventId, page = 1, limit = 10) => {
+    const response = await axiosClient.get(`/api/feedback/event/${eventId}/forms-name`, {
+      params: { page, limit }
+    });
+    return response.data;
+  },
 
   // HoOC - Create a new form
   createForm: async (eventId, formData) => {
@@ -24,6 +31,12 @@ export const feedbackApi = {
   // HoOC - Update form
   updateForm: async (eventId, formId, formData) => {
     const response = await axiosClient.patch(`/api/feedback/event/${eventId}/forms/${formId}`, formData);
+    return response.data;
+  },
+
+  // HoOC - Delete form
+  deleteForm: async (eventId, formId) => {
+    const response = await axiosClient.delete(`/api/feedback/event/${eventId}/forms/${formId}`);
     return response.data;
   },
 
@@ -62,6 +75,12 @@ export const feedbackApi = {
     const response = await axiosClient.post(`/api/feedback/event/${eventId}/forms/${formId}/submit`, {
       responses
     });
+    return response.data;
+  },
+
+  // HoOC - Export form responses
+  exportFormResponses: async (eventId, formId) => {
+    const response = await axiosClient.get(`/api/feedback/event/${eventId}/forms/${formId}/export`);
     return response.data;
   }
 };

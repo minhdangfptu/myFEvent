@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
@@ -99,7 +99,8 @@ export default function HomePage() {
     CONFIG_BY_ROLE[user?.role] || CONFIG_BY_ROLE.User;
 
   // ===== UI states =====
-  const [searchQuery, setSearchQuery] = useState("");
+  const [myEventsSearch, setMyEventsSearch] = useState("");
+  const myEventsSearchTimeoutRef = useRef(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -112,7 +113,6 @@ export default function HomePage() {
     images: [],
   });
   const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [createError, setCreateError] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [imageInputType, setImageInputType] = useState("url");
@@ -121,28 +121,82 @@ export default function HomePage() {
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
 
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, pagination: myEventsPagination, changePage: changeMyEventsPage, refetchEvents } = useEvents();
   const myEvents = useMemo(() => dedupeById(events || []), [events]);
 
-  // ===== Fetch blogs and stop loading =====
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBlogs = async () => {
-      try {
-        const res = await eventService.fetchAllPublicEvents();
-        if (!cancelled) {
-          setBlogs(normalizeEventList(res));
-        }
-      } catch (err) {
-        console.error("fetch public events failed", err);
-        if (!cancelled) setBlogs([]);
+  // Debounce search for my events (server-side)
+  const handleMyEventsSearchChange = (value) => {
+    setMyEventsSearch(value);
+    if (myEventsSearchTimeoutRef.current) {
+      clearTimeout(myEventsSearchTimeoutRef.current);
+    }
+    myEventsSearchTimeoutRef.current = setTimeout(() => {
+      refetchEvents(1, myEventsPagination.limit, value);
+    }, 500);
+  };
+
+  // Pagination for public events (blogs)
+  const [blogsPagination, setBlogsPagination] = useState({
+    page: 1,
+    limit: 8,
+    total: 0,
+    totalPages: 0
+  });
+  const [blogsLoading, setBlogsLoading] = useState(false);
+  const [blogsSearch, setBlogsSearch] = useState("");
+  const [blogsStatusFilter, setBlogsStatusFilter] = useState("");
+
+  // ===== Fetch blogs with pagination, search and filter =====
+  const fetchBlogs = useCallback(async (page = 1, search = blogsSearch, status = blogsStatusFilter) => {
+    setBlogsLoading(true);
+    try {
+      const res = await eventService.fetchAllPublicEvents({
+        page,
+        limit: blogsPagination.limit,
+        search: search || '',
+        status: status || ''
+      });
+      setBlogs(normalizeEventList(res));
+      if (res?.pagination) {
+        setBlogsPagination(res.pagination);
       }
-    };
-    fetchBlogs();
-    return () => {
-      cancelled = true;
-    };
+    } catch (err) {
+      console.error("fetch public events failed", err);
+      setBlogs([]);
+    } finally {
+      setBlogsLoading(false);
+    }
+  }, [blogsPagination.limit, blogsSearch, blogsStatusFilter]);
+
+  // Debounce search for public events
+  const blogsSearchTimeoutRef = useRef(null);
+  const handleBlogsSearchChange = (value) => {
+    setBlogsSearch(value);
+    if (blogsSearchTimeoutRef.current) {
+      clearTimeout(blogsSearchTimeoutRef.current);
+    }
+    blogsSearchTimeoutRef.current = setTimeout(() => {
+      fetchBlogs(1, value, blogsStatusFilter);
+    }, 500);
+  };
+
+  const handleBlogsStatusChange = (status) => {
+    setBlogsStatusFilter(status);
+    fetchBlogs(1, blogsSearch, status);
+  };
+
+  useEffect(() => {
+    fetchBlogs(1, '', '');
   }, []);
+
+  // Show login success toast once
+  useEffect(() => {
+    if (location.state?.loginSuccess) {
+      toast.success("Đăng nhập thành công!");
+      // Clear the state to prevent showing toast again on refresh/back
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   // ===== Image handling functions =====
   const handleFileUpload = (event) => {
@@ -151,13 +205,13 @@ export default function HomePage() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setCreateError("Vui lòng chọn file hình ảnh hợp lệ");
+      toast.error("Vui lòng chọn file hình ảnh hợp lệ");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setCreateError("Kích thước file không được vượt quá 5MB");
+      toast.error("Kích thước file không được vượt quá 5MB");
       return;
     }
 
@@ -174,7 +228,7 @@ export default function HomePage() {
 
   const handleUrlAdd = () => {
     if (!imageUrl.trim()) {
-      setCreateError("Vui lòng nhập URL hình ảnh");
+      toast.error("Vui lòng nhập URL hình ảnh");
       return;
     }
 
@@ -182,7 +236,7 @@ export default function HomePage() {
     try {
       new URL(imageUrl);
     } catch {
-      setCreateError("URL không hợp lệ");
+      toast.error("URL không hợp lệ");
       return;
     }
 
@@ -191,7 +245,6 @@ export default function HomePage() {
       images: [...prev.images, imageUrl.trim()],
     }));
     setImageUrl("");
-    setCreateError("");
   };
 
   const removeImage = (index) => {
@@ -246,19 +299,14 @@ export default function HomePage() {
     return () => document.removeEventListener("click", onClickOutside);
   }, []);
 
-  // ===== Filter + sort =====
-  const norm = (s) => (s || "").toLowerCase();
+  // ===== Filter + sort (search is now done server-side) =====
   const filteredEvents = myEvents
-    .filter(
-      (ev) =>
-        norm(ev.name).includes(norm(searchQuery)) ||
-        norm(ev.description).includes(norm(searchQuery))
-    )
     .filter((ev) => {
+      // Status filter (client-side) - search is done server-side
       if (statusFilter === STATUS.ALL) return true;
-      if (statusFilter === STATUS.UPCOMING) return ev.status === "Sắp diễn ra";
-      if (statusFilter === STATUS.ONGOING) return ev.status === "Đang diễn ra";
-      if (statusFilter === STATUS.PAST) return ev.status === "Đã kết thúc";
+      if (statusFilter === STATUS.UPCOMING) return ev.status === "scheduled";
+      if (statusFilter === STATUS.ONGOING) return ev.status === "ongoing";
+      if (statusFilter === STATUS.PAST) return ev.status === "completed";
       return true;
     })
     .sort((a, b) => {
@@ -270,35 +318,19 @@ export default function HomePage() {
       return 0;
     });
 
-  // ===== Toast router state =====
-  const toastShown = useRef(false);
-  useEffect(() => {
-    const toastData = location.state?.toast;
-    if (toastData && !toastShown.current) {
-      toast.dismiss();
-      const fn = toast[toastData.type] || toast.success;
-      fn(toastData.message);
-      toastShown.current = true;
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location, navigate]);
-
-  // Check cả authLoading và eventsLoading
-  if (authLoading || eventsLoading) {
+  // Chỉ chờ authLoading, eventsLoading sẽ hiển thị loading trong section
+  if (authLoading) {
     return (
       <UserLayout title={title} sidebarType={sidebarType}>
         <div
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            minHeight: "50vh",
           }}
         >
-          <Loading size={80} />
+          <Loading size={60} />
         </div>
       </UserLayout>
     );
@@ -308,8 +340,8 @@ export default function HomePage() {
     <UserLayout title={title} activePage="home" sidebarType={sidebarType}>
       {/* Search + actions */}
       <div className="bg-light border-bottom py-3 px-0 pt-0">
-        <div className="d-flex gap-3 align-items-center">
-          <div className="flex-grow-1">
+        <div className="d-flex gap-3 align-items-center flex-wrap">
+          <div className="flex-grow-1" style={{ minWidth: 200 }}>
             <div className="position-relative">
               <i
                 className="bi bi-search position-absolute"
@@ -320,11 +352,26 @@ export default function HomePage() {
                 type="text"
                 className="form-control soft-input ps-5"
                 placeholder={t("searchPlaceholder")}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={myEventsSearch}
+                onChange={(e) => handleMyEventsSearchChange(e.target.value)}
                 aria-label={t("searchPlaceholder")}
+                disabled={eventsLoading}
               />
             </div>
           </div>
+          {myEventsSearch && (
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => {
+                setMyEventsSearch("");
+                refetchEvents(1, myEventsPagination.limit, "");
+              }}
+              disabled={eventsLoading}
+            >
+              <i className="bi bi-x-lg me-1"></i>
+              Xóa tìm kiếm
+            </button>
+          )}
 
           {/* Create/Join (Bootstrap dropdown chạy bằng data-bs) */}
           <div className="dropdown">
@@ -405,7 +452,7 @@ export default function HomePage() {
         .blog-img { height:160px; background:#f3f4f6; position:relative; }
         .blog-img::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)); }
         .blog-body { padding:16px; }
-        .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; }
+        .blog-title { font-weight:700; font-size:16px; margin-bottom:8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
         .blog-meta { display:flex; flex-wrap:wrap; gap:6px; color:#6B7280; font-size:12px; }
         .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; margin-bottom:16px; flex-wrap:wrap; }
         .section-title { color:red; margin:0; font-size:18px; font-weight:700; }
@@ -537,7 +584,11 @@ export default function HomePage() {
           </div>
         </div>
 
-        {filteredEvents.length === 0 ? (
+        {eventsLoading ? (
+          <div className="d-flex justify-content-center align-items-center py-5">
+            <Loading size={50} />
+          </div>
+        ) : filteredEvents.length === 0 ? (
           <div className="d-flex flex-column justify-content-center align-items-center py-5">
             <img
               src={NoDataImg}
@@ -545,7 +596,9 @@ export default function HomePage() {
               style={{ width: 200, maxWidth: "50vw", opacity: 0.8 }}
             />
             <div className="text-muted mt-3" style={{ fontSize: 18 }}>
-              Chưa có sự kiện nào!
+              {myEventsSearch || statusFilter !== STATUS.ALL
+                ? "Không tìm thấy sự kiện phù hợp với bộ lọc"
+                : "Chưa có sự kiện nào!"}
             </div>
           </div>
         ) : (
@@ -632,6 +685,10 @@ export default function HomePage() {
                           maxHeight: 48,
                           overflow: "hidden",
                           lineHeight: "24px",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: "vertical",
+                          textOverflow: "ellipsis",
                         }}
                       >
                         {event.name}
@@ -732,9 +789,7 @@ export default function HomePage() {
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
-                            navigate(
-                              `/member-event-detail/${eid}?eventId=${eid}`
-                            );
+                            navigate(`/member-dashboard?eventId=${eid}`);
                             return;
                           }
                           if (role === "HoOC") {
@@ -756,6 +811,70 @@ export default function HomePage() {
             })}
           </div>
         )}
+
+        {/* Pagination for My Events */}
+        {myEventsPagination && myEventsPagination.totalPages > 1 && (
+          <div className="d-flex justify-content-center mt-4">
+            <div className="d-flex align-items-center" style={{ gap: 16 }}>
+              <button
+                type="button"
+                onClick={() => changeMyEventsPage(myEventsPagination.page - 1, myEventsSearch)}
+                disabled={myEventsPagination.page <= 1 || eventsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              {Array.from({ length: myEventsPagination.totalPages }, (_, i) => i + 1).map(
+                (n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => changeMyEventsPage(n, myEventsSearch)}
+                    disabled={eventsLoading}
+                    className="btn"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: "1px solid " + (n === myEventsPagination.page ? "#EF4444" : "#e5e7eb"),
+                      background: n === myEventsPagination.page ? "#EF4444" : "#fff",
+                      color: n === myEventsPagination.page ? "#fff" : "#111827",
+                      padding: 0,
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => changeMyEventsPage(myEventsPagination.page + 1, myEventsSearch)}
+                disabled={myEventsPagination.page >= myEventsPagination.totalPages || eventsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ====== Blog ====== */}
@@ -765,6 +884,51 @@ export default function HomePage() {
             Sự kiện tại trường Đại học FPT Hà Nội
           </h4>
         </div>
+
+        {/* Search and Filter for Public Events */}
+        <div className="d-flex gap-3 mb-4 flex-wrap align-items-center">
+          <div className="position-relative flex-grow-1" style={{ maxWidth: 400 }}>
+            <i
+              className="bi bi-search position-absolute"
+              style={{ left: 12, top: 12, color: "#9CA3AF" }}
+            />
+            <input
+              type="text"
+              className="form-control soft-input ps-5"
+              placeholder="Tìm kiếm sự kiện công khai..."
+              value={blogsSearch}
+              onChange={(e) => handleBlogsSearchChange(e.target.value)}
+              disabled={blogsLoading}
+            />
+          </div>
+          <select
+            className="form-select soft-input"
+            style={{ width: 180 }}
+            value={blogsStatusFilter}
+            onChange={(e) => handleBlogsStatusChange(e.target.value)}
+            disabled={blogsLoading}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="scheduled">Sắp diễn ra</option>
+            <option value="ongoing">Đang diễn ra</option>
+            <option value="completed">Đã kết thúc</option>
+          </select>
+          {(blogsSearch || blogsStatusFilter) && (
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => {
+                setBlogsSearch("");
+                setBlogsStatusFilter("");
+                fetchBlogs(1, "", "");
+              }}
+              disabled={blogsLoading}
+            >
+              <i className="bi bi-x-lg me-1"></i>
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+
         <div className="row g-4">
           {blogs.map((blog, idx) => (
             <div
@@ -887,14 +1051,87 @@ export default function HomePage() {
               </div>
             </div>
           ))}
-          {blogs.length === 0 && (
+          {blogs.length === 0 && !blogsLoading && (
             <div className="col-12">
               <div className="soft-card p-4 text-center text-muted">
-                Chưa có sự kiện nào
+                {blogsSearch || blogsStatusFilter
+                  ? "Không tìm thấy sự kiện phù hợp với bộ lọc"
+                  : "Chưa có sự kiện nào"}
+              </div>
+            </div>
+          )}
+          {blogsLoading && (
+            <div className="col-12">
+              <div className="soft-card p-4 text-center">
+                <Loading size={40} />
               </div>
             </div>
           )}
         </div>
+
+        {/* Pagination for Public Events */}
+        {blogsPagination && blogsPagination.totalPages > 1 && (
+          <div className="d-flex justify-content-center mt-4">
+            <div className="d-flex align-items-center" style={{ gap: 16 }}>
+              <button
+                type="button"
+                onClick={() => fetchBlogs(blogsPagination.page - 1, blogsSearch, blogsStatusFilter)}
+                disabled={blogsPagination.page <= 1 || blogsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              {Array.from({ length: blogsPagination.totalPages }, (_, i) => i + 1).map(
+                (n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => fetchBlogs(n, blogsSearch, blogsStatusFilter)}
+                    disabled={blogsLoading}
+                    className="btn"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: "1px solid " + (n === blogsPagination.page ? "#EF4444" : "#e5e7eb"),
+                      background: n === blogsPagination.page ? "#EF4444" : "#fff",
+                      color: n === blogsPagination.page ? "#fff" : "#111827",
+                      padding: 0,
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => fetchBlogs(blogsPagination.page + 1, blogsSearch, blogsStatusFilter)}
+                disabled={blogsPagination.page >= blogsPagination.totalPages || blogsLoading}
+                className="btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#9ca3af",
+                  padding: 0,
+                }}
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ====== CREATE EVENT MODAL ====== */}
@@ -925,7 +1162,6 @@ export default function HomePage() {
                       images: [],
                     });
                     setImageUrl("");
-                    setCreateError("");
                   }}
                 />
               </div>
@@ -933,62 +1169,63 @@ export default function HomePage() {
                 <div className="text-muted mb-3" style={{ fontSize: 14 }}>
                   Hãy tạo sự kiện mới của riêng mình thôi!
                 </div>
-                {createError && (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {createError}
-                  </div>
-                )}
 
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    setCreateError("");
 
                     // Validation
-                    if (!createForm.name.trim())
-                      return setCreateError("Vui lòng nhập tên sự kiện");
-                    if (!createForm.organizerName.trim())
-                      return setCreateError(
-                        "Vui lòng nhập tên CLB/Đội nhóm/Người đại diện tổ chức"
-                      );
-                    if (!createForm.eventStartDate)
-                      return setCreateError("Vui lòng chọn ngày bắt đầu");
-                    if (!createForm.eventEndDate)
-                      return setCreateError("Vui lòng chọn ngày kết thúc");
-                    if (!createForm.location.trim())
-                      return setCreateError("Vui lòng nhập địa điểm");
-                    if (!createForm.description.trim())
-                      return setCreateError("Vui lòng nhập mô tả sự kiện");
+                    if (!createForm.name.trim()) {
+                      toast.error("Vui lòng nhập tên sự kiện");
+                      return;
+                    }
+                    if (!createForm.organizerName.trim()) {
+                      toast.error("Vui lòng nhập tên CLB/Đội nhóm/Người đại diện tổ chức");
+                      return;
+                    }
+                    if (!createForm.eventStartDate) {
+                      toast.error("Vui lòng chọn ngày bắt đầu");
+                      return;
+                    }
+                    if (!createForm.eventEndDate) {
+                      toast.error("Vui lòng chọn ngày kết thúc");
+                      return;
+                    }
+                    if (!createForm.location.trim()) {
+                      toast.error("Vui lòng nhập địa điểm");
+                      return;
+                    }
+                    if (!createForm.description.trim()) {
+                      toast.error("Vui lòng nhập mô tả sự kiện");
+                      return;
+                    }
 
                     // Kiểm tra ngày bắt đầu và ngày kết thúc phải là ngày hôm nay hoặc trong tương lai
                     const now = new Date();
                     const startDate = new Date(createForm.eventStartDate);
                     const endDate = new Date(createForm.eventEndDate);
-                    
+
                     // So sánh chỉ ngày (không tính giờ/phút) để tránh lỗi timezone
                     const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
                     const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                    
+
                     // Cho phép ngày hôm nay hoặc ngày trong tương lai
                     if (startDateOnly < nowDateOnly) {
-                      return setCreateError(
-                        "Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai"
-                      );
+                      toast.error("Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai");
+                      return;
                     }
-                    
+
                     if (endDateOnly < nowDateOnly) {
-                      return setCreateError(
-                        "Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai"
-                      );
+                      toast.error("Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai");
+                      return;
                     }
-                    
-                    // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
-                    if (endDateOnly <= startDateOnly) {
-                      return setCreateError(
-                        "Ngày kết thúc phải sau ngày bắt đầu"
-                      );
-                    }
+
+                    // // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
+                    // if (endDateOnly <= startDateOnly) {
+                    //   toast.error("Ngày kết thúc phải sau ngày bắt đầu");
+                    //   return;
+                    // }
 
                     try {
                       setCreateSubmitting(true);
@@ -1017,7 +1254,6 @@ export default function HomePage() {
                         err?.message ||
                         "Tạo sự kiện thất bại";
                       toast.error(msg);
-                      setCreateError(msg);
                     } finally {
                       setCreateSubmitting(false);
                     }
@@ -1269,7 +1505,6 @@ export default function HomePage() {
                           images: [],
                         });
                         setImageUrl("");
-                        setCreateError("");
                       }}
                     >
                       Hủy
@@ -1493,9 +1728,9 @@ export default function HomePage() {
                 style={{
                   fontSize: '36px',
                   fontWeight: 700,
-                  letterSpacing: '6px',
+                  letterSpacing: '2px',
                   color: '#dc2626',
-                  fontFamily: 'monospace',
+                  fontFamily: 'roboto',  
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
               >
@@ -1550,7 +1785,7 @@ export default function HomePage() {
                 style={{
                   flex: 1,
                   padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -1561,16 +1796,14 @@ export default function HomePage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
                   transition: 'all 0.2s',
+                  boxShadow: 'none',
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.4)';
+                  e.target.style.background = '#a41c1cff';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                  e.target.style.background = '#dc2626';
                 }}
               >
                 <i className="bi bi-copy"></i>

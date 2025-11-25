@@ -4,6 +4,8 @@ import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { useAuth } from '../../contexts/AuthContext';
 import Loading from '../../components/Loading';
+import { useEvents } from '../../contexts/EventContext';
+import { toast } from 'react-toastify';
 
 export default function MemberEventDetail() {
   const { eventId } = useParams();
@@ -11,8 +13,11 @@ export default function MemberEventDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const [event, setEvent] = useState(null);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [eventRole, setEventRole] = useState('');
+  const { fetchEventRole, refetchEvents } = useEvents();
 
   // Thêm eventId vào URL query để sidebar đồng bộ
   useEffect(() => {
@@ -29,15 +34,32 @@ export default function MemberEventDetail() {
     fetchEventDetail();
   }, [eventId]);
 
+  useEffect(() => {
+    const loadRole = async () => {
+      if (!eventId) return;
+      try {
+        const role = await fetchEventRole(eventId);
+        setEventRole(role || '');
+      } catch {
+        setEventRole('');
+      }
+    };
+    loadRole();
+  }, [eventId, fetchEventRole]);
+
   const fetchEventDetail = async () => {
     try {
       setLoading(true);
       const response = await eventApi.getAllEventDetail(eventId);
       console.log('Event detail response:', response);
       
-      // API returns { event, members } but we just need event for now
       if (response.data && response.data.event) {
-        setEvent(response.data.event);
+        const memberList = response.data.members || [];
+        setEvent({
+          ...response.data.event,
+          memberCount: memberList.length || response.data.event.memberCount || 0,
+        });
+        setMembers(memberList);
       } else {
         setError('Không tìm thấy thông tin sự kiện');
       }
@@ -50,6 +72,26 @@ export default function MemberEventDetail() {
       } else {
         setError('Không thể tải thông tin sự kiện');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeaveEvent = async () => {
+    if (!eventId) return;
+    const confirmed = window.confirm('Bạn có chắc chắn muốn rời sự kiện này? Bạn sẽ mất quyền truy cập vào các chức năng của sự kiện.');
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      await eventApi.leaveEvent(eventId);
+      await refetchEvents?.();
+      toast.success('Bạn đã rời sự kiện thành công');
+      navigate('/home-page');
+    } catch (error) {
+      console.error('Error leaving event:', error);
+      const msg = error?.response?.data?.message || 'Không thể rời sự kiện';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -176,16 +218,40 @@ export default function MemberEventDetail() {
             <h5 className="fw-bold mb-3">Thông tin</h5>
             <div className="d-flex justify-content-between mb-2">
               <span>Số thành viên:</span>
-              <span className="fw-bold">{event.memberCount || 0}</span>
+              <span className="fw-bold">{event.memberCount || members.length || 0}</span>
             </div>
-            {/* <div className="d-flex justify-content-between mb-2">
-              <span>Ngân sách:</span>
-              <span className="fw-bold">{event.budget ? `${event.budget.toLocaleString()} VNĐ` : 'Chưa cập nhật'}</span>
-            </div>
-            <div className="d-flex justify-content-between mb-2">
-              <span>Chi tiêu:</span>
-              <span className="fw-bold">{event.expenses ? `${event.expenses.toLocaleString()} VNĐ` : '0 VNĐ'}</span>
-            </div> */}
+            {members.length > 0 && (
+              <div>
+                <div className="text-muted small mb-2">Thành viên tiêu biểu</div>
+                <div className="d-flex flex-wrap gap-2">
+                  {members.slice(0, 4).map((m) => (
+                    <div
+                      key={m._id || m.id}
+                      className="d-flex align-items-center gap-2 rounded border px-2 py-1"
+                    >
+                      <img
+                        src={m.userId?.avatarUrl || "/website-icon-fix@3x.png"}
+                        alt={m.userId?.fullName || "Member"}
+                        style={{ width: 32, height: 32, borderRadius: 999, objectFit: "cover" }}
+                      />
+                      <div>
+                        <div className="fw-semibold" style={{ fontSize: 13 }}>
+                          {m.userId?.fullName || "Thành viên"}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: 12 }}>
+                          {m.departmentId?.name || "Chưa phân ban"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {members.length > 4 && (
+                    <div className="text-muted small d-flex align-items-center">
+                      +{members.length - 4} thành viên khác
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="info-card">
@@ -203,6 +269,15 @@ export default function MemberEventDetail() {
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 Rủi ro
               </button>
+              {eventRole === 'Member' && (
+                <button
+                  className="btn btn-outline-danger"
+                  onClick={handleLeaveEvent}
+                >
+                  <i className="bi bi-box-arrow-right me-2"></i>
+                  Rời sự kiện
+                </button>
+              )}
             </div>
           </div>
         </div>

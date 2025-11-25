@@ -247,6 +247,14 @@ export default function ManageMemberPage() {
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
   const isMember = eventRole === 'Member';
 
+  // Hàm chuyển đổi role sang tên hiển thị
+  const getRoleDisplayName = (role) => {
+    if (role === 'HoOC') return 'Trưởng ban Tổ chức';
+    if (role === 'HoD') return 'Trưởng ban';
+    if (role === 'Member') return 'Thành viên';
+    return role; // Giữ nguyên nếu không khớp
+  };
+
   return (
     <UserLayout
       title="Quản lý thành viên sự kiện"
@@ -323,7 +331,7 @@ export default function ManageMemberPage() {
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Tên</th>
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Ban</th>
                   <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Vai trò</th>
-                  <th style={{ width: 56, fontSize: "14px", fontWeight: "500", color: "#374151" }}>Action</th>
+                  <th style={{ width: 56, fontSize: "14px", fontWeight: "500", color: "#374151" }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -341,7 +349,7 @@ export default function ManageMemberPage() {
                     </td>
                     <td style={{ padding: "10px", fontWeight: "500", color: "#374151" }}>{r.name}</td>
                     <td>{r.dept}</td>
-                    <td>{r.role}</td>
+                    <td>{getRoleDisplayName(r.role)}</td>
                     <td className="cell-action text-end">
                       <i className="bi bi-three-dots" />
                     </td>

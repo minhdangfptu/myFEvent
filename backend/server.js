@@ -28,12 +28,6 @@ app.get('/test', (req, res) => {
   res.send('<h1>Hello World!</h1>');
 });
 
-// // Request logging middleware
-// app.use((req, res, next) => {
-//   console.log(`Request: ${req.method} ${req.url}`);
-//   next();
-// });
-
 // Validation error handler
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
@@ -62,15 +56,15 @@ app.use('*', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    
     // Khởi động scheduled task để tự động cập nhật trạng thái task
     const { startTaskAutoStatusScheduler } = await import('./src/services/taskAutoStatusService.js');
     startTaskAutoStatusScheduler();
     
-    app.listen(config.PORT, () => {
+    const server = app.listen(config.PORT, () => {
       console.log(`Server is running at http://localhost:${config.PORT}`);
       console.log(`Environment: ${config.NODE_ENV}`);
     });
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

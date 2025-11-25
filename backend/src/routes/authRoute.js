@@ -61,7 +61,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     if (!dbUser) return res.status(404).json({ message: 'User not found' });
     
     // Tính tổng số sự kiện user đã tham gia
-    const totalEvents = await EventMember.countDocuments({ userId: req.user.id });
+    const totalEvents = await EventMember.countDocuments({ userId: req.user.id, status: { $ne: 'deactive' } });
     
     return res.status(200).json({
       data: {
@@ -137,7 +137,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
     
     // Tính tổng số sự kiện user đã tham gia
-    const totalEvents = await EventMember.countDocuments({ userId: req.user.id });
+    const totalEvents = await EventMember.countDocuments({ userId: req.user.id, status: { $ne: 'deactive' } });
     
     return res.status(200).json({ 
       message: 'Updated', 

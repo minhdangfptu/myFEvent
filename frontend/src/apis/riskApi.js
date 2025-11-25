@@ -150,24 +150,34 @@ export const riskApiHelpers = {
 
   // Validate risk data before send
   validateRiskData: (riskData) => {
-    const required = ['name', 'departmentId', 'risk_category', 'impact', 'likelihood', 'risk_mitigation_plan'];
+    const required = ['name', 'risk_category', 'impact', 'likelihood', 'risk_mitigation_plan'];
     const missing = required.filter(field => !riskData[field]);
-    
+
+    // Only require departmentId when scope is "department"
+    if (riskData.scope === "department" && !riskData.departmentId) {
+      missing.push('departmentId');
+    }
+
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
 
     // Validate enums
+    const validScopes = ['event', 'department'];
     const validCategories = [
       'infrastructure', 'mc-guests', 'communication', 'players', 'staffing',
-      'communication_post', 'attendees', 'weather', 'time', 'timeline', 
-      'tickets', 'collateral', 'game', 'sponsorship', 'finance', 
+      'communication_post', 'attendees', 'weather', 'time', 'timeline',
+      'tickets', 'collateral', 'game', 'sponsorship', 'finance',
       'transportation', 'decor', 'others'
     ];
-    
+
     const validImpacts = ['low', 'medium', 'high'];
     const validLikelihoods = ['very_low', 'low', 'medium', 'high', 'very_high'];
-    const validStatuses = ['not_yet', 'resolved', 'cancelled'];
+    const validStatuses = ['not_yet', 'resolved', 'resolving'];
+
+    if (riskData.scope && !validScopes.includes(riskData.scope)) {
+      throw new Error(`Invalid scope. Must be one of: ${validScopes.join(', ')}`);
+    }
 
     if (!validCategories.includes(riskData.risk_category)) {
       throw new Error(`Invalid risk_category. Must be one of: ${validCategories.join(', ')}`);
@@ -224,6 +234,7 @@ export const riskApiHelpers = {
     if (filters.likelihood) params.likelihood = filters.likelihood;
     if (filters.risk_status) params.risk_status = filters.risk_status;
     if (filters.departmentId) params.departmentId = filters.departmentId;
+    if (filters.scope) params.scope = filters.scope;
     
     return params;
   },

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import Loading from '../../components/Loading';
@@ -62,35 +63,61 @@ export default function FeedbackSummary() {
     return date.toLocaleString('vi-VN');
   };
 
-  const exportCSV = () => {
-    if (!summaryData) return;
-    
-    let csv = 'Câu hỏi,Loại,Thống kê\n';
-    summaryData.questionStats.forEach((stat, index) => {
-      csv += `"${stat.questionText}",${stat.questionType},`;
-      if (stat.questionType === 'rating') {
-        csv += `Trung bình: ${stat.statistics.average}\n`;
-        Object.keys(stat.statistics.distribution).forEach(rating => {
-          csv += `,${rating} sao,${stat.statistics.distribution[rating]} (${stat.statistics.percentages[rating]}%)\n`;
-        });
-      } else if (stat.questionType === 'multiple-choice') {
-        Object.keys(stat.statistics.distribution).forEach(option => {
-          csv += `,${option},${stat.statistics.distribution[option]} (${stat.statistics.percentages[option]}%)\n`;
-        });
-      } else {
-        csv += `${JSON.stringify(stat.statistics)}\n`;
-      }
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `feedback-summary-${formId}.csv`;
-    link.click();
-  };
 
   const exportPDF = () => {
     toast.info('Tính năng xuất PDF đang được phát triển');
+  };
+
+  const exportExcel = async () => {
+    try {
+      toast.info('Đang tải dữ liệu...');
+      const res = await feedbackApi.exportFormResponses(eventId, formId);
+      const { data, formName } = res;
+
+      if (!data || data.length === 0) {
+        toast.warning('Không có dữ liệu để xuất');
+        return;
+      }
+
+      // Prepare data for Excel
+      const excelData = data.map((item) => ({
+        'Thời gian gửi': new Date(item.submittedAt).toLocaleString('vi-VN'),
+        'Người gửi': item.userFullName,
+        'Câu hỏi': item.questionText,
+        'Loại câu hỏi': item.questionType === 'rating' ? 'Đánh giá' : 
+                       item.questionType === 'multiple-choice' ? 'Lựa chọn nhiều' :
+                       item.questionType === 'yes-no' ? 'Có/Không' :
+                       item.questionType === 'text' ? 'Văn bản' : item.questionType,
+        'Câu trả lời': item.answer
+      }));
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 20 }, // Thời gian gửi
+        { wch: 25 }, // Người gửi
+        { wch: 40 }, // Câu hỏi
+        { wch: 15 }, // Loại câu hỏi
+        { wch: 50 }  // Câu trả lời
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Phản hồi');
+
+      // Generate filename with form name and current date
+      const dateStr = new Date().toISOString().split('T')[0];
+      const sanitizedFormName = (formName || 'feedback').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+      const filename = `Phan_hoi_${sanitizedFormName}_${dateStr}.xlsx`;
+
+      // Write file
+      XLSX.writeFile(wb, filename);
+      toast.success('Xuất Excel thành công!');
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      toast.error(error.response?.data?.message || 'Không thể xuất file Excel');
+    }
   };
 
   if (loading || !summaryData) {
@@ -124,9 +151,9 @@ export default function FeedbackSummary() {
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                onClick={exportCSV}
+                onClick={exportExcel}
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: '#10b981',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -138,8 +165,8 @@ export default function FeedbackSummary() {
                   gap: '8px'
                 }}
               >
-                <i className="bi bi-file-earmark-spreadsheet"></i>
-                Xuất CSV
+                <i className="bi bi-file-earmark-excel"></i>
+                Xuất Excel
               </button>
               <button
                 onClick={exportPDF}
