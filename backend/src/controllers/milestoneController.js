@@ -14,9 +14,9 @@ import * as agendaService from '../services/agendaService.js';
 export const createMilestone = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { name, description, targetDate, status } = req.body;
+    const { name, description, targetDate } = req.body;
 
-    if (!name || !targetDate || !status) {
+    if (!name || !targetDate) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -25,7 +25,12 @@ export const createMilestone = async (req, res) => {
     }
 
     // 1. Create milestone first
-    const milestone = await createMilestoneDoc({ eventId, name, description, targetDate, status });
+    const milestone = await createMilestoneDoc({
+      eventId,
+      name,
+      description,
+      targetDate
+    });
     
     // 2. Create agenda document for this milestone
     try {
@@ -120,7 +125,6 @@ export const getMilestoneDetail = async (req, res) => {
       id: String(milestone._id),
       name: milestone.name,
       date: milestone.targetDate,
-      status: milestone.status || 'upcoming',
       description: milestone.description || '',
       relatedTasks: (tasks || []).map(t => ({
         id: String(t._id),
@@ -144,12 +148,11 @@ export const updateMilestone = async (req, res) => {
     if (!membership || membership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Only HoOC can update milestone' });
     }
-    const { name, description, dueDate, status } = req.body;
+    const { name, description, dueDate } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (dueDate !== undefined) updates.dueDate = dueDate;
-    if (status !== undefined) updates.status = status;
 
     const milestone = await updateMilestoneDoc(eventId, milestoneId, updates);
     if (!milestone) return res.status(404).json({ message: 'Milestone not found' });

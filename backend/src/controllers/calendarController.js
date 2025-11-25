@@ -26,7 +26,8 @@ import {
 import {
     notifyMeetingReminder,
     notifyRemovedFromCalendar,
-    notifyAddedToCalendar
+    notifyAddedToCalendar,
+    notifyCalendarUpdated
 } from "../services/notificationService.js";
 
 const toIdString = (value) => {
@@ -687,6 +688,18 @@ export const updateCalendarForEvent = async (req, res) => {
 		await updateCalendar(calendarId, allowedUpdate);
 		// Return populated document
 		calendar = await getCalendarById(calendarId);
+
+		// Send notification to all participants about the update
+		const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+		if (calendarEventId && calendar.participants && calendar.participants.length > 0) {
+			await notifyCalendarUpdated(
+				calendarEventId,
+				calendarId,
+				calendar.participants,
+				calendar.name
+			);
+		}
+
 		return res.status(200).json({ data: calendar });
     } catch (error) {
         console.error('updateCalendarForEntity error:', error);
@@ -807,17 +820,17 @@ export const getAvailableMembers = async (req, res) => {
 
     const calendar = await getCalendarById(calendarId);
     if (!calendar) {
-      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+      return res.status(404).json({ message: 'Calendar not found' });
     }
 
     const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
     if (!calendarEventId || calendarEventId !== eventId) {
-      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+      return res.status(400).json({ message: 'Calendar does not belong to this event' });
     }
 
     const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
     if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
-      return res.status(403).json({ message: 'Bạn không có quyền quản lý người tham gia' });
+      return res.status(403).json({ message: 'Infficient permissions' });
     }
 
     const allMembers = await getActiveEventMembers(calendarEventId);
@@ -830,14 +843,16 @@ export const getAvailableMembers = async (req, res) => {
       member => !currentMemberIds.has(member._id.toString())
     );
 
+    console.log('Available members:', availableMembers.map(m => m._id.toString()));
+
     return res.status(200).json({
-      message: 'Lấy danh sách thành viên thành công',
+      message: 'Successfully get available members',
       data: availableMembers
     });
   } catch (error) {
     console.error('Error in getAvailableMembers:', error);
     return res.status(500).json({
-      message: 'Lỗi server khi lấy danh sách thành viên'
+      message: 'Failed to get available members'
     });
   }
 };

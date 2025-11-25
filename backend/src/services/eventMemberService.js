@@ -134,7 +134,7 @@ export const createEventMember = async (userId, eventId) => {
 export const getActiveEventMembers = async (eventId) => {
   return await EventMember.find({ 
     eventId: eventId,
-    status: 'active'
+    status: 'Active'
   })
     .populate('userId', 'fullName email avatarUrl')
     .lean();

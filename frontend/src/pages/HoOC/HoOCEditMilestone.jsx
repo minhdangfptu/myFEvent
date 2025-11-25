@@ -13,7 +13,6 @@ const HoOCEditMilestone = () => {
   const [milestone, setMilestone] = useState({
     name: '',
     date: '',
-    status: '',
     description: ''
   });
   const [relatedTasks, setRelatedTasks] = useState([]);
@@ -35,7 +34,6 @@ const HoOCEditMilestone = () => {
       setMilestone({
         name: stateData.milestone.name || '',
         date: stateData.milestone.date || '',
-        status: stateData.milestone.status || '',
         description: stateData.milestone.description || ''
       });
       setRelatedTasks(stateData.relatedTasks || []);
@@ -49,7 +47,6 @@ const HoOCEditMilestone = () => {
           setMilestone({
             name: response.name || '',
             date: response.date || '',
-            status: response.status || '',
             description: response.description || ''
           });
           setRelatedTasks(response.relatedTasks || []);
@@ -106,28 +103,6 @@ const HoOCEditMilestone = () => {
       case "in_progress": return "#f59e0b";
       case "blocked": return "#dc2626";
       case "done": return "#10b981";
-      case "cancelled": return "#6b7280";
-      default: return "#6b7280";
-    }
-  };
-
-  const getMilestoneStatusLabel = (status) => {
-    switch (status) {
-      case "planned": return "Sắp tới";
-      case "in_progress": return "Đang làm";
-      case "completed": return "Đã hoàn thành";
-      case "delayed": return "Trễ hạn";
-      case "cancelled": return "Đã hủy";
-      default: return "Sắp tới";
-    }
-  };
-
-  const getMilestoneStatusColor = (status) => {
-    switch (status) {
-      case "planned": return "#6b7280";
-      case "in_progress": return "#f59e0b";
-      case "completed": return "#10b981";
-      case "delayed": return "#dc2626";
       case "cancelled": return "#6b7280";
       default: return "#6b7280";
     }
@@ -219,24 +194,6 @@ const HoOCEditMilestone = () => {
                    }}
                 ></i>
               </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="form-label" style={{ color: '#374151', fontWeight: '500' }}>
-                Trạng thái
-              </label>
-              <select 
-                className="form-select"
-                value={milestone.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                style={{ borderRadius: '8px' }}
-              >
-                <option value="planned">Sắp tới</option>
-                <option value="in_progress">Đang làm</option>
-                <option value="completed">Đã hoàn thành</option>
-                <option value="delayed">Trễ hạn</option>
-                <option value="cancelled">Đã hủy</option>
-              </select>
             </div>
 
             <div className="mb-4">

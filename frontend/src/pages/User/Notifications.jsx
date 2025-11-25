@@ -1,5 +1,6 @@
 import UserLayout from '../../components/UserLayout'
 import { useNotifications } from '../../contexts/NotificationsContext'
+import { useNavigate } from 'react-router-dom'
 
 function timeAgo(iso) {
   try {
@@ -14,6 +15,25 @@ function timeAgo(iso) {
 
 export default function NotificationsPage() {
   const { notifications, markAllRead, markRead } = useNotifications()
+  const navigate = useNavigate()
+
+  const handleNotificationClick = (notification) => {
+    // Mark as read
+    markRead(notification.id)
+
+    // Navigate based on related entities
+    if (notification.relatedCalendarId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
+    } else if (notification.relatedTaskId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
+    } else if (notification.relatedMilestoneId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
+    } else if (notification.relatedAgendaId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/agendas/${notification.relatedAgendaId}`)
+    } else if (notification.eventId) {
+      navigate(`/events/${notification.eventId}`)
+    }
+  }
 
   return (
     <UserLayout title="Tất cả thông báo" activePage="notifications">
@@ -30,7 +50,7 @@ export default function NotificationsPage() {
 
       <div className="noti-card p-0">
         {notifications.map(n => (
-          <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => markRead(n.id)}>
+          <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => handleNotificationClick(n)}>
             <div className="d-flex align-items-center justify-content-center" style={{ width:32, height:32 }}>
               <i className={n.icon} style={{ color:'#ef4444' }} />
             </div>
