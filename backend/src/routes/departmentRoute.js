@@ -8,6 +8,7 @@ import {
   addMemberToDepartment,
   removeMemberFromDepartment,
   editDepartment,
+  deleteDepartment,
   
 } from '../controllers/departmentController.js';
 import {getMembersByDepartment} from "../controllers/eventMemberController.js"
@@ -26,6 +27,7 @@ router.patch('/:departmentId/change-hod', authenticateToken, changeHoD);
 router.post('/:departmentId/members', authenticateToken, addMemberToDepartment);
 router.delete('/:departmentId/members/:memberId', authenticateToken, removeMemberFromDepartment);
 router.patch('/:departmentId', authenticateToken, editDepartment);
+router.delete('/:departmentId', authenticateToken, deleteDepartment);
 // Calendar endpoints for a department (HoD)
 router.post('/:departmentId/calendars/create-calendar-for-department', authenticateToken, createCalendarForDepartment);
 

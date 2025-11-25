@@ -18,6 +18,7 @@ import {
   findEventMemberById,
   getRequesterMembership,
   countDepartmentMembersExcludingHoOC,
+  getMembersByDepartmentRaw,
 } from '../services/eventMemberService.js';
 
 // GET /api/events/:eventId/departments
@@ -169,10 +170,14 @@ export const deleteDepartment = async (req, res) => {
       return res.status(404).json({ message: 'Event không tồn tại' });
     }
     const department = await ensureDepartmentInEvent(eventId, departmentId);
-    if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
+    if (!department) return res.status(404).json({ message: 'Department not found' });
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-    if (!requesterMembership || requesterMembership.role !== 'HooC') {
-      return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
+    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
+      return res.status(403).json({ message: 'Only HoOC can delete department' });
+    }
+    const member = await getMembersByDepartmentRaw(departmentId);
+    if (member.length > 0) {
+      return res.status(409).json({ message: 'Cannot delete department with members. Please remove all members first.' });
     }
     await deleteDepartmentDoc(departmentId);
     return res.status(200).json({ message: 'Xoá department thành công' });
