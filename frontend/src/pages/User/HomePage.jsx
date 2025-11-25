@@ -1557,9 +1557,7 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `/member-event-detail/${
-                          res.data.eventId || res.data.id
-                        }?eventId=${res.data.eventId || res.data.id}`
+                        `/member-dashboard?eventId=${res.data.eventId || res.data.id}`
                       );
                       toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {

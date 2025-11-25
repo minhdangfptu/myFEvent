@@ -119,7 +119,7 @@ export default function MemberEventDetail() {
 
   if (error || !event) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
+      <UserLayout  title="Chi tiết sự kiện" sidebarType="member">
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy sự kiện'}
         </div>
@@ -128,7 +128,7 @@ export default function MemberEventDetail() {
   }
 
   return (
-    <UserLayout title="Chi tiết sự kiện" sidebarType="member">
+    <UserLayout activePage='overview-detail' title="Chi tiết sự kiện" sidebarType="member" eventId={eventId}>
       <style>{`
         .hero-section { 
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
@@ -188,7 +188,7 @@ export default function MemberEventDetail() {
             <h5 className="fw-bold mb-3">Thông tin sự kiện</h5>
             <div className="row">
               <div className="col-md-6">
-                <p><strong>Ngày tổ chức:</strong> {new Date(event.eventStartDate).toLocaleDateString('vi-VN')} " - " {new Date(event?.eventEndDate).toLocaleDateString('vi-VN')} </p>
+                <p><strong>Ngày tổ chức:</strong> {new Date(event.eventStartDate).toLocaleDateString('vi-VN')}  -  {new Date(event?.eventEndDate).toLocaleDateString('vi-VN')} </p>
                 <p><strong>Địa điểm:</strong> {event.location || 'Chưa cập nhật'}</p>
                 <p><strong>Đơn vị tổ chức:</strong> {event.organizerName?.fullName || event.organizerName || 'Chưa cập nhật'}</p>
               </div>
@@ -257,19 +257,19 @@ export default function MemberEventDetail() {
           <div className="info-card">
             <h5 className="fw-bold mb-3">Hành động</h5>
             <div className="d-grid gap-2">
-              <button className="btn btn-outline-primary" onClick={() => navigate('/member-task')}>
+              <button className="btn btn-outline-primary" onClick={() => navigate('/member-tasks')}>
                 <i className="bi bi-list-task me-2"></i>
                 Xem công việc
               </button>
-              <button className="btn btn-outline-info" onClick={() => navigate('/member-calendar')}>
+              <button className="btn btn-outline-info" onClick={() => navigate('/my-calendar')}>
                 <i className="bi bi-calendar me-2"></i>
                 Lịch cá nhân
               </button>
-              <button className="btn btn-outline-warning" onClick={() => navigate('/member-risk')}>
+              <button className="btn btn-outline-warning" onClick={() => navigate('/risks')}>
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 Rủi ro
               </button>
-              {eventRole === 'Member' && (
+              {/* {eventRole === 'Member' && (
                 <button
                   className="btn btn-outline-danger"
                   onClick={handleLeaveEvent}
@@ -277,7 +277,7 @@ export default function MemberEventDetail() {
                   <i className="bi bi-box-arrow-right me-2"></i>
                   Rời sự kiện
                 </button>
-              )}
+              )} */}
             </div>
           </div>
         </div>
