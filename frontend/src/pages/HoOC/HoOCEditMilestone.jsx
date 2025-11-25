@@ -72,7 +72,7 @@ const HoOCEditMilestone = () => {
     try {
       await milestoneService.updateMilestone(eventId, id, milestone);
       toast.success('Cập nhật cột mốc thành công');
-      navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
+      navigate(`/events/${eventId}/milestone-detail/${id}`);
       // no immediate setActionLoading(false) here because navigate will unmount
     } catch (error) {
       console.error('Error updating milestone:', error);
@@ -83,7 +83,7 @@ const HoOCEditMilestone = () => {
   };
 
   const handleCancel = () => {
-    navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
+    navigate(`/events/${eventId}/milestone-detail/${id}`);
   };
 
   const getTaskStatusLabel = (status) => {
