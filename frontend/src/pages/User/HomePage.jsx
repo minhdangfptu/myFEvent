@@ -101,6 +101,7 @@ export default function HomePage() {
   // ===== UI states =====
   const [myEventsSearch, setMyEventsSearch] = useState("");
   const myEventsSearchTimeoutRef = useRef(null);
+  const myEventsSectionRef = useRef(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -123,6 +124,18 @@ export default function HomePage() {
 
   const { events, loading: eventsLoading, pagination: myEventsPagination, changePage: changeMyEventsPage, refetchEvents } = useEvents();
   const myEvents = useMemo(() => dedupeById(events || []), [events]);
+
+  // Auto scroll to top when pagination changes
+  useEffect(() => {
+    if (myEventsPagination.page > 1) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [myEventsPagination.page]);
+
+  // Wrapper to scroll to My Events section when changing page
+  const handleMyEventsPageChange = useCallback((page, search = '') => {
+    changeMyEventsPage(page, search);
+  }, [changeMyEventsPage]);
 
   // Debounce search for my events (server-side)
   const handleMyEventsSearchChange = (value) => {
@@ -190,11 +203,15 @@ export default function HomePage() {
   }, []);
 
   // Show login success toast once
+  const loginToastShown = useRef(false);
   useEffect(() => {
-    if (location.state?.loginSuccess) {
+    if (location.state?.loginSuccess && !loginToastShown.current) {
+      loginToastShown.current = true;
       toast.success("Đăng nhập thành công!");
-      // Clear the state to prevent showing toast again on refresh/back
-      navigate(location.pathname, { replace: true, state: {} });
+      // Clear the state after a brief delay to prevent showing toast again on refresh/back
+      setTimeout(() => {
+        navigate(location.pathname, { replace: true, state: {} });
+      }, 100);
     }
   }, [location.state, location.pathname, navigate]);
 
@@ -473,7 +490,7 @@ export default function HomePage() {
       `}</style>
 
       {/* ====== SECTION: Events ====== */}
-      <div className="mb-5">
+      <div className="mb-5" ref={myEventsSectionRef}>
         <div className="section-head">
           <h4 className="section-title">Sự kiện của bạn</h4>
 
@@ -818,7 +835,7 @@ export default function HomePage() {
             <div className="d-flex align-items-center" style={{ gap: 16 }}>
               <button
                 type="button"
-                onClick={() => changeMyEventsPage(myEventsPagination.page - 1, myEventsSearch)}
+                onClick={() => handleMyEventsPageChange(myEventsPagination.page - 1, myEventsSearch)}
                 disabled={myEventsPagination.page <= 1 || eventsLoading}
                 className="btn"
                 style={{
@@ -838,7 +855,7 @@ export default function HomePage() {
                   <button
                     key={n}
                     type="button"
-                    onClick={() => changeMyEventsPage(n, myEventsSearch)}
+                    onClick={() => handleMyEventsPageChange(n, myEventsSearch)}
                     disabled={eventsLoading}
                     className="btn"
                     style={{
@@ -857,7 +874,7 @@ export default function HomePage() {
               )}
               <button
                 type="button"
-                onClick={() => changeMyEventsPage(myEventsPagination.page + 1, myEventsSearch)}
+                onClick={() => handleMyEventsPageChange(myEventsPagination.page + 1, myEventsSearch)}
                 disabled={myEventsPagination.page >= myEventsPagination.totalPages || eventsLoading}
                 className="btn"
                 style={{
@@ -1557,9 +1574,7 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `/member-event-detail/${
-                          res.data.eventId || res.data.id
-                        }?eventId=${res.data.eventId || res.data.id}`
+                        `/member-dashboard?eventId=${res.data.eventId || res.data.id}`
                       );
                       toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {

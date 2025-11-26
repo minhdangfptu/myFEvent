@@ -517,7 +517,7 @@ export default function UpdateEventCalendarPage() {
     }
 
     return (
-        <UserLayout sidebarType={eventRole} activePage="calendar">
+        <UserLayout eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{
                 minHeight: "100vh",

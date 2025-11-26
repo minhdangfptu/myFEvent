@@ -458,7 +458,7 @@ const Milestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
+    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện' eventId={eventId}>
       <style>{animationStyles}</style>
       <ToastContainer position="top-right" autoClose={3000} />
 

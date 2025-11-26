@@ -128,25 +128,9 @@ export default function HoDEventDetail() {
         activePage="overview-detail"
         eventId={eventId}
       >
-        <div
-          className="d-flex justify-content-center align-items-center"
-          style={{ height: "400px" }}
-        >
-          {loading && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(255,255,255,1)",
-                zIndex: 2000,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Loading size={80} />
-            </div>
-          )}
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
         </div>
       </UserLayout>
     );

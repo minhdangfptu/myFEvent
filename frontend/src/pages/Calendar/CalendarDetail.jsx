@@ -79,7 +79,7 @@ export default function CalendarDetail() {
     console.log(calendar);
     if (loading) {
         return (
-            <UserLayout sidebarType={eventRole}>
+            <UserLayout eventId={eventId} sidebarType={eventRole}>
                 <Loading/>
             </UserLayout>
         );
@@ -87,7 +87,7 @@ export default function CalendarDetail() {
 
     if (error) {
         return (
-            <UserLayout sidebarType={eventRole}>
+            <UserLayout eventId={eventId} sidebarType={eventRole}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
                     <div style={{ textAlign: 'center', maxWidth: '400px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
@@ -271,7 +271,7 @@ export default function CalendarDetail() {
     };
 
     return (
-        <UserLayout sidebarType={eventRole} activePage="calendar">
+        <UserLayout eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{ margin: 0, padding: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
                 <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>

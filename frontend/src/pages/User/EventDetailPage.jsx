@@ -44,23 +44,19 @@ function EventDetailPage() {
   const address = event?.location || "";
   const statusText = deriveEventStatus(event).text;
   console.log(event);
-  return (
-    <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user">
-      {loading && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={80} />
+  if (loading) {
+    return (
+      <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user" eventId={eventId}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
         </div>
-      )}
+      </UserLayout>
+    );
+  }
+
+  return (
+    <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user" eventId={eventId}>
       <div
         className="container-xl py-4"
         style={{

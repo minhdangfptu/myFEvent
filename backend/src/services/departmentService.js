@@ -35,7 +35,31 @@ export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) =
     Department.countDocuments(filter)
   ]);
 
-  return { items, total };
+  let memberCounts = {};
+  const departmentIds = items.map((dept) => dept._id).filter(Boolean);
+  if (departmentIds.length > 0) {
+    const counts = await EventMember.aggregate([
+      {
+        $match: {
+          departmentId: { $in: departmentIds },
+          role: { $ne: 'HoOC' },
+          status: { $ne: 'deactive' }
+        }
+      },
+      {
+        $group: {
+          _id: '$departmentId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    memberCounts = counts.reduce((acc, curr) => {
+      acc[curr._id.toString()] = curr.count;
+      return acc;
+    }, {});
+  }
+
+  return { items, total, memberCounts };
 };
 
 export const findDepartmentById = async (departmentId) => {

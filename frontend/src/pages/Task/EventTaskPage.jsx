@@ -618,6 +618,7 @@ export default function EventTaskPage() {
         title={t("taskPage.title")}
         activePage={"work" && "work-board"}
         sidebarType={getSidebarType()}
+        eventId={eventId}
       >
         <style>{`
           .task-header { 

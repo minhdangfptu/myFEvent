@@ -366,7 +366,19 @@ const ListBudgetsPage = () => {
   }
 
   if (loading) {
-    return <Loading />;
+    return (
+      <UserLayout
+        title={eventRole === 'HoD' ? "Ngân sách của ban" : "Danh sách Ngân sách của Ban"}
+        activePage="budget"
+        sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
+        eventId={eventId}
+      >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải danh sách ngân sách...</div>
+        </div>
+      </UserLayout>
+    );
   }
 
   const isEmpty = filteredBudgets.length === 0;
@@ -375,8 +387,8 @@ const ListBudgetsPage = () => {
 
   return (
     <UserLayout
-      title={isEmpty && !hasAnyBudgets ? 
-        (eventRole === 'HoD' ? "Ngân sách của ban (trống)" : "Danh sách Ngân sách của Ban (trống)") : 
+      title={isEmpty && !hasAnyBudgets ?
+        (eventRole === 'HoD' ? "Ngân sách của ban (trống)" : "Danh sách Ngân sách của Ban (trống)") :
         (eventRole === 'HoD' ? "Ngân sách của ban" : "Danh sách Ngân sách của Ban")}
       activePage="budget"
       sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
