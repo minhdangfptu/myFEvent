@@ -484,8 +484,6 @@ export default function DataExportPage() {
 
       // Cleanup
       window.URL.revokeObjectURL(url);
-
-      console.log(`✅ File downloaded: ${downloadFilename}`);
     } catch (error) {
       console.error("❌ Download failed:", error);
       alert(`Tải file thất bại: ${error.message}`);
@@ -513,8 +511,6 @@ export default function DataExportPage() {
     setDownloadingItems((prev) => new Set(prev).add('selected'));
 
     try {
-      console.log("🚀 Starting download selected items as ZIP...", selected);
-
       // Gọi API export selected items thành file ZIP
       const response = await exportSelectedItemsZip(eventId, selected);
 
@@ -563,19 +559,12 @@ export default function DataExportPage() {
 
   // Trong DataExportPage.jsx - Cập nhật handleDownloadItemOptions
 const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
-  console.log("🔍 Debug handleDownloadItemOptions:");
-  console.log("- itemId:", itemId, "type:", typeof itemId);
-  console.log("- selectedSubItems:", selectedSubItems, "type:", typeof selectedSubItems);
   
   // Ensure itemId is string
   const cleanItemId = String(itemId);
   
   // Ensure selectedSubItems is array
   const cleanSubItems = Array.isArray(selectedSubItems) ? selectedSubItems : [];
-  
-  console.log("🔧 Cleaned values:");
-  console.log("- cleanItemId:", cleanItemId);
-  console.log("- cleanSubItems:", cleanSubItems);
   
   await handleDownload(cleanItemId, cleanSubItems);
   setShowOptionsModal(null);

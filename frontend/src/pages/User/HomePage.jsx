@@ -101,6 +101,7 @@ export default function HomePage() {
   // ===== UI states =====
   const [myEventsSearch, setMyEventsSearch] = useState("");
   const myEventsSearchTimeoutRef = useRef(null);
+  const myEventsSectionRef = useRef(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -123,6 +124,18 @@ export default function HomePage() {
 
   const { events, loading: eventsLoading, pagination: myEventsPagination, changePage: changeMyEventsPage, refetchEvents } = useEvents();
   const myEvents = useMemo(() => dedupeById(events || []), [events]);
+
+  // Auto scroll to top when pagination changes
+  useEffect(() => {
+    if (myEventsPagination.page > 1) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [myEventsPagination.page]);
+
+  // Wrapper to scroll to My Events section when changing page
+  const handleMyEventsPageChange = useCallback((page, search = '') => {
+    changeMyEventsPage(page, search);
+  }, [changeMyEventsPage]);
 
   // Debounce search for my events (server-side)
   const handleMyEventsSearchChange = (value) => {
@@ -473,7 +486,7 @@ export default function HomePage() {
       `}</style>
 
       {/* ====== SECTION: Events ====== */}
-      <div className="mb-5">
+      <div className="mb-5" ref={myEventsSectionRef}>
         <div className="section-head">
           <h4 className="section-title">Sự kiện của bạn</h4>
 
@@ -818,7 +831,7 @@ export default function HomePage() {
             <div className="d-flex align-items-center" style={{ gap: 16 }}>
               <button
                 type="button"
-                onClick={() => changeMyEventsPage(myEventsPagination.page - 1, myEventsSearch)}
+                onClick={() => handleMyEventsPageChange(myEventsPagination.page - 1, myEventsSearch)}
                 disabled={myEventsPagination.page <= 1 || eventsLoading}
                 className="btn"
                 style={{
@@ -838,7 +851,7 @@ export default function HomePage() {
                   <button
                     key={n}
                     type="button"
-                    onClick={() => changeMyEventsPage(n, myEventsSearch)}
+                    onClick={() => handleMyEventsPageChange(n, myEventsSearch)}
                     disabled={eventsLoading}
                     className="btn"
                     style={{
@@ -857,7 +870,7 @@ export default function HomePage() {
               )}
               <button
                 type="button"
-                onClick={() => changeMyEventsPage(myEventsPagination.page + 1, myEventsSearch)}
+                onClick={() => handleMyEventsPageChange(myEventsPagination.page + 1, myEventsSearch)}
                 disabled={myEventsPagination.page >= myEventsPagination.totalPages || eventsLoading}
                 className="btn"
                 style={{

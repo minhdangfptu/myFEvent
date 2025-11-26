@@ -3,12 +3,25 @@
     [
       "@babel/preset-env",
       {
-        "modules": false
+        "targets": { "node": "22" },
+        "modules": false            
       }
     ]
   ],
   "plugins": [
-    ["@babel/transform-runtime"],
-    ["module-resolver", { "alias": { "~": "./src" } }]
+    [
+      "@babel/plugin-transform-runtime",
+      {
+        "useESModules": true        
+      }
+    ],
+    [
+      "babel-plugin-module-resolver",
+      {
+        "alias": {
+          "~": "./src"
+        }
+      }
+    ]
   ]
 }

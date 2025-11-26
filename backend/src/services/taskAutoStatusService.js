@@ -7,6 +7,8 @@ const TASK_STATUSES = {
   DONE: 'hoan_thanh'
 };
 
+let isSchedulerRunning = false;
+
 /**
  * Tự động cập nhật trạng thái task sang "đã bắt đầu" khi đến thời gian bắt đầu
  * Chỉ cập nhật các task có:
@@ -15,6 +17,13 @@ const TASK_STATUSES = {
  * - có assigneeId (không phải parent task)
  */
 export const autoUpdateTaskStatusByStartDate = async () => {
+  if (isSchedulerRunning) {
+    console.warn('[Auto Status] Previous job still running, skip this tick to avoid overlap');
+    return { skipped: true, updated: 0, tasks: [] };
+  }
+
+  isSchedulerRunning = true;
+  const startedAt = Date.now();
   try {
     const now = new Date();
     
@@ -76,13 +85,17 @@ export const autoUpdateTaskStatusByStartDate = async () => {
       console.log(`[Auto Status] Đã cập nhật ${updatedTasks.length} task sang trạng thái "đã bắt đầu"`);
     }
 
+    const duration = Date.now() - startedAt;
     return { 
       updated: updatedTasks.length, 
-      tasks: updatedTasks.map(t => ({ id: t._id, title: t.title }))
+      tasks: updatedTasks.map(t => ({ id: t._id, title: t.title })),
+      duration
     };
   } catch (error) {
     console.error('[Auto Status] Lỗi khi tự động cập nhật trạng thái task:', error);
     return { updated: 0, tasks: [], error: error.message };
+  } finally {
+    isSchedulerRunning = false;
   }
 };
 

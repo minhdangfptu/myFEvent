@@ -17,12 +17,9 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
         const occurredRisks = risk.occurred_risk || [];
         let newStatus = 'not_yet'; // Default status
 
-        // console.log(`🔍 Processing risk ${riskId} with ${occurredRisks.length} occurred risks`);
-
         if (occurredRisks.length === 0) {
             // BR: occurred = 0 → risk status = not_yet
             newStatus = 'not_yet';
-            console.log(`📋 No occurred risks → setting status to 'not_yet'`);
         } else {
             // BR: occurred > 0, check the statuses
             // Count different statuses
@@ -34,22 +31,19 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
                 occ.occurred_status === 'resolved'
             ).length;
 
-            // console.log(`📊 Status breakdown: resolving/pending=${resolvingOrPendingCount}, resolved=${resolvedCount}, total=${occurredRisks.length}`);
+           
 
             // BR: Nếu có bất kỳ occurred nào là pending/resolving → risk status = resolving
             if (resolvingOrPendingCount > 0) {
-                newStatus = 'resolving';
-                // console.log(`⚡ Found ${resolvingOrPendingCount} unresolved occurred risks → setting status to 'resolving'`);
+                newStatus = 'resolving';;
             }
             // BR: Nếu tất cả occurred đều là resolved → risk status = resolved
             else if (resolvedCount === occurredRisks.length && occurredRisks.length > 0) {
                 newStatus = 'resolved';
-                // console.log(`✅ All ${resolvedCount} occurred risks are resolved → setting status to 'resolved'`);
             }
             // Edge case: nếu có occurred nhưng không có status hợp lệ
             else {
                 newStatus = 'resolving'; // Default to resolving if there are occurred risks
-                // console.log(`⚠️ Edge case: occurred risks exist but no valid status found → defaulting to 'resolving'`);
             }
         }
         // Only update if status has changed
