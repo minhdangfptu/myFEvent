@@ -1138,7 +1138,17 @@ export default function HoOCEventDetail() {
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-calendar-event"></i>
-                <span>{formatDate(event.eventStartDate) || "Chưa có"} - {formatDate(event.eventEndDate) || "Chưa có"}</span>
+                <span>
+                  {(() => {
+                    if (!event?.eventStartDate || !event?.eventEndDate) return "Chưa có thông tin";
+                    const startDate = new Date(event.eventStartDate);
+                    const endDate = new Date(event.eventEndDate);
+                    const isSameDay = startDate.toDateString() === endDate.toDateString();
+                    return isSameDay
+                      ? formatDate(event.eventStartDate)
+                      : `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`;
+                  })()}
+                </span>
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-geo-alt-fill"></i>

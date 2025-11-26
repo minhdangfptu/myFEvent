@@ -179,7 +179,15 @@ export default function MemberEventDetail() {
             <h5 className="fw-bold mb-3">Thông tin sự kiện</h5>
             <div className="row">
               <div className="col-md-6">
-                <p><strong>Ngày tổ chức:</strong> {new Date(event.eventStartDate).toLocaleDateString('vi-VN')}  -  {new Date(event?.eventEndDate).toLocaleDateString('vi-VN')} </p>
+                <p><strong>Ngày tổ chức:</strong> {(() => {
+                  if (!event?.eventStartDate || !event?.eventEndDate) return "Chưa có thông tin";
+                  const startDate = new Date(event.eventStartDate);
+                  const endDate = new Date(event.eventEndDate);
+                  const isSameDay = startDate.toDateString() === endDate.toDateString();
+                  return isSameDay
+                    ? startDate.toLocaleDateString('vi-VN')
+                    : `${startDate.toLocaleDateString('vi-VN')} - ${endDate.toLocaleDateString('vi-VN')}`;
+                })()}</p>
                 <p><strong>Địa điểm:</strong> {event.location || 'Chưa cập nhật'}</p>
                 <p><strong>Đơn vị tổ chức:</strong> {event.organizerName?.fullName || event.organizerName || 'Chưa cập nhật'}</p>
               </div>
@@ -248,15 +256,15 @@ export default function MemberEventDetail() {
           <div className="info-card">
             <h5 className="fw-bold mb-3">Hành động</h5>
             <div className="d-grid gap-2">
-              <button className="btn btn-outline-primary" onClick={() => navigate('/member-tasks')}>
+              <button className="btn btn-outline-primary" onClick={() => navigate(`/events/${eventId}/member-tasks`)}>
                 <i className="bi bi-list-task me-2"></i>
                 Xem công việc
               </button>
-              <button className="btn btn-outline-info" onClick={() => navigate('/my-calendar')}>
+              <button className="btn btn-outline-info" onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                 <i className="bi bi-calendar me-2"></i>
                 Lịch cá nhân
               </button>
-              <button className="btn btn-outline-warning" onClick={() => navigate('/risks')}>
+              <button className="btn btn-outline-warning" onClick={() => navigate(`/events/${eventId}/risks`)}>
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 Rủi ro
               </button>
