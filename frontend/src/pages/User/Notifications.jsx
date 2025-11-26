@@ -1,19 +1,37 @@
 import UserLayout from '../../components/UserLayout'
 import { useNotifications } from '../../contexts/NotificationsContext'
-
-function timeAgo(iso) {
-  try {
-    const d = new Date(iso)
-    const diff = (Date.now() - d.getTime()) / 1000
-    if (diff < 60) return 'Vừa xong'
-    if (diff < 3600) return `${Math.floor(diff/60)} phút trước`
-    if (diff < 86400) return `${Math.floor(diff/3600)} giờ trước`
-    return `${Math.floor(diff/86400)} ngày trước`
-  } catch { return '' }
-}
+import { useNavigate } from 'react-router-dom'
+import { timeAgo } from '../../utils/timeAgo'
 
 export default function NotificationsPage() {
   const { notifications, markAllRead, markRead } = useNotifications()
+  const navigate = useNavigate()
+
+  const getNotificationTargetUrl = (n) => {
+    if (n.targetUrl) return n.targetUrl
+
+    if (n.eventId && n.relatedTaskId) {
+      return `/events/${n.eventId}/tasks/${n.relatedTaskId}`
+    }
+
+    if (n.eventId && n.category === 'THÀNH VIÊN') {
+      return `/home-page/events/${n.eventId}`
+    }
+
+    if (n.eventId) {
+      return `/home-page/events/${n.eventId}`
+    }
+
+    return '/notifications'
+  }
+
+  const handleNotificationClick = (n) => {
+    if (n.id) {
+      markRead(n.id)
+    }
+    const url = getNotificationTargetUrl(n)
+    navigate(url)
+  }
 
   return (
     <UserLayout title="Tất cả thông báo" activePage="notifications">
@@ -30,7 +48,7 @@ export default function NotificationsPage() {
 
       <div className="noti-card p-0">
         {notifications.map(n => (
-          <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => markRead(n.id)}>
+          <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => handleNotificationClick(n)}>
             <div className="d-flex align-items-center justify-content-center" style={{ width:32, height:32 }}>
               <i className={n.icon} style={{ color:'#ef4444' }} />
             </div>
