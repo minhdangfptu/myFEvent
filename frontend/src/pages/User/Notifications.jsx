@@ -29,7 +29,7 @@ export default function NotificationsPage() {
     } else if (notification.relatedMilestoneId && notification.eventId) {
       navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
     } else if (notification.relatedAgendaId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/agendas/${notification.relatedAgendaId}`)
+      navigate(`/events/${notification.eventId}/my-calendar`)
     } else if (notification.eventId) {
       navigate(`/events/${notification.eventId}`)
     }
@@ -43,12 +43,12 @@ export default function NotificationsPage() {
         .dot{width:8px;height:8px;border-radius:50%;background:#3b82f6}
       `}</style>
 
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h5 className="mb-0" style={{ color: '#111827' }}>Tất cả thông báo</h5>
+      <div className="d-flex align-items-center justify-content-end mb-3">
+        {/* <h5 className="mb-0" style={{ color: '#111827' }}>Tất cả thông báo</h5> */}
         <button className="btn btn-link text-decoration-none" onClick={markAllRead}>Đánh dấu tất cả đã đọc</button>
       </div>
 
-      <div className="noti-card p-0">
+      <div style={{backgroundColor:"white"}} className="noti-card p-0">
         {notifications.map(n => (
           <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => handleNotificationClick(n)}>
             <div className="d-flex align-items-center justify-content-center" style={{ width:32, height:32 }}>

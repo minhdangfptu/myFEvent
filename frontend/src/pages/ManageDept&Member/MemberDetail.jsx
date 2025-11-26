@@ -758,14 +758,16 @@ export default function MemberProfilePage() {
                     Hủy
                   </button>
                   <button
-                    className="btn btn-danger"
+                    className="btn btn-danger d-flex align-items-center"
                     onClick={handleConfirmChangeDepartment}
                     disabled={departmentModalSaving || departmentModalLoading}
                   >
-                    {departmentModalSaving && (
-                      <span className="spinner-border spinner-border-sm me-2"></span>
+                    {departmentModalSaving ? (
+                      <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                    ) : (
+                      <i className="bi bi-check-lg me-2"></i>
                     )}
-                    Xác nhận
+                    {departmentModalSaving ? 'Đang xác nhận...' : 'Xác nhận'}
                   </button>
                 </div>
               </>
@@ -814,14 +816,16 @@ export default function MemberProfilePage() {
                 Hủy
               </button>
               <button
-                className="btn btn-danger"
+                className="btn btn-danger d-flex align-items-center"
                 onClick={handleConfirmChangeRole}
                 disabled={roleSaving}
               >
-                {roleSaving && (
-                  <span className="spinner-border spinner-border-sm me-2"></span>
+                {roleSaving ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-check-lg me-2"></i>
                 )}
-                Xác nhận
+                {roleSaving ? 'Đang xác nhận...' : 'Xác nhận'}
               </button>
             </div>
           </div>

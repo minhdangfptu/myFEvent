@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
+import { APP_VERSION } from "~/config";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -777,7 +778,7 @@ export default function MemberSidebar({
                     fontWeight: 500,
                   }}
                 >
-                  Version 1.0.0
+                 Phiên bản {APP_VERSION}
                 </div>
                 <div
                   style={{
