@@ -41,6 +41,11 @@ const DepartmentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [roleLoading, setRoleLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [isAssigningLeader, setIsAssigningLeader] = useState(false);
   const { fetchEventRole } = useEvents();
   
   const getMemberDisplayName = (member) =>
@@ -202,14 +207,19 @@ const DepartmentDetail = () => {
 
   const canManage = eventRole === 'HoOC' || (eventRole === 'HoD');
   console.log('Can manage department:', canManage);
-  const handleEdit = () => {
-    if (department) {
-      setEditForm({
-        name: department.name || "",
-        description: department.description || "",
-      });
+  const handleEdit = async () => {
+    setIsEditing(true);
+    try {
+      if (department) {
+        setEditForm({
+          name: department.name || "",
+          description: department.description || "",
+        });
+      }
+      setEditing(true);
+    } finally {
+      setIsEditing(false);
     }
-    setEditing(true);
   };
 
   const handleSave = async () => {
@@ -242,6 +252,7 @@ const DepartmentDetail = () => {
 
   const handleConfirmDelete = async () => {
     if (deleteConfirmName === department.name) {
+      setIsDeleting(true);
       try {
         await departmentApi.deleteDepartment(eventId, id);
         setShowDeleteModal(false);
@@ -252,12 +263,14 @@ const DepartmentDetail = () => {
           state: {
             showToast: true,
             toastMessage: "Xóa ban thành công!",
-            toastType: "success"
-          }
+            toastType: "success",
+          },
         });
       } catch (error) {
         console.error("Delete department error:", error);
         toast.error(error?.response?.data?.message || "Xóa ban thất bại!");
+      } finally {
+        setIsDeleting(false);
       }
     } else {
       toast.error("Tên ban không khớp!");
@@ -282,6 +295,7 @@ const DepartmentDetail = () => {
   const handleConfirmRemoveMember = async () => {
     if (!memberToRemove) return;
 
+    setIsRemovingMember(true);
     try {
       await departmentService.removeMemberFromDepartment(
         eventId,
@@ -295,6 +309,8 @@ const DepartmentDetail = () => {
     } catch (error) {
       console.error("Error removing member:", error);
       toast.error("Không thể xóa thành viên khỏi ban");
+    } finally {
+      setIsRemovingMember(false);
     }
   };
 
@@ -341,6 +357,7 @@ const DepartmentDetail = () => {
       return;
     }
 
+    setIsAddingMembers(true);
     try {
       for (const memberId of selectedMembers) {
         await departmentService.addMemberToDepartment(eventId, id, memberId);
@@ -353,6 +370,8 @@ const DepartmentDetail = () => {
     } catch (error) {
       console.error("Error adding members:", error);
       toast.error("Không thể thêm thành viên vào ban");
+    } finally {
+      setIsAddingMembers(false);
     }
   };
 
@@ -414,9 +433,12 @@ const DepartmentDetail = () => {
       return;
     }
 
+    setIsAssigningLeader(true);
     try {
-      setAssigningLeader(true);
-      const newHoDUserId = selectedAssignLeader.userId || selectedAssignLeader._id || selectedAssignLeader.id;
+      const newHoDUserId =
+        selectedAssignLeader.userId ||
+        selectedAssignLeader._id ||
+        selectedAssignLeader.id;
       await departmentService.changeHoD(eventId, id, newHoDUserId);
       toast.success("Đã gán trưởng ban thành công!");
       setShowAssignLeaderModal(false);
@@ -426,7 +448,7 @@ const DepartmentDetail = () => {
       console.error("Assign HoD error:", error);
       toast.error("Không thể gán trưởng ban");
     } finally {
-      setAssigningLeader(false);
+      setIsAssigningLeader(false);
     }
   };
 
@@ -811,9 +833,14 @@ const DepartmentDetail = () => {
                       className="btn btn-outline-danger d-flex align-items-center"
                       onClick={handleEdit}
                       style={{ borderRadius: "8px", fontWeight: "500" }}
+                      disabled={isEditing}
                     >
-                      <i className="bi bi-pencil me-2"></i>
-                      Chỉnh sửa
+                      {isEditing ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-pencil me-2"></i>
+                      )}
+                      {isEditing ? "Đang chỉnh sửa..." : "Chỉnh sửa"}
                     </button>
                   ) : (
                     <div className="d-flex gap-2">
@@ -956,15 +983,15 @@ const DepartmentDetail = () => {
                   <button
                     className="btn btn-danger d-flex align-items-center mb-2"
                     onClick={handleDeleteDepartment}
-                    style={{
-                      backgroundColor: "#dc2626",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontWeight: "400",
-                    }}
+                    style={{ backgroundColor: "#dc2626", border: "none", borderRadius: "8px", fontWeight: "400" }}
+                    disabled={isDeleting}
                   >
-                    <i className="bi bi-trash me-2"></i>
-                    Xoá ban vĩnh viễn
+                    {isDeleting ? (
+                      <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                    ) : (
+                      <i className="bi bi-trash me-2"></i>
+                    )}
+                    {isDeleting ? "Đang xoá..." : "Xoá ban vĩnh viễn"}
                   </button>
                   <p
                     style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}
@@ -1209,14 +1236,17 @@ const DepartmentDetail = () => {
                 type="button"
                 className="btn btn-danger"
                 onClick={handleAddSelectedMembers}
-                disabled={selectedMembers.length === 0}
+                disabled={isAddingMembers || selectedMembers.length === 0}
                 style={{ borderRadius: "8px" }}
               >
-                Thêm{" "}
-                {selectedMembers.length > 0
-                  ? `(${selectedMembers.length})`
-                  : ""}{" "}
-                thành viên
+                {isAddingMembers ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang thêm...
+                  </>
+                ) : (
+                  `Thêm ${selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên`
+                )}
               </button>
             </div>
           </div>
@@ -1270,8 +1300,16 @@ const DepartmentDetail = () => {
                 className="btn btn-danger"
                 onClick={handleConfirmRemoveMember}
                 style={{ borderRadius: "8px" }}
+                disabled={isRemovingMember}
               >
-                Xoá thành viên
+                {isRemovingMember ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang xoá...
+                  </>
+                ) : (
+                  "Xoá thành viên"
+                )}
               </button>
             </div>
           </div>

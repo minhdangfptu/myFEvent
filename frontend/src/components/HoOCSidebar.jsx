@@ -687,9 +687,9 @@ export default function HoOCSidebar({
               </div>
 
               <img
-                src="/gov.webp"
-                alt="Đã thông báo Bộ Công Thương"
-                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+                src="/gov.png"
+                alt="FPTU - FEVENT TEAM"
+                style={{ height: "30px", width: "auto", objectFit: "contain" }}
               />
             </div>
           </div>

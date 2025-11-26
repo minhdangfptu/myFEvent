@@ -15,6 +15,8 @@ const MilestoneDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [eventRole, setEventRole] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchMilestoneDetail() {
@@ -77,13 +79,18 @@ const MilestoneDetail = () => {
         return "#6b7280";
     }
   };
-  const handleEditMilestone = () => {
-    navigate(`/events/${eventId}/hooc-edit-milestone/${id}`, {
-      state: {
-        milestone: milestone,
-        relatedTasks: milestone.relatedTasks || [],
-      },
-    });
+  const handleEditMilestone = async () => {
+    setIsEditing(true);
+    try {
+      navigate(`/events/${eventId}/hooc-edit-milestone/${id}`, {
+        state: {
+          milestone: milestone,
+          relatedTasks: milestone.relatedTasks || [],
+        },
+      });
+    } finally {
+      setIsEditing(false);
+    }
   };
 
   const handleDeleteMilestone = () => {
@@ -92,7 +99,7 @@ const MilestoneDetail = () => {
 
   const handleConfirmDelete = async () => {
     if (deleteConfirmName === milestone.name) {
-      // Xử lý xóa milestone
+      setIsDeleting(true);
       try {
         const response = await milestoneService.deleteMilestone(eventId, id);
         toast.success("Xoá cột mốc thành công");
@@ -100,6 +107,8 @@ const MilestoneDetail = () => {
       } catch (error) {
         toast.error("Xoá cột mốc thất bại");
         console.error("Error deleting milestone:", error);
+      } finally {
+        setIsDeleting(false);
       }
     }
   };
@@ -137,17 +146,27 @@ const MilestoneDetail = () => {
                 className="btn btn-outline-primary d-flex align-items-center"
                 onClick={handleEditMilestone}
                 style={{ borderRadius: "8px" }}
+                disabled={isEditing}
               >
-                <i className="bi bi-pencil me-2"></i>
-                Sửa cột mốc
+                {isEditing ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-pencil me-2"></i>
+                )}
+                {isEditing ? "Đang sửa..." : "Sửa cột mốc"}
               </button>
               <button
                 className="btn btn-outline-danger d-flex align-items-center"
                 onClick={handleDeleteMilestone}
                 style={{ borderRadius: "8px" }}
+                disabled={isDeleting}
               >
-                <i className="bi bi-trash me-2"></i>
-                Xoá cột mốc
+                {isDeleting ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-trash me-2"></i>
+                )}
+                {isDeleting ? "Đang xoá..." : "Xoá cột mốc"}
               </button>
             </div>
           )}
