@@ -115,7 +115,7 @@ export const listMilestones = async (req, res) => {
 export const getMilestoneDetail = async (req, res) => {
   try {
     const { eventId, milestoneId } = req.params;
-    const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'staff']);
+    const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
     if (!member) return res.status(403).json({ message: 'Can not view milestone detail!' });
     const result = await findMilestoneDetail(eventId, milestoneId);
     if (!result) return res.status(404).json({ message: 'Milestone not found' });
