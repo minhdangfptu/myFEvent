@@ -27,7 +27,7 @@ export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) =
 
   const [items, total] = await Promise.all([
     Department.find(filter)
-      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+      .populate({ path: 'leaderId', select: 'fullName' })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -40,7 +40,7 @@ export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) =
 
 export const findDepartmentById = async (departmentId) => {
   return await Department.findOne({ _id: departmentId })
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
@@ -48,7 +48,7 @@ export const findDepartmentById = async (departmentId) => {
 export const createDepartmentDoc = async (payload) => {
   const department = await Department.create(payload);
   return await Department.findById(department._id)
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
@@ -57,7 +57,7 @@ export const updateDepartmentDoc = async (departmentId, set) => {
     departmentId,
     { $set: set },
     { new: true }
-  ).populate({ path: 'leaderId', select: 'fullName email avatarUrl' }).lean();
+  ).populate({ path: 'leaderId', select: 'fullName' }).lean();
 };
 
 export const deleteDepartmentDoc = async (departmentId) => {
@@ -88,7 +88,7 @@ export const assignHoDToDepartment = async (eventId, department, userId) => {
   }
 
   return await Department.findById(department._id)
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
