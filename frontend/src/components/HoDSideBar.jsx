@@ -4,6 +4,7 @@ import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "./Loading";
+import { APP_VERSION } from "~/config";
 
 export default function HoDSideBar({
   sidebarOpen,
@@ -849,7 +850,7 @@ export default function HoDSideBar({
                     fontWeight: 500,
                   }}
                 >
-                  Version 1.0.0
+                  Phiên bản {APP_VERSION}
                 </div>
                 <div
                   style={{

@@ -282,9 +282,13 @@ export default function ManageFeedbackEventPage() {
                               padding: '6px 16px',
                               fontSize: '14px',
                               cursor: actionState.id === form._id && actionState.type === 'publish' ? 'not-allowed' : 'pointer',
-                              opacity: actionState.id === form._id && actionState.type === 'publish' ? 0.7 : 1
+                              opacity: actionState.id === form._id && actionState.type === 'publish' ? 0.7 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
                             }}
                           >
+                            {actionState.id === form._id && actionState.type === 'publish' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                             {actionState.id === form._id && actionState.type === 'publish' ? 'Đang xuất bản...' : 'Xuất bản'}
                           </button>
                         </>
@@ -315,9 +319,13 @@ export default function ManageFeedbackEventPage() {
                           padding: '6px 16px',
                           fontSize: '14px',
                           cursor: actionState.id === form._id && actionState.type === 'delete' ? 'not-allowed' : 'pointer',
-                          opacity: actionState.id === form._id && actionState.type === 'delete' ? 0.6 : 1
+                          opacity: actionState.id === form._id && actionState.type === 'delete' ? 0.6 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
                       >
+                        {actionState.id === form._id && actionState.type === 'delete' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                         {actionState.id === form._id && actionState.type === 'delete' ? 'Đang xoá...' : 'Xoá'}
                       </button>
                       {form.status === 'open' && (
@@ -332,9 +340,13 @@ export default function ManageFeedbackEventPage() {
                             padding: '6px 16px',
                             fontSize: '14px',
                             cursor: actionState.id === form._id && actionState.type === 'close' ? 'not-allowed' : 'pointer',
-                            opacity: actionState.id === form._id && actionState.type === 'close' ? 0.6 : 1
+                            opacity: actionState.id === form._id && actionState.type === 'close' ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}
                         >
+                          {actionState.id === form._id && actionState.type === 'close' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                           {actionState.id === form._id && actionState.type === 'close' ? 'Đang đóng...' : 'Đóng form'}
                         </button>
                       )}
@@ -350,9 +362,13 @@ export default function ManageFeedbackEventPage() {
                             padding: '6px 16px',
                             fontSize: '14px',
                             cursor: actionState.id === form._id && actionState.type === 'reopen' ? 'not-allowed' : 'pointer',
-                            opacity: actionState.id === form._id && actionState.type === 'reopen' ? 0.6 : 1
+                            opacity: actionState.id === form._id && actionState.type === 'reopen' ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}
                         >
+                          {actionState.id === form._id && actionState.type === 'reopen' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                           {actionState.id === form._id && actionState.type === 'reopen' ? 'Đang mở...' : 'Mở lại'}
                         </button>
                       )}

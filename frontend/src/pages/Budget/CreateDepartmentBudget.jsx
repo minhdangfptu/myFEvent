@@ -11,7 +11,6 @@ const CreateDepartmentBudget = () => {
   const navigate = useNavigate();
   const location = window.location.pathname;
   const isEditMode = location.includes('/edit');
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [department, setDepartment] = useState(null);
   const [budget, setBudget] = useState(null);
@@ -34,6 +33,8 @@ const CreateDepartmentBudget = () => {
   const [categories, setCategories] = useState([]); // Danh sách hạng mục
   const [newCategory, setNewCategory] = useState(""); // Input để thêm hạng mục mới
   const [members, setMembers] = useState([]); // Danh sách members để assign
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchDepartment();
@@ -297,7 +298,7 @@ const CreateDepartmentBudget = () => {
       return;
     }
 
-    setLoading(true);
+    setIsSavingDraft(true);
     try {
       const data = {
         items: budgetItems.map((item) => ({
@@ -322,7 +323,7 @@ const CreateDepartmentBudget = () => {
         const result = await budgetApi.createBudget(eventId, departmentId, data);
         budgetId = result._id;
       }
-      
+
       // Update categories
       if (budgetId && categories.length > 0) {
         await budgetApi.updateCategories(eventId, departmentId, budgetId, categories);
@@ -332,7 +333,7 @@ const CreateDepartmentBudget = () => {
     } catch (error) {
       toast.error(error?.response?.data?.message || "Lưu nháp thất bại!");
     } finally {
-      setLoading(false);
+      setIsSavingDraft(false);
     }
   };
 
@@ -342,7 +343,7 @@ const CreateDepartmentBudget = () => {
       return;
     }
 
-    setLoading(true);
+    setIsSubmitting(true);
     try {
       const data = {
         items: budgetItems.map((item) => ({
@@ -367,12 +368,12 @@ const CreateDepartmentBudget = () => {
         const result = await budgetApi.createBudget(eventId, departmentId, data);
         budgetId = result._id;
       }
-      
+
       // Update categories
       if (budgetId && categories.length > 0) {
         await budgetApi.updateCategories(eventId, departmentId, budgetId, categories);
       }
-      
+
       if (budgetId) {
         await budgetApi.submitBudget(eventId, departmentId, budgetId);
       }
@@ -381,7 +382,7 @@ const CreateDepartmentBudget = () => {
     } catch (error) {
       toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -424,25 +425,35 @@ const CreateDepartmentBudget = () => {
               className="btn btn-outline-primary"
               onClick={handleCancel}
               style={{ borderRadius: "8px" }}
+              disabled={isSavingDraft || isSubmitting}
             >
               Huỷ
             </button>
             <button
-              className="btn btn-outline-primary"
+              className="btn btn-outline-primary d-flex align-items-center"
               onClick={handleSaveDraft}
-              disabled={loading}
+              disabled={isSavingDraft || isSubmitting}
               style={{ borderRadius: "8px" }}
             >
-              Lưu Nháp
+              {isSavingDraft ? (
+                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+              ) : (
+                <i className="bi bi-save me-2"></i>
+              )}
+              {isSavingDraft ? "Đang lưu..." : "Lưu Nháp"}
             </button>
             <button
-              className={budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "btn btn-danger" : "btn btn-primary"}
+              className={`${budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "btn btn-danger" : "btn btn-primary"} d-flex align-items-center`}
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={isSavingDraft || isSubmitting}
               style={{ borderRadius: "8px" }}
             >
-              <i className="bi bi-send me-2"></i>
-              {budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "Gửi lại" : "Gửi Duyệt"}
+              {isSubmitting ? (
+                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+              ) : (
+                <i className="bi bi-send me-2"></i>
+              )}
+              {isSubmitting ? "Đang gửi..." : (budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "Gửi lại" : "Gửi Duyệt")}
             </button>
           </div>
         </div>

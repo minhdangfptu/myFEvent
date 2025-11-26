@@ -64,6 +64,7 @@ export default function ListRiskPage() {
   // ====== Delete Confirmation Modal ======
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [riskToDelete, setRiskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ====== Risk Category Mappings ======
   const categoryLabels = {
@@ -387,6 +388,7 @@ export default function ListRiskPage() {
   const deleteRisk = async () => {
     if (!riskToDelete) return;
 
+    setIsDeleting(true);
     try {
       const response = await riskApiWithErrorHandling.deleteRisk(
         eventId,
@@ -403,6 +405,8 @@ export default function ListRiskPage() {
     } catch (error) {
       console.error("Error deleting risk:", error);
       toast.error("Lỗi khi xóa rủi ro");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1342,17 +1346,20 @@ export default function ListRiskPage() {
                 Hủy
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary d-flex align-items-center justify-content-center"
                 onClick={createRisk}
                 disabled={submitting || (newRisk.scope === "department" && !newRisk.departmentId)}
               >
                 {submitting ? (
                   <>
-                    <div className="loading-spinner me-2"></div>
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
                     Đang thêm...
                   </>
                 ) : (
-                  "Thêm rủi ro"
+                  <>
+                    <i className="bi bi-plus-lg me-2"></i>
+                    Thêm rủi ro
+                  </>
                 )}
               </button>
             </div>
@@ -1369,6 +1376,7 @@ export default function ListRiskPage() {
         }}
         onConfirm={deleteRisk}
         message="Bạn có chắc muốn xóa rủi ro này?"
+        isLoading={isDeleting}
       />
     </UserLayout>
   );

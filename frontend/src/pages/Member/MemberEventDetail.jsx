@@ -260,7 +260,7 @@ export default function MemberEventDetail() {
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 Rủi ro
               </button>
-              {/* {eventRole === 'Member' && (
+              {eventRole === 'Member' && (
                 <button
                   className="btn btn-outline-danger"
                   onClick={handleLeaveEvent}
@@ -268,7 +268,7 @@ export default function MemberEventDetail() {
                   <i className="bi bi-box-arrow-right me-2"></i>
                   Rời sự kiện
                 </button>
-              )} */}
+              )}
             </div>
           </div>
         </div>

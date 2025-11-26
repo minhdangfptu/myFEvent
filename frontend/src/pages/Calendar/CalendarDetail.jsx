@@ -27,6 +27,8 @@ export default function CalendarDetail() {
     const [isQuickAbsent, setIsQuickAbsent] = useState(false);
 
     const [isPastMeeting, setIsPastMeeting] = useState(false);
+    const [isParticipating, setIsParticipating] = useState(false);
+    const [isConfirmingStatus, setIsConfirmingStatus] = useState(false);
 
     // States cho modal xem tất cả
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
@@ -225,6 +227,7 @@ export default function CalendarDetail() {
 
     // Handle participate actions
     const handleParticipate = async (status, reason = "") => {
+        setIsParticipating(true);
         try {
             const payload = { participateStatus: status };
             if (status === 'absent' && reason) {
@@ -241,6 +244,8 @@ export default function CalendarDetail() {
         } catch (error) {
             console.error('Error updating participation status:', error);
             alert('Có lỗi xảy ra khi cập nhật trạng thái tham gia');
+        } finally {
+            setIsParticipating(false);
         }
     };
 
@@ -264,10 +269,15 @@ export default function CalendarDetail() {
             return;
         }
 
-        await handleParticipate(newStatus, absentReason);
-        setIsChangeStatusModalOpen(false);
-        setNewStatus("");
-        setAbsentReason("");
+        setIsConfirmingStatus(true);
+        try {
+            await handleParticipate(newStatus, absentReason);
+            setIsChangeStatusModalOpen(false);
+            setNewStatus("");
+            setAbsentReason("");
+        } finally {
+            setIsConfirmingStatus(false);
+        }
     };
 
     return (
@@ -689,13 +699,19 @@ export default function CalendarDetail() {
                                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px' }}>
                                         <button
                                             onClick={() => handleParticipate('confirmed')}
-                                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                            disabled={isParticipating}
+                                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: isParticipating ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center', opacity: isParticipating ? 0.6 : 1 }}
                                         >
-                                            <span>✓</span> Tham gia
+                                            {isParticipating ? (
+                                                <><i className="bi bi-arrow-clockwise spin-animation"></i> Đang xử lý...</>
+                                            ) : (
+                                                <><span>✓</span> Tham gia</>
+                                            )}
                                         </button>
                                         <button
                                             onClick={() => handleOpenChangeStatus('absent')}
-                                            style={{ backgroundColor: '#c3c4c4ff', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                            disabled={isParticipating}
+                                            style={{ backgroundColor: '#c3c4c4ff', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: isParticipating ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center', opacity: isParticipating ? 0.6 : 1 }}
                                         >
                                             <span>✖</span> Không tham gia
                                         </button>
@@ -1284,25 +1300,31 @@ export default function CalendarDetail() {
                             </button>
                             <button
                                 onClick={handleConfirmChangeStatus}
+                                disabled={isConfirmingStatus}
                                 style={{
                                     backgroundColor: '#2563eb',
                                     color: 'white',
                                     border: 'none',
                                     padding: '10px 24px',
                                     borderRadius: '8px',
-                                    cursor: 'pointer',
+                                    cursor: isConfirmingStatus ? 'not-allowed' : 'pointer',
                                     fontSize: '15px',
                                     fontWeight: 600,
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    opacity: isConfirmingStatus ? 0.6 : 1
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                    if (!isConfirmingStatus) e.currentTarget.style.backgroundColor = '#1d4ed8';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#2563eb';
+                                    if (!isConfirmingStatus) e.currentTarget.style.backgroundColor = '#2563eb';
                                 }}
                             >
-                                Xác nhận
+                                {isConfirmingStatus && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                                {isConfirmingStatus ? 'Đang xử lý...' : 'Xác nhận'}
                             </button>
                         </div>
                     </div>

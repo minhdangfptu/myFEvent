@@ -441,22 +441,23 @@ export default function EventTaskPage() {
       message,
       onConfirm: async () => {
         setConfirmModal({ show: false, message: "", onConfirm: null });
+        setIsDeletingTasks(true);
         try {
           // Xóa epic tasks trước (sẽ tự động xóa task trong epic)
-          const deleteEpicPromises = selectedEpicIds.map((epicId) => 
+          const deleteEpicPromises = selectedEpicIds.map((epicId) =>
             taskApi.deleteTask(eventId, epicId)
           );
-          
+
           // Xóa normal tasks (loại bỏ các task đã nằm trong epic được xóa)
           const normalTaskIdsToDelete = selectedTaskIds.filter(
             (taskId) => !epicTaskIdsToDelete.includes(taskId)
           );
-          const deleteTaskPromises = normalTaskIdsToDelete.map((taskId) => 
+          const deleteTaskPromises = normalTaskIdsToDelete.map((taskId) =>
             taskApi.deleteTask(eventId, taskId)
           );
-          
+
           await Promise.all([...deleteEpicPromises, ...deleteTaskPromises]);
-          
+
           setSelectedTaskIds([]);
           setSelectedEpicIds([]);
           fetchTasks();
@@ -465,6 +466,8 @@ export default function EventTaskPage() {
           const errorMessage = error?.response?.data?.message || "Xóa công việc thất bại";
           toast.error(errorMessage);
           console.error("Error deleting tasks:", error);
+        } finally {
+          setIsDeletingTasks(false);
         }
       }
     });
@@ -485,6 +488,8 @@ export default function EventTaskPage() {
   const [milestones, setMilestones] = useState([]);
   const [parents, setParents] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isDeletingTasks, setIsDeletingTasks] = useState(false);
 
   const selectedDepartmentName = useMemo(() => (
     departments.find((d) => d._id === addTaskForm.departmentId)?.name || ""
@@ -536,7 +541,7 @@ export default function EventTaskPage() {
 
   const handleCreateTask = async () => {
     setAddTaskError("");
-  
+
     if (!addTaskForm.title || !addTaskForm.departmentId || !addTaskForm.dueDate) {
       setAddTaskError("Vui lòng nhập đầy đủ các trường * bắt buộc!");
       return;
@@ -545,10 +550,10 @@ export default function EventTaskPage() {
       setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
     }
-  
+
     const toISO = (d) => new Date(d).toISOString();
     const orUndef = (v) => (v ? v : undefined);
-  
+
     const payload = {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
@@ -559,7 +564,8 @@ export default function EventTaskPage() {
       parentId: orUndef(addTaskForm.parentId),
       taskType: addTaskForm.taskType || "epic",
     };
-  
+
+    setIsCreatingTask(true);
     try {
       const response = await taskApi.createTask(eventId, payload);
       const createdTask = response?.data || response;
@@ -583,11 +589,13 @@ export default function EventTaskPage() {
     } catch (err) {
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
       const errors = err?.response?.data?.errors || [];
-      const fullError = errors.length > 0 
+      const fullError = errors.length > 0
         ? `${errorMessage}: ${errors.join(", ")}`
         : errorMessage;
       setAddTaskError(fullError);
       toast.error(fullError);
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
@@ -612,6 +620,7 @@ export default function EventTaskPage() {
         onConfirm={() => {
           if (confirmModal.onConfirm) confirmModal.onConfirm();
         }}
+        isLoading={isDeletingTasks}
       />
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
@@ -1521,15 +1530,27 @@ export default function EventTaskPage() {
                       type="button"
                       className="btn btn-outline-secondary"
                       onClick={() => setShowAddModal(false)}
+                      disabled={isCreatingTask}
                     >
                       Hủy
                     </button>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-primary d-flex align-items-center"
                       onClick={handleCreateTask}
+                      disabled={isCreatingTask}
                     >
-                      Thêm công việc
+                      {isCreatingTask ? (
+                        <>
+                          <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                          Đang thêm...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-plus-lg me-2"></i>
+                          Thêm công việc
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1613,9 +1634,14 @@ export default function EventTaskPage() {
               className="btn btn-sm btn-danger"
               onClick={handleDeleteSelected}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
+              disabled={isDeletingTasks}
             >
-              <i className="bi bi-trash"></i>
-              Delete
+              {isDeletingTasks ? (
+                <i className="bi bi-arrow-clockwise spin-animation"></i>
+              ) : (
+                <i className="bi bi-trash"></i>
+              )}
+              {isDeletingTasks ? "Đang xóa..." : "Delete"}
             </button>
             <button
               className="btn btn-sm btn-outline-secondary"
