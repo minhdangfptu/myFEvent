@@ -225,6 +225,7 @@ export default function DataTemplatePage() {
       sidebarType="hooc"
       title="Tài liệu dữ liệu mẫu"
       activePage="export-example"
+      eventId={eventId}
     >
       <div className="data-template-page">
         <div className="data-template-page__container">

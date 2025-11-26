@@ -280,23 +280,19 @@ export default function UserProfilePage() {
     }
   }, [showAvatarDropdown]);
 
+  if (loading) {
+    return (
+      <UserLayout title="Hồ sơ của tôi" activePage="account">
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải hồ sơ...</div>
+        </div>
+      </UserLayout>
+    );
+  }
+
   return (
     <UserLayout title="Hồ sơ của tôi" activePage="account">
-      {loading ? (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={100} />
-        </div>
-      ) : null}
 
       <style>{`
         .mp-primary { color: #EF4444; }

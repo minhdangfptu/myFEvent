@@ -457,14 +457,9 @@ export default function ListRiskPage() {
   useEffect(() => {
     if (eventId) {
       fetchDepartments();
-    }
-  }, [eventId, fetchDepartments]);
-
-  useEffect(() => {
-    if (eventId && departments.length > 0) {
       fetchRisks();
     }
-  }, [eventId, departments.length, fetchRisks]);
+  }, [eventId, fetchDepartments, fetchRisks]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -625,6 +620,7 @@ export default function ListRiskPage() {
       title={t("riskPage.title")}
       activePage={"risk" && "risk-list"}
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <style>{`
         .task-header { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }

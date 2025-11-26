@@ -15,6 +15,8 @@ const MilestoneDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [eventRole, setEventRole] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchMilestoneDetail() {
@@ -24,22 +26,6 @@ const MilestoneDetail = () => {
     fetchMilestoneDetail();
   }, [id]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Đã lên kế hoạch":
-        return "#3b82f6";
-      case "Đang thực hiện":
-        return "#f59e0b";
-      case "Đã hoàn thành":
-        return "#10b981";
-      case "Trễ hạn":
-        return "#dc2626";
-      case "Đã hủy":
-        return "#6b7280";
-      default:
-        return "#6b7280";
-    }
-  };
   // Load event role to decide sidebar and actions visibility
   useEffect(() => {
     let mounted = true;
@@ -93,45 +79,18 @@ const MilestoneDetail = () => {
         return "#6b7280";
     }
   };
-  const getMilestoneStatusLabel = (status) => {
-    switch (status) {
-      case "planned":
-        return "Sắp tới";
-      case "in_progress":
-        return "Đang làm";
-      case "completed":
-        return "Đã hoàn thành";
-      case "delayed":
-        return "Trễ hạn";
-      case "cancelled":
-        return "Đã hủy";
-      default:
-        return "Sắp tới";
+  const handleEditMilestone = async () => {
+    setIsEditing(true);
+    try {
+      navigate(`/events/${eventId}/hooc-edit-milestone/${id}`, {
+        state: {
+          milestone: milestone,
+          relatedTasks: milestone.relatedTasks || [],
+        },
+      });
+    } finally {
+      setIsEditing(false);
     }
-  };
-  const getMilestoneStatusColor = (status) => {
-    switch (status) {
-      case "planned":
-        return "#6b7280";
-      case "in_progress":
-        return "#f59e0b";
-      case "completed":
-        return "#10b981";
-      case "delayed":
-        return "#dc2626";
-      case "cancelled":
-        return "#6b7280";
-      default:
-        return "#6b7280";
-    }
-  };
-  const handleEditMilestone = () => {
-    navigate(`/events/${eventId}/hooc-edit-milestone/${id}`, {
-      state: {
-        milestone: milestone,
-        relatedTasks: milestone.relatedTasks || [],
-      },
-    });
   };
 
   const handleDeleteMilestone = () => {
@@ -140,7 +99,7 @@ const MilestoneDetail = () => {
 
   const handleConfirmDelete = async () => {
     if (deleteConfirmName === milestone.name) {
-      // Xử lý xóa milestone
+      setIsDeleting(true);
       try {
         const response = await milestoneService.deleteMilestone(eventId, id);
         toast.success("Xoá cột mốc thành công");
@@ -148,6 +107,8 @@ const MilestoneDetail = () => {
       } catch (error) {
         toast.error("Xoá cột mốc thất bại");
         console.error("Error deleting milestone:", error);
+      } finally {
+        setIsDeleting(false);
       }
     }
   };
@@ -185,17 +146,27 @@ const MilestoneDetail = () => {
                 className="btn btn-outline-primary d-flex align-items-center"
                 onClick={handleEditMilestone}
                 style={{ borderRadius: "8px" }}
+                disabled={isEditing}
               >
-                <i className="bi bi-pencil me-2"></i>
-                Sửa cột mốc
+                {isEditing ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-pencil me-2"></i>
+                )}
+                {isEditing ? "Đang sửa..." : "Sửa cột mốc"}
               </button>
               <button
                 className="btn btn-outline-danger d-flex align-items-center"
                 onClick={handleDeleteMilestone}
                 style={{ borderRadius: "8px" }}
+                disabled={isDeleting}
               >
-                <i className="bi bi-trash me-2"></i>
-                Xoá cột mốc
+                {isDeleting ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-trash me-2"></i>
+                )}
+                {isDeleting ? "Đang xoá..." : "Xoá cột mốc"}
               </button>
             </div>
           )}
@@ -214,23 +185,6 @@ const MilestoneDetail = () => {
                 </span>
                 <span style={{ fontWeight: "500", fontSize: "1rem" }}>
                   {formatDate(milestone.date)}
-                </span>
-              </div>
-
-              <div className="mb-3">
-                <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                  Trạng thái:{" "}
-                </span>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    backgroundColor: "#fef3c7",
-                    color: "#92400e",
-                    fontSize: "0.9rem",
-                    borderRadius: "20px",
-                  }}
-                >
-                  {getMilestoneStatusLabel(milestone.status)}
                 </span>
               </div>
             </div>
@@ -271,7 +225,7 @@ const MilestoneDetail = () => {
                 <span
                   className="badge px-3 py-2"
                   style={{
-                    backgroundColor: getStatusColor(task.status),
+                    backgroundColor: getTaskStatusColor(task.status),
                     color: "white",
                     fontSize: "0.9rem",
                     borderRadius: "20px",

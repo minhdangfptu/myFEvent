@@ -438,7 +438,7 @@ export const notifyRemovedFromCalendar = async (eventId, calendarId, userId, cal
 export const notifyMeetingReminder = async (eventId, calendarId, participants, calendarName, startAt) => {
   try {
     const meetingDate = new Date(startAt).toLocaleDateString('vi-VN');
-    
+
     const userIds = participants
       .filter(p => p.member && p.member.userId)
       .map(p => p.member.userId._id);
@@ -462,6 +462,35 @@ export const notifyMeetingReminder = async (eventId, calendarId, participants, c
     return userIds.length;
   } catch (error) {
     console.error('Error notifying meeting reminder:', error);
+    return 0;
+  }
+};
+
+export const notifyCalendarUpdated = async (eventId, calendarId, participants, calendarName) => {
+  try {
+    const userIds = participants
+      .filter(p => p.member && p.member.userId)
+      .map(p => p.member.userId._id);
+
+    if (userIds.length === 0) {
+      console.log('No valid participants to notify about calendar update');
+      return 0;
+    }
+
+    await createNotificationsForUsers(userIds, {
+      eventId,
+      category: 'LỊCH HỌP',
+      title: `Cuộc họp "${calendarName}" đã được cập nhật`,
+      icon: 'bi bi-calendar-check',
+      color: '#10b981',
+      relatedCalendarId: calendarId,
+      unread: true,
+    });
+
+    console.log(`Update notification sent to ${userIds.length} users for calendar:`, calendarName);
+    return userIds.length;
+  } catch (error) {
+    console.error('Error notifying calendar updated:', error);
     return 0;
   }
 };

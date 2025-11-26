@@ -692,6 +692,7 @@ export default function HoDTaskPage() {
         title="Danh sách công việc"
         activePage="work-board"
         sidebarType="HoD"
+        eventId={eventId}
       >
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Không tìm thấy ban</h5>
@@ -716,6 +717,7 @@ export default function HoDTaskPage() {
         title={t("taskPage.title")}
         activePage="work-board"
         sidebarType="HoD"
+        eventId={eventId}
       >
         <style>{`
         .task-header { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }

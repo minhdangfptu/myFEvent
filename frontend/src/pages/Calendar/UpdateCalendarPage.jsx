@@ -4,6 +4,7 @@ import { toast, ToastContainer } from "react-toastify";
 import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
+import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
 import { departmentService } from "~/services/departmentService";
 import { eventService } from "~/services/eventService";
@@ -57,6 +58,7 @@ export default function UpdateEventCalendarPage() {
     const navigate = useNavigate();
     const { eventId, calendarId } = useParams();
     const { fetchEventRole } = useEvents();
+    const { user } = useAuth();
     const [eventRole, setEventRole] = useState("");
     const [loadingCalendar, setLoadingCalendar] = useState(true);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -173,6 +175,9 @@ export default function UpdateEventCalendarPage() {
             // Refresh calendar data
             const updatedCalendar = await calendarService.getCalendarEventDetail(eventId, calendarId);
             setCurrentParticipants(updatedCalendar.data.participants || []);
+            
+            // Refresh available members list
+            await fetchAvailableMembers();
         } catch (error) {
             console.error('Error removing participant:', error);
             toast.error(error.response?.data?.message || 'Không thể xóa người tham gia');
@@ -224,6 +229,7 @@ export default function UpdateEventCalendarPage() {
     const [loadingData, setLoadingData] = useState(true);
     const [isDepartmentCalendar, setIsDepartmentCalendar] = useState(false);
     const [calendarDepartmentId, setCalendarDepartmentId] = useState(null);
+    const [calendarCreatorId, setCalendarCreatorId] = useState(null);
 
     // Load calendar data để populate form
     useEffect(() => {
@@ -511,7 +517,7 @@ export default function UpdateEventCalendarPage() {
     }
 
     return (
-        <UserLayout sidebarType={eventRole} activePage="calendar">
+        <UserLayout eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{
                 minHeight: "100vh",
@@ -1371,114 +1377,111 @@ export default function UpdateEventCalendarPage() {
                                     </div>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {getFilteredParticipants().map(participant => {
-                                            const isCreator = participant.member?._id === currentParticipants.find(p => p.member?._id === participant.member?._id)?.member?._id;
-                                            return (
-                                                <div
-                                                    key={participant.member?._id}
-                                                    style={{
+                                        {getFilteredParticipants().map(participant => (
+                                            <div
+                                                key={participant.member?._id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '16px',
+                                                    backgroundColor: '#f9fafb',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #e5e7eb'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                                    <div style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#e5e7eb',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        padding: '16px',
-                                                        backgroundColor: '#f9fafb',
-                                                        borderRadius: '8px',
-                                                        border: '1px solid #e5e7eb'
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                                                        <div style={{
-                                                            width: '40px',
-                                                            height: '40px',
-                                                            borderRadius: '50%',
-                                                            backgroundColor: '#e5e7eb',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            overflow: 'hidden'
-                                                        }}>
-                                                            {participant.member?.userId?.avatarUrl ? (
-                                                                <img
-                                                                    src={participant.member.userId.avatarUrl}
-                                                                    alt={participant.member.userId.fullName}
-                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                />
-                                                            ) : (
-                                                                <span style={{ fontSize: '18px' }}>👤</span>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ flex: 1 }}>
-                                                            <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>
-                                                                {participant.member?.userId?.fullName || 'N/A'}
-                                                            </p>
-                                                            <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
-                                                                {participant.member?.userId?.email || 'N/A'}
-                                                            </p>
-                                                        </div>
+                                                        justifyContent: 'center',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        {participant.member?.userId?.avatarUrl ? (
+                                                            <img
+                                                                src={participant.member.userId.avatarUrl}
+                                                                alt={participant.member.userId.fullName}
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            />
+                                                        ) : (
+                                                            <span style={{ fontSize: '18px' }}>👤</span>
+                                                        )}
                                                     </div>
-
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                        {participant.participateStatus === 'confirmed' && (
-                                                            <span style={{
-                                                                backgroundColor: '#d1fae5',
-                                                                color: '#065f46',
-                                                                padding: '4px 12px',
-                                                                borderRadius: '12px',
-                                                                fontSize: '12px',
-                                                                fontWeight: 500
-                                                            }}>
-                                                                ✓ Tham gia
-                                                            </span>
-                                                        )}
-                                                        {participant.participateStatus === 'absent' && (
-                                                            <span style={{
-                                                                backgroundColor: '#fee2e2',
-                                                                color: '#991b1b',
-                                                                padding: '4px 12px',
-                                                                borderRadius: '12px',
-                                                                fontSize: '12px',
-                                                                fontWeight: 500
-                                                            }}>
-                                                                ✖ Từ chối
-                                                            </span>
-                                                        )}
-                                                        {participant.participateStatus === 'unconfirmed' && (
-                                                            <span style={{
-                                                                backgroundColor: '#fef3c7',
-                                                                color: '#92400e',
-                                                                padding: '4px 12px',
-                                                                borderRadius: '12px',
-                                                                fontSize: '12px',
-                                                                fontWeight: 500
-                                                            }}>
-                                                                ⏳ Chưa phản hồi
-                                                            </span>
-                                                        )}
-
-                                                        {!isCreator && (
-                                                            <button
-                                                                onClick={() => handleRemoveParticipant(
-                                                                    participant.member?._id,
-                                                                    participant.member?.userId?.fullName
-                                                                )}
-                                                                style={{
-                                                                    backgroundColor: '#fee2e2',
-                                                                    color: '#dc2626',
-                                                                    border: 'none',
-                                                                    padding: '6px 12px',
-                                                                    borderRadius: '6px',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: '13px',
-                                                                    fontWeight: 600
-                                                                }}
-                                                            >
-                                                                Xóa
-                                                            </button>
-                                                        )}
+                                                    <div style={{ flex: 1 }}>
+                                                        <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>
+                                                            {participant.member?.userId?.fullName || 'N/A'}
+                                                        </p>
+                                                        <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
+                                                            {participant.member?.userId?.email || 'N/A'}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    {participant.participateStatus === 'confirmed' && (
+                                                        <span style={{
+                                                            backgroundColor: '#d1fae5',
+                                                            color: '#065f46',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            ✓ Tham gia
+                                                        </span>
+                                                    )}
+                                                    {participant.participateStatus === 'absent' && (
+                                                        <span style={{
+                                                            backgroundColor: '#fee2e2',
+                                                            color: '#991b1b',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            ✖ Từ chối
+                                                        </span>
+                                                    )}
+                                                    {participant.participateStatus === 'unconfirmed' && (
+                                                        <span style={{
+                                                            backgroundColor: '#fef3c7',
+                                                            color: '#92400e',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            ⏳ Chưa phản hồi
+                                                        </span>
+                                                    )}
+
+                                                    {participant.member?.userId?._id !== user?.id && (
+                                                        <button
+                                                            onClick={() => handleRemoveParticipant(
+                                                                participant.member?._id,
+                                                                participant.member?.userId?.fullName
+                                                            )}
+                                                            style={{
+                                                                backgroundColor: '#fee2e2',
+                                                                color: '#dc2626',
+                                                                border: 'none',
+                                                                padding: '6px 12px',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '13px',
+                                                                fontWeight: 600
+                                                            }}
+                                                        >
+                                                            Xóa
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
 
                                         {getFilteredParticipants().length === 0 && (
                                             <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>

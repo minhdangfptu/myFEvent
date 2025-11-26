@@ -187,6 +187,7 @@ export default function HoOCTaskStatisticPage() {
         title="Thống kê công việc"
         activePage="work-statitics"
         sidebarType="HoOC"
+        eventId={eventId}
       >
         <div className="hooc-task-statistic-page">
           <div style={{ textAlign: "center", padding: "40px" }}>
@@ -203,6 +204,7 @@ export default function HoOCTaskStatisticPage() {
       title="Thống kê công việc"
       activePage="work-statitics"
       sidebarType="HoOC"
+      eventId={eventId}
     >
       <div className="hooc-task-statistic-page">
         {/* Header Section */}

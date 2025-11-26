@@ -241,11 +241,7 @@ export default function App() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
-        <ToastContainer position="top-right" autoClose={3000} />
-        <NetworkWarningOverlay
-          isVisible={showNetworkWarning}
-          onClose={handleCloseOverlay}
-        />
+        <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
         <NotificationsProvider>
           <EventProvider>
             <Routes>

@@ -24,7 +24,12 @@ export function NotificationsProvider({ children }) {
         title: n.title || '',
         createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         unread: n.unread !== undefined ? n.unread : true,
-        color: n.color || '#ef4444'
+        color: n.color || '#ef4444',
+        eventId: n.eventId,
+        relatedCalendarId: n.relatedCalendarId,
+        relatedTaskId: n.relatedTaskId,
+        relatedMilestoneId: n.relatedMilestoneId,
+        relatedAgendaId: n.relatedAgendaId
       }))
       setNotifications(mapped)
     } catch (error) {

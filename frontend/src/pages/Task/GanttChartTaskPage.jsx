@@ -593,6 +593,7 @@ export default function GanttChartTaskPage() {
         title={t("taskPage.title") || "Gantt Chart"}
         activePage="work-board"
         sidebarType={getSidebarType()}
+        eventId={eventId}
       >
         <div
           className="d-flex justify-content-center align-items-center"
@@ -611,6 +612,7 @@ export default function GanttChartTaskPage() {
       title={(t("taskPage.title") || "Tasks") + ": Biểu đồ Gantt"}
       activePage="work-gantt"
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <div
         className="container-fluid"

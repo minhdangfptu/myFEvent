@@ -116,31 +116,18 @@ export default function UserSidebar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => navigate("/")}
-            style={{ cursor: "pointer" }}
+            style={{cursor: "pointer"}}
           >
             <div className="logo-content d-flex align-items-center ">
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginRight: "10px",
-                }}
-              >
-                <img
-                  className="hover-rotate"
-                  src="/website-icon-fix@3x.png"
-                  alt="myFEvent"
-                  style={{ width: 40, height: 40 }}
-                />
+              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
+                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
               </div>
-              {sidebarOpen && (
-                <img
-                  src="/logo-03.png"
-                  alt="myFEvent"
-                  style={{ width: "auto", height: 40 }}
-                />
-              )}
+              {sidebarOpen &&  <img
+              onClick={() => navigate("/")}
+              src="/logo-03.png"
+              alt="myFEvent"
+              style={{ width: "auto", height: 40 }}
+            />}
             </div>
           </div>
 
@@ -302,9 +289,9 @@ export default function UserSidebar({
               </div>
 
               <img
-                src="/gov.webp"
-                alt="Đã thông báo Bộ Công Thương"
-                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+                src="/gov.png"
+                alt="FPTU - FEVENT TEAM"
+                style={{ height: "30px", width: "auto", objectFit: "contain" }}
               />
             </div>
           </div>

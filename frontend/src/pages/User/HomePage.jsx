@@ -203,11 +203,15 @@ export default function HomePage() {
   }, []);
 
   // Show login success toast once
+  const loginToastShown = useRef(false);
   useEffect(() => {
-    if (location.state?.loginSuccess) {
+    if (location.state?.loginSuccess && !loginToastShown.current) {
+      loginToastShown.current = true;
       toast.success("Đăng nhập thành công!");
-      // Clear the state to prevent showing toast again on refresh/back
-      navigate(location.pathname, { replace: true, state: {} });
+      // Clear the state after a brief delay to prevent showing toast again on refresh/back
+      setTimeout(() => {
+        navigate(location.pathname, { replace: true, state: {} });
+      }, 100);
     }
   }, [location.state, location.pathname, navigate]);
 
@@ -1570,9 +1574,7 @@ export default function HomePage() {
                       setShowJoinModal(false);
                       setJoinCode("");
                       navigate(
-                        `/member-event-detail/${
-                          res.data.eventId || res.data.id
-                        }?eventId=${res.data.eventId || res.data.id}`
+                        `/member-dashboard?eventId=${res.data.eventId || res.data.id}`
                       );
                       toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {

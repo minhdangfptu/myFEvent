@@ -750,7 +750,7 @@ const validateDate = (dateString) => {
   const currentSchedules = getSchedulesForSelectedDate();
   if (loading) {
     return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()}>
+      <UserLayout title="Agenda" sidebarType={getSidebarType()} eventId={eventId}>
         <div className="agenda-page__container">
           <div className="text-center">
             <div className="spinner-border text-primary" role="status">
@@ -765,7 +765,7 @@ const validateDate = (dateString) => {
 
   if (error) {
     return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()}>
+      <UserLayout title="Agenda" sidebarType={getSidebarType()} eventId={eventId}>
         <div className="agenda-page__container">
           <div className="alert alert-danger">
             <h4>Lỗi tải dữ liệu</h4>
@@ -787,6 +787,7 @@ const validateDate = (dateString) => {
       title={`Agenda ${milestoneTitle}`}
       sidebarType={getSidebarType()}
       activePage="overview & overview-timeline"
+      eventId={eventId}
     >
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="agenda-page__container">
