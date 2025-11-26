@@ -130,21 +130,31 @@ const HoOCEditMilestone = () => {
             Chi tiết cột mốc
           </h3>
           <div className="d-flex gap-2">
-            <button 
+            <button
               className="btn btn-outline-secondary"
               onClick={handleCancel}
               style={{ borderRadius: '8px' }}
               disabled={actionLoading}
             >
-              {actionLoading ? <Loading size={14} /> : 'Huỷ'}
+              Huỷ
             </button>
-            <button 
-              className="btn btn-danger"
+            <button
+              className="btn btn-danger d-flex align-items-center"
               onClick={handleSaveChanges}
               style={{ borderRadius: '8px' }}
               disabled={actionLoading}
             >
-              {actionLoading ? <Loading size={14} /> : 'Lưu thay đổi'}
+              {actionLoading ? (
+                <>
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-lg me-2"></i>
+                  Lưu thay đổi
+                </>
+              )}
             </button>
           </div>
         </div>

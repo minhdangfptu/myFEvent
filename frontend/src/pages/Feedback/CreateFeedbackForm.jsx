@@ -550,8 +550,12 @@ export default function CreateFeedbackForm() {
                     opacity: submitting ? 0.6 : 1
                   }}
                 >
-                  <i className="bi bi-box-arrow-up"></i>
-                  Xuất bản
+                  {submitting ? (
+                    <i className="bi bi-arrow-clockwise spin-animation"></i>
+                  ) : (
+                    <i className="bi bi-box-arrow-up"></i>
+                  )}
+                  {submitting ? 'Đang xuất bản...' : 'Xuất bản'}
                 </button>
               )}
             </div>
@@ -852,9 +856,13 @@ export default function CreateFeedbackForm() {
                       padding: '10px 24px',
                       fontSize: '14px',
                       cursor: submitting ? 'not-allowed' : 'pointer',
-                      opacity: submitting ? 0.6 : 1
+                      opacity: submitting ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
+                    {submitting && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                     {submitting ? 'Đang lưu...' : 'Lưu nháp'}
                   </button>
                 </div>

@@ -12,6 +12,7 @@ import {
   isUserMemberOfDepartment,
   addMemberToDepartmentDoc,
   removeMemberFromDepartmentDoc,
+  findDepartmentByName,
 } from '../services/departmentService.js';
 
 import {
@@ -107,6 +108,11 @@ export const createDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
     }
 
+    const existingDept = await findDepartmentByName(eventId, name.trim());
+    if (existingDept) {
+      return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+    }
+
     const populatedDepart = await createDepartmentDoc({ eventId, name, description, leaderId });
 
     const formattedDepartment = {
@@ -147,6 +153,21 @@ export const editDepartment = async (req, res) => {
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
     }
+
+    if (typeof name === 'string') {
+        const trimmedName = name.trim();
+        if (trimmedName === '') {
+             return res.status(400).json({ message: 'Tên Department không được để trống' });
+        }
+
+        // Kiểm tra xem có department nào KHÁC department hiện tại đang dùng tên này không
+        const existingDept = await findDepartmentByName(eventId, trimmedName);
+        if (existingDept && existingDept._id.toString() !== departmentId) {
+            return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+        }
+        set.name = trimmedName;
+    }
+    
     // Cập nhật qua service
     const set = {};
     if (typeof name === 'string') set.name = name;

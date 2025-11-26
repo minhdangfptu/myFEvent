@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
+import { APP_VERSION } from "../config";
 
 export default function UserSidebar({
   sidebarOpen,
@@ -276,7 +277,7 @@ export default function UserSidebar({
                     fontWeight: 500,
                   }}
                 >
-                  Version 1.0.0
+                  Phiên bản {APP_VERSION}
                 </div>
                 <div
                   style={{

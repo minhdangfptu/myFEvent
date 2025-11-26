@@ -295,16 +295,22 @@ const MilestoneDetail = () => {
                 className="btn btn-outline-secondary"
                 onClick={handleCancelDelete}
                 style={{ borderRadius: "8px" }}
+                disabled={isDeleting}
               >
                 Huỷ
               </button>
               <button
-                className="btn btn-danger"
+                className="btn btn-danger d-flex align-items-center"
                 onClick={handleConfirmDelete}
-                disabled={deleteConfirmName !== milestone.name}
+                disabled={deleteConfirmName !== milestone.name || isDeleting}
                 style={{ borderRadius: "8px" }}
               >
-                Xoá
+                {isDeleting ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-trash me-2"></i>
+                )}
+                {isDeleting ? "Đang xoá..." : "Xoá"}
               </button>
             </div>
           </div>

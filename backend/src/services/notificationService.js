@@ -1,6 +1,5 @@
 import Notification from '../models/notification.js';
 import EventMember from '../models/eventMember.js';
-import Department from '../models/department.js';
 import Task from '../models/task.js';
 
 /**
@@ -13,7 +12,7 @@ export const createNotification = async ({
   title,
   icon = 'bi bi-bell',
   avatarUrl = '/logo-03.png',
-  color = '#ef4444',
+  color = '#aaaaaaff',
   relatedTaskId = null,
   relatedMilestoneId = null,
   relatedAgendaId = null,
@@ -40,6 +39,7 @@ export const createNotification = async ({
     throw error;
   }
 };
+
 
 /**
  * Tạo thông báo cho nhiều users
@@ -72,7 +72,8 @@ export const notifyTaskAssigned = async (eventId, taskId, assigneeId) => {
 
     const assigneeUserId = assigneeMember.userId._id;
     const taskTitle = task.title || 'Công việc';
-
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
     // Lấy thông tin người giao việc (từ req.user trong controller)
     // Tạm thời dùng "HoOC" hoặc lấy từ context
 
@@ -80,9 +81,9 @@ export const notifyTaskAssigned = async (eventId, taskId, assigneeId) => {
       userId: assigneeUserId,
       eventId,
       category: 'CÔNG VIỆC',
-      title: `Bạn đã được giao công việc "${taskTitle}"`,
+      title: `[${eventName}] Bạn đã được giao công việc "${taskTitle}"`,
       icon: 'bi bi-asterisk',
-      color: '#ef4444',
+      color: '#ee4b4bff',
       relatedTaskId: taskId,
     });
   } catch (error) {
@@ -103,7 +104,8 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       console.log('Task, departmentId or assigneeId not found');
       return;
     }
-
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
     const departmentId = task.departmentId._id || task.departmentId;
     const assigneeMember = await EventMember.findById(task.assigneeId._id || task.assigneeId)
       .populate('userId');
@@ -133,9 +135,9 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
           userId: hodUserId,
           eventId,
           category: 'CÔNG VIỆC',
-          title: `${assigneeName} đã hoàn thành công việc "${taskTitle}"`,
+          title: `[${eventName}] ${assigneeName} đã hoàn thành công việc "${taskTitle}"`,
           icon: 'bi bi-check-circle',
-          color: '#10b981',
+          color: '#ee4b4bff',
           relatedTaskId: taskId,
         });
         
@@ -162,9 +164,9 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
           await createNotificationsForUsers(hoocUserIds, {
             eventId,
             category: 'CÔNG VIỆC',
-            title: `${hodName} (${departmentName}) đã hoàn thành công việc "${taskTitle}"`,
+            title: `[${eventName}] ${hodName} (${departmentName}) đã hoàn thành công việc "${taskTitle}"`,
             icon: 'bi bi-check-circle',
-            color: '#10b981',
+            color: '#ee4b4bff',
             relatedTaskId: taskId,
             unread: true,
           });
@@ -188,7 +190,8 @@ export const notifyTaskOverdue = async (eventId, taskId) => {
       .populate('departmentId');
     
     if (!task) return;
-
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
     const userIds = [];
 
     // Thông báo cho Member được giao việc
@@ -223,9 +226,9 @@ export const notifyTaskOverdue = async (eventId, taskId) => {
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'CÔNG VIỆC',
-      title: `Công việc "${taskTitle}" đã quá hạn`,
+      title: `[${eventName}] Công việc "${taskTitle}" đã quá hạn`,
       icon: 'bi bi-exclamation-triangle',
-      color: '#ef4444',
+      color: '#ee4b4bff',
       relatedTaskId: taskId,
       unread: true,
     });
@@ -246,6 +249,9 @@ export const notifyMajorTaskStatus = async (eventId, taskId, isCompleted) => {
     const isMajorTask = !task.parentId;
     if (!isMajorTask) return; // Chỉ là task con, không phải task lớn
 
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
+
     // Lấy tất cả HoOC của event
     const hoocMembers = await EventMember.find({
       eventId,
@@ -263,15 +269,15 @@ export const notifyMajorTaskStatus = async (eventId, taskId, isCompleted) => {
 
     const taskTitle = task.title || 'Công việc';
     const title = isCompleted
-      ? `Công việc lớn "${taskTitle}" đã hoàn thành`
-      : `Công việc lớn "${taskTitle}" đã quá hạn`;
+      ? `[${eventName}] Công việc lớn "${taskTitle}" đã hoàn thành`
+      : `[${eventName}] Công việc lớn "${taskTitle}" đã quá hạn`;
 
     await createNotificationsForUsers(hoocUserIds, {
       eventId,
       category: 'CÔNG VIỆC',
       title,
       icon: isCompleted ? 'bi bi-check-circle' : 'bi bi-exclamation-triangle',
-      color: isCompleted ? '#10b981' : '#ef4444',
+      color: '#ee4b4bff',
       relatedTaskId: taskId,
       unread: true,
     });
@@ -291,6 +297,8 @@ export const notifyAgendaCreated = async (eventId, agendaId, milestoneId) => {
       role: { $in: ['HoD', 'Member'] },
       status: { $ne: 'deactive' },
     }).populate('userId');
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
 
     if (members.length === 0) return;
 
@@ -303,7 +311,7 @@ export const notifyAgendaCreated = async (eventId, agendaId, milestoneId) => {
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'LỊCH HỌP',
-      title: 'Bạn có lịch họp mới',
+      title:  `[${eventName}] Bạn có lịch họp mới  `,
       icon: 'bi bi-calendar-event',
       color: '#3b82f6',
       relatedAgendaId: agendaId,
@@ -328,6 +336,8 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
       console.log('New member not found');
       return;
     }
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
 
     const newMemberName = newMember.userId.fullName || 'Thành viên mới';
     const departmentName = newMember.departmentId?.name || 'Ban';
@@ -352,9 +362,9 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'THÀNH VIÊN',
-      title: `${newMemberName} đã tham gia ${departmentName}`,
+      title: `[${eventName}] ${newMemberName} đã tham gia ${departmentName}`,
       icon: 'bi bi-person-plus',
-      color: '#3b82f6',
+      color: '#f59e0b',
       unread: true,
     });
 
@@ -363,9 +373,9 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
       userId: newMember.userId._id,
       eventId,
       category: 'THÀNH VIÊN',
-      title: `Bạn đã được thêm vào ${departmentName}`,
+      title: `[${eventName}] Bạn đã được thêm vào ${departmentName}`,
       icon: 'bi bi-person-check',
-      color: '#10b981',
+      color: '#f59e0b',
       unread: true,
     });
 
@@ -397,10 +407,13 @@ export const notifyAddedToCalendar = async (eventId, calendarId, memberIds, cale
       return 0;
     }
 
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
+
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'LỊCH HỌP',
-      title: `Bạn đã được thêm vào cuộc họp "${calendarName}"`,
+      title: `[${eventName}] Bạn đã được thêm vào cuộc họp "${calendarName}"`,
       icon: 'bi bi-calendar-event',
       color: '#3b82f6',
       relatedCalendarId: calendarId,
@@ -417,13 +430,15 @@ export const notifyAddedToCalendar = async (eventId, calendarId, memberIds, cale
 
 export const notifyRemovedFromCalendar = async (eventId, calendarId, userId, calendarName) => {
   try {
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
     await createNotification({
       userId,
       eventId,
       category: 'LỊCH HỌP',
-      title: `Bạn đã bị xóa khỏi cuộc họp "${calendarName}"`,
+      title: `[${eventName}] Bạn đã bị xóa khỏi cuộc họp "${calendarName}"`,
       icon: 'bi bi-calendar-x',
-      color: '#ef4444',
+      color: '#3b82f6',
       relatedCalendarId: calendarId,
     });
 
@@ -438,7 +453,8 @@ export const notifyRemovedFromCalendar = async (eventId, calendarId, userId, cal
 export const notifyMeetingReminder = async (eventId, calendarId, participants, calendarName, startAt) => {
   try {
     const meetingDate = new Date(startAt).toLocaleDateString('vi-VN');
-
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
     const userIds = participants
       .filter(p => p.member && p.member.userId)
       .map(p => p.member.userId._id);
@@ -451,9 +467,9 @@ export const notifyMeetingReminder = async (eventId, calendarId, participants, c
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'LỊCH HỌP',
-      title: `Nhắc nhở: Cuộc họp "${calendarName}" vào ${meetingDate}`,
+      title: `[${eventName}] Nhắc nhở: Cuộc họp "${calendarName}" vào ${meetingDate}`,
       icon: 'bi bi-bell',
-      color: '#f59e0b',
+      color: '#3b82f6',
       relatedCalendarId: calendarId,
       unread: true,
     });
@@ -477,12 +493,15 @@ export const notifyCalendarUpdated = async (eventId, calendarId, participants, c
       return 0;
     }
 
+    const event = await Event.findById(eventId).select('name').lean();
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
+
     await createNotificationsForUsers(userIds, {
       eventId,
       category: 'LỊCH HỌP',
-      title: `Cuộc họp "${calendarName}" đã được cập nhật`,
+      title: `[${eventName}] Cuộc họp "${calendarName}" đã được cập nhật, vui lòng xác nhận lại`,
       icon: 'bi bi-calendar-check',
-      color: '#10b981',
+      color: '#3b82f6',
       relatedCalendarId: calendarId,
       unread: true,
     });

@@ -51,6 +51,9 @@ const [newDateInput, setNewDateInput] = useState("");
   const [scheduleToDelete, setScheduleToDelete] = useState(null);
   const [showDeleteDateModal, setShowDeleteDateModal] = useState(false);
   const [dateToDelete, setDateToDelete] = useState(null);
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
+  const [isDeletingDate, setIsDeletingDate] = useState(false);
 
   // Context and params
   const { fetchEventRole } = useEvents();
@@ -344,6 +347,7 @@ const validateDate = (dateString) => {
   const handleDeleteSchedule = async () => {
     if (!scheduleToDelete) return;
 
+    setIsDeletingSchedule(true);
     try {
       // Use index-based API for deleting items (since items don't have _id)
       await removeDayItem(
@@ -363,6 +367,8 @@ const validateDate = (dateString) => {
       toast.error(err.message || "Lỗi khi xóa lịch trình");
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
+    } finally {
+      setIsDeletingSchedule(false);
     }
   };
 
@@ -372,7 +378,7 @@ const validateDate = (dateString) => {
       toast.error("Vui lòng nhập nội dung lịch trình");
       return;
     }
-  
+
     if (!selectedDateId) {
       toast.error("Vui lòng chọn ngày để thêm lịch trình");
       return;
@@ -384,16 +390,17 @@ const validateDate = (dateString) => {
       toast.error(timeValidation.message);
       return;
     }
-  
+
+    setIsAddingSchedule(true);
     try {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
- 
+
       if (!selectedDate || !selectedDate.dateId) {
         debugLog("Add schedule aborted: selected date missing", { selectedDateId, selectedDate });
         toast.error("Không tìm thấy dateId cho ngày được chọn");
         return;
       }
-  
+
       // Use proper date construction
       const selectedRawDate = selectedDate.rawDate;
       debugLog("Adding schedule", { selectedDate, selectedRawDate, newSchedule });
@@ -421,7 +428,7 @@ const validateDate = (dateString) => {
         duration: endTime - startTime, // milliseconds
         content: newSchedule.content.trim(),
       };
-  
+
       // Use ID-based API for adding items to existing dates
       const response = await addItemToDateById(
         eventId,
@@ -438,6 +445,8 @@ const validateDate = (dateString) => {
       console.error("❌ Error adding schedule:", err);
       debugLog("Error when adding schedule", { err, newSchedule, selectedDateId });
       toast.error(err.message || "Lỗi khi thêm lịch trình");
+    } finally {
+      setIsAddingSchedule(false);
     }
   };
 
@@ -497,6 +506,7 @@ const validateDate = (dateString) => {
   const handleDeleteDate = async () => {
     if (!dateToDelete) return;
 
+    setIsDeletingDate(true);
     try {
       if (dateToDelete.dateId) {
         // Use ID-based API for deleting dates
@@ -520,6 +530,8 @@ const validateDate = (dateString) => {
       toast.error(err.message || "Lỗi khi xóa ngày");
       setShowDeleteDateModal(false);
       setDateToDelete(null);
+    } finally {
+      setIsDeletingDate(false);
     }
   };
 
@@ -1118,8 +1130,13 @@ const validateDate = (dateString) => {
                   <button
                     className="agenda-page__action-button agenda-page__action-button--confirm"
                     onClick={handleAddSchedule}
+                    disabled={isAddingSchedule}
                   >
-                    <i className="bi bi-check-circle"></i>
+                    {isAddingSchedule ? (
+                      <i className="bi bi-arrow-clockwise spin-animation"></i>
+                    ) : (
+                      <i className="bi bi-check-circle"></i>
+                    )}
                   </button>
                   <button
                     className="agenda-page__action-button agenda-page__action-button--delete"
@@ -1171,6 +1188,7 @@ const validateDate = (dateString) => {
           }}
           onConfirm={handleDeleteSchedule}
           message="Bạn có chắc chắn muốn xóa lịch trình này?"
+          isLoading={isDeletingSchedule}
         />
 
         <ConfirmModal
@@ -1181,6 +1199,7 @@ const validateDate = (dateString) => {
           }}
           onConfirm={handleDeleteDate}
           message="Bạn có chắc chắn muốn xóa ngày này và tất cả lịch trình?"
+          isLoading={isDeletingDate}
         />
       </div>
     </UserLayout>

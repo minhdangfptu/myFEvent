@@ -6,6 +6,9 @@ export const baseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
 // Google OAuth Configuration
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+//App Version Em Minh Dang code
+export const APP_VERSION = '1.1.0';
+
 // App Configuration
 export const appConfig = {
     name: 'myFEvent',

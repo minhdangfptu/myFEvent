@@ -46,6 +46,7 @@ const DepartmentDetail = () => {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [isAssigningLeader, setIsAssigningLeader] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const { fetchEventRole } = useEvents();
   
   const getMemberDisplayName = (member) =>
@@ -228,6 +229,7 @@ const DepartmentDetail = () => {
       description: (editForm.description || "").trim(),
     };
     if (!payload.name) return toast.warning("Tên ban không được để trống");
+    setIsSavingChanges(true);
     try {
       await departmentApi.updateDepartment(eventId, id, payload);
       setDepartment((prev) => ({ ...(prev || {}), ...payload }));
@@ -235,6 +237,8 @@ const DepartmentDetail = () => {
       setEditing(false);
     } catch (error) {
       toast.error(error?.response?.data?.message || "Cập nhật ban thất bại!");
+    } finally {
+      setIsSavingChanges(false);
     }
   };
 
@@ -670,9 +674,14 @@ const DepartmentDetail = () => {
                     padding: "10px 20px",
                     fontWeight: "500",
                   }}
+                  disabled={loadingMembers}
                 >
-                  <i className="bi bi-plus-lg me-2"></i>
-                  Thêm thành viên
+                  {loadingMembers ? (
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  ) : (
+                    <i className="bi bi-plus-lg me-2"></i>
+                  )}
+                  {loadingMembers ? "Đang tải..." : "Thêm thành viên"}
                 </button>
               )}
             </div>
@@ -848,14 +857,20 @@ const DepartmentDetail = () => {
                         className="btn btn-danger d-flex align-items-center"
                         onClick={handleSave}
                         style={{ borderRadius: "8px", fontWeight: "500" }}
+                        disabled={isSavingChanges}
                       >
-                        <i className="bi bi-check-lg me-2"></i>
-                        Lưu thay đổi
+                        {isSavingChanges ? (
+                          <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                        ) : (
+                          <i className="bi bi-check-lg me-2"></i>
+                        )}
+                        {isSavingChanges ? "Đang lưu..." : "Lưu thay đổi"}
                       </button>
                       <button
                         className="btn btn-outline-secondary d-flex align-items-center"
                         onClick={handleCancel}
                         style={{ borderRadius: "8px", fontWeight: "500" }}
+                        disabled={isSavingChanges}
                       >
                         <i className="bi bi-x-lg me-2"></i>
                         Hủy
@@ -952,18 +967,28 @@ const DepartmentDetail = () => {
                       className="btn btn-outline-danger d-flex align-items-center"
                       style={{ borderRadius: "8px", fontWeight: "400" }}
                       onClick={() => setShowChangeLeaderModal(true)}
+                      disabled={changingLeader}
                     >
-                      <i className="bi bi-arrow-repeat me-2"></i>
-                      Đổi trưởng ban
+                      {changingLeader ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-arrow-repeat me-2"></i>
+                      )}
+                      {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
                     </button>
                   ) : (
                     <button
                       className="btn btn-success d-flex align-items-center"
                       style={{ borderRadius: "8px", fontWeight: "400" }}
                       onClick={openAssignLeaderModal}
+                      disabled={assigningLeader}
                     >
-                      <i className="bi bi-person-plus me-2"></i>
-                      Gán trưởng ban
+                      {assigningLeader ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-person-plus me-2"></i>
+                      )}
+                      {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
                     </button>
                   )}
                 </div>
@@ -1063,16 +1088,22 @@ const DepartmentDetail = () => {
                 className="btn btn-outline-secondary"
                 onClick={handleCancelDelete}
                 style={{ borderRadius: "8px" }}
+                disabled={isDeleting}
               >
                 Huỷ
               </button>
               <button
-                className="btn btn-danger"
+                className="btn btn-danger d-flex align-items-center"
                 onClick={handleConfirmDelete}
-                disabled={deleteConfirmName !== department.name}
+                disabled={deleteConfirmName !== department.name || isDeleting}
                 style={{ borderRadius: "8px" }}
               >
-                Xoá
+                {isDeleting ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-trash me-2"></i>
+                )}
+                {isDeleting ? "Đang xoá..." : "Xoá"}
               </button>
             </div>
           </div>

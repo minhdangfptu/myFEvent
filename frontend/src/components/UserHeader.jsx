@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
+// 1. Import useNavigate
+import { useNavigate } from 'react-router-dom'; 
 
 export default function UserHeader({
   title,
@@ -13,12 +15,36 @@ export default function UserHeader({
 }) {
   const { user, logout, setUser } = useAuth();
   const { t } = useTranslation();
-  const { notifications, unreadCount, markAllRead } = useNotifications();
+  // 2. Lấy thêm markRead để xử lý khi click vào từng thông báo
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
   const unread = notifications.filter((n) => n.unread).slice(0, 5);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timeFormat, setTimeFormat] = useState(() => {
     return localStorage.getItem('timeFormat') || '24h';
   });
+
+  // 3. Khởi tạo navigate
+  const navigate = useNavigate();
+
+  // 4. Logic xử lý click notification (Copy từ NotificationsPage)
+  const handleNotificationClick = (notification) => {
+    // Đánh dấu đã đọc
+    markRead(notification.id);
+
+    // Điều hướng dựa trên dữ liệu entity
+    if (notification.relatedCalendarId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
+    } else if (notification.relatedTaskId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
+    } else if (notification.relatedMilestoneId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
+    } else if (notification.relatedAgendaId && notification.eventId) {
+      navigate(`/events/${notification.eventId}/my-calendar`)
+    } else if (notification.eventId) {
+      navigate(`/events/${notification.eventId}`)
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);
   }, [timeFormat]);
@@ -52,12 +78,14 @@ export default function UserHeader({
       return currentTime.toLocaleTimeString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: false,
       });
     } else {
       return currentTime.toLocaleTimeString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
         hour12: true,
       });
     }
@@ -293,6 +321,9 @@ export default function UserHeader({
                   <div
                     key={n.id}
                     className="px-3 py-3 border-bottom d-flex align-items-start gap-2"
+                    // 5. Thêm style pointer và sự kiện onClick
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleNotificationClick(n)}
                   >
                     <div className="mt-1">
                       <i className={n.icon} style={{ color: "#ef4444" }} />

@@ -22,6 +22,7 @@ const Department = () => {
   const [error, setError] = useState('');
   const [evenntRole, setEventRole] = useState('');
   const [roleLoading, setRoleLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { fetchEventRole } = useEvents();
 
@@ -81,34 +82,34 @@ const Department = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
-      setLoading(true);
       setError('');
-      
+
       const response = await departmentService.createDepartment(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim()
       });
-      
+
       const newDepartment = {
         ...response,
         leader: response.leaderName || 'Chưa có',
         action: 'Xem chi tiết'
       };
-      
+
       // Thêm ban mới vào danh sách
       setDepartments([...departments, newDepartment]);
-      
+
       // Đóng modal và reset form
       setShowCreateModal(false);
       setCreateForm({ name: '', description: '' });
-      
+
       toast.success('Tạo ban thành công!');
     } catch (err) {
       console.error('Error creating department:', err);
       setError(err.response?.data?.message || 'Tạo ban thất bại');
     } finally {
-      setLoading(false);
+      setIsCreating(false);
     }
   };
 
@@ -330,21 +331,27 @@ const Department = () => {
               </div>
               
               <div className="d-flex justify-content-end gap-2">
-                <button 
+                <button
                   type="button"
                   className="btn btn-outline-secondary"
                   onClick={() => setShowCreateModal(false)}
                   style={{ borderRadius: '8px' }}
+                  disabled={isCreating}
                 >
                   Huỷ
                 </button>
-                <button 
+                <button
                   type="submit"
-                  className="btn btn-danger"
+                  className="btn btn-danger d-flex align-items-center"
                   style={{ borderRadius: '8px' }}
-                  disabled={loading}
+                  disabled={isCreating}
                 >
-                  {loading ? 'Đang tạo...' : 'Xác nhận'}
+                  {isCreating ? (
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  ) : (
+                    <i className="bi bi-check-lg me-2"></i>
+                  )}
+                  {isCreating ? 'Đang tạo...' : 'Xác nhận'}
                 </button>
               </div>
             </form>
