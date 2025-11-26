@@ -152,13 +152,14 @@ export default function MemberSidebar({
   // Submenu Công việc - Member có đầy đủ quyền trừ thống kê tiến độ
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/member-tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: "/task" },
+    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId || ''}/tasks/gantt` },
     // Không có work-stats (thống kê tiến độ)
   ];
 
   // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
+    // Ngân sách: đưa member đến trang danh sách budget theo phòng ban
+    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets/departments` },
     { id: "expenses", label: "Chi tiêu", path: `/events/${eventId || ''}/expenses` },
     // Không có finance-stats (thống kê thu chi)
   ];
