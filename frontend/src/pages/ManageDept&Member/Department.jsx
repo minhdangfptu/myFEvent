@@ -21,12 +21,15 @@ const Department = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [evenntRole, setEventRole] = useState('');
+  const [roleLoading, setRoleLoading] = useState(true);
 
   const { fetchEventRole } = useEvents();
 
   useEffect(() => {
+    setRoleLoading(true);
     fetchEventRole(eventId).then(role => {
       setEventRole(role);
+      setRoleLoading(false);
     });
   }, [eventId]);
 
@@ -117,11 +120,22 @@ const Department = () => {
     dept.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Show loading while fetching role to prevent showing wrong sidebar
+  if (roleLoading) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <Loading />
+        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+      </div>
+    );
+  }
+
   return (
     <UserLayout
       title="Quản lý phân ban sự kiện"
-      sidebarType= {getSidebarType()}
+      sidebarType={getSidebarType()}
       activePage="department-management"
+      eventId={eventId}
     >
       <ToastContainer position="top-right" autoClose={3000} />
       {/* Main Content */}
@@ -158,7 +172,12 @@ const Department = () => {
           </div>
 
           {/* Departments Table */}
-          {filteredDepartments.length === 0 ? (
+          {loading ? (
+            <div className="d-flex flex-column justify-content-center align-items-center py-5">
+              <Loading />
+              <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải danh sách ban...</div>
+            </div>
+          ) : filteredDepartments.length === 0 ? (
             <div className="d-flex flex-column justify-content-center align-items-center py-4">
               <img src={NoDataImg} alt="Không có dữ liệu" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
               <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có ban nào được tạo!</div>

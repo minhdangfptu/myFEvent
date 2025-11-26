@@ -109,26 +109,18 @@ const HoOCEditMilestone = () => {
   };
 
   if (loading) {
-    return <Loading />;
+    return (
+      <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin cột mốc...</div>
+        </div>
+      </UserLayout>
+    );
   }
 
   return (
-    <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline">
-      {loading && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(255,255,255,0.75)',
-            zIndex: 2000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Loading />
-        </div>
-      )}
+    <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
 
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>

@@ -1204,6 +1204,7 @@ export default function EventTaskDetailPage() {
         title={t("taskPage.title")}
         activePage={"work" && "work-board"}
         sidebarType={getSidebarType()}
+        eventId={eventId}
       >
         <ToastContainer position="top-right" autoClose={3000} />
         <style>{`

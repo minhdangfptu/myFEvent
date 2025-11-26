@@ -234,6 +234,7 @@ export default function MemberTaskPage() {
         title="Danh sách công việc"
         activePage="work-board"
         sidebarType="member"
+        eventId={eventId}
       >
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Không tìm thấy thông tin thành viên</h5>
@@ -250,6 +251,7 @@ export default function MemberTaskPage() {
         title={t("taskPage.title")}
         activePage="work-board"
         sidebarType="member"
+        eventId={eventId}
       >
         <style>{`
         .task-header { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }

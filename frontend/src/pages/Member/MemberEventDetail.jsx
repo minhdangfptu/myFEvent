@@ -99,19 +99,10 @@ export default function MemberEventDetail() {
 
   if (loading) {
     return (
-      <UserLayout title="Chi tiết sự kiện" sidebarType="member">
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={80} />
+      <UserLayout title="Chi tiết sự kiện" sidebarType="member" eventId={eventId}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
         </div>
       </UserLayout>
     );
@@ -119,7 +110,7 @@ export default function MemberEventDetail() {
 
   if (error || !event) {
     return (
-      <UserLayout  title="Chi tiết sự kiện" sidebarType="member">
+      <UserLayout  title="Chi tiết sự kiện" sidebarType="member" eventId={eventId}>
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy sự kiện'}
         </div>

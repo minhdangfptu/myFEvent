@@ -33,14 +33,17 @@ export default function MemberProfilePage() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('Member');
   const [roleSaving, setRoleSaving] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
   const { fetchEventRole } = useEvents();
 
   // Get member data from navigation state if available
   const memberFromState = location.state?.member;
 
   useEffect(() => {
+    setRoleLoading(true);
     fetchEventRole(eventId).then(role => {
       setEventRole(role);
+      setRoleLoading(false);
     });
   }, [eventId]);
 
@@ -237,9 +240,19 @@ export default function MemberProfilePage() {
     });
   };
 
+  // Show loading while fetching role to prevent showing wrong sidebar
+  if (roleLoading) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <Loading />
+        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members">
+      <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members" eventId={eventId}>
         <div
           style={{
             position: "fixed",
@@ -259,7 +272,7 @@ export default function MemberProfilePage() {
 
   if (error || !member) {
     return (
-      <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members">
+      <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members" eventId={eventId}>
         <div className="container-fluid" style={{ maxWidth: 1100 }}>
           <div className="alert alert-danger" role="alert">
             {error || 'Không tìm thấy thông tin thành viên'}
@@ -299,10 +312,11 @@ export default function MemberProfilePage() {
   ];
 
   return (
-    <UserLayout 
-      title="Thông tin thành viên" 
-      sidebarType={getSidebarType()} 
+    <UserLayout
+      title="Thông tin thành viên"
+      sidebarType={getSidebarType()}
       activePage="members"
+      eventId={eventId}
     >
       <ConfirmModal
         show={confirmModal.show}

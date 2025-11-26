@@ -9,7 +9,7 @@ export default function HoDSideBar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
-  eventId, // Nhận eventId qua props
+  eventId, 
 }) {
   const STORAGE_KEY = 'sidebar_state_hod';
   const [isInitialized, setIsInitialized] = useState(false);
@@ -351,14 +351,14 @@ export default function HoDSideBar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => navigate("/home-page")}
-            style={{ cursor: "pointer" }}
+            style={{cursor: "pointer"}}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
               </div>
               {sidebarOpen &&  <img
+              onClick={() => navigate("/home-page")}
               src="/logo-03.png"
               alt="myFEvent"
               style={{ width: "auto", height: 40 }}

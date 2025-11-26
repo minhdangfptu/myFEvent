@@ -39,7 +39,8 @@ const DepartmentDetail = () => {
   const [selectedAssignLeader, setSelectedAssignLeader] = useState(null);
   const [assigningLeader, setAssigningLeader] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); 
+  const [error, setError] = useState(null);
+  const [roleLoading, setRoleLoading] = useState(true);
   const { fetchEventRole } = useEvents();
   
   const getMemberDisplayName = (member) =>
@@ -155,10 +156,12 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole('');
           setUserDepartmentId(null);
+          setRoleLoading(false);
         }
         return;
       }
       try {
+        setRoleLoading(true);
         console.log('Fetching event role for eventId:', eventId);
         const r = await fetchEventRole(eventId);
         console.log('Role response:', r);
@@ -181,6 +184,7 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole(normalized);
           setUserDepartmentId(deptId);
+          setRoleLoading(false);
           console.log('✓ Role set to:', normalized);
         }
       } catch (err) {
@@ -188,6 +192,7 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole('');
           setUserDepartmentId(null);
+          setRoleLoading(false);
         }
       }
     };
@@ -442,6 +447,16 @@ const DepartmentDetail = () => {
         .includes(memberSearchQuery.toLowerCase())
   );
 
+  // Show loading while fetching role to prevent showing wrong sidebar
+  if (roleLoading) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <Loading />
+        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+      </div>
+    );
+  }
+
   // ===== IMPROVED LOADING & ERROR HANDLING =====
   if (loading) {
     return (
@@ -470,6 +485,7 @@ const DepartmentDetail = () => {
         title="Chi tiết phân ban"
         sidebarType={getSidebarType()}
         activePage="department-management"
+        eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
           <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: "4rem" }}></i>
@@ -496,6 +512,7 @@ const DepartmentDetail = () => {
         title="Chi tiết phân ban"
         sidebarType={getSidebarType()}
         activePage="department-management"
+        eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
           <i className="bi bi-inbox text-muted" style={{ fontSize: "4rem" }}></i>
@@ -518,6 +535,7 @@ const DepartmentDetail = () => {
       title="Chi tiết phân ban"
       sidebarType={getSidebarType()}
       activePage="department-management"
+      eventId={eventId}
     >
     <ToastContainer position="top-right" autoClose={2000}/>
       {/* Main Content */}

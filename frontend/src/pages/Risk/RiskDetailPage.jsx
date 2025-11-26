@@ -515,7 +515,7 @@ export default function RiskDetailPage() {
 
   if (loading) {
     return (
-      <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()}>
+      <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()} eventId={eventId}>
         <div className="container-fluid d-flex justify-content-center align-items-center" style={{ height: "60vh" }}>
           <Loading />
         </div>
@@ -525,7 +525,7 @@ export default function RiskDetailPage() {
 
   if (!risk) {
     return (
-      <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()}>
+      <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()} eventId={eventId}>
         <div className="container-fluid d-flex justify-content-center align-items-center" style={{ height: "60vh" }}>
           <div className="text-center">
             <div style={{ fontSize: 48 }}>❌</div>
@@ -542,7 +542,7 @@ export default function RiskDetailPage() {
   const filteredOccurredRisks = getFilteredOccurredRisks();
 
   return (
-    <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()}>
+    <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()} eventId={eventId}>
       <style>{`
         .loading-spinner {
           display: inline-block;

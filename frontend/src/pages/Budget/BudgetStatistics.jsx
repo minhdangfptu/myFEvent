@@ -32,7 +32,19 @@ const BudgetStatistics = () => {
   };
 
   if (loading) {
-    return <Loading />;
+    return (
+      <UserLayout
+        title="Thống kê thu chi"
+        activePage="budget"
+        sidebarType="hooc"
+        eventId={eventId}
+      >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thống kê thu chi...</div>
+        </div>
+      </UserLayout>
+    );
   }
 
   if (!statistics) {
