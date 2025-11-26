@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventService } from "../../services/eventService";
 import { departmentService } from "../../services/departmentService";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
@@ -239,9 +239,19 @@ const DepartmentDetail = () => {
     if (deleteConfirmName === department.name) {
       try {
         await departmentApi.deleteDepartment(eventId, id);
-        toast.success("Xóa ban thành công!");
-        navigate(`/events/${eventId}/`);
+        setShowDeleteModal(false);
+        setDeleteConfirmName("");
+
+        // Navigate với state để trang đích hiện toast
+        navigate(`/events/${eventId}/departments`, {
+          state: {
+            showToast: true,
+            toastMessage: "Xóa ban thành công!",
+            toastType: "success"
+          }
+        });
       } catch (error) {
+        console.error("Delete department error:", error);
         toast.error(error?.response?.data?.message || "Xóa ban thất bại!");
       }
     } else {
@@ -509,6 +519,7 @@ const DepartmentDetail = () => {
       sidebarType={getSidebarType()}
       activePage="department-management"
     >
+    <ToastContainer position="top-right" autoClose={2000}/>
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: "30px" }}>
         {/* Department Header */}

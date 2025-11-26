@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
@@ -9,6 +9,7 @@ import { useEvents } from '~/contexts/EventContext';
 
 const Department = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { eventId } = useParams();
   const [departments, setDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +29,19 @@ const Department = () => {
       setEventRole(role);
     });
   }, [eventId]);
+
+  // Handle toast notification from navigation state (e.g., after delete)
+  useEffect(() => {
+    if (location.state?.showToast) {
+      if (location.state.toastType === 'success') {
+        toast.success(location.state.toastMessage);
+      } else if (location.state.toastType === 'error') {
+        toast.error(location.state.toastMessage);
+      }
+      // Clear the state to prevent toast from showing on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const getSidebarType = () => {
     if (evenntRole === 'HoOC') return 'HoOC';
