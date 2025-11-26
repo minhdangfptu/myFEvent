@@ -15,7 +15,7 @@ export default function ErrorPageOffline() {
         <div className="mb-2">Vui Lòng Chờ Hoặc Làm Mới Lại Trang</div>
         <button className="btn btn-primary" onClick={handleReload}>Làm mới trang</button>
         <div className="text-secondary mt-3" style={{ fontSize: 15 }}>
-          Nếu Sự Cố Vẫn Tiếp Diễn, Vui Lòng Liên Hệ <a href="#" className="fw-semibold">Trung Tâm Hỗ Trợ</a>
+          Nếu Sự Cố Vẫn Tiếp Diễn, Vui Lòng Liên Hệ <a href="mailto:minhddhe180032@fpt.edu.vn" className="fw-semibold">minhddhe180032@fpt.edu.vn</a>
         </div>
       </div>
     </div>

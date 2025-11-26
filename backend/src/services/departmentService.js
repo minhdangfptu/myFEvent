@@ -14,6 +14,13 @@ export const ensureDepartmentInEvent = async (eventId, departmentId) => {
   return await Department.findOne({ _id: departmentId, eventId });
 };
 
+export const findDepartmentByName = async (eventId, name) => {
+  return await Department.findOne({ 
+    eventId, 
+    name: { $regex: new RegExp(`^${name}$`, 'i') } 
+  });
+};
+
 
 // Query services
 export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) => {
