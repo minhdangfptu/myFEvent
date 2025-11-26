@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
-// 1. Import useNavigate
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from "react-router-dom";
+import { timeAgo } from "../utils/timeAgo";
 
 export default function UserHeader({
   title,
@@ -15,9 +15,15 @@ export default function UserHeader({
 }) {
   const { user, logout, setUser } = useAuth();
   const { t } = useTranslation();
-  // 2. Lấy thêm markRead để xử lý khi click vào từng thông báo
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
-  const unread = notifications.filter((n) => n.unread).slice(0, 5);
+
+  // Sắp xếp thông báo mới nhất lên trước, hiển thị tất cả (có scroll),
+  // nhưng giới hạn chiều cao để nhìn giống ~3 thông báo như hiện tại.
+  const sortedNotifications = [...notifications].sort((a, b) => {
+    const da = new Date(a.createdAt).getTime();
+    const db = new Date(b.createdAt).getTime();
+    return db - da;
+  });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timeFormat, setTimeFormat] = useState(() => {
     return localStorage.getItem('timeFormat') || '24h';
@@ -27,23 +33,23 @@ export default function UserHeader({
   const navigate = useNavigate();
 
   // 4. Logic xử lý click notification (Copy từ NotificationsPage)
-  const handleNotificationClick = (notification) => {
-    // Đánh dấu đã đọc
-    markRead(notification.id);
+  // const handleNotificationClick = (notification) => {
+  //   // Đánh dấu đã đọc
+  //   markRead(notification.id);
 
-    // Điều hướng dựa trên dữ liệu entity
-    if (notification.relatedCalendarId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
-    } else if (notification.relatedTaskId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
-    } else if (notification.relatedMilestoneId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
-    } else if (notification.relatedAgendaId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar`)
-    } else if (notification.eventId) {
-      navigate(`/events/${notification.eventId}`)
-    }
-  }
+  //   // Điều hướng dựa trên dữ liệu entity
+  //   if (notification.relatedCalendarId && notification.eventId) {
+  //     navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
+  //   } else if (notification.relatedTaskId && notification.eventId) {
+  //     navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
+  //   } else if (notification.relatedMilestoneId && notification.eventId) {
+  //     navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
+  //   } else if (notification.relatedAgendaId && notification.eventId) {
+  //     navigate(`/events/${notification.eventId}/my-calendar`)
+  //   } else if (notification.eventId) {
+  //     navigate(`/events/${notification.eventId}`)
+  //   }
+  // }
 
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);
@@ -70,6 +76,40 @@ export default function UserHeader({
   // Toggle time format
   const toggleTimeFormat = () => {
     setTimeFormat(prev => prev === '24h' ? '12h' : '24h');
+  };
+
+  const getNotificationTargetUrl = (n) => {
+    // Backend can optionally send a direct URL
+    if (n.targetUrl) return n.targetUrl;
+
+    // Ưu tiên điều hướng về đúng công việc được giao nếu có taskId + eventId
+    if (n.eventId && n.relatedTaskId) {
+      return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;
+    }
+
+    // Các thông báo về thành viên tham gia / rời sự kiện
+    if (n.eventId && n.category === "THÀNH VIÊN") {
+      // Trang chi tiết sự kiện cho member
+      return `/home-page/events/${n.eventId}`;
+    }
+
+    // Mặc định nếu có eventId thì đưa về trang chi tiết sự kiện
+    if (n.eventId) {
+      return `/home-page/events/${n.eventId}`;
+    }
+
+    // Fallback: về trang danh sách thông báo
+    return "/notifications";
+  };
+
+  const handleNotificationClick = (n) => {
+    // Đánh dấu đã đọc
+    if (n.id) {
+      markRead(n.id);
+    }
+    // Điều hướng tới trang phù hợp
+    const url = getNotificationTargetUrl(n);
+    navigate(url);
   };
 
   // Format time display
@@ -309,18 +349,17 @@ export default function UserHeader({
                   Đánh dấu tất cả đã đọc
                 </button>
               </div>
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                {unread.length === 0 && (
+              <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                {sortedNotifications.length === 0 && (
                   <div className="px-3 py-3 text-secondary">
                     Không có thông báo mới
                   </div>
                 )}
-                {unread.map((n) => (
+                {sortedNotifications.map((n) => (
                   <div
                     key={n.id}
                     className="px-3 py-3 border-bottom d-flex align-items-start gap-2"
-                    // 5. Thêm style pointer và sự kiện onClick
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: "pointer" }}
                     onClick={() => handleNotificationClick(n)}
                   >
                     <div className="mt-1">
@@ -341,12 +380,16 @@ export default function UserHeader({
                           {n.title}
                         </span>
                       </div>
-                      <div className="text-secondary small">Vừa xong</div>
+                      <div className="text-secondary small">
+                        {timeAgo(n.createdAt)}
+                      </div>
                     </div>
-                    <span
-                      className="bg-primary rounded-circle"
-                      style={{ width: 8, height: 8 }}
-                    />
+                    {n.unread && (
+                      <span
+                        className="bg-primary rounded-circle"
+                        style={{ width: 8, height: 8 }}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

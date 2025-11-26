@@ -1,38 +1,36 @@
 import UserLayout from '../../components/UserLayout'
 import { useNotifications } from '../../contexts/NotificationsContext'
 import { useNavigate } from 'react-router-dom'
-
-function timeAgo(iso) {
-  try {
-    const d = new Date(iso)
-    const diff = (Date.now() - d.getTime()) / 1000
-    if (diff < 60) return 'Vừa xong'
-    if (diff < 3600) return `${Math.floor(diff/60)} phút trước`
-    if (diff < 86400) return `${Math.floor(diff/3600)} giờ trước`
-    return `${Math.floor(diff/86400)} ngày trước`
-  } catch { return '' }
-}
+import { timeAgo } from '../../utils/timeAgo'
 
 export default function NotificationsPage() {
   const { notifications, markAllRead, markRead } = useNotifications()
   const navigate = useNavigate()
 
-  const handleNotificationClick = (notification) => {
-    // Mark as read
-    markRead(notification.id)
+  const getNotificationTargetUrl = (n) => {
+    if (n.targetUrl) return n.targetUrl
 
-    // Navigate based on related entities
-    if (notification.relatedCalendarId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
-    } else if (notification.relatedTaskId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
-    } else if (notification.relatedMilestoneId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
-    } else if (notification.relatedAgendaId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar`)
-    } else if (notification.eventId) {
-      navigate(`/events/${notification.eventId}`)
+    if (n.eventId && n.relatedTaskId) {
+      return `/events/${n.eventId}/tasks/${n.relatedTaskId}`
     }
+
+    if (n.eventId && n.category === 'THÀNH VIÊN') {
+      return `/home-page/events/${n.eventId}`
+    }
+
+    if (n.eventId) {
+      return `/home-page/events/${n.eventId}`
+    }
+
+    return '/notifications'
+  }
+
+  const handleNotificationClick = (n) => {
+    if (n.id) {
+      markRead(n.id)
+    }
+    const url = getNotificationTargetUrl(n)
+    navigate(url)
   }
 
   return (
