@@ -83,7 +83,7 @@ export const assignHoDToDepartment = async (eventId, department, userId) => {
   if (previousLeaderId && previousLeaderId !== userId) {
     await EventMember.findOneAndUpdate(
       { eventId, userId: previousLeaderId, status: { $ne: 'deactive' } },
-      { $set: { departmentId: department._id, role: 'staff' } }
+      { $set: { departmentId: department._id, role: 'Member' } }
     );
   }
 
@@ -110,8 +110,6 @@ export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, 
 };
 
 export const removeMemberFromDepartmentDoc = async (eventId, departmentId, memberId) => {
-  // ✅ Xử lý tasks: chỉ unassign các task chưa hoàn thành
-  // Giữ nguyên các task đã hoàn thành, chỉ unassign task ở trạng thái chưa bắt đầu/đã bắt đầu
   await Task.updateMany(
     {
       eventId,
