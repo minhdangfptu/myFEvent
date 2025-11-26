@@ -328,7 +328,6 @@ const Milestone = () => {
     name: "",
     description: "",
     targetDate: "",
-    status: "Đã lên kế hoạch",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -389,7 +388,6 @@ const Milestone = () => {
         id: ms._id || ms.id,
         name: ms.name,
         date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
-        status: getStatusLabel(ms.status),
         description: ms.description || "",
         relatedTasks: ms.tasksCount || 0,
       }))
@@ -405,47 +403,8 @@ const Milestone = () => {
     }
   }
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case "planned":
-        return "Đã lên kế hoạch"
-      case "in_progress":
-        return "Đang thực hiện"
-      case "completed":
-        return "Đã hoàn thành"
-      case "delayed":
-        return "Trễ hạn"
-      case "cancelled":
-        return "Đã hủy"
-      default:
-        return "Đã lên kế hoạch"
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Đã lên kế hoạch":
-        return "#3b82f6"
-      case "Đang thực hiện":
-        return "#f59e0b"
-      case "Đã hoàn thành":
-        return "#10b981"
-      case "Trễ hạn":
-        return "#dc2626"
-      case "Đã hủy":
-        return "#6b7280"
-      default:
-        return "#6b7280"
-    }
-  }
-
   const handleMilestoneClick = (milestone) => {
     setSelectedMilestone(milestone)
-  }
-
-  const handleEditMilestone = (milestoneId) => {
-    setLoading(true)
-    navigate(`/events/${eventId}/hooc-edit-milestone/${milestoneId}`)
   }
 
   const handleViewDetails = (milestoneId) => {
@@ -479,16 +438,15 @@ const Milestone = () => {
     try {
       setLoading(true)
 
-      const response = await milestoneApi.createMilestone(eventId, {
+      await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
         targetDate: createForm.targetDate,
-        status: getStatusValue(createForm.status),
       })
 
       await fetchMilestones()
       setShowCreateModal(false)
-      setCreateForm({ name: "", description: "", targetDate: "", status: "Đã lên kế hoạch" })
+      setCreateForm({ name: "", description: "", targetDate: "" })
       setShowCreatedModal(true)
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
@@ -499,19 +457,8 @@ const Milestone = () => {
     }
   }
 
-  const getStatusValue = (label) => {
-    const map = {
-      "Đã lên kế hoạch": "planned",
-      "Đang thực hiện": "in_progress",
-      "Đã hoàn thành": "completed",
-      "Trễ hạn": "delayed",
-      "Đã hủy": "cancelled",
-    }
-    return map[label] || "planned"
-  }
-
   return (
-    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
+    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện' eventId={eventId}>
       <style>{animationStyles}</style>
       <ToastContainer position="top-right" autoClose={3000} />
 
@@ -563,7 +510,7 @@ const Milestone = () => {
                   <div
                     style={{
                       ...styles.milestoneDot,
-                      background: `linear-gradient(135deg, ${getStatusColor(milestone.status)} 0%, rgba(239, 68, 68, 0.3) 100%)`,
+                      background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
                     }}
                   >
                     <div style={styles.dotInner}></div>
@@ -582,14 +529,6 @@ const Milestone = () => {
               <div style={styles.milestoneDetails}>
                 <div style={styles.detailsHeader}>
                   <h2 style={styles.detailsHeaderTitle}>{selectedMilestone.name}</h2>
-                  <span
-                    style={{
-                      ...styles.statusBadge,
-                      backgroundColor: getStatusColor(selectedMilestone.status),
-                    }}
-                  >
-                    {selectedMilestone.status}
-                  </span>
                 </div>
 
                 <div style={styles.detailsBody}>
@@ -626,18 +565,6 @@ const Milestone = () => {
                     }}
                   >
                     Xem Agenda
-                  </button>
-                  <button
-                    style={styles.btnSecondary}
-                    onClick={() => handleEditMilestone(selectedMilestone.id)}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "#e5e7eb"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "#f3f4f6"
-                    }}
-                  >
-                    Chỉnh sửa
                   </button>
                   <button
                     style={styles.btnPrimary}
@@ -720,28 +647,6 @@ const Milestone = () => {
                     }}
                     required
                   />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Trạng thái:</label>
-                  <select
-                    style={styles.formInput}
-                    value={createForm.status}
-                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value })}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#ef4444"
-                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e5e7eb"
-                      e.target.style.boxShadow = "none"
-                    }}
-                  >
-                    <option>Đã lên kế hoạch</option>
-                    <option>Đang thực hiện</option>
-                    <option>Đã hoàn thành</option>
-                    <option>Trễ hạn</option>
-                    <option>Đã hủy</option>
-                  </select>
                 </div>
                 <div style={styles.modalActions}>
                   <button

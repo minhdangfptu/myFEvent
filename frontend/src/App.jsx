@@ -52,6 +52,7 @@ import ErrorPage404 from "./pages/Errors/ErrorPage404";
 import ErrorPage403 from "./pages/Errors/ErrorPage403";
 import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
+import ErrorPage504 from "./pages/Errors/ErrorPage504";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDDashBoard from "./pages/HoD/HoDDashBoard";
@@ -101,6 +102,10 @@ import UserManagement from "./pages/Admin/UserManagement";
 import EventDetailManagement from "./pages/Admin/EventDetailManagement";
 import UserDetailManagement from "./pages/Admin/UserDetailManagement";
 import EventManagement from "./pages/Admin/EventManagement";
+import ErrorPage503 from "./pages/Errors/ErrorPage503";
+import ErrorPage500 from "./pages/Errors/ErrorPage500";
+import AxiosInterceptor from "./components/AxiosInterceptor";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Network Warning Overlay Component
 function NetworkWarningOverlay({ isVisible, onClose }) {
@@ -204,13 +209,6 @@ export default function App() {
           <WifiOff size={20} />
           <span>Mạng không ổn định! Vui lòng kiểm tra kết nối.</span>
         </div>,
-        {
-          autoClose: 60000,
-          closeOnClick: false,
-          pauseOnHover: true,
-          draggable: false,
-          toastId: "network-timeout-toast",
-        }
       );
     }
 
@@ -241,13 +239,11 @@ export default function App() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
-        <ToastContainer position="top-right" autoClose={3000} />
-        <NetworkWarningOverlay
-          isVisible={showNetworkWarning}
-          onClose={handleCloseOverlay}
-        />
+      <AxiosInterceptor>
+        <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
         <NotificationsProvider>
           <EventProvider>
+            <ErrorBoundary>
             <Routes>
               {/* Default Route */}
               <Route
@@ -904,7 +900,9 @@ export default function App() {
               {/* Error Routes */}
               <Route path="/401" element={<ErrorPage401 />} />
               <Route path="/502" element={<ErrorPage502 />} />
-              <Route path="/off" element={<ErrorPageOffline />} />
+              <Route path="/504" element={<ErrorPage504 />} />
+              <Route path="/503" element={<ErrorPage503 />} />
+              <Route path="/500" element={<ErrorPage500 />} />
               <Route
                 path="/unauthorized"
                 element={
@@ -914,8 +912,10 @@ export default function App() {
               {/* 404 Route - Must be last */}
               <Route path="*" element={<ErrorPage404 />} />
             </Routes>
+            </ErrorBoundary>
           </EventProvider>
         </NotificationsProvider>
+        </AxiosInterceptor>
       </BrowserRouter>
     </GoogleOAuthProvider>
   );

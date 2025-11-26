@@ -442,18 +442,9 @@ export default function HoOCDashBoard() {
         activePage="overview-dashboard"
         eventId={eventId}
       >
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={80} />
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải dữ liệu dashboard...</div>
         </div>
       </UserLayout>
     )

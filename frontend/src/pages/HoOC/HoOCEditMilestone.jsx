@@ -13,7 +13,6 @@ const HoOCEditMilestone = () => {
   const [milestone, setMilestone] = useState({
     name: '',
     date: '',
-    status: '',
     description: ''
   });
   const [relatedTasks, setRelatedTasks] = useState([]);
@@ -35,7 +34,6 @@ const HoOCEditMilestone = () => {
       setMilestone({
         name: stateData.milestone.name || '',
         date: stateData.milestone.date || '',
-        status: stateData.milestone.status || '',
         description: stateData.milestone.description || ''
       });
       setRelatedTasks(stateData.relatedTasks || []);
@@ -49,7 +47,6 @@ const HoOCEditMilestone = () => {
           setMilestone({
             name: response.name || '',
             date: response.date || '',
-            status: response.status || '',
             description: response.description || ''
           });
           setRelatedTasks(response.relatedTasks || []);
@@ -75,7 +72,7 @@ const HoOCEditMilestone = () => {
     try {
       await milestoneService.updateMilestone(eventId, id, milestone);
       toast.success('Cập nhật cột mốc thành công');
-      navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
+      navigate(`/events/${eventId}/milestone-detail/${id}`);
       // no immediate setActionLoading(false) here because navigate will unmount
     } catch (error) {
       console.error('Error updating milestone:', error);
@@ -86,7 +83,7 @@ const HoOCEditMilestone = () => {
   };
 
   const handleCancel = () => {
-    navigate(`/events/${eventId}/hooc-milestone-detail/${id}`);
+    navigate(`/events/${eventId}/milestone-detail/${id}`);
   };
 
   const getTaskStatusLabel = (status) => {
@@ -111,49 +108,19 @@ const HoOCEditMilestone = () => {
     }
   };
 
-  const getMilestoneStatusLabel = (status) => {
-    switch (status) {
-      case "planned": return "Sắp tới";
-      case "in_progress": return "Đang làm";
-      case "completed": return "Đã hoàn thành";
-      case "delayed": return "Trễ hạn";
-      case "cancelled": return "Đã hủy";
-      default: return "Sắp tới";
-    }
-  };
-
-  const getMilestoneStatusColor = (status) => {
-    switch (status) {
-      case "planned": return "#6b7280";
-      case "in_progress": return "#f59e0b";
-      case "completed": return "#10b981";
-      case "delayed": return "#dc2626";
-      case "cancelled": return "#6b7280";
-      default: return "#6b7280";
-    }
-  };
-
   if (loading) {
-    return <Loading />;
+    return (
+      <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin cột mốc...</div>
+        </div>
+      </UserLayout>
+    );
   }
 
   return (
-    <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline">
-      {loading && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(255,255,255,0.75)',
-            zIndex: 2000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Loading />
-        </div>
-      )}
+    <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
 
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
@@ -163,21 +130,31 @@ const HoOCEditMilestone = () => {
             Chi tiết cột mốc
           </h3>
           <div className="d-flex gap-2">
-            <button 
+            <button
               className="btn btn-outline-secondary"
               onClick={handleCancel}
               style={{ borderRadius: '8px' }}
               disabled={actionLoading}
             >
-              {actionLoading ? <Loading size={14} /> : 'Huỷ'}
+              Huỷ
             </button>
-            <button 
-              className="btn btn-danger"
+            <button
+              className="btn btn-danger d-flex align-items-center"
               onClick={handleSaveChanges}
               style={{ borderRadius: '8px' }}
               disabled={actionLoading}
             >
-              {actionLoading ? <Loading size={14} /> : 'Lưu thay đổi'}
+              {actionLoading ? (
+                <>
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-lg me-2"></i>
+                  Lưu thay đổi
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -219,24 +196,6 @@ const HoOCEditMilestone = () => {
                    }}
                 ></i>
               </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="form-label" style={{ color: '#374151', fontWeight: '500' }}>
-                Trạng thái
-              </label>
-              <select 
-                className="form-select"
-                value={milestone.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                style={{ borderRadius: '8px' }}
-              >
-                <option value="planned">Sắp tới</option>
-                <option value="in_progress">Đang làm</option>
-                <option value="completed">Đã hoàn thành</option>
-                <option value="delayed">Trễ hạn</option>
-                <option value="cancelled">Đã hủy</option>
-              </select>
             </div>
 
             <div className="mb-4">

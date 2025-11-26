@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import UserLayout from '../../components/UserLayout';
 import { departmentService } from '../../services/departmentService';
@@ -9,6 +9,7 @@ import { useEvents } from '~/contexts/EventContext';
 
 const Department = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { eventId } = useParams();
   const [departments, setDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,14 +21,31 @@ const Department = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [evenntRole, setEventRole] = useState('');
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { fetchEventRole } = useEvents();
 
   useEffect(() => {
+    setRoleLoading(true);
     fetchEventRole(eventId).then(role => {
       setEventRole(role);
+      setRoleLoading(false);
     });
   }, [eventId]);
+
+  // Handle toast notification from navigation state (e.g., after delete)
+  useEffect(() => {
+    if (location.state?.showToast) {
+      if (location.state.toastType === 'success') {
+        toast.success(location.state.toastMessage);
+      } else if (location.state.toastType === 'error') {
+        toast.error(location.state.toastMessage);
+      }
+      // Clear the state to prevent toast from showing on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const getSidebarType = () => {
     if (evenntRole === 'HoOC') return 'HoOC';
@@ -64,34 +82,34 @@ const Department = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
-      setLoading(true);
       setError('');
-      
+
       const response = await departmentService.createDepartment(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim()
       });
-      
+
       const newDepartment = {
         ...response,
         leader: response.leaderName || 'Chưa có',
         action: 'Xem chi tiết'
       };
-      
+
       // Thêm ban mới vào danh sách
       setDepartments([...departments, newDepartment]);
-      
+
       // Đóng modal và reset form
       setShowCreateModal(false);
       setCreateForm({ name: '', description: '' });
-      
+
       toast.success('Tạo ban thành công!');
     } catch (err) {
       console.error('Error creating department:', err);
       setError(err.response?.data?.message || 'Tạo ban thất bại');
     } finally {
-      setLoading(false);
+      setIsCreating(false);
     }
   };
 
@@ -103,11 +121,22 @@ const Department = () => {
     dept.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Show loading while fetching role to prevent showing wrong sidebar
+  if (roleLoading) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <Loading />
+        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+      </div>
+    );
+  }
+
   return (
     <UserLayout
       title="Quản lý phân ban sự kiện"
-      sidebarType= {getSidebarType()}
+      sidebarType={getSidebarType()}
       activePage="department-management"
+      eventId={eventId}
     >
       <ToastContainer position="top-right" autoClose={3000} />
       {/* Main Content */}
@@ -144,7 +173,12 @@ const Department = () => {
           </div>
 
           {/* Departments Table */}
-          {filteredDepartments.length === 0 ? (
+          {loading ? (
+            <div className="d-flex flex-column justify-content-center align-items-center py-5">
+              <Loading />
+              <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải danh sách ban...</div>
+            </div>
+          ) : filteredDepartments.length === 0 ? (
             <div className="d-flex flex-column justify-content-center align-items-center py-4">
               <img src={NoDataImg} alt="Không có dữ liệu" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
               <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có ban nào được tạo!</div>
@@ -297,21 +331,27 @@ const Department = () => {
               </div>
               
               <div className="d-flex justify-content-end gap-2">
-                <button 
+                <button
                   type="button"
                   className="btn btn-outline-secondary"
                   onClick={() => setShowCreateModal(false)}
                   style={{ borderRadius: '8px' }}
+                  disabled={isCreating}
                 >
                   Huỷ
                 </button>
-                <button 
+                <button
                   type="submit"
-                  className="btn btn-danger"
+                  className="btn btn-danger d-flex align-items-center"
                   style={{ borderRadius: '8px' }}
-                  disabled={loading}
+                  disabled={isCreating}
                 >
-                  {loading ? 'Đang tạo...' : 'Xác nhận'}
+                  {isCreating ? (
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  ) : (
+                    <i className="bi bi-check-lg me-2"></i>
+                  )}
+                  {isCreating ? 'Đang tạo...' : 'Xác nhận'}
                 </button>
               </div>
             </form>

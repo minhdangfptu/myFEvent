@@ -635,6 +635,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
       sidebarType="hooc"
       title="Xuất dữ liệu báo cáo"
       activePage="export-all"
+      eventId={eventId}
     >
       <div className="data-export-page">
         <div className="data-export-page__container">

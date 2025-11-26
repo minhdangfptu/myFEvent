@@ -361,6 +361,7 @@ export default function RiskStatisticsPage() {
       title="Tổng kết Rủi ro"
       activePage={"risk-analysis"}
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <div className="p-4" style={{ backgroundColor: "#f9fafb" }}>
         {/* Header - KEEP ORIGINAL */}

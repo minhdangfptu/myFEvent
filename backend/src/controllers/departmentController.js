@@ -12,12 +12,14 @@ import {
   isUserMemberOfDepartment,
   addMemberToDepartmentDoc,
   removeMemberFromDepartmentDoc,
+  findDepartmentByName,
 } from '../services/departmentService.js';
 
 import {
   findEventMemberById,
   getRequesterMembership,
   countDepartmentMembersExcludingHoOC,
+  getMembersByDepartmentRaw,
 } from '../services/eventMemberService.js';
 
 // GET /api/events/:eventId/departments
@@ -106,6 +108,11 @@ export const createDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
     }
 
+    const existingDept = await findDepartmentByName(eventId, name.trim());
+    if (existingDept) {
+      return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+    }
+
     const populatedDepart = await createDepartmentDoc({ eventId, name, description, leaderId });
 
     const formattedDepartment = {
@@ -146,6 +153,21 @@ export const editDepartment = async (req, res) => {
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
     }
+
+    if (typeof name === 'string') {
+        const trimmedName = name.trim();
+        if (trimmedName === '') {
+             return res.status(400).json({ message: 'Tên Department không được để trống' });
+        }
+
+        // Kiểm tra xem có department nào KHÁC department hiện tại đang dùng tên này không
+        const existingDept = await findDepartmentByName(eventId, trimmedName);
+        if (existingDept && existingDept._id.toString() !== departmentId) {
+            return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+        }
+        set.name = trimmedName;
+    }
+    
     // Cập nhật qua service
     const set = {};
     if (typeof name === 'string') set.name = name;
@@ -169,11 +191,14 @@ export const deleteDepartment = async (req, res) => {
       return res.status(404).json({ message: 'Event không tồn tại' });
     }
     const department = await ensureDepartmentInEvent(eventId, departmentId);
-    if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
-    // Kiểm tra quyền HooC
+    if (!department) return res.status(404).json({ message: 'Department not found' });
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-    if (!requesterMembership || requesterMembership.role !== 'HooC') {
-      return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
+    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
+      return res.status(403).json({ message: 'Only HoOC can delete department' });
+    }
+    const member = await getMembersByDepartmentRaw(departmentId);
+    if (member.length > 0) {
+      return res.status(409).json({ message: 'Cannot delete department with members. Please remove all members first.' });
     }
     await deleteDepartmentDoc(departmentId);
     return res.status(200).json({ message: 'Xoá department thành công' });

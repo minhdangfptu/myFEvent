@@ -140,24 +140,10 @@ export default function MemberPage() {
 
   if (loading) {
     return (
-      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()}>
-        <div
-          className="d-flex justify-content-center align-items-center"
-          style={{ minHeight: "400px" }}
-        >
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(255,255,255,1)",
-              zIndex: 2000,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Loading size={80} />
-          </div>
+      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()} eventId={eventId}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải danh sách thành viên...</div>
         </div>
       </UserLayout>
     );
@@ -165,7 +151,7 @@ export default function MemberPage() {
 
   if (error) {
     return (
-      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()}>
+      <UserLayout title="Thành viên" activePage="members" sidebarType={getSidebarType()} eventId={eventId}>
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
@@ -178,6 +164,7 @@ export default function MemberPage() {
       title={`Thành viên - Sự kiện ${event?.name}`}
       activePage="members"
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">

@@ -4,12 +4,13 @@ import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "./Loading";
+import { APP_VERSION } from "~/config";
 
 export default function HoDSideBar({
   sidebarOpen,
   setSidebarOpen,
   activePage = "home",
-  eventId, // Nhận eventId qua props
+  eventId, 
 }) {
   const STORAGE_KEY = 'sidebar_state_hod';
   const [isInitialized, setIsInitialized] = useState(false);
@@ -351,14 +352,14 @@ export default function HoDSideBar({
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div
             className="logo-container"
-            onClick={() => navigate("/home-page")}
-            style={{ cursor: "pointer" }}
+            style={{cursor: "pointer"}}
           >
             <div className="logo-content d-flex align-items-center ">
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
               </div>
               {sidebarOpen &&  <img
+              onClick={() => navigate("/home-page")}
               src="/logo-03.png"
               alt="myFEvent"
               style={{ width: "auto", height: 40 }}
@@ -849,7 +850,7 @@ export default function HoDSideBar({
                     fontWeight: 500,
                   }}
                 >
-                  Version 1.0.0
+                  Phiên bản {APP_VERSION}
                 </div>
                 <div
                   style={{
@@ -862,9 +863,9 @@ export default function HoDSideBar({
               </div>
 
               <img
-                src="/gov.webp"
-                alt="Đã thông báo Bộ Công Thương"
-                style={{ height: "32px", width: "auto", objectFit: "contain" }}
+                src="/gov.png"
+                alt="FPTU - FEVENT TEAM"
+                style={{ height: "30px", width: "auto", objectFit: "contain" }}
               />
             </div>
           </div>

@@ -4,7 +4,7 @@ import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
-import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Trash, Users, X, XCircle } from "lucide-react";
+import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Search, Trash, Users, X, XCircle } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import Loading from "~/components/Loading";
 
@@ -27,6 +27,13 @@ export default function CalendarDetail() {
     const [isQuickAbsent, setIsQuickAbsent] = useState(false);
 
     const [isPastMeeting, setIsPastMeeting] = useState(false);
+    const [isParticipating, setIsParticipating] = useState(false);
+    const [isConfirmingStatus, setIsConfirmingStatus] = useState(false);
+
+    // States cho modal xem tất cả
+    const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
+    const [viewAllType, setViewAllType] = useState(""); // "confirmed", "absent", "unconfirmed"
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         let mounted = true
@@ -74,7 +81,7 @@ export default function CalendarDetail() {
     console.log(calendar);
     if (loading) {
         return (
-            <UserLayout sidebarType={eventRole}>
+            <UserLayout eventId={eventId} sidebarType={eventRole}>
                 <Loading/>
             </UserLayout>
         );
@@ -82,7 +89,7 @@ export default function CalendarDetail() {
 
     if (error) {
         return (
-            <UserLayout sidebarType={eventRole}>
+            <UserLayout title="Cuộc họp của bạn" eventId={eventId} sidebarType={eventRole}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
                     <div style={{ textAlign: 'center', maxWidth: '400px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
@@ -160,6 +167,38 @@ export default function CalendarDetail() {
         setIsReasonModalOpen(true);
     };
 
+    // Handle view all modal
+    const handleViewAll = (type) => {
+        setViewAllType(type);
+        setSearchQuery("");
+        setIsViewAllModalOpen(true);
+    };
+
+    // Get filtered list for view all modal
+    const getFilteredList = () => {
+        let list = [];
+        if (viewAllType === 'confirmed') list = attendees;
+        else if (viewAllType === 'absent') list = notAttending;
+        else if (viewAllType === 'unconfirmed') list = pending;
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            return list.filter(p => 
+                p.name?.toLowerCase().includes(query) || 
+                p.email?.toLowerCase().includes(query)
+            );
+        }
+        return list;
+    };
+
+    // Get modal title based on type
+    const getModalTitle = () => {
+        if (viewAllType === 'confirmed') return 'Danh sách người tham gia';
+        if (viewAllType === 'absent') return 'Danh sách người không tham gia';
+        if (viewAllType === 'unconfirmed') return 'Danh sách người chưa phản hồi';
+        return '';
+    };
+
     // Get current user's participation status
     const getCurrentUserParticipateStatus = () => {
         if (!user || !calendar) return null;
@@ -188,6 +227,7 @@ export default function CalendarDetail() {
 
     // Handle participate actions
     const handleParticipate = async (status, reason = "") => {
+        setIsParticipating(true);
         try {
             const payload = { participateStatus: status };
             if (status === 'absent' && reason) {
@@ -204,6 +244,8 @@ export default function CalendarDetail() {
         } catch (error) {
             console.error('Error updating participation status:', error);
             alert('Có lỗi xảy ra khi cập nhật trạng thái tham gia');
+        } finally {
+            setIsParticipating(false);
         }
     };
 
@@ -227,14 +269,19 @@ export default function CalendarDetail() {
             return;
         }
 
-        await handleParticipate(newStatus, absentReason);
-        setIsChangeStatusModalOpen(false);
-        setNewStatus("");
-        setAbsentReason("");
+        setIsConfirmingStatus(true);
+        try {
+            await handleParticipate(newStatus, absentReason);
+            setIsChangeStatusModalOpen(false);
+            setNewStatus("");
+            setAbsentReason("");
+        } finally {
+            setIsConfirmingStatus(false);
+        }
     };
 
     return (
-        <UserLayout sidebarType={eventRole} activePage="calendar">
+        <UserLayout title="Cuộc họp của bạn" eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
             <div style={{ margin: 0, padding: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
                 <div style={{ maxWidth: '900px', margin: '0 auto', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
@@ -379,7 +426,22 @@ export default function CalendarDetail() {
                                         </div>
                                     ))}
                                     {attendees.length > 3 && (
-                                        <a href="#" style={{ fontSize: '13px', color: '#2563eb', textDecoration: 'none', marginTop: '4px' }}>+ Xem tất cả</a>
+                                        <button
+                                            onClick={() => handleViewAll('confirmed')}
+                                            style={{
+                                                fontSize: '13px',
+                                                color: '#2563eb',
+                                                textDecoration: 'none',
+                                                marginTop: '4px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                padding: 0
+                                            }}
+                                        >
+                                            + Xem tất cả ({attendees.length})
+                                        </button>
                                     )}
                                     {attendees.length === 0 && (
                                         <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>Chưa có người tham gia</p>
@@ -430,7 +492,22 @@ export default function CalendarDetail() {
                                         </div>
                                     ))}
                                     {notAttending.length > 3 && (
-                                        <a href="#" style={{ fontSize: '13px', color: '#2563eb', textDecoration: 'none', marginTop: '4px' }}>+ Xem tất cả</a>
+                                        <button
+                                            onClick={() => handleViewAll('absent')}
+                                            style={{
+                                                fontSize: '13px',
+                                                color: '#2563eb',
+                                                textDecoration: 'none',
+                                                marginTop: '4px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                padding: 0
+                                            }}
+                                        >
+                                            + Xem tất cả ({notAttending.length})
+                                        </button>
                                     )}
                                     {notAttending.length === 0 && (
                                         <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>Không có người từ chối</p>
@@ -465,7 +542,22 @@ export default function CalendarDetail() {
                                         </div>
                                     ))}
                                     {pending.length > 3 && (
-                                        <a href="#" style={{ fontSize: '13px', color: '#2563eb', textDecoration: 'none', marginTop: '4px' }}>+ Xem tất cả</a>
+                                        <button
+                                            onClick={() => handleViewAll('unconfirmed')}
+                                            style={{
+                                                fontSize: '13px',
+                                                color: '#2563eb',
+                                                textDecoration: 'none',
+                                                marginTop: '4px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                padding: 0
+                                            }}
+                                        >
+                                            + Xem tất cả ({pending.length})
+                                        </button>
                                     )}
                                     {pending.length === 0 && (
                                         <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>Tất cả đã phản hồi</p>
@@ -607,13 +699,19 @@ export default function CalendarDetail() {
                                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px' }}>
                                         <button
                                             onClick={() => handleParticipate('confirmed')}
-                                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                            disabled={isParticipating}
+                                            style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: isParticipating ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center', opacity: isParticipating ? 0.6 : 1 }}
                                         >
-                                            <span>✓</span> Tham gia
+                                            {isParticipating ? (
+                                                <><i className="bi bi-arrow-clockwise spin-animation"></i> Đang xử lý...</>
+                                            ) : (
+                                                <><span>✓</span> Tham gia</>
+                                            )}
                                         </button>
                                         <button
                                             onClick={() => handleOpenChangeStatus('absent')}
-                                            style={{ backgroundColor: '#c3c4c4ff', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center' }}
+                                            disabled={isParticipating}
+                                            style={{ backgroundColor: '#c3c4c4ff', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '8px', cursor: isParticipating ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', justifyContent: 'center', opacity: isParticipating ? 0.6 : 1 }}
                                         >
                                             <span>✖</span> Không tham gia
                                         </button>
@@ -624,6 +722,171 @@ export default function CalendarDetail() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal xem tất cả người tham gia */}
+            {isViewAllModalOpen && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '20px'
+                    }}
+                    onClick={() => {
+                        setIsViewAllModalOpen(false);
+                        setSearchQuery("");
+                    }}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            position: 'relative',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div style={{ padding: '24px', borderBottom: '1px solid #e5e7eb' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#1f2937' }}>
+                                        {getModalTitle()}
+                                    </h2>
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#6b7280' }}>
+                                        Tổng số: {getFilteredList().length} người
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setIsViewAllModalOpen(false);
+                                        setSearchQuery("");
+                                    }}
+                                    style={{
+                                        border: 'none',
+                                        background: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#6b7280'
+                                    }}
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            {/* Search bar */}
+                            <div style={{ position: 'relative' }}>
+                                <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm kiếm theo tên hoặc email..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px 10px 40px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {getFilteredList().map(person => (
+                                    <div
+                                        key={person.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '16px',
+                                            backgroundColor: '#f9fafb',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e5e7eb'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                            <div style={{
+                                                width: '40px',
+                                                height: '40px',
+                                                borderRadius: '50%',
+                                                backgroundColor: '#e5e7eb',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                overflow: 'hidden'
+                                            }}>
+                                                {person.avatar && person.avatar.startsWith('http') ? (
+                                                    <img
+                                                        src={person.avatar}
+                                                        alt={person.name}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                ) : (
+                                                    <span style={{ fontSize: '18px' }}>👤</span>
+                                                )}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>
+                                                    {person.name}
+                                                </p>
+                                                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
+                                                    {person.email}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {viewAllType === 'absent' && (
+                                            <button
+                                                onClick={() => handleViewReason(person)}
+                                                style={{
+                                                    backgroundColor: '#fee2e2',
+                                                    color: '#dc2626',
+                                                    border: 'none',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Xem lý do
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {getFilteredList().length === 0 && (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                                        <Users size={48} color="#d1d5db" style={{ margin: '0 auto 16px' }} />
+                                        <p style={{ margin: 0, fontSize: '15px' }}>Không tìm thấy người nào</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal xem lý do nghỉ của người khác */}
             {isReasonModalOpen && selectedPerson && (
@@ -1037,25 +1300,31 @@ export default function CalendarDetail() {
                             </button>
                             <button
                                 onClick={handleConfirmChangeStatus}
+                                disabled={isConfirmingStatus}
                                 style={{
                                     backgroundColor: '#2563eb',
                                     color: 'white',
                                     border: 'none',
                                     padding: '10px 24px',
                                     borderRadius: '8px',
-                                    cursor: 'pointer',
+                                    cursor: isConfirmingStatus ? 'not-allowed' : 'pointer',
                                     fontSize: '15px',
                                     fontWeight: 600,
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    opacity: isConfirmingStatus ? 0.6 : 1
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                    if (!isConfirmingStatus) e.currentTarget.style.backgroundColor = '#1d4ed8';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#2563eb';
+                                    if (!isConfirmingStatus) e.currentTarget.style.backgroundColor = '#2563eb';
                                 }}
                             >
-                                Xác nhận
+                                {isConfirmingStatus && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                                {isConfirmingStatus ? 'Đang xử lý...' : 'Xác nhận'}
                             </button>
                         </div>
                     </div>

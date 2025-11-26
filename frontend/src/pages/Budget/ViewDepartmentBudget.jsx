@@ -455,7 +455,19 @@ const ViewDepartmentBudget = () => {
   };
 
   if (loading) {
-    return <Loading />;
+    return (
+      <UserLayout
+        title="Xem Ngân sách của Ban"
+        activePage="budget"
+        sidebarType="hod"
+        eventId={eventId}
+      >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin ngân sách...</div>
+        </div>
+      </UserLayout>
+    );
   }
 
   if (!budget) {
@@ -469,7 +481,7 @@ const ViewDepartmentBudget = () => {
   const isApproved = status === "approved";
   const isSentToMembers = status === "sent_to_members";
 
-  const itemsWithFeedback = budget?.items?.filter(item => 
+  const itemsWithFeedback = budget?.items?.filter(item =>
     item.feedback && item.feedback.trim() !== "" && item.status === "rejected"
   ) || [];
   const hasRejectedItems = itemsWithFeedback.length > 0;

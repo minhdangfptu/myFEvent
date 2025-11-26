@@ -496,8 +496,9 @@ export default function HoOCEventDetail() {
   if (loading) {
     return (
       <UserLayout title="Chi tiết sự kiện" sidebarType={sidebarType} activePage="overview-detail" eventId={eventId}>
-        <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 2000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <Loading size={80} />
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
         </div>
       </UserLayout>
     );
@@ -1137,7 +1138,17 @@ export default function HoOCEventDetail() {
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-calendar-event"></i>
-                <span>{formatDate(event.eventStartDate) || "Chưa có"} - {formatDate(event.eventEndDate) || "Chưa có"}</span>
+                <span>
+                  {(() => {
+                    if (!event?.eventStartDate || !event?.eventEndDate) return "Chưa có thông tin";
+                    const startDate = new Date(event.eventStartDate);
+                    const endDate = new Date(event.eventEndDate);
+                    const isSameDay = startDate.toDateString() === endDate.toDateString();
+                    return isSameDay
+                      ? formatDate(event.eventStartDate)
+                      : `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`;
+                  })()}
+                </span>
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-geo-alt-fill"></i>

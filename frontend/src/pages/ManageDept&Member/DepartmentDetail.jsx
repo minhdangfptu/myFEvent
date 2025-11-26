@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventService } from "../../services/eventService";
 import { departmentService } from "../../services/departmentService";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
@@ -39,7 +39,14 @@ const DepartmentDetail = () => {
   const [selectedAssignLeader, setSelectedAssignLeader] = useState(null);
   const [assigningLeader, setAssigningLeader] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); 
+  const [error, setError] = useState(null);
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [isAssigningLeader, setIsAssigningLeader] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const { fetchEventRole } = useEvents();
   
   const getMemberDisplayName = (member) =>
@@ -155,10 +162,12 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole('');
           setUserDepartmentId(null);
+          setRoleLoading(false);
         }
         return;
       }
       try {
+        setRoleLoading(true);
         console.log('Fetching event role for eventId:', eventId);
         const r = await fetchEventRole(eventId);
         console.log('Role response:', r);
@@ -181,6 +190,7 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole(normalized);
           setUserDepartmentId(deptId);
+          setRoleLoading(false);
           console.log('✓ Role set to:', normalized);
         }
       } catch (err) {
@@ -188,6 +198,7 @@ const DepartmentDetail = () => {
         if (mounted) {
           setEventRole('');
           setUserDepartmentId(null);
+          setRoleLoading(false);
         }
       }
     };
@@ -197,14 +208,19 @@ const DepartmentDetail = () => {
 
   const canManage = eventRole === 'HoOC' || (eventRole === 'HoD');
   console.log('Can manage department:', canManage);
-  const handleEdit = () => {
-    if (department) {
-      setEditForm({
-        name: department.name || "",
-        description: department.description || "",
-      });
+  const handleEdit = async () => {
+    setIsEditing(true);
+    try {
+      if (department) {
+        setEditForm({
+          name: department.name || "",
+          description: department.description || "",
+        });
+      }
+      setEditing(true);
+    } finally {
+      setIsEditing(false);
     }
-    setEditing(true);
   };
 
   const handleSave = async () => {
@@ -213,6 +229,7 @@ const DepartmentDetail = () => {
       description: (editForm.description || "").trim(),
     };
     if (!payload.name) return toast.warning("Tên ban không được để trống");
+    setIsSavingChanges(true);
     try {
       await departmentApi.updateDepartment(eventId, id, payload);
       setDepartment((prev) => ({ ...(prev || {}), ...payload }));
@@ -220,6 +237,8 @@ const DepartmentDetail = () => {
       setEditing(false);
     } catch (error) {
       toast.error(error?.response?.data?.message || "Cập nhật ban thất bại!");
+    } finally {
+      setIsSavingChanges(false);
     }
   };
 
@@ -237,12 +256,25 @@ const DepartmentDetail = () => {
 
   const handleConfirmDelete = async () => {
     if (deleteConfirmName === department.name) {
+      setIsDeleting(true);
       try {
         await departmentApi.deleteDepartment(eventId, id);
-        toast.success("Xóa ban thành công!");
-        navigate(`/events/${eventId}/`);
+        setShowDeleteModal(false);
+        setDeleteConfirmName("");
+
+        // Navigate với state để trang đích hiện toast
+        navigate(`/events/${eventId}/departments`, {
+          state: {
+            showToast: true,
+            toastMessage: "Xóa ban thành công!",
+            toastType: "success",
+          },
+        });
       } catch (error) {
+        console.error("Delete department error:", error);
         toast.error(error?.response?.data?.message || "Xóa ban thất bại!");
+      } finally {
+        setIsDeleting(false);
       }
     } else {
       toast.error("Tên ban không khớp!");
@@ -267,6 +299,7 @@ const DepartmentDetail = () => {
   const handleConfirmRemoveMember = async () => {
     if (!memberToRemove) return;
 
+    setIsRemovingMember(true);
     try {
       await departmentService.removeMemberFromDepartment(
         eventId,
@@ -280,6 +313,8 @@ const DepartmentDetail = () => {
     } catch (error) {
       console.error("Error removing member:", error);
       toast.error("Không thể xóa thành viên khỏi ban");
+    } finally {
+      setIsRemovingMember(false);
     }
   };
 
@@ -326,6 +361,7 @@ const DepartmentDetail = () => {
       return;
     }
 
+    setIsAddingMembers(true);
     try {
       for (const memberId of selectedMembers) {
         await departmentService.addMemberToDepartment(eventId, id, memberId);
@@ -338,6 +374,8 @@ const DepartmentDetail = () => {
     } catch (error) {
       console.error("Error adding members:", error);
       toast.error("Không thể thêm thành viên vào ban");
+    } finally {
+      setIsAddingMembers(false);
     }
   };
 
@@ -399,9 +437,12 @@ const DepartmentDetail = () => {
       return;
     }
 
+    setIsAssigningLeader(true);
     try {
-      setAssigningLeader(true);
-      const newHoDUserId = selectedAssignLeader.userId || selectedAssignLeader._id || selectedAssignLeader.id;
+      const newHoDUserId =
+        selectedAssignLeader.userId ||
+        selectedAssignLeader._id ||
+        selectedAssignLeader.id;
       await departmentService.changeHoD(eventId, id, newHoDUserId);
       toast.success("Đã gán trưởng ban thành công!");
       setShowAssignLeaderModal(false);
@@ -411,7 +452,7 @@ const DepartmentDetail = () => {
       console.error("Assign HoD error:", error);
       toast.error("Không thể gán trưởng ban");
     } finally {
-      setAssigningLeader(false);
+      setIsAssigningLeader(false);
     }
   };
 
@@ -431,6 +472,16 @@ const DepartmentDetail = () => {
         ?.toLowerCase()
         .includes(memberSearchQuery.toLowerCase())
   );
+
+  // Show loading while fetching role to prevent showing wrong sidebar
+  if (roleLoading) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <Loading />
+        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+      </div>
+    );
+  }
 
   // ===== IMPROVED LOADING & ERROR HANDLING =====
   if (loading) {
@@ -460,6 +511,7 @@ const DepartmentDetail = () => {
         title="Chi tiết phân ban"
         sidebarType={getSidebarType()}
         activePage="department-management"
+        eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
           <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: "4rem" }}></i>
@@ -486,6 +538,7 @@ const DepartmentDetail = () => {
         title="Chi tiết phân ban"
         sidebarType={getSidebarType()}
         activePage="department-management"
+        eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
           <i className="bi bi-inbox text-muted" style={{ fontSize: "4rem" }}></i>
@@ -508,7 +561,9 @@ const DepartmentDetail = () => {
       title="Chi tiết phân ban"
       sidebarType={getSidebarType()}
       activePage="department-management"
+      eventId={eventId}
     >
+    <ToastContainer position="top-right" autoClose={2000}/>
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: "30px" }}>
         {/* Department Header */}
@@ -619,9 +674,14 @@ const DepartmentDetail = () => {
                     padding: "10px 20px",
                     fontWeight: "500",
                   }}
+                  disabled={loadingMembers}
                 >
-                  <i className="bi bi-plus-lg me-2"></i>
-                  Thêm thành viên
+                  {loadingMembers ? (
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  ) : (
+                    <i className="bi bi-plus-lg me-2"></i>
+                  )}
+                  {loadingMembers ? "Đang tải..." : "Thêm thành viên"}
                 </button>
               )}
             </div>
@@ -637,9 +697,10 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        width: "80px",
                       }}
                     >
-                      <input type="checkbox" className="form-check-input" />
+                      STT
                     </th>
                     <th
                       style={{
@@ -686,10 +747,16 @@ const DepartmentDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMembers.map((member) => (
+                  {filteredMembers.map((member, index) => (
                     <tr key={member._id || member.id}>
-                      <td style={{ padding: "15px" }}>
-                        <input type="checkbox" className="form-check-input" />
+                      <td
+                        style={{
+                          padding: "15px",
+                          fontWeight: "500",
+                          color: "#6b7280",
+                        }}
+                      >
+                        {index + 1}
                       </td>
                       <td
                         style={{
@@ -782,9 +849,14 @@ const DepartmentDetail = () => {
                       className="btn btn-outline-danger d-flex align-items-center"
                       onClick={handleEdit}
                       style={{ borderRadius: "8px", fontWeight: "500" }}
+                      disabled={isEditing}
                     >
-                      <i className="bi bi-pencil me-2"></i>
-                      Chỉnh sửa
+                      {isEditing ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-pencil me-2"></i>
+                      )}
+                      {isEditing ? "Đang chỉnh sửa..." : "Chỉnh sửa"}
                     </button>
                   ) : (
                     <div className="d-flex gap-2">
@@ -792,14 +864,20 @@ const DepartmentDetail = () => {
                         className="btn btn-danger d-flex align-items-center"
                         onClick={handleSave}
                         style={{ borderRadius: "8px", fontWeight: "500" }}
+                        disabled={isSavingChanges}
                       >
-                        <i className="bi bi-check-lg me-2"></i>
-                        Lưu thay đổi
+                        {isSavingChanges ? (
+                          <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                        ) : (
+                          <i className="bi bi-check-lg me-2"></i>
+                        )}
+                        {isSavingChanges ? "Đang lưu..." : "Lưu thay đổi"}
                       </button>
                       <button
                         className="btn btn-outline-secondary d-flex align-items-center"
                         onClick={handleCancel}
                         style={{ borderRadius: "8px", fontWeight: "500" }}
+                        disabled={isSavingChanges}
                       >
                         <i className="bi bi-x-lg me-2"></i>
                         Hủy
@@ -896,18 +974,28 @@ const DepartmentDetail = () => {
                       className="btn btn-outline-danger d-flex align-items-center"
                       style={{ borderRadius: "8px", fontWeight: "400" }}
                       onClick={() => setShowChangeLeaderModal(true)}
+                      disabled={changingLeader}
                     >
-                      <i className="bi bi-arrow-repeat me-2"></i>
-                      Đổi trưởng ban
+                      {changingLeader ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-arrow-repeat me-2"></i>
+                      )}
+                      {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
                     </button>
                   ) : (
                     <button
                       className="btn btn-success d-flex align-items-center"
                       style={{ borderRadius: "8px", fontWeight: "400" }}
                       onClick={openAssignLeaderModal}
+                      disabled={assigningLeader}
                     >
-                      <i className="bi bi-person-plus me-2"></i>
-                      Gán trưởng ban
+                      {assigningLeader ? (
+                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      ) : (
+                        <i className="bi bi-person-plus me-2"></i>
+                      )}
+                      {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
                     </button>
                   )}
                 </div>
@@ -927,15 +1015,15 @@ const DepartmentDetail = () => {
                   <button
                     className="btn btn-danger d-flex align-items-center mb-2"
                     onClick={handleDeleteDepartment}
-                    style={{
-                      backgroundColor: "#dc2626",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontWeight: "400",
-                    }}
+                    style={{ backgroundColor: "#dc2626", border: "none", borderRadius: "8px", fontWeight: "400" }}
+                    disabled={isDeleting}
                   >
-                    <i className="bi bi-trash me-2"></i>
-                    Xoá ban vĩnh viễn
+                    {isDeleting ? (
+                      <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                    ) : (
+                      <i className="bi bi-trash me-2"></i>
+                    )}
+                    {isDeleting ? "Đang xoá..." : "Xoá ban vĩnh viễn"}
                   </button>
                   <p
                     style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}
@@ -1007,16 +1095,22 @@ const DepartmentDetail = () => {
                 className="btn btn-outline-secondary"
                 onClick={handleCancelDelete}
                 style={{ borderRadius: "8px" }}
+                disabled={isDeleting}
               >
                 Huỷ
               </button>
               <button
-                className="btn btn-danger"
+                className="btn btn-danger d-flex align-items-center"
                 onClick={handleConfirmDelete}
-                disabled={deleteConfirmName !== department.name}
+                disabled={deleteConfirmName !== department.name || isDeleting}
                 style={{ borderRadius: "8px" }}
               >
-                Xoá
+                {isDeleting ? (
+                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                ) : (
+                  <i className="bi bi-trash me-2"></i>
+                )}
+                {isDeleting ? "Đang xoá..." : "Xoá"}
               </button>
             </div>
           </div>
@@ -1180,14 +1274,17 @@ const DepartmentDetail = () => {
                 type="button"
                 className="btn btn-danger"
                 onClick={handleAddSelectedMembers}
-                disabled={selectedMembers.length === 0}
+                disabled={isAddingMembers || selectedMembers.length === 0}
                 style={{ borderRadius: "8px" }}
               >
-                Thêm{" "}
-                {selectedMembers.length > 0
-                  ? `(${selectedMembers.length})`
-                  : ""}{" "}
-                thành viên
+                {isAddingMembers ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang thêm...
+                  </>
+                ) : (
+                  `Thêm ${selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên`
+                )}
               </button>
             </div>
           </div>
@@ -1241,8 +1338,16 @@ const DepartmentDetail = () => {
                 className="btn btn-danger"
                 onClick={handleConfirmRemoveMember}
                 style={{ borderRadius: "8px" }}
+                disabled={isRemovingMember}
               >
-                Xoá thành viên
+                {isRemovingMember ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang xoá...
+                  </>
+                ) : (
+                  "Xoá thành viên"
+                )}
               </button>
             </div>
           </div>

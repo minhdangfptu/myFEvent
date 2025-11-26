@@ -111,6 +111,7 @@ export default function HoDTaskStatisticPage() {
         title="Thống kê công việc"
         activePage="work-statistics"
         sidebarType="HoD"
+        eventId={eventId}
       >
         <div className="hod-task-statistic-page">
           <div style={{ textAlign: "center", padding: "40px" }}>
@@ -127,6 +128,7 @@ export default function HoDTaskStatisticPage() {
       title="Thống kê công việc"
       activePage="work-statistics"
       sidebarType="HoD"
+      eventId={eventId}
     >
       <div className="hod-task-statistic-page">
         {/* Header Section */}
