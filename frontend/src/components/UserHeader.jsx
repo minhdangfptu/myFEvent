@@ -30,28 +30,6 @@ export default function UserHeader({
     return localStorage.getItem('timeFormat') || '24h';
   });
 
-  // 3. Khởi tạo navigate
-  const navigate = useNavigate();
-
-  // 4. Logic xử lý click notification (Copy từ NotificationsPage)
-  const handleNotificationClick = (notification) => {
-    // Đánh dấu đã đọc
-    markRead(notification.id);
-
-    // Điều hướng dựa trên dữ liệu entity
-    if (notification.relatedCalendarId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
-    } else if (notification.relatedTaskId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
-    } else if (notification.relatedMilestoneId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
-    } else if (notification.relatedAgendaId && notification.eventId) {
-      navigate(`/events/${notification.eventId}/my-calendar`)
-    } else if (notification.eventId) {
-      navigate(`/events/${notification.eventId}`)
-    }
-  }
-
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);
   }, [timeFormat]);

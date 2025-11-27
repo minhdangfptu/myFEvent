@@ -91,6 +91,7 @@ import DepartmentBudgetsListPage from "./pages/Budget/DepartmentBudgetsListPage"
 import ViewDeptBudgetDetailHoOC from "./pages/Budget/ViewDeptBudgetDetailHoOC";
 import BudgetStatistics from "./pages/Budget/BudgetStatistics";
 import MemberExpensePage from "./pages/Budget/MemberExpensePage";
+import MemberBudgetPage from "./pages/Budget/MemberBudgetPage";
 import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
 import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
 import DataExportPage from "./pages/HoOC/ExportData/DataExportPage";
@@ -730,6 +731,14 @@ export default function App() {
           />
           {/* Budget Routes - Member */}
           <Route
+            path="/events/:eventId/budgets/member" 
+            element={
+              <ProtectedRoute>
+                <MemberBudgetPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/expenses" 
             element={
               <ProtectedRoute>
@@ -830,6 +839,14 @@ export default function App() {
             }
           />
           {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/budgets/member" 
+            element={
+              <ProtectedRoute>
+                <MemberBudgetPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/events/:eventId/expenses" 
             element={
