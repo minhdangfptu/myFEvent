@@ -38,10 +38,7 @@ export const groupMembersByDepartment = (members) => {
       avatar: member.userId?.avatarUrl ||
         `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
       role: member.role,
-      status: member.status,
-      department: deptName,
-      departmentId: member.departmentId?._id,
-      joinedAt: member.createdAt
+      department: deptName
     });
   });
 
@@ -75,9 +72,7 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     avatar: member.userId?.avatarUrl ||
       `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
     role: member.role,
-    status: member.status,
-    departmentId: member.departmentId,
-    joinedAt: member.createdAt
+    departmentId: member.departmentId
   }));
 };
 

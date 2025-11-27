@@ -763,6 +763,8 @@ export const getMyCalendarInEvent = async (req, res) => {
             return res.status(403).json({ message: 'Infficient permissions' });
         };
         const { eventId } = req.params;
+        const { month, year } = req.query;
+
         const event = await findEventById(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
@@ -771,9 +773,22 @@ export const getMyCalendarInEvent = async (req, res) => {
         if (!membership) {
             return res.status(403).json({ message: 'You are not a member of this event' });
         }
+
+        // Calculate date range if month/year provided
+        let startDate = null;
+        let endDate = null;
+        if (month && year) {
+            const monthNum = parseInt(month);
+            const yearNum = parseInt(year);
+            if (!isNaN(monthNum) && !isNaN(yearNum) && monthNum >= 1 && monthNum <= 12) {
+                startDate = new Date(yearNum, monthNum - 1, 1);
+                endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+            }
+        }
+
         let calendars = [];
         try {
-            calendars = await getCalendarsInEventScope(eventId);
+            calendars = await getCalendarsInEventScope(eventId, startDate, endDate);
             if (!Array.isArray(calendars)) calendars = [];
         } catch (_) {
             // Fallback to event-only calendars if event-scope query fails
