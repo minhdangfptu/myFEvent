@@ -20,7 +20,25 @@ import { CSS } from '@dnd-kit/utilities';
 import { taskApi } from '~/apis/taskApi';
 import { toast } from 'react-toastify';
 
-export default function KanbanBoardTask({ listTask, eventId, onTaskMove, currentUserId }) {
+const normalizeAssigneeId = (assignee) => {
+  if (!assignee) return null;
+  if (typeof assignee === 'string') return assignee;
+  if (typeof assignee === 'object') {
+    return (
+      assignee.id ||
+      assignee._id ||
+      (typeof assignee.toString === 'function' ? assignee.toString() : null)
+    );
+  }
+  return String(assignee);
+};
+
+export default function KanbanBoardTask({
+  listTask,
+  eventId,
+  onTaskMove,
+  currentEventMemberId,
+}) {
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
   // Ensure every task has a stable string `id` property for dnd-kit
@@ -81,6 +99,17 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     setActiveId(event.active.id);
   };
 
+  const normalizedCurrentMemberId = currentEventMemberId
+    ? String(currentEventMemberId)
+    : null;
+
+  const canCurrentMemberUpdate = (task) => {
+    if (!normalizedCurrentMemberId) return true;
+    const taskAssigneeId = normalizeAssigneeId(task?.assigneeId);
+    if (!taskAssigneeId) return false;
+    return String(taskAssigneeId) === normalizedCurrentMemberId;
+  };
+
   const handleDragEnd = async (event) => {
     const { active, over } = event;
     setActiveId(null);
@@ -105,7 +134,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     if (!activeTask) return;
 
     // Kiểm tra quyền trước khi đổi trạng thái
-    if (activeTask.assigneeId && String(activeTask.assigneeId) !== String(currentUserId)) {
+    if (!canCurrentMemberUpdate(activeTask)) {
       setItems(items); // rollback
       toast.error('Chỉ người được giao task này mới có quyền đổi trạng thái!');
       return;

@@ -1250,7 +1250,6 @@ export default function HoDTaskPage() {
                 eventId={eventId}
                 listTask={statusGroup}
                 onTaskMove={fetchTasks}
-                currentUserId={user?._id}
               />
             </div>
           )}

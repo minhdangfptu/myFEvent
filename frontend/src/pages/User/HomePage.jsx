@@ -1181,11 +1181,11 @@ export default function HomePage() {
                       return;
                     }
                     if (!createForm.eventStartDate) {
-                      toast.error("Vui lòng chọn ngày bắt đầu");
+                      toast.error("Vui lòng chọn ngày bắt đầu DDAY");
                       return;
                     }
                     if (!createForm.eventEndDate) {
-                      toast.error("Vui lòng chọn ngày kết thúc");
+                      toast.error("Vui lòng chọn ngày kết thúc DDAY");
                       return;
                     }
                     if (!createForm.location.trim()) {
@@ -1213,12 +1213,12 @@ export default function HomePage() {
 
                     // Cho phép ngày hôm nay hoặc ngày trong tương lai
                     if (startDateOnly < nowDateOnly) {
-                      toast.error("Ngày bắt đầu phải là ngày hôm nay hoặc trong tương lai");
+                      toast.error("Ngày bắt đầu DDAY phải là ngày hôm nay hoặc trong tương lai");
                       return;
                     }
 
                     if (endDateOnly < nowDateOnly) {
-                      toast.error("Ngày kết thúc phải là ngày hôm nay hoặc trong tương lai");
+                      toast.error("Ngày kết thúc DDAY phải là ngày hôm nay hoặc trong tương lai");
                       return;
                     }
 
@@ -1298,7 +1298,7 @@ export default function HomePage() {
                   <div className="row mb-3">
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">
-                        Ngày bắt đầu *
+                        Ngày bắt đầu DDAY *
                       </label>
                       <input
                         type="datetime-local"
@@ -1316,7 +1316,7 @@ export default function HomePage() {
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">
-                        Ngày kết thúc *
+                        Ngày kết thúc DDAY *
                       </label>
                       <input
                         type="datetime-local"
@@ -1330,7 +1330,7 @@ export default function HomePage() {
                         }
                         required
                         disabled={createSubmitting}
-                        min={createForm.eventStartDate} // Không cho chọn ngày kết thúc trước ngày bắt đầu
+                        min={createForm.eventStartDate} 
                       />
                     </div>
                   </div>

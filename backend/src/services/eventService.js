@@ -16,8 +16,8 @@ const validateEventDataForPublic = (event) => {
   if (!event.name || !event.name.trim()) missingFields.push('Tên sự kiện');
   if (!event.description || !event.description.trim()) missingFields.push('Mô tả');
   if (!event.organizerName || !event.organizerName.trim()) missingFields.push('Người tổ chức');
-  if (!event.eventStartDate) missingFields.push('Ngày bắt đầu');
-  if (!event.eventEndDate) missingFields.push('Ngày kết thúc');
+  if (!event.eventStartDate) missingFields.push('Ngày bắt đầu DDAY');
+  if (!event.eventEndDate) missingFields.push('Ngày kết thúc DDAY');
   if (!event.location || !event.location.trim()) missingFields.push('Địa điểm');
   if (!event.image || typeof event.image !== 'string' || !event.image.trim()) missingFields.push('Hình ảnh sự kiện');
   return { isValid: missingFields.length === 0, missingFields };
@@ -140,7 +140,7 @@ export const eventService = {
     const startdate = new Date(eventStartDate);
     const endDate = new Date(eventEndDate);
     if (endDate < startdate) {
-      const err = new Error('Ngày kết thúc phải ở sau ngày bắt đầu');
+      const err = new Error('Ngày kết thúc DDAY phải ở sau ngày bắt đầu DDAY');
       err.status = 400;
       throw err;
     }
@@ -264,7 +264,7 @@ export const eventService = {
   // GET /api/events/me/list
   async listMyEvents({ userId, page = 1, limit = 8, search = '' }) {
     const p = Math.max(parseInt(page, 10) || 1, 1);
-    const lim = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 8, 1), 100);
     const skip = (p - 1) * lim;
 
     // Nếu có search, cần tìm events trước rồi filter memberships
