@@ -632,7 +632,7 @@ export default function HomePage() {
                         src={
                           event.image && event.image.length > 0
                             ? event.image[0]
-                            : "/default-events.jpg"
+                            : "/error_event.png"
                         }
                         alt={event.name}
                         className="event-img"

@@ -16,6 +16,7 @@ export default function UserHeader({
   const { user, logout, setUser } = useAuth();
   const { t } = useTranslation();
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const navigate = useNavigate();
 
   // Sắp xếp thông báo mới nhất lên trước, hiển thị tất cả (có scroll),
   // nhưng giới hạn chiều cao để nhìn giống ~3 thông báo như hiện tại.
@@ -28,28 +29,6 @@ export default function UserHeader({
   const [timeFormat, setTimeFormat] = useState(() => {
     return localStorage.getItem('timeFormat') || '24h';
   });
-
-  // 3. Khởi tạo navigate
-  const navigate = useNavigate();
-
-  // 4. Logic xử lý click notification (Copy từ NotificationsPage)
-  // const handleNotificationClick = (notification) => {
-  //   // Đánh dấu đã đọc
-  //   markRead(notification.id);
-
-  //   // Điều hướng dựa trên dữ liệu entity
-  //   if (notification.relatedCalendarId && notification.eventId) {
-  //     navigate(`/events/${notification.eventId}/my-calendar/${notification.relatedCalendarId}`)
-  //   } else if (notification.relatedTaskId && notification.eventId) {
-  //     navigate(`/events/${notification.eventId}/tasks/${notification.relatedTaskId}`)
-  //   } else if (notification.relatedMilestoneId && notification.eventId) {
-  //     navigate(`/events/${notification.eventId}/milestones/${notification.relatedMilestoneId}`)
-  //   } else if (notification.relatedAgendaId && notification.eventId) {
-  //     navigate(`/events/${notification.eventId}/my-calendar`)
-  //   } else if (notification.eventId) {
-  //     navigate(`/events/${notification.eventId}`)
-  //   }
-  // }
 
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);

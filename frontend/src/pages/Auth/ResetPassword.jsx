@@ -15,8 +15,12 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
+    if (password.length < 8 || password.length > 50) {
+      setError('Mật khẩu phải có từ 8 đến 50 ký tự')
+      return
+    }
+    if (!/(?=.*[0-9])(?=.*[!@#$%^&*])/.test(password)) {
+      setError('Mật khẩu phải chứa ít nhất 1 số và 1 ký tự đặc biệt')
       return
     }
     if (password !== confirm) {
@@ -47,11 +51,30 @@ export default function ResetPassword() {
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
               <label className="form-label">Mật khẩu</label>
-              <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} />
+              <input 
+                type="password" 
+                className="form-control" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder="Nhập mật khẩu mới"
+                required 
+                disabled={loading} 
+              />
+              <small className="form-text text-muted" style={{ fontSize: '0.875rem' }}>
+                Mật khẩu phải có từ 8-50 ký tự, bao gồm ít nhất 1 số và 1 ký tự đặc biệt 
+              </small>
             </div>
             <div className="mb-3">
               <label className="form-label">Nhập lại mật khẩu</label>
-              <input type="password" className="form-control" value={confirm} onChange={(e) => setConfirm(e.target.value)} required disabled={loading} />
+              <input 
+                type="password" 
+                className="form-control" 
+                value={confirm} 
+                onChange={(e) => setConfirm(e.target.value)} 
+                placeholder="Nhập lại mật khẩu để xác nhận"
+                required 
+                disabled={loading} 
+              />
             </div>
             {error && <div className="alert alert-danger mb-3" role="alert">{error}</div>}
             <div className="d-flex gap-2">
