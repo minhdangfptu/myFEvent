@@ -54,7 +54,7 @@ export const eventService = {
         .sort({ eventStartDate: 1, createdAt: -1 })
         .skip(skip)
         .limit(lim)
-        .select('name type description eventStartDate eventEndDate location image status createdAt updatedAt organizerName')
+        .select('name type description eventStartDate eventEndDate location status createdAt updatedAt organizerName')
         .lean(),
       Event.countDocuments(filter)
     ]);
@@ -275,7 +275,7 @@ export const eventService = {
 
     // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventStartDate eventEndDate image description location')
+      .select('name status eventStartDate eventEndDate description location')
       .lean();
 
     // Tạo map event theo _id để lookup nhanh
@@ -548,22 +548,42 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
 
   const skip = (page - 1) * limit;
 
-  const data = await Event.find(filter)
-    .select("name organizerName type eventStartDate eventEndDate status banInfo")
-    .populate({
-      path: "members",
-      match: { role: "HoOC" },
-      populate: {
-        path: "userId",
-        select: "fullName email avatarUrl phone"
-      }
-    })
-    .skip(skip)
-    .limit(limit)
-    .sort({ createdAt: -1 })
+  // Tối ưu: Query events và members riêng thay vì dùng virtual populate
+  const [events, total] = await Promise.all([
+    Event.find(filter)
+      .select("name organizerName type eventStartDate eventEndDate status banInfo")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean(),
+    Event.countDocuments(filter)
+  ]);
+
+  // Lấy HoOC members cho các events này
+  const eventIds = events.map(e => e._id);
+  const hoocMembers = await EventMember.find({
+    eventId: { $in: eventIds },
+    role: 'HoOC',
+    status: { $ne: 'deactive' }
+  })
+    .populate('userId', 'fullName email avatarUrl phone')
+    .select('eventId userId')
     .lean();
 
-  const total = await Event.countDocuments(filter);
+  // Map members vào events
+  const membersByEvent = {};
+  hoocMembers.forEach(m => {
+    const eventIdStr = m.eventId.toString();
+    if (!membersByEvent[eventIdStr]) {
+      membersByEvent[eventIdStr] = [];
+    }
+    membersByEvent[eventIdStr].push(m);
+  });
+
+  const data = events.map(event => ({
+    ...event,
+    members: membersByEvent[event._id.toString()] || []
+  }));
 
   return {
     page,

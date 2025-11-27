@@ -25,11 +25,14 @@ export function NotificationsProvider({ children }) {
         createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         unread: n.unread !== undefined ? n.unread : true,
         color: n.color || '#ef4444',
-        eventId: n.eventId,
-        relatedCalendarId: n.relatedCalendarId,
-        relatedTaskId: n.relatedTaskId,
-        relatedMilestoneId: n.relatedMilestoneId,
-        relatedAgendaId: n.relatedAgendaId
+        // Keep relational ids so we can navigate to the right place on click
+        eventId: n.eventId || n.event?.id || n.event,
+        relatedTaskId: n.relatedTaskId || n.taskId || n.task,
+        relatedMilestoneId: n.relatedMilestoneId || n.milestoneId || n.milestone,
+        relatedAgendaId: n.relatedAgendaId || n.agendaId || n.agenda,
+        relatedCalendarId: n.relatedCalendarId || n.calendarId || n.calendar,
+        // Optional explicit target URL from backend, if provided
+        targetUrl: n.targetUrl || n.url
       }))
       setNotifications(mapped)
     } catch (error) {

@@ -46,7 +46,13 @@ const UserSchema = new Schema({
     required: function () { return this.status === 'banned'; },
   }
 }, { timestamps: true });
+
+// Indexes để tối ưu query performance
 UserSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 UserSchema.index({ googleId: 1 }, { unique: true, partialFilterExpression: { googleId: { $type: "string" } } });
+UserSchema.index({ status: 1 }); // Filter users by status
+UserSchema.index({ role: 1 }); // Filter by role (admin/user)
+UserSchema.index({ verified: 1 }); // Filter by verified status
+UserSchema.index({ authProvider: 1 }); // Filter by auth provider
 
 export default mongoose.model('User', UserSchema);

@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
 // controllers/eventController.js
 import { getUserById } from '../services/userService.js';
-import { eventService } from '../services/eventService.js';
+import { eventService, findEventById } from '../services/eventService.js';
+import eventMember from '../models/eventMember.js';
+import { createEventMember } from '../services/eventMemberService.js';
 
 const ok = (res, status, body) => res.status(status).json(body);
 const handle = async (res, fn) => {
@@ -145,7 +147,7 @@ export const inviteMemberToEvent = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     // Check if the user is already a member of the event
-    const existingMember = await EventMember.findOne({ eventId, userId });
+    const existingMember = await eventMember.findOne({ eventId, userId });
     if (existingMember) {
       return res.status(400).json({ message: 'User is already a member of the event' });
     }

@@ -697,9 +697,10 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        width: "80px",
                       }}
                     >
-                      <input type="checkbox" className="form-check-input" />
+                      STT
                     </th>
                     <th
                       style={{
@@ -746,10 +747,16 @@ const DepartmentDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMembers.map((member) => (
+                  {filteredMembers.map((member, index) => (
                     <tr key={member._id || member.id}>
-                      <td style={{ padding: "15px" }}>
-                        <input type="checkbox" className="form-check-input" />
+                      <td
+                        style={{
+                          padding: "15px",
+                          fontWeight: "500",
+                          color: "#6b7280",
+                        }}
+                      >
+                        {index + 1}
                       </td>
                       <td
                         style={{

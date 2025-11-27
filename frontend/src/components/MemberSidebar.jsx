@@ -159,7 +159,8 @@ export default function MemberSidebar({
 
   // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
+    // Ngân sách: trang budget riêng cho member
+    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets/member` },
     { id: "expenses", label: "Chi tiêu", path: `/events/${eventId || ''}/expenses` },
     // Không có finance-stats (thống kê thu chi)
   ];

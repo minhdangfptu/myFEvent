@@ -426,7 +426,11 @@ export const forgotPassword = async (req, res) => {
 
     const resetLink = `${config.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${resetJwt}`;
 
-    await sendMail({
+    // Send response immediately, then send email in background (non-blocking)
+    res.status(200).json({ message: 'Reset email sent' });
+
+    // Send email asynchronously without blocking the response
+    sendMail({
       to: email,
       subject: 'Đặt lại mật khẩu myFEvent',
       html: `
@@ -438,9 +442,10 @@ export const forgotPassword = async (req, res) => {
           <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
         </div>
       `,
+    }).catch((error) => {
+      // Log error but don't block the response
+      console.error('Failed to send password reset email:', error);
     });
-
-    return res.status(200).json({ message: 'Reset email sent' });
   } catch (error) {
     console.error('Forgot password error:', error);
     return res.status(500).json({ message: 'Failed to send reset email' });
