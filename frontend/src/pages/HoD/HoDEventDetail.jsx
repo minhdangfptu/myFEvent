@@ -93,28 +93,10 @@ export default function HoDEventDetail() {
 
   const getImageSrc = (image) => {
     if (!image) return "/default-events.jpg";
-
-    //take first image
-    if (Array.isArray(image) && image.length > 0) {
-      const firstImage = image[0];
-      if (typeof firstImage === "string" && firstImage.startsWith("data:")) {
-        return firstImage;
-      }
-      return `data:image/jpeg;base64,${firstImage}`;
-    }
-
-    //image is string
-    if (typeof image === "string") {
-      if (image.startsWith("data:")) {
-        return image;
-      }
-      if (image.startsWith("http")) {
-        return image;
-      }
-      return `data:image/jpeg;base64,${image}`;
-    }
-
-    return "/default-events.jpg";
+    const source = Array.isArray(image) && image.length > 0 ? image[0] : image;
+    if (typeof source !== "string") return "/default-events.jpg";
+    if (source.startsWith("data:") || source.startsWith("http")) return source;
+    return `data:image/jpeg;base64,${source}`;
   };
 
   const getStatusConfig = (status) => {

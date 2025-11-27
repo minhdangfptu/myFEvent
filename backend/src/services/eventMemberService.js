@@ -152,7 +152,7 @@ export const getEventMemberProfileById = async (memberId) => {
 export const inactiveEventMember = async (memberId) => {
   return EventMember.findByIdAndUpdate(
     memberId,
-    { status: "Deactive" },
+    { status: "deactive" },
     { new: true }
   );
 };
@@ -161,13 +161,13 @@ export const createEventMember = async (userId, eventId) => {
     userId,
     eventId,
     role: 'Member',
-    status: 'Active'
+    status: 'active'
   });
 };
 export const getActiveEventMembers = async (eventId) => {
   return await EventMember.find({
     eventId: eventId,
-    status: 'Active'
+    status: 'active'
   })
     .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
     .lean();

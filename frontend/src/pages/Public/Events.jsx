@@ -6,6 +6,7 @@ import { eventService } from '../../services/eventService';
 import { formatDate } from '../../utils/formatDate';
 import {deriveEventStatus} from '../../utils/getEventStatus';
 import Loading from '../../components/Loading';
+import { getEventImage } from '../../utils/getEventImage';
 
 
 export default function EventsPage() {
@@ -126,8 +127,7 @@ export default function EventsPage() {
             {visible.map((event) => {
               const id = event._id || event.id;
               const title = event.name || event.title || 'Untitled';
-              const img = Array.isArray(event.image) ? event.image[0] : event.image || '/default-events.jpg';
-              const images = Array.isArray(event.image) ? event.image : [];
+              const img = getEventImage(event);
               return (
                 <div className="col" key={id}>
                   <RouterLink to={`/events/${id}`} state={{ event }} className="text-decoration-none text-reset">
@@ -152,15 +152,6 @@ export default function EventsPage() {
                         >
                           Xem chi tiết
                         </button>
-                        {/* Image count indicator */}
-                        {images.length > 1 && (
-                          <div className="position-absolute" style={{ top: 12, left: 12, zIndex: 1 }}>
-                            <span className="badge bg-dark bg-opacity-75 text-white">
-                              <i className="bi bi-images me-1"></i>
-                              {images.length}
-                            </span>
-                          </div>
-                        )}
                       </div>
                       <div className="blog-body">
                         <div className="blog-title">{title}</div>

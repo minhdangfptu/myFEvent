@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import { uploadImageIfNeeded } from './cloudinaryService.js';
 import {
   calculateEventStatus,
   ensureAutoStatusForDoc,
@@ -18,8 +19,31 @@ const validateEventDataForPublic = (event) => {
   if (!event.eventStartDate) missingFields.push('Ngày bắt đầu');
   if (!event.eventEndDate) missingFields.push('Ngày kết thúc');
   if (!event.location || !event.location.trim()) missingFields.push('Địa điểm');
-  if (!event.image || !Array.isArray(event.image) || event.image.length === 0) missingFields.push('Hình ảnh sự kiện');
+  if (!event.image || typeof event.image !== 'string' || !event.image.trim()) missingFields.push('Hình ảnh sự kiện');
   return { isValid: missingFields.length === 0, missingFields };
+};
+
+const isDataUri = (value = '') => typeof value === 'string' && value.startsWith('data:');
+
+const ensureCloudinaryImage = async (event) => {
+  if (!event) return event;
+
+  if (Array.isArray(event.image)) {
+    event.image = event.image.find((img) => typeof img === 'string' && img.trim()) || null;
+  }
+
+  if (!event.image || typeof event.image !== 'string') return event;
+  if (!isDataUri(event.image)) return event;
+
+  const uploaded = await uploadImageIfNeeded(event.image, 'events');
+  if (uploaded && event._id) {
+    await Event.updateOne({ _id: event._id }, { $set: { image: uploaded } }).catch((err) =>
+      console.error('Failed to persist Cloudinary image', err?.message)
+    );
+    event.image = uploaded;
+  }
+
+  return event;
 };
 
 const genJoinCode = async () => {
@@ -54,11 +78,12 @@ export const eventService = {
         .sort({ eventStartDate: 1, createdAt: -1 })
         .skip(skip)
         .limit(lim)
-        .select('name type description eventStartDate eventEndDate location status createdAt updatedAt organizerName')
+        .select('name type description eventStartDate eventEndDate location status createdAt updatedAt organizerName image')
         .lean(),
       Event.countDocuments(filter)
     ]);
 
+    await Promise.all(items.map((event) => ensureCloudinaryImage(event)));
     const data = await ensureAutoStatusForDocs(items);
     return {
       data,
@@ -77,6 +102,7 @@ export const eventService = {
       throw err;
     }
 
+    await ensureCloudinaryImage(event);
     const data = await ensureAutoStatusForDoc(event);
     return { data };
   },
@@ -92,12 +118,13 @@ export const eventService = {
       throw err;
     }
     const data = await ensureAutoStatusForDoc(event);
+    await ensureCloudinaryImage(event);
     return { data };
   },
 
   // POST /api/events
   async createEvent({ userId, body }) {
-    const { name, description, eventStartDate, eventEndDate, location, type = 'private', images, organizerName } = body;
+    const { name, description, eventStartDate, eventEndDate, location, type = 'private', image, coverImage, images, organizerName } = body;
 
     if (!name) {
       const err = new Error('Name is required');
@@ -133,14 +160,16 @@ export const eventService = {
 
     const joinCode = await genJoinCode();
 
-    // Lọc ảnh hợp lệ
-    let processedImages = [];
-    if (images && Array.isArray(images)) {
-      processedImages = images.filter(
-        (img) =>
-          typeof img === 'string' &&
-          (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:image/'))
-      );
+    const rawImage =
+      coverImage ??
+      image ??
+      (Array.isArray(images) ? images.find((img) => typeof img === 'string' && img.trim()) : images);
+
+    const processedImage = rawImage ? await uploadImageIfNeeded(rawImage, 'events') : null;
+    if (!processedImage) {
+      const err = new Error('Ảnh sự kiện là bắt buộc');
+      err.status = 400;
+      throw err;
     }
 
     const autoStatus = calculateEventStatus(startdate, endDate);
@@ -153,7 +182,7 @@ export const eventService = {
       type,
       organizerName,
       joinCode,
-      image: processedImages,
+      image: processedImage,
       status: autoStatus
     });
 
@@ -220,7 +249,10 @@ export const eventService = {
     }
 
     const [event, members] = await Promise.all([
-      ensureAutoStatusForDoc(eventRaw),
+      (async () => {
+        await ensureCloudinaryImage(eventRaw);
+        return ensureAutoStatusForDoc(eventRaw);
+      })(),
       EventMember.find({ eventId: eventRaw._id, status: { $ne: 'deactive' } })
         .populate('userId', 'fullName email')
         .lean()
@@ -275,8 +307,10 @@ export const eventService = {
 
     // Tối ưu: Sử dụng aggregation hoặc query tối ưu hơn
     const events = await Event.find({ _id: { $in: eventIds } })
-      .select('name status eventStartDate eventEndDate description location')
+      .select('name status eventStartDate eventEndDate description location image')
       .lean();
+
+    await Promise.all(events.map((evt) => ensureCloudinaryImage(evt)));
 
     // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
     const now = new Date();
@@ -369,6 +403,11 @@ export const eventService = {
 
     if (location !== undefined) updateData.location = location;
 
+    if (body.coverImage !== undefined || body.image !== undefined) {
+      const nextImage = body.coverImage ?? body.image;
+      updateData.image = nextImage ? await uploadImageIfNeeded(nextImage, 'events') : null;
+    }
+
     // validate khi chuyển sang public
     const nextType = body.status === 'cancelled' ? 'private' : type ?? currentEvent.type;
     if (nextType === 'public' && currentEvent.type !== 'public') {
@@ -393,6 +432,7 @@ export const eventService = {
       throw err;
     }
 
+    await ensureCloudinaryImage(event);
     const data = await ensureAutoStatusForDoc(event);
     return { message: 'Event updated', data };
   },
@@ -410,83 +450,37 @@ export const eventService = {
     return { message: 'Event deleted' };
   },
 
-  // PUT /api/events/:id/images (replace)
-  async replaceEventImages({ userId, id, images }) {
-    if (!Array.isArray(images)) {
-      const err = new Error('images must be an array of base64 strings');
-      err.status = 400;
-      throw err;
-    }
+  // PATCH /api/events/:id/image
+  async updateEventImage({ userId, id, image }) {
     const membership = await ensureEventRole(userId, id, ['HoOC', 'HoD']);
     if (!membership) {
       const err = new Error('Insufficient permissions');
       err.status = 403;
       throw err;
     }
-    const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
+
+    let nextImage = null;
+    if (typeof image === 'string' && image.trim()) {
+      nextImage = await uploadImageIfNeeded(image, 'events');
+    }
+
     const event = await Event.findByIdAndUpdate(
       id,
-      { $set: { image: sanitized } },
+      { $set: { image: nextImage } },
       { new: true }
     ).select('image');
-    if (!event) {
-      const err = new Error('Event not found');
-      err.status = 404;
-      throw err;
-    }
-    return { message: 'Images updated', data: { image: event.image } };
-  },
 
-  // POST /api/events/:id/images (add)
-  async addEventImages({ userId, id, images }) {
-    if (!Array.isArray(images) || images.length === 0) {
-      const err = new Error('images is required');
-      err.status = 400;
-      throw err;
-    }
-    const membership = await ensureEventRole(userId, id, ['HoOC', 'HoD']);
-    if (!membership) {
-      const err = new Error('Insufficient permissions');
-      err.status = 403;
-      throw err;
-    }
-    const sanitized = images.filter((s) => typeof s === 'string' && s.length > 0);
-    const event = await Event.findByIdAndUpdate(
-      id,
-      { $push: { image: { $each: sanitized } } },
-      { new: true }
-    ).select('image');
     if (!event) {
       const err = new Error('Event not found');
       err.status = 404;
       throw err;
     }
-    return { message: 'Images added', data: { image: event.image } };
-  },
 
-  // DELETE /api/events/:id/images
-  async removeEventImages({ userId, id, indexes }) {
-    if (!Array.isArray(indexes)) {
-      const err = new Error('indexes must be an array of numbers');
-      err.status = 400;
-      throw err;
-    }
-    const membership = await ensureEventRole(userId, id, ['HoOC', 'HoD']);
-    if (!membership) {
-      const err = new Error('Insufficient permissions');
-      err.status = 403;
-      throw err;
-    }
-    const event = await Event.findById(id).select('image');
-    if (!event) {
-      const err = new Error('Event not found');
-      err.status = 404;
-      throw err;
-    }
-    const keep = event.image.filter((_, idx) => !indexes.includes(idx));
-    event.image = keep;
-    await event.save();
-    return { message: 'Images removed', data: { image: event.image } };
+    await ensureCloudinaryImage(event);
+    return {
+      message: 'Image updated',
+      data: { image: event.image }
+    };
   },
 
   // GET /api/events/detail/:id
@@ -501,6 +495,7 @@ export const eventService = {
       throw err;
     }
 
+    await ensureCloudinaryImage(eventRaw);
     const event = await ensureAutoStatusForDoc(eventRaw);
     if (event.type === 'public') {
       return { data: { event } };
