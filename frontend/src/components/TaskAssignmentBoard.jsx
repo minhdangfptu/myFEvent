@@ -25,8 +25,7 @@ export default function TaskAssignmentBoard({
   members, 
   eventId, 
   departmentId,
-  onTaskAssigned,
-  currentUserId 
+  onTaskAssigned
 }) {
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);

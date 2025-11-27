@@ -309,8 +309,8 @@ export const editTask = async (req, res) => {
         if (isEpic && member.role !== 'HoOC') {
             return res.status(403).json({ message: 'Chỉ HoOC có quyền chỉnh sửa Epic task.' });
         }
-        if (isNormal && member.role !== 'HoD') {
-            return res.status(403).json({ message: 'Chỉ HoD có quyền chỉnh sửa task thường.' });
+        if (isNormal && !['HoOC', 'HoD'].includes(member.role)) {
+            return res.status(403).json({ message: 'Chỉ HoOC hoặc HoD có quyền chỉnh sửa task thường.' });
         }
 
         if (isNormal && currentTask.status !== TASK_STATUSES.NOT_STARTED) {
@@ -321,6 +321,8 @@ export const editTask = async (req, res) => {
 
         const update = { ...(req.body || {}) };
         if (!update) return res.status(404).json({ message: "Chưa có thông tin cập nhật" })
+
+        const errors = [];
 
         // Không cho chỉnh sửa các trường nhạy cảm
         delete update.taskType;
@@ -336,8 +338,6 @@ export const editTask = async (req, res) => {
         if (isNormal && update.departmentId && String(update.departmentId) !== String(currentTask.departmentId)) {
             errors.push('Không thể chuyển task thường sang ban khác');
         }
-
-        const errors = [];
 
         const deps = Array.isArray(update.dependencies) ? update.dependencies.map(String) : [];
         const targetDepartmentId = update.departmentId || currentTask.departmentId;
