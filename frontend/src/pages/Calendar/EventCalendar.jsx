@@ -34,8 +34,15 @@ export default function EventCalendar() {
     setLoading(true);
     try {
       console.log("Fetching calendars for:", { eventId, month: currentMonth + 1, year: currentYear });
-      const response = await calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear);
-      console.log("API Response:", response);
+
+      // Fetch both calendars and milestones in parallel
+      const [calendarResponse, milestoneResponse] = await Promise.all([
+        calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear),
+        milestoneApi.listMilestonesByEvent(eventId)
+      ]);
+
+      console.log("Calendar Response:", calendarResponse);
+      console.log("Milestone Response:", milestoneResponse);
 
       // Group calendars by date
       const grouped = {};
