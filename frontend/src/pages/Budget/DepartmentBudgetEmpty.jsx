@@ -53,7 +53,7 @@ const DepartmentBudgetEmpty = () => {
         {/* Title Section */}
         <div className="mb-4">
           <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-            Budget Ban
+            Đơn ngân sách của ban
           </h2>
           <div className="d-flex align-items-center gap-2 text-muted">
             <i className="bi bi-people-fill"></i>

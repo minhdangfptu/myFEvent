@@ -696,6 +696,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/departments/:departmentId/budget/edit" 
             element={
               <ProtectedRoute>
@@ -805,6 +813,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/departments/:departmentId/budget/edit" 
             element={
               <ProtectedRoute>

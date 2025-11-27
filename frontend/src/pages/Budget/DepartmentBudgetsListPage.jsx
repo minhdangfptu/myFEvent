@@ -58,6 +58,8 @@ const DepartmentBudgetsListPage = () => {
             budgetId: budget._id || budget.id,
             departmentId: budget.departmentId || deptId,
             departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
+            requestName: budget.name || "Budget Ban",
+            creatorName: budget.creatorName || "",
             budgetStatus: budget.status || null,
             totalItems: budget.totalItems || 0,
             totalCost: budget.totalCost || 0,
@@ -194,7 +196,10 @@ const DepartmentBudgetsListPage = () => {
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
-                      Tên Ban
+                      Tên đơn
+                    </th>
+                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
+                      Ban phụ trách
                     </th>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                       Trạng thái
@@ -216,17 +221,25 @@ const DepartmentBudgetsListPage = () => {
                 <tbody>
                   {departments.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-4 text-muted">
+                      <td colSpan={7} className="text-center py-4 text-muted">
                         Chưa có budget nào
                       </td>
                     </tr>
                   ) : (
                     departments.map((budget) => (
                       <tr key={budget.budgetId}>
-                        <td style={{ padding: "12px" }}>
+                        <td style={{ padding: "12px", maxWidth: 240 }}>
                           <span className="fw-semibold" style={{ fontSize: "16px" }}>
-                            {budget.departmentName}
+                            {budget.requestName || "Chưa đặt tên"}
                           </span>
+                          {budget.creatorName && (
+                            <div className="text-muted" style={{ fontSize: "13px" }}>
+                              Trưởng ban: {budget.creatorName}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          <span className="text-muted">{budget.departmentName}</span>
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span

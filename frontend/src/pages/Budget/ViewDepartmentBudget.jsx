@@ -27,6 +27,12 @@ const ViewDepartmentBudget = () => {
   const [activeTable, setActiveTable] = useState("hooc"); // "hooc" hoặc "member"
   const [members, setMembers] = useState([]);
   const [assigningItem, setAssigningItem] = useState(null);
+  const [renaming, setRenaming] = useState(false);
+  const [showEvidenceModal, setShowEvidenceModal] = useState(false);
+  const [editingEvidenceItem, setEditingEvidenceItem] = useState(null);
+  const [evidenceFormData, setEvidenceFormData] = useState({
+    evidence: []
+  });
   
   // Column widths state for resizable columns
   const [columnWidths, setColumnWidths] = useState(null);
@@ -43,7 +49,41 @@ const ViewDepartmentBudget = () => {
     evidence: 150,
     memberNote: 200,
     total: 130,
-    actualAmount: 150
+    actualAmount: 150,
+    // Columns for HoOC table
+    hoocCategory: 120,
+    hoocName: 200,
+    hoocUnitCost: 130,
+    hoocQty: 100,
+    hoocUnit: 100,
+    hoocTotal: 130,
+    hoocNote: 200,
+    hoocEvidence: 150,
+    hoocFeedback: 250
+  };
+
+  // Minimum widths to prevent text wrapping in headers and ensure full text visibility
+  const minWidths = {
+    category: 110,
+    name: 180,
+    unitCost: 140,
+    qty: 100,
+    unit: 110,
+    note: 180,
+    assign: 130,
+    evidence: 130,
+    memberNote: 180,
+    total: 140,
+    actualAmount: 150,
+    hoocCategory: 110,
+    hoocName: 180,
+    hoocUnitCost: 140,
+    hoocQty: 100,
+    hoocUnit: 110,
+    hoocTotal: 140,
+    hoocNote: 180,
+    hoocEvidence: 130,
+    hoocFeedback: 220
   };
   
   const widths = columnWidths || defaultWidths;
@@ -70,7 +110,8 @@ const ViewDepartmentBudget = () => {
     
     const handleMouseMove = (e) => {
       const diff = e.pageX - startX;
-      currentWidth = Math.max(80, startWidth + diff); // Min width 80px
+      const minWidth = minWidths[column] || 80;
+      currentWidth = Math.max(minWidth, startWidth + diff);
       setColumnWidths(prev => {
         const updated = { ...(prev || defaultWidths), [column]: currentWidth };
         return updated;
@@ -215,6 +256,18 @@ const ViewDepartmentBudget = () => {
     return date.toLocaleDateString("vi-VN");
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "Chưa có";
+    const date = new Date(dateString);
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const getStatusLabel = (status) => {
     const statusMap = {
       draft: "Nháp",
@@ -247,7 +300,13 @@ const ViewDepartmentBudget = () => {
   ) || 0;
 
   const handleEdit = () => {
-    navigate(`/events/${eventId}/departments/${departmentId}/budget/edit`);
+    // Navigate với budgetId cụ thể để đảm bảo edit đúng budget
+    const currentBudgetId = budget?._id || budgetId;
+    if (currentBudgetId) {
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/${currentBudgetId}/edit`);
+    } else {
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/edit`);
+    }
   };
 
   const handleDeleteDraft = async () => {
@@ -302,6 +361,29 @@ const ViewDepartmentBudget = () => {
     }
   };
 
+  const handleRenameBudget = async () => {
+    if (!budget?._id) return;
+    const currentName = budget.name || "Budget Ban";
+    const newName = prompt("Nhập tên đơn ngân sách mới", currentName);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast.error("Tên đơn không được để trống.");
+      return;
+    }
+    if (trimmed === currentName) return;
+    try {
+      setRenaming(true);
+      await budgetApi.updateBudget(eventId, departmentId, budget._id, { name: trimmed });
+      toast.success("Đã cập nhật tên đơn ngân sách.");
+      await fetchData();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Đổi tên thất bại!");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
   const handleExportExcel = () => {
     if (!budget || !filteredItems.length) {
       toast.warning("Không có dữ liệu để xuất");
@@ -349,7 +431,7 @@ const ViewDepartmentBudget = () => {
             "Bằng chứng": item.evidence && item.evidence.length > 0 
               ? item.evidence.map(ev => ev.type === 'link' ? ev.url : ev.name).join(", ")
               : "",
-            "Chú thích (member ghi)": item.memberNote || "",
+            "Chú thích của member": item.memberNote || "",
             "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
             "Tổng tiền thực tế": parseFloat(item.actualAmount) || 0
           };
@@ -433,6 +515,94 @@ const ViewDepartmentBudget = () => {
     }
   };
 
+  const handleOpenEvidenceModal = (item) => {
+    setEditingEvidenceItem(item);
+    setEvidenceFormData({
+      evidence: item.evidence || []
+    });
+    setShowEvidenceModal(true);
+  };
+
+  const handleCloseEvidenceModal = () => {
+    setShowEvidenceModal(false);
+    setEditingEvidenceItem(null);
+    setEvidenceFormData({
+      evidence: []
+    });
+  };
+
+  const handleSaveEvidence = async () => {
+    if (!editingEvidenceItem || !budget) return;
+    
+    try {
+      setIsSubmitting(true);
+      const itemIdToUse = editingEvidenceItem.itemId?.toString() || 
+                         editingEvidenceItem.itemId?._id?.toString() || 
+                         editingEvidenceItem.itemId ||
+                         editingEvidenceItem._id?.toString() ||
+                         editingEvidenceItem._id;
+      
+      await budgetApi.reportExpense(
+        eventId,
+        departmentId,
+        budget._id,
+        itemIdToUse,
+        {
+          evidence: evidenceFormData.evidence || []
+        }
+      );
+      toast.success("Đã lưu bằng chứng thành công!");
+      handleCloseEvidenceModal();
+      await fetchData();
+    } catch (error) {
+      console.error("Error saving evidence:", error);
+      toast.error(error?.response?.data?.message || "Lưu bằng chứng thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddEvidenceLink = () => {
+    const link = prompt("Nhập link bằng chứng:");
+    if (link && link.trim()) {
+      setEvidenceFormData(prev => ({
+        ...prev,
+        evidence: [...(prev.evidence || []), {
+          type: 'link',
+          url: link.trim(),
+          name: `Link ${(prev.evidence || []).length + 1}`
+        }]
+      }));
+    }
+  };
+
+  const handleAddEvidenceFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileType = file.type.startsWith('image/') ? 'image' : 
+                      file.type === 'application/pdf' ? 'pdf' : 'doc';
+      setEvidenceFormData(prev => ({
+        ...prev,
+        evidence: [...(prev.evidence || []), {
+          type: fileType,
+          url: event.target.result,
+          name: file.name
+        }]
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveEvidence = (idx) => {
+    setEvidenceFormData(prev => ({
+      ...prev,
+      evidence: (prev.evidence || []).filter((_, i) => i !== idx)
+    }));
+  };
+
   // Kiểm tra xem tất cả items đã được assign chưa
   const allItemsAssigned = budget?.items?.every(item => {
     const assignedId = item.assignedTo?.toString() || 
@@ -513,6 +683,13 @@ const ViewDepartmentBudget = () => {
     item.feedback && item.feedback.trim() !== "" && item.status === "rejected"
   ) || [];
   const hasRejectedItems = itemsWithFeedback.length > 0;
+  const budgetName = budget.name || "Budget Ban";
+  const creatorName =
+    budget.createdBy?.fullName ||
+    budget.createdBy?.name ||
+    department?.leaderId?.fullName ||
+    department?.leader?.fullName ||
+    "—";
 
   return (
     <UserLayout
@@ -525,7 +702,7 @@ const ViewDepartmentBudget = () => {
         {/* Title Section */}
         <div className="mb-4 d-flex justify-content-between align-items-start">
           <div>
-            <div className="d-flex align-items-center gap-3 mb-2">
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-2">
               <button
                 className="btn btn-outline-secondary"
                 onClick={() => navigate(`/events/${eventId}/budgets/departments`)}
@@ -536,8 +713,23 @@ const ViewDepartmentBudget = () => {
                 Quay lại
               </button>
               <h2 className="fw-bold mb-0" style={{ fontSize: "28px", color: "#111827" }}>
-                Budget Ban
+                {budgetName}
               </h2>
+              {isHoD && (
+                <button
+                  className="btn btn-link p-0"
+                  onClick={handleRenameBudget}
+                  disabled={renaming}
+                  style={{ fontSize: "14px" }}
+                >
+                  <i className="bi bi-pencil-square me-1"></i>
+                  {renaming ? "Đang đổi tên..." : "Đổi tên đơn"}
+                </button>
+              )}
+            </div>
+            <div className="d-flex align-items-center gap-2 text-muted">
+              <i className="bi bi-file-earmark-text"></i>
+              <span>Tên đơn: {budgetName}</span>
             </div>
             <div className="d-flex align-items-center gap-2 text-muted">
               <i className="bi bi-people-fill"></i>
@@ -570,68 +762,81 @@ const ViewDepartmentBudget = () => {
             Tổng Quan Ngân Sách
           </h5>
 
-          <div className="d-flex flex-wrap" style={{ gap: "32px" }}>
-            <div style={{ flex: "1", minWidth: "150px" }}>
-              <div>
+          <div className="d-flex flex-wrap align-items-start" style={{ gap: "24px" }}>
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
                 <div
-                  className="fw-bold mb-1"
-                  style={{ fontSize: "32px", color: "#3B82F6" }}
+                  className="fw-bold mb-2"
+                  style={{ fontSize: "20px", color: "#3B82F6", lineHeight: "1.2" }}
                 >
                   {formatCurrency(totalCost)}
                 </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
                   Tổng Chi Phí Dự Kiến (VNĐ)
                 </p>
               </div>
             </div>
 
-            <div style={{ flex: "1", minWidth: "150px" }}>
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "24px", color: "#111827" }}>
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div className="fw-bold mb-2" style={{ fontSize: "20px", color: "#111827", lineHeight: "1.2" }}>
                   {budget.items?.length || 0}
                 </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
                   Tổng Số Mục
                 </p>
               </div>
             </div>
 
-            <div style={{ flex: "1", minWidth: "150px" }}>
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {formatDate(budget.createdAt)}
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div className="fw-bold mb-2" style={{ fontSize: "20px", color: "#111827", lineHeight: "1.2" }}>
+                  {formatDateTime(budget.createdAt)}
                 </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Ngày Tạo
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
+                  Tạo lúc
                 </p>
               </div>
             </div>
 
-            <div style={{ flex: "1", minWidth: "150px" }}>
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {budget.createdBy?.fullName || "Nguyễn Văn A"}
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div className="fw-bold mb-2" style={{ fontSize: "20px", color: "#111827", lineHeight: "1.2" }}>
+                  {formatDateTime(budget.updatedAt)}
                 </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
+                  Cập nhật gần nhất
+                </p>
+              </div>
+            </div>
+
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div className="fw-bold mb-2" style={{ fontSize: "20px", color: "#111827", lineHeight: "1.2" }}>
+                  {creatorName}
+                </div>
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
                   Người Tạo (Trưởng ban)
                 </p>
               </div>
             </div>
 
-            <div style={{ flex: "1", minWidth: "150px" }}>
-              <div>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    background: getStatusColor(status) + "22",
-                    color: getStatusColor(status),
-                    fontSize: "14px",
-                    fontWeight: "600",
-                  }}
-                >
-                  {getStatusLabel(status)}
-                </span>
-                <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
+            <div style={{ flex: "1", minWidth: "160px", maxWidth: "200px" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div className="mb-2" style={{ lineHeight: "1.2", minHeight: "28px", display: "flex", alignItems: "center" }}>
+                  <span
+                    className="badge px-3 py-2"
+                    style={{
+                      background: getStatusColor(status) + "22",
+                      color: getStatusColor(status),
+                      fontSize: "14px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {getStatusLabel(status)}
+                  </span>
+                </div>
+                <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
                   Trạng thái budget
                 </p>
               </div>
@@ -698,31 +903,299 @@ const ViewDepartmentBudget = () => {
           {/* Bảng 1: Gửi cho HoOC */}
           {activeTable === "hooc" && (
             <div className="table-responsive" style={{ overflowX: "auto" }}>
-              <table className="table" style={{ width: "100%", wordWrap: "break-word" }}>
+              <table className="table" style={{ width: "100%", wordWrap: "break-word", tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "120px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocCategory || 120}px`,
+                      minWidth: `${minWidths.hoocCategory || 110}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Hạng Mục
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocCategory" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocCategory")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "200px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocName || 200}px`,
+                      minWidth: `${minWidths.hoocName || 180}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Nội dung
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocName" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocName")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "130px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocUnitCost || 130}px`,
+                      minWidth: `${minWidths.hoocUnitCost || 140}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Đơn Giá (VNĐ)
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocUnitCost" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocUnitCost")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "100px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocQty || 100}px`,
+                      minWidth: `${minWidths.hoocQty || 100}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Số Lượng
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocQty" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocQty")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "100px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocUnit || 100}px`,
+                      minWidth: `${minWidths.hoocUnit || 110}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Đơn Vị Tính
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocUnit" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocUnit")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "130px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocTotal || 130}px`,
+                      minWidth: `${minWidths.hoocTotal || 140}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Tổng Tiền (VNĐ)
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocTotal" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocTotal")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "200px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocNote || 200}px`,
+                      minWidth: `${minWidths.hoocNote || 180}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Ghi Chú
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocNote" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocNote")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
                     </th>
-                    <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "250px" }}>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocEvidence || 150}px`,
+                      minWidth: `${minWidths.hoocEvidence || 130}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
+                      Bằng chứng
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "hoocEvidence" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "hoocEvidence")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
+                    </th>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.hoocFeedback || 250}px`,
+                      minWidth: `${minWidths.hoocFeedback || 220}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
                       Phản hồi từ TBTC
                     </th>
                   </tr>
@@ -730,7 +1203,7 @@ const ViewDepartmentBudget = () => {
                 <tbody>
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center text-muted py-4">
+                      <td colSpan={9} className="text-center text-muted py-4">
                         Không tìm thấy mục nào
                       </td>
                     </tr>
@@ -753,9 +1226,7 @@ const ViewDepartmentBudget = () => {
                           <td style={{ 
                             padding: "12px", 
                             backgroundColor: cellBgColor, 
-                            width: "200px",
-                            minWidth: "200px",
-                            maxWidth: "200px",
+                            width: `${widths.hoocName || 200}px`,
                             wordWrap: "break-word",
                             wordBreak: "break-word",
                             whiteSpace: "normal",
@@ -792,9 +1263,7 @@ const ViewDepartmentBudget = () => {
                           <td style={{ 
                             padding: "12px", 
                             backgroundColor: cellBgColor, 
-                            width: "200px",
-                            minWidth: "200px",
-                            maxWidth: "200px",
+                            width: `${widths.hoocNote || 200}px`,
                             wordWrap: "break-word",
                             wordBreak: "break-word",
                             whiteSpace: "normal",
@@ -811,9 +1280,76 @@ const ViewDepartmentBudget = () => {
                           <td style={{ 
                             padding: "12px", 
                             backgroundColor: cellBgColor, 
-                            width: "250px",
-                            minWidth: "250px",
-                            maxWidth: "250px",
+                            width: `${widths.hoocEvidence || 150}px`,
+                            wordWrap: "break-word",
+                            wordBreak: "break-word",
+                            whiteSpace: "normal",
+                            verticalAlign: "top"
+                          }}>
+                            {item.evidence && item.evidence.length > 0 ? (
+                              <div className="d-flex flex-wrap gap-1">
+                                {item.evidence.map((ev, idx) => {
+                                  const isImage = ev.type === 'image';
+                                  const evidenceName = ev.name || `Bằng chứng ${idx + 1}`;
+                                  return isImage ? (
+                                    <button
+                                      key={idx}
+                                      className="badge"
+                                      onClick={() => {
+                                        setSelectedImage(ev.url);
+                                        setShowImageModal(true);
+                                      }}
+                                      style={{
+                                        background: "#DBEAFE",
+                                        color: "#1E40AF",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        fontSize: "11px",
+                                        wordWrap: "break-word",
+                                        wordBreak: "break-word",
+                                        whiteSpace: "normal",
+                                        marginBottom: "4px"
+                                      }}
+                                      title="Click để xem ảnh"
+                                    >
+                                      <i className="bi bi-image me-1"></i>
+                                      {evidenceName}
+                                    </button>
+                                  ) : (
+                                    <a
+                                      key={idx}
+                                      href={ev.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="badge"
+                                      style={{
+                                        background: "#DBEAFE",
+                                        color: "#1E40AF",
+                                        textDecoration: "none",
+                                        fontSize: "11px",
+                                        wordWrap: "break-word",
+                                        wordBreak: "break-word",
+                                        whiteSpace: "normal",
+                                        display: "inline-block",
+                                        marginBottom: "4px"
+                                      }}
+                                    >
+                                      {ev.type === 'pdf' && <i className="bi bi-file-pdf me-1"></i>}
+                                      {ev.type === 'doc' && <i className="bi bi-file-word me-1"></i>}
+                                      {ev.type === 'link' && <i className="bi bi-link-45deg me-1"></i>}
+                                      {evidenceName}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td style={{ 
+                            padding: "12px", 
+                            backgroundColor: cellBgColor, 
+                            width: `${widths.hoocFeedback || 250}px`,
                             wordWrap: "break-word",
                             wordBreak: "break-word",
                             whiteSpace: "normal",
@@ -853,8 +1389,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.category}px`,
+                      minWidth: `${minWidths.category || 110}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Hạng Mục
                       <div
@@ -886,8 +1424,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.name}px`,
+                      minWidth: `${minWidths.name || 180}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Nội dung
                       <div
@@ -919,8 +1459,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.unitCost}px`,
+                      minWidth: `${minWidths.unitCost || 140}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Đơn Giá (VNĐ)
                       <div
@@ -952,8 +1494,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.qty}px`,
+                      minWidth: `${minWidths.qty || 100}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Số Lượng
                       <div
@@ -985,8 +1529,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.unit}px`,
+                      minWidth: `${minWidths.unit || 110}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Đơn Vị Tính
                       <div
@@ -1018,8 +1564,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.note}px`,
+                      minWidth: `${minWidths.note || 180}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Ghi Chú
                       <div
@@ -1052,8 +1600,10 @@ const ViewDepartmentBudget = () => {
                         fontWeight: "600", 
                         color: "#374151", 
                         width: `${widths.assign}px`,
+                        minWidth: `${minWidths.assign || 130}px`,
                         position: "relative",
-                        userSelect: "none"
+                        userSelect: "none",
+                        whiteSpace: "nowrap"
                       }}>
                         Giao việc
                         <div
@@ -1086,8 +1636,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.evidence}px`,
+                      minWidth: `${minWidths.evidence || 130}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Bằng chứng
                       <div
@@ -1119,13 +1671,15 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.memberNote}px`,
+                      minWidth: `${minWidths.memberNote || 180}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Chú thích (member ghi)
                       <div
                         style={{
-                          position: "absolute",
+                          position: "absolute", 
                           right: 0,
                           top: 0,
                           bottom: 0,
@@ -1152,8 +1706,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.total}px`,
+                      minWidth: `${minWidths.total || 140}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Tổng Tiền (VNĐ)
                       <div
@@ -1185,8 +1741,10 @@ const ViewDepartmentBudget = () => {
                       fontWeight: "600", 
                       color: "#374151", 
                       width: `${widths.actualAmount}px`,
+                      minWidth: `${minWidths.actualAmount || 150}px`,
                       position: "relative",
-                      userSelect: "none"
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
                     }}>
                       Tổng tiền thực tế
                     </th>
@@ -1304,65 +1862,93 @@ const ViewDepartmentBudget = () => {
                             whiteSpace: "normal",
                             verticalAlign: "top"
                           }}>
-                            {item.evidence && item.evidence.length > 0 ? (
-                              <div className="d-flex flex-wrap gap-1">
-                                {item.evidence.map((ev, idx) => {
-                                  const isImage = ev.type === 'image';
-                                  const evidenceName = ev.name || `Bằng chứng ${idx + 1}`;
-                                  return isImage ? (
+                            <div className="d-flex flex-column gap-1">
+                              {item.evidence && item.evidence.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-1">
+                                  {item.evidence.map((ev, idx) => {
+                                    const isImage = ev.type === 'image';
+                                    const evidenceName = ev.name || `Bằng chứng ${idx + 1}`;
+                                    return isImage ? (
+                                      <button
+                                        key={idx}
+                                        className="badge"
+                                        onClick={() => {
+                                          setSelectedImage(ev.url);
+                                          setShowImageModal(true);
+                                        }}
+                                        style={{
+                                          background: "#DBEAFE",
+                                          color: "#1E40AF",
+                                          border: "none",
+                                          cursor: "pointer",
+                                          fontSize: "11px",
+                                          wordWrap: "break-word",
+                                          wordBreak: "break-word",
+                                          whiteSpace: "normal",
+                                          marginBottom: "4px"
+                                        }}
+                                        title="Click để xem ảnh"
+                                      >
+                                        <i className="bi bi-image me-1"></i>
+                                        {evidenceName}
+                                      </button>
+                                    ) : (
+                                      <a
+                                        key={idx}
+                                        href={ev.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="badge"
+                                        style={{
+                                          background: "#DBEAFE",
+                                          color: "#1E40AF",
+                                          textDecoration: "none",
+                                          fontSize: "11px",
+                                          wordWrap: "break-word",
+                                          wordBreak: "break-word",
+                                          whiteSpace: "normal",
+                                          display: "inline-block",
+                                          marginBottom: "4px"
+                                        }}
+                                      >
+                                        {ev.type === 'pdf' && <i className="bi bi-file-pdf me-1"></i>}
+                                        {ev.type === 'doc' && <i className="bi bi-file-word me-1"></i>}
+                                        {ev.type === 'link' && <i className="bi bi-link-45deg me-1"></i>}
+                                        {evidenceName}
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                              {(() => {
+                                // Kiểm tra xem có thể chỉnh sửa bằng chứng không
+                                // HoD có thể chỉnh sửa tất cả
+                                // Member chỉ có thể chỉnh sửa item được assign cho mình
+                                const canEditEvidence = isHoD || 
+                                  (assignedMemberId && currentMemberId && String(assignedMemberId) === String(currentMemberId));
+                                
+                                if ((isApproved || isSentToMembers) && canEditEvidence) {
+                                  return (
                                     <button
-                                      key={idx}
-                                      className="badge"
-                                      onClick={() => {
-                                        setSelectedImage(ev.url);
-                                        setShowImageModal(true);
-                                      }}
+                                      className="btn btn-sm btn-outline-primary"
+                                      onClick={() => handleOpenEvidenceModal(item)}
                                       style={{
-                                        background: "#DBEAFE",
-                                        color: "#1E40AF",
-                                        border: "none",
-                                        cursor: "pointer",
                                         fontSize: "11px",
-                                        wordWrap: "break-word",
-                                        wordBreak: "break-word",
-                                        whiteSpace: "normal",
-                                        marginBottom: "4px"
+                                        padding: "2px 8px",
+                                        marginTop: "4px"
                                       }}
-                                      title="Click để xem ảnh"
+                                      title="Thêm/sửa bằng chứng"
                                     >
-                                      <i className="bi bi-image me-1"></i>
-                                      {evidenceName}
+                                      <i className="bi bi-plus-circle me-1"></i>
+                                      {item.evidence && item.evidence.length > 0 ? "Sửa" : "Thêm"}
                                     </button>
-                                  ) : (
-                                    <a
-                                      key={idx}
-                                      href={ev.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="badge"
-                                      style={{
-                                        background: "#DBEAFE",
-                                        color: "#1E40AF",
-                                        textDecoration: "none",
-                                        fontSize: "11px",
-                                        wordWrap: "break-word",
-                                        wordBreak: "break-word",
-                                        whiteSpace: "normal",
-                                        display: "inline-block",
-                                        marginBottom: "4px"
-                                      }}
-                                    >
-                                      {ev.type === 'pdf' && <i className="bi bi-file-pdf me-1"></i>}
-                                      {ev.type === 'doc' && <i className="bi bi-file-word me-1"></i>}
-                                      {ev.type === 'link' && <i className="bi bi-link-45deg me-1"></i>}
-                                      {evidenceName}
-                                    </a>
                                   );
-                                })}
-                              </div>
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
+                                }
+                                return null;
+                              })()}
+                            </div>
                           </td>
                           <td style={{ 
                             padding: "12px", 
@@ -1587,6 +2173,127 @@ const ViewDepartmentBudget = () => {
                     e.target.alt = "Không thể tải ảnh";
                   }}
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Modal */}
+      {showEvidenceModal && editingEvidenceItem && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 9999 }}
+          onClick={handleCloseEvidenceModal}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Thêm/Sửa Bằng Chứng</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseEvidenceModal}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-file-earmark-text me-2"></i>
+                    Mục: {editingEvidenceItem.name}
+                  </label>
+                </div>
+
+                {/* Evidence */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-paperclip me-2"></i>
+                    Bằng chứng
+                  </label>
+                  {evidenceFormData.evidence && evidenceFormData.evidence.length > 0 && (
+                    <div className="mb-3">
+                      {evidenceFormData.evidence.map((ev, idx) => (
+                        <div key={idx} className="d-flex justify-content-between align-items-center p-2 mb-2" style={{ background: "#f9fafb", borderRadius: "8px" }}>
+                          <div className="d-flex align-items-center gap-2">
+                            {ev.type === 'image' && <i className="bi bi-image text-primary"></i>}
+                            {ev.type === 'pdf' && <i className="bi bi-file-pdf text-danger"></i>}
+                            {ev.type === 'doc' && <i className="bi bi-file-word text-info"></i>}
+                            {ev.type === 'link' && <i className="bi bi-link-45deg text-success"></i>}
+                            <span>{ev.name}</span>
+                          </div>
+                          <div className="d-flex gap-2">
+                            {ev.type === 'image' && (
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => {
+                                  setSelectedImage(ev.url);
+                                  setShowImageModal(true);
+                                }}
+                              >
+                                <i className="bi bi-eye"></i>
+                              </button>
+                            )}
+                            {(ev.type === 'pdf' || ev.type === 'doc' || ev.type === 'link') && (
+                              <a
+                                href={ev.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-outline-primary"
+                              >
+                                <i className="bi bi-box-arrow-up-right"></i>
+                              </a>
+                            )}
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleRemoveEvidence(idx)}
+                            >
+                              <i className="bi bi-trash"></i>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-outline-primary"
+                      onClick={handleAddEvidenceLink}
+                    >
+                      <i className="bi bi-link-45deg me-2"></i>
+                      Thêm link
+                    </button>
+                    <label className="btn btn-outline-primary">
+                      <i className="bi bi-upload me-2"></i>
+                      Tải file lên
+                      <input
+                        type="file"
+                        className="d-none"
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onChange={handleAddEvidenceFile}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseEvidenceModal}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSaveEvidence}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Đang lưu..." : "Lưu"}
+                </button>
               </div>
             </div>
           </div>

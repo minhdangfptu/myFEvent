@@ -106,7 +106,7 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       return;
     }
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
+    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
     const departmentId = task.departmentId._id || task.departmentId;
     const assigneeMember = await EventMember.findById(task.assigneeId._id || task.assigneeId)
       .populate('userId');
@@ -136,7 +136,7 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
           userId: hodUserId,
           eventId,
           category: 'CÔNG VIỆC',
-          title: `[${eventName}] ${assigneeName} đã hoàn thành công việc "${taskTitle}"`,
+          title: `[${eventName}]${assigneeName} đã hoàn thành công việc "${taskTitle}"`,
           icon: 'bi bi-check-circle',
           color: '#ee4b4bff',
           relatedTaskId: taskId,
@@ -165,7 +165,7 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
           await createNotificationsForUsers(hoocUserIds, {
             eventId,
             category: 'CÔNG VIỆC',
-            title: `[${eventName}] ${hodName} (${departmentName}) đã hoàn thành công việc "${taskTitle}"`,
+            title: `[${eventName}]  ${hodName} (${departmentName}) đã hoàn thành công việc "${taskTitle}"`,
             icon: 'bi bi-check-circle',
             color: '#ee4b4bff',
             relatedTaskId: taskId,
