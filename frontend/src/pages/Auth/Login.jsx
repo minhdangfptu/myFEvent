@@ -40,8 +40,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      if (user?.role === "admin") {
+      const { user: loggedInUser } = await login(email, password);
+      if (loggedInUser?.role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else {
         navigate("/home-page", { replace: true, state: { loginSuccess: true } });
