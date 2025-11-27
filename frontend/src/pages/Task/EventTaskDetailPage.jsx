@@ -725,35 +725,6 @@ export default function EventTaskDetailPage() {
           )}
         </div>
       </div>
-      <div className="mb-3">
-        <label className="form-label">
-          Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})
-        </label>
-        {isEditing ? (
-          <select
-            multiple
-            className="form-select"
-            value={form.dependenciesText.split(',').filter(Boolean)}
-            onChange={e => handleChange('dependenciesText', Array.from(e.target.selectedOptions, o => o.value).join(','))}
-            disabled={!canEdit}
-            size={6}
-            style={{ minHeight: 160 }}
-          >
-            {tasksAll.filter(
-              t => t.assigneeId && String(t._id) !== String(taskId)
-            ).map(t => (
-              <option key={t._id} value={t._id}>{t.title}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            className="form-control"
-            value={form.dependenciesText}
-            disabled
-          />
-        )}
-      </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
         <div className="d-flex flex-wrap gap-5">
@@ -1087,37 +1058,7 @@ export default function EventTaskDetailPage() {
           )}
         </div>
         <div>
-          <div className="text-muted small mb-1">Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})</div>
-          {relatedTasks.dependencies.length > 0 ? (
-            <div className="fw-medium">
-              {relatedTasks.dependencies.map((dep, idx) => (
-                <div key={dep.id} className="mb-1">
-                  <a
-                    href={`/events/${eventId}/tasks/${dep.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(`/events/${eventId}/tasks/${dep.id}`);
-                    }}
-                    style={{
-                      color: "#3B82F6",
-                      textDecoration: "none",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.textDecoration = "none";
-                    }}
-                  >
-                    {dep.title}
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="fw-medium">—</div>
-          )}
+        
         </div>
       </div>
     </div>

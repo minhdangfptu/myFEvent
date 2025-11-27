@@ -489,6 +489,7 @@ export default function EventTaskPage() {
   const [parents, setParents] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [assignNow, setAssignNow] = useState(false);
   const [isDeletingTasks, setIsDeletingTasks] = useState(false);
 
   const selectedDepartmentName = useMemo(() => (
@@ -535,6 +536,8 @@ export default function EventTaskPage() {
         next.assigneeId = "";
         next.parentId = "";
       }
+      // Nếu người dùng nhập thủ công startDate, tắt assignNow
+      if (field === "startDate" && value) setAssignNow(false);
       return next;
     });
   };
@@ -554,11 +557,19 @@ export default function EventTaskPage() {
     const toISO = (d) => new Date(d).toISOString();
     const orUndef = (v) => (v ? v : undefined);
 
+    // Nếu người dùng tick "Giao việc ngay", dùng thời điểm hiện tại cho startDate
+    const computedStart = assignNow
+      ? new Date().toISOString()
+      : addTaskForm.startDate
+      ? toISO(addTaskForm.startDate)
+      : undefined;
+
     const payload = {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
       departmentId: addTaskForm.departmentId,
-      startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
+      assigneeId: orUndef(addTaskForm.assigneeId),
+      startDate: computedStart,
       dueDate: toISO(addTaskForm.dueDate),
       milestoneId: orUndef(addTaskForm.milestoneId),
       parentId: orUndef(addTaskForm.parentId),
@@ -1413,34 +1424,77 @@ export default function EventTaskPage() {
                         ))}
                       </select>
                     </div>
+                    {addTaskForm.taskType === "normal" && (
+                      <div className="mb-3">
+                        <label className="form-label">Người phụ trách</label>
+                        <select
+                          className="form-select"
+                          value={addTaskForm.assigneeId}
+                          onChange={(e) => handleAddTaskInput("assigneeId", e.target.value)}
+                          disabled={!addTaskForm.departmentId}
+                        >
+                          <option value="">Chọn thành viên</option>
+                          {assignees.map((member) => (
+                            <option key={member._id || member.id} value={member._id || member.id}>
+                              {member.name || member.userId?.fullName || "Thành viên"}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="form-text small text-muted">
+                          Chọn thành viên của ban để giao công việc này
+                        </div>
+                      </div>
+                    )}
                     <div className="row">
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Thời gian bắt đầu</label>
-                        <input
-                          type="datetime-local"
-                          className="form-control"
-                          value={addTaskForm.startDate}
-                          onChange={(e) =>
-                            handleAddTaskInput("startDate", e.target.value)
-                          }
-                          min={(() => {
-                            const now = new Date();
-                            now.setMinutes(now.getMinutes() + 1);
-                            const minDateTime = now.toISOString().slice(0, 16);
-                            if (eventInfo?.createdAt) {
-                              const eventCreatedAt = new Date(eventInfo.createdAt);
-                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
-                              return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
-                            }
-                            return minDateTime;
-                          })()}
-                        />
-                        {eventInfo && (
-                          <div className="form-text small text-muted">
-                            Lưu ý: Thời gian bắt đầu phải sau thời điểm
-                            {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                          <label className="form-label">Thời gian bắt đầu</label>
+                          <div className="form-check mb-2">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id="assignNowChk"
+                              checked={assignNow}
+                              onChange={(e) => {
+                                const next = e.target.checked;
+                                setAssignNow(next);
+                                if (next) {
+                                  // Clear manual startDate when using now
+                                  setAddTaskForm((prev) => ({ ...prev, startDate: "" }));
+                                }
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor="assignNowChk">
+                              Giao việc ngay (dùng thời điểm hiện tại)
+                            </label>
                           </div>
-                        )}
+                          <input
+                            type="datetime-local"
+                            className="form-control"
+                            value={addTaskForm.startDate}
+                            onChange={(e) =>
+                              handleAddTaskInput("startDate", e.target.value)
+                            }
+                            disabled={assignNow}
+                            min={(() => {
+                              const now = new Date();
+                              now.setMinutes(now.getMinutes() + 1);
+                              const minDateTime = now.toISOString().slice(0, 16);
+                              if (eventInfo?.createdAt) {
+                                const eventCreatedAt = new Date(eventInfo.createdAt);
+                                const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
+                                return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
+                              }
+                              return minDateTime;
+                            })()}
+                          />
+                          {assignNow ? (
+                            <div className="form-text small text-muted">Thời gian bắt đầu sẽ là: {new Date().toLocaleString('vi-VN')}</div>
+                          ) : eventInfo ? (
+                            <div className="form-text small text-muted">
+                              Lưu ý: Thời gian bắt đầu phải sau thời điểm
+                              {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                            </div>
+                          ) : null}
                       </div>
                       <div className="col-md-6 mb-3">
                         <label className="form-label">Deadline *</label>
@@ -1524,6 +1578,8 @@ export default function EventTaskPage() {
                         )}
                       </div>
                     </div>
+                    {/* Thành viên phụ trách - chỉ hiển thị cho Công việc (normal) */}
+                    
                   </div>
                   <div className="modal-footer">
                     <button
@@ -1618,7 +1674,7 @@ export default function EventTaskPage() {
                 fontWeight: 500,
               }}
             >
-              {selectedTaskIds.length + selectedEpicIds.length} selected
+              {selectedTaskIds.length + selectedEpicIds.length} đã chọn
             </div>
             <div style={{ width: 1, height: 24, backgroundColor: "#E5E7EB" }} />
             <button
@@ -1627,7 +1683,7 @@ export default function EventTaskPage() {
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
               <i className="bi bi-cursor"></i>
-              Select all
+              Chọn tất cả
             </button>
             <div style={{ flex: 1 }} />
             <button
@@ -1641,7 +1697,7 @@ export default function EventTaskPage() {
               ) : (
                 <i className="bi bi-trash"></i>
               )}
-              {isDeletingTasks ? "Đang xóa..." : "Delete"}
+              {isDeletingTasks ? "Đang xóa..." : "Xóa"}
             </button>
             <button
               className="btn btn-sm btn-outline-secondary"

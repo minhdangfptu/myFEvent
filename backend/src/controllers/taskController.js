@@ -84,7 +84,7 @@ export const getTaskDetail = async (req, res) => {
                     path: 'assigneeId',
                     select: 'userId role departmentId',
                     populate: [
-                        { path: 'userId', model: 'User', select: 'fullName email avatarUrl' },
+                        { path: 'userId', model: 'User', select: 'fullName email' }, // Removed avatarUrl (base64 images cause timeout)
                         { path: 'departmentId', model: 'Department', select: 'name' }
                     ]
                 },
@@ -117,7 +117,7 @@ export const getTaskByDepartment = async (req, res) => {
                     path: 'assigneeId',
                     select: 'userId role departmentId',
                     populate: [
-                        { path: 'userId', model: 'User', select: 'fullName email avatarUrl' },
+                        { path: 'userId', model: 'User', select: 'fullName email' }, // Removed avatarUrl (base64 images cause timeout)
                         { path: 'departmentId', model: 'Department', select: 'name' }
                     ]
                 },

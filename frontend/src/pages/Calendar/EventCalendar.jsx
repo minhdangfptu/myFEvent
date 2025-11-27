@@ -418,6 +418,15 @@ export default function EventCalendar() {
             {days.map((dayObj, index) => {
               const dayCalendars = getCalendarsForDay(dayObj.day, dayObj.month, dayObj.year);
               const isToday = dayObj.isCurrentMonth && dayObj.day === todayDay && dayObj.month === todayMonth && dayObj.year === todayYear;
+              const hasEvents = dayCalendars.length > 0;
+
+              // Determine background color
+              let backgroundColor = dayObj.isCurrentMonth ? "white" : "#fafafa";
+              if (isToday) {
+                backgroundColor = "#e3f2fd"; // Light blue for today
+              } else if (hasEvents && dayObj.isCurrentMonth) {
+                backgroundColor = "#fef3e8"; // Light orange for days with events
+              }
 
               return (
                 <div
@@ -427,18 +436,47 @@ export default function EventCalendar() {
                     borderBottom: index < 28 ? "1px solid #e5e7eb" : "none",
                     padding: "8px",
                     minHeight: "160px",
-                    backgroundColor: dayObj.isCurrentMonth ? "white" : "#fafafa",
+                    backgroundColor: backgroundColor,
                     position: "relative",
+                    border: isToday ? "2px solid #4285f4" : "none",
+                    borderRadius: isToday ? "4px" : "0",
                   }}
                 >
                   <div style={{
                     fontSize: "13px",
-                    fontWeight: dayObj.isCurrentMonth ? "500" : "normal",
+                    fontWeight: isToday ? "700" : (dayObj.isCurrentMonth ? "500" : "normal"),
                     marginBottom: "8px",
                     color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
-                    display: "inline-block",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    flexWrap: "wrap",
                   }}>
-                    {dayObj.day}
+                    <span style={{ fontSize: "14px" }}>{dayObj.day}</span>
+                    {isToday && (
+                      <span style={{ 
+                        fontSize: "10px", 
+                        backgroundColor: "#4285f4", 
+                        color: "white", 
+                        padding: "2px 6px", 
+                        borderRadius: "10px",
+                        fontWeight: "600"
+                      }}>
+                        Hôm nay
+                      </span>
+                    )}
+                    {hasEvents && (
+                      <span style={{ 
+                        fontSize: "9px", 
+                        backgroundColor: isToday ? "#1976d2" : "#f57c00", 
+                        color: "white", 
+                        padding: "2px 5px", 
+                        borderRadius: "8px",
+                        fontWeight: "500"
+                      }}>
+                        {dayCalendars.length} sự kiện
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>

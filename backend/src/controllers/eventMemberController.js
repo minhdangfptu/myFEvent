@@ -20,17 +20,39 @@ import { createNotification, createNotificationsForUsers } from '../services/not
 export const getMembersByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
+
+    console.log('[getMembersByEvent] Request for eventId:', eventId);
+
+    // Validate eventId format
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      console.error('[getMembersByEvent] Invalid eventId format:', eventId);
+      return res.status(400).json({ message: 'Invalid event ID format' });
+    }
+
     const event = await findEventById(eventId);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (!event) {
+      console.error('[getMembersByEvent] Event not found:', eventId);
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    console.log('[getMembersByEvent] Event found:', event.name);
+
     const members = await getMembersByEventRaw(eventId);
+    console.log('[getMembersByEvent] Members count:', members.length);
+
     const byDept = groupMembersByDepartment(members);
+    console.log('[getMembersByEvent] Grouped by departments:', Object.keys(byDept));
+
     return res.status(200).json({
       data: byDept,
       event: { id: event._id, name: event.name, description: event.description }
     });
   } catch (error) {
-    console.error('getMembersByEvent error:', error);
-    return res.status(500).json({ message: 'Failed to load members' });
+    console.error('[getMembersByEvent] Error:', error);
+    return res.status(500).json({
+      message: 'Failed to load members',
+      error: error.message
+    });
   }
 };
 export const getUnassignedMembersByEvent = async (req, res) => {
@@ -108,7 +130,7 @@ export const updateMemberRole = async (req, res) => {
       eventId,
       status: { $ne: 'deactive' }
     })
-      .populate('userId', 'fullName email avatarUrl')
+      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
       .populate('departmentId', 'name')
       .lean();
 
@@ -130,7 +152,7 @@ export const updateMemberRole = async (req, res) => {
       { $set: set },
       { new: true }
     )
-      .populate('userId', 'fullName email avatarUrl')
+      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
       .populate('departmentId', 'name')
       .lean();
 
@@ -164,7 +186,7 @@ export const changeMemberDepartment = async (req, res) => {
       eventId,
       status: { $ne: 'deactive' }
     })
-      .populate('userId', 'fullName email avatarUrl')
+      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
       .populate('departmentId', 'name')
       .lean();
 
@@ -208,7 +230,7 @@ export const changeMemberDepartment = async (req, res) => {
       { $set: { departmentId: normalizedDepartmentId } },
       { new: true }
     )
-      .populate('userId', 'fullName email avatarUrl')
+      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
       .populate('departmentId', 'name')
       .lean();
 

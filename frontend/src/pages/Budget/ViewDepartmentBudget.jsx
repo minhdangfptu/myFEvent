@@ -8,11 +8,13 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useAuth } from "../../contexts/AuthContext";
+import { useEvents } from "../../contexts/EventContext";
 
 const ViewDepartmentBudget = () => {
   const { eventId, departmentId, budgetId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { fetchEventRole } = useEvents();
   const [loading, setLoading] = useState(true);
   const [budget, setBudget] = useState(null);
   const [department, setDepartment] = useState(null);
@@ -155,6 +157,32 @@ const ViewDepartmentBudget = () => {
       if (!budgetData) {
         navigate(`/events/${eventId}/departments/${departmentId}/budget/empty`);
         return;
+      }
+      
+      // Kiểm tra nếu user là member thì chỉ được xem budget của ban mình
+      if (user) {
+        const role = await fetchEventRole(eventId);
+        if (role === 'Member') {
+          const userId = user._id || user.id;
+          const membersArray = Array.isArray(membersData) ? membersData : [];
+          const isMemberOfThisDept = membersArray.some(member => {
+            const memberUserId = member.userId?._id || member.userId?.id || member.userId;
+            return String(memberUserId) === String(userId);
+          });
+          
+          if (!isMemberOfThisDept) {
+            toast.error("Bạn chỉ được xem budget của ban mình");
+            navigate(`/events/${eventId}/budgets/member`);
+            return;
+          }
+          
+          // Nếu budget chưa được duyệt, member không được xem
+          if (budgetData.status !== 'approved') {
+            toast.error("Budget này chưa được duyệt, bạn chỉ được xem các budget đã được duyệt");
+            navigate(`/events/${eventId}/budgets/member`);
+            return;
+          }
+        }
       }
       
       setBudget(budgetData);

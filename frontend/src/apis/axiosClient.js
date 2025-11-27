@@ -7,7 +7,7 @@ const axiosClient = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  timeout: 13000,
+  timeout: 30000, // Tăng từ 13s lên 30s để phù hợp với MongoDB timeout
 });
 
 axiosClient.interceptors.request.use(

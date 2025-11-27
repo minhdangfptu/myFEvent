@@ -8,4 +8,10 @@ const MilestoneSchema = new Schema({
     targetDate: { type: Date, required: true },
     isDeleted: { type: Boolean, default: false },
 }, { timestamps: true, versionKey: false });
+
+// Indexes để tối ưu query performance
+MilestoneSchema.index({ eventId: 1, targetDate: 1 }); // Compound index cho queries và sort
+MilestoneSchema.index({ eventId: 1, isDeleted: 1 }); // Filter milestones theo event và deleted status
+MilestoneSchema.index({ targetDate: 1 }); // Sort theo targetDate
+
 export default mongoose.model('Milestone', MilestoneSchema);
