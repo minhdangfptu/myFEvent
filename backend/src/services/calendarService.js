@@ -60,8 +60,8 @@ export const getCalendarsInEventScope = async (eventId, startDate = null, endDat
     // Add date range filter if provided
     if (startDate && endDate) {
         query.startAt = {
-            $gte: new Date(startDate),
-            $lte: new Date(endDate)
+            $gte: startDate,
+            $lte: endDate
         };
     }
 
