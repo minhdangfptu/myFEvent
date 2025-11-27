@@ -157,7 +157,7 @@ export default function HoDSideBar({
 
   // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
-    { id: "overview-dashboard", label: "Dashboard tổng", path: "/hod-dashboard" },
+    { id: "overview-dashboard", label: "Dashboard tổng", path: `/hod-dashboard?eventId=${eventId}` },
     { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` },
     { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${selectedEvent || ''}/milestones` }
   ];
@@ -623,7 +623,7 @@ export default function HoDSideBar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-camera me-3" style={{ width: 20 }} />
+                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (

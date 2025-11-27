@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
-import { useParams, useLocation } from "react-router-dom"
+import { useParams, useLocation, useNavigate } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
-import { eventApi } from "../../apis/eventApi"
-import { milestoneService } from "../../services/milestoneService"
-import { departmentService } from "../../services/departmentService"
+import { dashboardApi } from "../../apis/dashboardApi"
 import calendarService from "../../services/calendarService"
 import Loading from "../../components/Loading"
+import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 
-// Helper function to generate calendar days
+// Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
   const today = new Date()
   const year = today.getFullYear()
@@ -20,13 +19,33 @@ function generateCalendarDays() {
   const lastDay = new Date(year, month + 1, 0)
   const daysInMonth = lastDay.getDate()
   
+  // Get day of week for first day of month (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const firstDayOfWeek = firstDay.getDay()
+  // Convert to Monday-based week (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
+  const mondayBasedDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
+  
   const days = []
+  
+  // Add empty days at the beginning to align with Monday start
+  for (let i = 0; i < mondayBasedDay; i++) {
+    days.push(null)
+  }
+  
+  // Add actual days of the month
   for (let i = 1; i <= daysInMonth; i++) {
     days.push({
       day: i,
-      today: i === today.getDate(),
+      today: i === today.getDate() && month === today.getMonth() && year === today.getFullYear(),
       highlight: false
     })
+  }
+  
+  // Add empty days at the end to complete the last week
+  const remainingDays = 7 - (days.length % 7)
+  if (remainingDays < 7) {
+    for (let i = 0; i < remainingDays; i++) {
+      days.push(null)
+    }
   }
   
   return days
@@ -45,67 +64,6 @@ const unwrapApiData = (payload) => {
   return current
 }
 
-const dedupeMembers = (members = []) => {
-  const seen = new Set()
-  return members.filter((member) => {
-    const id = [
-      member?.id,
-      member?._id,
-      member?.userId,
-      member?.userId?._id,
-      member?.user?.id,
-      member?.user?._id,
-      member?.user?.userId
-    ].find(Boolean)
-
-    if (!id) return true
-    if (seen.has(id)) return false
-    seen.add(id)
-    return true
-  })
-}
-
-const normalizeMembers = (payload) => {
-  const data = unwrapApiData(payload)
-  if (!data) return []
-  if (Array.isArray(data)) return dedupeMembers(data)
-  if (Array.isArray(data.members)) return dedupeMembers(data.members)
-  if (Array.isArray(data.list)) return dedupeMembers(data.list)
-  if (Array.isArray(data.items)) return dedupeMembers(data.items)
-  if (Array.isArray(data.results)) return dedupeMembers(data.results)
-  if (typeof data === "object") {
-    const aggregated = Object.values(data).reduce((acc, value) => {
-      if (Array.isArray(value)) acc.push(...value)
-      else if (Array.isArray(value?.members)) acc.push(...value.members)
-      return acc
-    }, [])
-    return dedupeMembers(aggregated)
-  }
-  return []
-}
-
-const normalizeMilestones = (payload) => {
-  const data = unwrapApiData(payload)
-  if (!data) return []
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data.milestones)) return data.milestones
-  if (Array.isArray(data.list)) return data.list
-  if (Array.isArray(data.items)) return data.items
-  if (Array.isArray(data.results)) return data.results
-  return []
-}
-
-const normalizeDepartments = (payload) => {
-  const data = unwrapApiData(payload)
-  if (!data) return []
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data.departments)) return data.departments
-  if (Array.isArray(data.list)) return data.list
-  if (Array.isArray(data.items)) return data.items
-  if (Array.isArray(data.results)) return data.results
-  return []
-}
-
 const normalizeCalendars = (payload) => {
   const data = unwrapApiData(payload)
   if (!data) return []
@@ -114,6 +72,13 @@ const normalizeCalendars = (payload) => {
   if (Array.isArray(data.list)) return data.list
   if (Array.isArray(data.items)) return data.items
   return []
+}
+
+const parseDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime())) return date
+  return null
 }
 
 const parseCalendarEventStart = (calendar) => {
@@ -126,13 +91,6 @@ const parseCalendarEventStart = (calendar) => {
   if (!candidate) return null
   const date = new Date(candidate)
   return Number.isNaN(date.getTime()) ? null : date
-}
-
-const parseMilestoneDate = (value) => {
-  if (!value) return null
-  const date = new Date(value)
-  if (!Number.isNaN(date.getTime())) return date
-  return null
 }
 
 const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
@@ -152,6 +110,7 @@ export default function HoOCDashBoard() {
   const location = useLocation()
   const { eventId: paramEventId } = useParams()
   const { fetchEventRole } = useEvents()
+  const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
@@ -197,42 +156,74 @@ export default function HoOCDashBoard() {
       try {
         setLoading(true)
 
-        const [eventResponse, membersResponse, milestonesResponse, departmentsResponse, calendarsResponse] = await Promise.all([
-          eventApi.getById(eventId),
-          eventApi.getMembersByEvent(eventId),
-          milestoneService.listMilestones(eventId, {
-            sortBy: "targetDate",
-            sortDir: "asc"
-          }),
-          departmentService.getDepartments(eventId),
-          calendarService.getCalendarsByEventId(eventId)
-        ])
+        // Fetch dashboard overview from optimized API (single call with 60s cache)
+        const dashboardResponse = await dashboardApi.getDashboardOverview(eventId)
 
         if (cancelled) return
 
-        const eventPayload = unwrapApiData(eventResponse)
-        setEventData(eventPayload?.event ?? eventPayload ?? null)
+        const { data } = dashboardResponse
 
-        setMembers(normalizeMembers(membersResponse))
-
-        const milestoneList = normalizeMilestones(milestonesResponse)
-        const sortedMilestones = milestoneList
-          .slice()
-          .sort((a, b) => {
-            const da = parseMilestoneDate(a?.targetDate) || new Date(8640000000000000)
-            const db = parseMilestoneDate(b?.targetDate) || new Date(8640000000000000)
-            return da.getTime() - db.getTime()
+        // Map event data
+        if (data?.event) {
+          setEventData({
+            _id: data.event.id,
+            name: data.event.name,
+            status: data.event.status,
+            type: data.event.type,
+            organizerName: data.event.organizerName,
+            eventStartDate: data.event.startDate,
+            eventEndDate: data.event.endDate,
+            location: data.event.location
           })
-        setMilestones(sortedMilestones)
+        }
 
-        setDepartments(normalizeDepartments(departmentsResponse))
-        setCalendarEvents(normalizeCalendars(calendarsResponse))
+        // Map members (create fake array with total count for stats)
+        const memberCount = data?.stats?.members?.total || 0
+        setMembers(Array(memberCount).fill({ _id: 'placeholder' }))
+
+        // Map milestones
+        if (data?.highlights?.nextMilestones) {
+          setMilestones(data.highlights.nextMilestones.map(m => ({
+            _id: m._id,
+            name: m.name,
+            status: m.status,
+            targetDate: m.targetDate
+          })))
+        }
+
+        // Map departments (use topDepartments + stats)
+        if (data?.highlights?.topDepartments) {
+          const depts = data.highlights.topDepartments.map(d => ({
+            _id: d.id,
+            name: d.name,
+            progress: d.progress,
+            // Add budget data from stats
+            budget: data.stats?.budget?.allocated || 0,
+            spent: data.stats?.budget?.spent || 0
+          }))
+          setDepartments(depts)
+        }
+
+        // Show dashboard immediately
+        setLoading(false)
+
+        // Lazy load calendar events (non-critical)
+        if (!cancelled) {
+          calendarService.getCalendarsByEventId(eventId)
+            .then(calendarsResponse => {
+              if (!cancelled) {
+                setCalendarEvents(normalizeCalendars(calendarsResponse))
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading calendar events:", err)
+              }
+            })
+        }
       } catch (error) {
         if (!cancelled) {
           console.error("Error fetching dashboard data:", error)
-        }
-      } finally {
-        if (!cancelled) {
           setLoading(false)
         }
       }
@@ -389,48 +380,88 @@ export default function HoOCDashBoard() {
     [milestones]
   )
 
-  // Calendar data (current month)
+  // Calendar data (current month) - includes both calendar events and milestones
   const calendarDays = useMemo(() => {
     const baseDays = generateCalendarDays()
-    if (!calendarEvents.length) return baseDays
     const today = new Date()
     const year = today.getFullYear()
     const month = today.getMonth()
-    const highlightedDays = new Set()
+    const calendarDays = new Set()
+    const milestoneDays = new Set()
 
+    // Track days with calendar events
     calendarEvents.forEach((event) => {
       const startDate = parseCalendarEventStart(event)
       if (!startDate) return
       if (startDate.getFullYear() !== year || startDate.getMonth() !== month) return
-      highlightedDays.add(startDate.getDate())
+      calendarDays.add(startDate.getDate())
     })
 
-    return baseDays.map((day) => ({
-      ...day,
-      highlight: highlightedDays.has(day.day)
-    }))
-  }, [calendarEvents])
+    // Track days with milestones
+    milestones.forEach((milestone) => {
+      const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+      if (!targetDate) return
+      if (targetDate.getFullYear() !== year || targetDate.getMonth() !== month) return
+      milestoneDays.add(targetDate.getDate())
+    })
 
-  // Get events for a specific day
+    return baseDays.map((day) => {
+      if (!day) return null
+      return {
+        ...day,
+        hasCalendar: calendarDays.has(day.day),
+        hasMilestone: milestoneDays.has(day.day),
+        highlight: calendarDays.has(day.day) || milestoneDays.has(day.day)
+      }
+    })
+  }, [calendarEvents, milestones])
+
+  // Get events for a specific day - includes both calendar events and milestones
   const getEventsForDay = useMemo(() => {
     const today = new Date()
     const year = today.getFullYear()
     const month = today.getMonth()
-    const eventsWithDate = calendarEvents
-      .map((event) => {
-        const startDate = parseCalendarEventStart(event)
-        return startDate ? { event, startDate } : null
-      })
-      .filter(Boolean)
-      .filter(({ startDate }) => startDate.getFullYear() === year && startDate.getMonth() === month)
-    
+
     return (day) => {
       if (!day) return []
-      return eventsWithDate
-        .filter(({ startDate }) => startDate.getDate() === day)
-        .map(({ event }) => event)
+      const items = []
+
+      // Add calendar events for this day
+      calendarEvents.forEach((event) => {
+        const startDate = parseCalendarEventStart(event)
+        if (!startDate) return
+        if (startDate.getFullYear() === year && startDate.getMonth() === month && startDate.getDate() === day) {
+          items.push({
+            ...event,
+            itemType: 'calendar',
+            startDate
+          })
+        }
+      })
+
+      // Add milestones for this day
+      milestones.forEach((milestone) => {
+        const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+        if (!targetDate) return
+        if (targetDate.getFullYear() === year && targetDate.getMonth() === month && targetDate.getDate() === day) {
+          items.push({
+            ...milestone,
+            itemType: 'milestone',
+            startDate: targetDate
+          })
+        }
+      })
+
+      // Sort by time (milestones first as "all day", then calendar events by time)
+      items.sort((a, b) => {
+        if (a.itemType === 'milestone' && b.itemType !== 'milestone') return -1
+        if (a.itemType !== 'milestone' && b.itemType === 'milestone') return 1
+        return a.startDate - b.startDate
+      })
+
+      return items
     }
-  }, [calendarEvents])
+  }, [calendarEvents, milestones])
 
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc'
 
@@ -442,15 +473,13 @@ export default function HoOCDashBoard() {
         activePage="overview-dashboard"
         eventId={eventId}
       >
-        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-          <Loading />
-          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải dữ liệu dashboard...</div>
-        </div>
+        <DashboardSkeleton />
       </UserLayout>
     )
   }
 
-  if (!eventData) {
+  // Only show error after loading is complete
+  if (!loading && !eventData) {
     return (
       <UserLayout
         title="Dashboard tổng"
@@ -458,7 +487,9 @@ export default function HoOCDashBoard() {
         activePage="overview-dashboard"
         eventId={eventId}
       >
-        <div className="alert alert-danger">Không tìm thấy sự kiện</div>
+        <div className="alert alert-danger" style={{ margin: "20px" }}>
+          Không tìm thấy sự kiện
+        </div>
       </UserLayout>
     )
   }
@@ -475,8 +506,8 @@ export default function HoOCDashBoard() {
           {/* Stats Cards */}
           <div className="row g-3 mb-4">
             <div className="col-12 col-sm-6 col-md-6 col-lg-3">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "140px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-2"
@@ -501,8 +532,8 @@ export default function HoOCDashBoard() {
             </div>
 
             <div className="col-12 col-sm-6 col-md-6 col-lg-3">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "140px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-2"
@@ -527,8 +558,8 @@ export default function HoOCDashBoard() {
             </div>
 
             <div className="col-12 col-sm-6 col-md-6 col-lg-3">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "140px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-2"
@@ -553,8 +584,8 @@ export default function HoOCDashBoard() {
             </div>
 
             <div className="col-12 col-sm-6 col-md-6 col-lg-3">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "140px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-2"
@@ -583,8 +614,8 @@ export default function HoOCDashBoard() {
           <div className="row g-3 mb-4">
             {/* Progress Section */}
             <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "320px" }}>
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
                     Công việc lớn của các ban
                   </h6>
@@ -637,8 +668,8 @@ export default function HoOCDashBoard() {
 
             {/* Chart Section */}
             <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "320px" }}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
                       Ngân sách vs Chi tiêu
@@ -723,7 +754,7 @@ export default function HoOCDashBoard() {
             {/* Calendar */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+                <div className="card-body p-4" style={{ cursor: "pointer", minHeight: "458px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
                       Lịch họp sắp tới
@@ -752,40 +783,97 @@ export default function HoOCDashBoard() {
                         <tr key={weekIndex}>
                           {Array.from({ length: 7 }, (_, dayIndex) => {
                             const dayData = calendarDays[weekIndex * 7 + dayIndex]
+                            if (!dayData) {
+                              return <td key={dayIndex} style={{ padding: "8px 4px" }}></td>
+                            }
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
                             const hasEvents = dayEvents.length > 0
-                            
+                            let bgColor = "transparent"
+                            let textColor = "#374151"
+                            let borderColor = "transparent"
+
+                            const isToday = dayData?.today
+                            const isMilestone = dayData?.hasMilestone
+                            const isCalendar = dayData?.hasCalendar
+
+                            // Ưu tiên event/milestone khi trùng today
+                            if (isHovered && hasEvents) {
+                              if (isMilestone && isCalendar) {
+                                bgColor = "#fef3e8"; textColor = "#92400e";
+                              } else if (isMilestone) {
+                                bgColor = "#ffe4e6"; textColor = "#991b1b";
+                              } else {
+                                bgColor = "#dbeafe"; textColor = "#1e40af";
+                              }
+                            } else if (hasEvents) {
+                              if (isMilestone && isCalendar) {
+                                bgColor = "#fef3c7"; textColor = "#92400e";
+                              } else if (isMilestone) {
+                                bgColor = "#fee2e2"; textColor = "#991b1b";
+                              } else {
+                                bgColor = "#e0f2fe"; textColor = "#1e40af";
+                              }
+                            }
+                            // Không gán border đỏ hoặc shadow nữa
+                            if (isToday) {
+                              // chỉ đổi màu, không border, không chip
+                              textColor = hasEvents && isCalendar ? "#1e40af" : (isMilestone ? "#dc2626" : "#dc2626");
+                            }
+                            // Tooltip
+                            let tooltipText = "";
+                            if (isToday && isMilestone && isCalendar) tooltipText = "Hôm nay - milestone & lịch họp";
+                            else if (isToday && isMilestone) tooltipText = "Hôm nay - DDay milestone";
+                            else if (isToday && isCalendar) tooltipText = "Hôm nay - có lịch họp";
+                            else if (isToday) tooltipText = "Hôm nay";
+                            else if (isMilestone && isCalendar) tooltipText = "Milestone & lịch họp";
+                            else if (isMilestone) tooltipText = "Milestone DDay";
+                            else if (isCalendar) tooltipText = "Có lịch họp";
+
                             return (
                               <td
                                 key={dayIndex}
-                                className={`text-center ${
-                                  dayData?.today ? "text-white rounded" : hasEvents ? "fw-semibold" : ""
-                                }`}
+                                className={`text-center ${isToday ? "text-white rounded" : hasEvents ? "fw-semibold" : ""}`}
                                 style={{
                                   fontSize: "13px",
-                                  backgroundColor: dayData?.today
-                                    ? "#dc2626"
-                                    : isHovered && hasEvents
-                                    ? "#ffe4e6"
-                                    : hasEvents
-                                    ? "#fee2e2"
-                                    : "transparent",
-                                  color: dayData?.today 
-                                    ? "white" 
-                                    : hasEvents
-                                    ? "#991b1b"
-                                    : "#374151",
-                                  border: hasEvents ? "1px solid #fecdd3" : "1px solid transparent",
-                                  padding: "8px 4px",
-                                  borderRadius: "8px",
+                                  backgroundColor: bgColor,
+                                  color: textColor,
+                                  border: `none`,
+                                  minWidth: 0,
+                                  width: "36px",
+                                  height: "36px",
+                                  padding: 0,
+                                  borderRadius: "7px",
                                   cursor: dayData?.day ? "pointer" : "default",
-                                  transition: "all 0.2s ease",
+                                  transition: "all 0.2s",
+                                  position: "relative",
+                                  verticalAlign: "middle"
                                 }}
                                 onMouseEnter={() => dayData?.day && setHoveredDay(dayData.day)}
                                 onMouseLeave={() => setHoveredDay(null)}
+                                title={tooltipText}
                               >
-                                {dayData?.day || ""}
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "36px" }}>
+                                  <span style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 2,
+                                    color: textColor
+                                  }}>
+                                    <span style={{
+                                      textDecoration: isToday ? "underline" : "none",
+                                      textUnderlineOffset: isToday ? "3px" : undefined,
+                                      textDecorationThickness: isToday ? "2px" : undefined,
+                                    }}>
+                                      {dayData?.day}
+                                    </span>
+                                    {/* Icon calendar/milestone sát số */}
+                                    {isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>}
+                                    {!isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>}
+                                    {isMilestone && !isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>}
+                                  </span>
+                                </div>
                               </td>
                             )
                           })}
@@ -797,14 +885,124 @@ export default function HoOCDashBoard() {
                   {(() => {
                     const hoveredEvents = hoveredDay ? getEventsForDay(hoveredDay) : []
                     if (hoveredDay && hoveredEvents.length > 0) {
+                      // Nếu có nhiều events, gộp thành 1 chip
+                      if (hoveredEvents.length > 1) {
+                        const hasMilestone = hoveredEvents.some(e => e.itemType === 'milestone')
+                        const hasCalendar = hoveredEvents.some(e => e.itemType === 'calendar')
+                        const milestoneCount = hoveredEvents.filter(e => e.itemType === 'milestone').length
+                        const calendarCount = hoveredEvents.filter(e => e.itemType === 'calendar').length
+                        
+                        let chipConfig = {}
+                        if (hasMilestone && hasCalendar) {
+                          chipConfig = {
+                            icon: "⭐",
+                            label: "Cột mốc & Lịch họp",
+                            bgColor: "#fef3c7",
+                            borderColor: "#fcd34d",
+                            textColor: "#92400e"
+                          }
+                        } else if (hasMilestone) {
+                          chipConfig = {
+                            icon: "🎯",
+                            label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc",
+                            bgColor: "#fef2f2",
+                            borderColor: "#dc2626",
+                            textColor: "#dc2626"
+                          }
+                        } else {
+                          chipConfig = {
+                            icon: "📅",
+                            label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp",
+                            bgColor: "#eff6ff",
+                            borderColor: "#3b82f6",
+                            textColor: "#1e40af"
+                          }
+                        }
+                        
+                        const eventNames = hoveredEvents.map(e => e?.name || (e.itemType === 'milestone' ? 'Cột mốc' : 'Lịch họp')).filter(Boolean)
+                        
+                        return (
+                          <div className="mt-4 pt-3 border-top">
+                            <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
+                              <div className="d-flex align-items-start gap-2">
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon}</span>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{
+                                    display: "inline-block",
+                                    fontSize: "9px",
+                                    backgroundColor: chipConfig.bgColor === "#fef3c7" ? "#fef3c7" : chipConfig.bgColor,
+                                    color: chipConfig.textColor,
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    fontWeight: "600",
+                                    marginBottom: "4px",
+                                    border: `1px solid ${chipConfig.borderColor}`
+                                  }}>
+                                    {chipConfig.label}
+                                  </div>
+                                  <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: chipConfig.textColor }}>
+                                    {eventNames.join(", ")}
+                                  </div>
+                                  <div className="text-muted" style={{ fontSize: "11px" }}>
+                                    {hoveredEvents.length} sự kiện trong ngày này
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      
+                      // Nếu chỉ có 1 event, hiển thị như cũ
                       return (
                         <div className="mt-4 pt-3 border-top">
-                          {hoveredEvents.map((event, index) => {
-                            const startDate = parseCalendarEventStart(event)
+                          {hoveredEvents.map((item, index) => {
+                            // Handle milestone items differently
+                            if (item.itemType === 'milestone') {
+                              return (
+                                <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                  <div style={{
+                                    backgroundColor: "#fef2f2",
+                                    padding: "10px",
+                                    borderRadius: "6px",
+                                    borderLeft: "3px solid #dc2626"
+                                  }}>
+                                    <div className="d-flex align-items-start gap-2">
+                                      <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{
+                                          display: "inline-block",
+                                          fontSize: "9px",
+                                          backgroundColor: "#fee2e2",
+                                          color: "#991b1b",
+                                          padding: "2px 6px",
+                                          borderRadius: "4px",
+                                          fontWeight: "600",
+                                          marginBottom: "4px"
+                                        }}>
+                                          Cột mốc
+                                        </div>
+                                        <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#dc2626" }}>
+                                          {item?.name || "Cột mốc"}
+                                        </div>
+                                        {item?.description && (
+                                          <div className="text-muted" style={{ fontSize: "11px" }}>
+                                            {item.description}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            }
+
+                            // Handle calendar events
+                            const startDate = parseCalendarEventStart(item)
                             const endDateCandidate =
-                              event?.endAt ||
-                              (event?.meetingDate && event?.endTime
-                                ? `${event.meetingDate}T${event.endTime}`
+                              item?.endAt ||
+                              (item?.meetingDate && item?.endTime
+                                ? `${item.meetingDate}T${item.endTime}`
                                 : null)
                             const endDate = endDateCandidate ? new Date(endDateCandidate) : null
                             const timeStr = startDate
@@ -824,19 +1022,45 @@ export default function HoOCDashBoard() {
 
                             return (
                               <div key={index} className={index > 0 ? "mt-3" : ""}>
-                                <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                                  {event?.name || "Lịch họp"}
+                                <div style={{
+                                  backgroundColor: "#eff6ff",
+                                  padding: "10px",
+                                  borderRadius: "6px",
+                                  borderLeft: "3px solid #3b82f6"
+                                }}>
+                                  <div className="d-flex align-items-start gap-2">
+                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📅</span>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{
+                                        display: "inline-block",
+                                        fontSize: "9px",
+                                        backgroundColor: "#dbeafe",
+                                        color: "#1e40af",
+                                        padding: "2px 6px",
+                                        borderRadius: "4px",
+                                        fontWeight: "600",
+                                        marginBottom: "4px"
+                                      }}>
+                                        Lịch họp
+                                      </div>
+                                      <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#1e40af" }}>
+                                        {item?.name || "Lịch họp"}
+                                      </div>
+                                      {timeDisplay && (
+                                        <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}>
+                                          <span>⏰</span>
+                                          <span>{timeDisplay}</span>
+                                        </div>
+                                      )}
+                                      {item?.location && (
+                                        <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}>
+                                          <span>📍</span>
+                                          <span>{item.location}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                {timeDisplay && (
-                                  <div className="text-muted" style={{ fontSize: "13px" }}>
-                                    {timeDisplay}
-                                  </div>
-                                )}
-                                {event?.location && (
-                                  <div className="text-muted" style={{ fontSize: "12px" }}>
-                                    {event.location}
-                                  </div>
-                                )}
                               </div>
                             )
                           })}
@@ -854,7 +1078,13 @@ export default function HoOCDashBoard() {
                       )
                     }
 
-                    return null
+                    return (
+                      <div className="mt-4 pt-3 border-top" style={{minHeight:80}}>
+                        <div className="text-muted text-center" style={{ fontSize: "14px", fontStyle: "italic" }}>
+                          Chọn một ngày trên lịch để xem chi tiết lịch họp hoặc cột mốc.
+                        </div>
+                      </div>
+                    )
                   })()}
                 </div>
               </div>
@@ -862,8 +1092,8 @@ export default function HoOCDashBoard() {
 
             {/* Event Card with Horizontal Timeline */}
             <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "458px" }}>
                   {/* Event Header */}
                   <div className="d-flex align-items-center gap-3 mb-3">
                     <div

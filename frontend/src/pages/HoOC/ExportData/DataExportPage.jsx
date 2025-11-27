@@ -4,7 +4,7 @@ import UserLayout from "~/components/UserLayout";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { getAgendaName } from "~/apis/agendaApi";
 import { feedbackApi } from "~/apis/feedbackApi";
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
   exportItem,
@@ -637,6 +637,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
       activePage="export-all"
       eventId={eventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="data-export-page">
         <div className="data-export-page__container">
           {/* Top Section */}

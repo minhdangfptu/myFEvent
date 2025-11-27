@@ -1,0 +1,18 @@
+{
+  "watch": ["src", "server.js", ".env"],
+  "ignore": [
+    "node_modules/**",
+    "build/**",
+    "*.test.js",
+    "*.spec.js",
+    ".git/**",
+    "logs/**",
+    "*.log",
+    "coverage/**",
+    ".vscode/**",
+    ".idea/**"
+  ],
+  "ext": "js,json",
+  "delay": 1000,
+  "exec": "node --no-warnings ./server.js"
+}

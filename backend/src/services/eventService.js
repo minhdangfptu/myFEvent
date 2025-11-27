@@ -16,8 +16,8 @@ const validateEventDataForPublic = (event) => {
   if (!event.name || !event.name.trim()) missingFields.push('Tên sự kiện');
   if (!event.description || !event.description.trim()) missingFields.push('Mô tả');
   if (!event.organizerName || !event.organizerName.trim()) missingFields.push('Người tổ chức');
-  if (!event.eventStartDate) missingFields.push('Ngày bắt đầu');
-  if (!event.eventEndDate) missingFields.push('Ngày kết thúc');
+  if (!event.eventStartDate) missingFields.push('Ngày bắt đầu DDAY');
+  if (!event.eventEndDate) missingFields.push('Ngày kết thúc DDAY');
   if (!event.location || !event.location.trim()) missingFields.push('Địa điểm');
   if (!event.image || typeof event.image !== 'string' || !event.image.trim()) missingFields.push('Hình ảnh sự kiện');
   return { isValid: missingFields.length === 0, missingFields };
@@ -140,7 +140,7 @@ export const eventService = {
     const startdate = new Date(eventStartDate);
     const endDate = new Date(eventEndDate);
     if (endDate < startdate) {
-      const err = new Error('Ngày kết thúc phải ở sau ngày bắt đầu');
+      const err = new Error('Ngày kết thúc DDAY phải ở sau ngày bắt đầu DDAY');
       err.status = 400;
       throw err;
     }
@@ -264,7 +264,7 @@ export const eventService = {
   // GET /api/events/me/list
   async listMyEvents({ userId, page = 1, limit = 8, search = '' }) {
     const p = Math.max(parseInt(page, 10) || 1, 1);
-    const lim = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 8, 1), 100);
     const skip = (p - 1) * lim;
 
     // Nếu có search, cần tìm events trước rồi filter memberships
@@ -314,39 +314,37 @@ export const eventService = {
 
     // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
     const now = new Date();
-    const eventsFixed = events.map(event => {
-      if (event.status === 'cancelled') return event;
-      const start = new Date(event.eventStartDate);
-      const end = new Date(event.eventEndDate);
-      let computedStatus = event.status;
-      if (now > end) computedStatus = 'completed';
-      else if (now >= start && now <= end) computedStatus = 'ongoing';
-      else computedStatus = 'scheduled';
 
-      if (event.status !== computedStatus && event._id) {
-        // Update async, không chờ
-        Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
-          .catch(err => console.error('autoStatus persist error:', err));
-        event.status = computedStatus;
+    // Tạo Map để lookup nhanh events theo id
+    const eventMap = new Map(events.map(evt => [evt._id.toString(), evt]));
+
+    // GIỮ ĐÚNG THỨ TỰ MEMBERSHIPS (sorted by createdAt desc)
+    const eventsWithMembership = memberships.map((membership) => {
+      const event = eventMap.get(membership.eventId.toString());
+      if (!event) return null;
+
+      // Auto-update status
+      if (event.status !== 'cancelled') {
+        const start = new Date(event.eventStartDate);
+        const end = new Date(event.eventEndDate);
+        let computedStatus = event.status;
+        if (now > end) computedStatus = 'completed';
+        else if (now >= start && now <= end) computedStatus = 'ongoing';
+        else computedStatus = 'scheduled';
+
+        if (event.status !== computedStatus) {
+          // Update async, không chờ
+          Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
+            .catch(err => console.error('autoStatus persist error:', err));
+          event.status = computedStatus;
+        }
       }
-      return event;
-    });
 
-    // Tạo map để tìm nhanh hơn thay vì find trong loop
-    const membershipMap = new Map();
-    memberships.forEach(m => {
-      membershipMap.set(m.eventId.toString(), m);
-    });
-
-    const eventsWithMembership = eventsFixed.map((event) => {
-      const membership = membershipMap.get(event._id.toString());
       return {
         ...event,
-        eventMember: membership
-          ? { role: membership.role, userId: userId.toString(), _id: membership._id }
-          : null
+        eventMember: { role: membership.role, userId: userId.toString(), _id: membership._id }
       };
-    });
+    }).filter(Boolean);
 
     return {
       data: eventsWithMembership,

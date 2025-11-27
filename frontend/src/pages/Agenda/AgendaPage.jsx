@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./AgendaPage.css";
 import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useEvents } from "~/contexts/EventContext";
 import { useParams } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -103,58 +104,6 @@ const [newDateInput, setNewDateInput] = useState("");
       return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
     return `${diffMins} phút`;
-  };
-
-  const buildUpdatedSchedule = (schedule, updates) => {
-    const finalStart = updates.startTime || schedule.startTime;
-    const finalEnd = updates.endTime || schedule.endTime;
-    const finalContent = updates.content ?? schedule.content;
-    const session = getSessionFromHour(new Date(finalStart).getHours());
-    return {
-      ...schedule,
-      ...updates,
-      content: finalContent,
-      startTime: finalStart,
-      endTime: finalEnd,
-      duration: calculateDuration(finalStart, finalEnd),
-      session,
-      originalStartTime: finalStart,
-      originalContent: finalContent
-    };
-  };
-
-  const applyScheduleUpdateLocally = (scheduleId, dateId, itemIndex, updates) => {
-    setSchedules((prev) =>
-      prev.map((schedule) =>
-        schedule.id === scheduleId
-          ? buildUpdatedSchedule(schedule, updates)
-          : schedule
-      )
-    );
-
-    setAgendaData((prev) => {
-      if (!prev || !Array.isArray(prev.agenda)) return prev;
-      return {
-        ...prev,
-        agenda: prev.agenda.map((dateAgenda) => {
-          const currentDateId = (dateAgenda._id || dateAgenda.id || "").toString();
-          if (currentDateId !== dateId) return dateAgenda;
-
-          const updatedItems = (dateAgenda.items || []).map((item, idx) => {
-            if (idx !== itemIndex) return item;
-            return {
-              ...item,
-              ...updates
-            };
-          });
-
-          return {
-            ...dateAgenda,
-            items: updatedItems
-          };
-        })
-      };
-    });
   };
 
   // Transform agenda data to UI format
@@ -712,14 +661,9 @@ const validateDate = (dateString) => {
       if (!response?.success) {
         throw new Error(response?.message || "Cập nhật lịch trình thất bại");
       }
- 
+
       setEditingSchedule(null);
-      applyScheduleUpdateLocally(
-        editingSchedule.id,
-        freshScheduleMeta.dateId,
-        freshScheduleMeta.itemIndex,
-        updates
-      );
+      await fetchAgendaData(); // Fetch fresh data to get correct indices after server-side sorting
       toast.success("Cập nhật lịch trình thành công!");
     } catch (err) {
       setError(err.message || "Failed to save edit");

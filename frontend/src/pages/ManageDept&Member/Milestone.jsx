@@ -331,8 +331,6 @@ const Milestone = () => {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [showCreatedModal, setShowCreatedModal] = useState(false)
-
   const currentEvent = events.find((event) => event._id === eventId)
 
   useEffect(() => {
@@ -447,7 +445,6 @@ const Milestone = () => {
       await fetchMilestones()
       setShowCreateModal(false)
       setCreateForm({ name: "", description: "", targetDate: "" })
-      setShowCreatedModal(true)
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
@@ -687,12 +684,6 @@ const Milestone = () => {
           </div>
         )}
       </div>
-      <ConfirmModal
-        show={showCreatedModal}
-        onClose={() => setShowCreatedModal(false)}
-        onConfirm={() => setShowCreatedModal(false)}
-        message="Tạo cột mốc thành công!"
-      />
     </UserLayout>
   )
 }

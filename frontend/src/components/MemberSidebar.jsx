@@ -585,7 +585,7 @@ export default function MemberSidebar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-camera me-3" style={{ width: 20 }} />
+                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
