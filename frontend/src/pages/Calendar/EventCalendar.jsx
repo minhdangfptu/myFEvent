@@ -34,11 +34,14 @@ export default function EventCalendar() {
       }
     }
     loadRole()
-    fetchCalendars();
     return () => {
       mounted = false
     }
   }, [eventId, fetchEventRole]);
+
+  useEffect(() => {
+    fetchCalendars();
+  }, [eventId, currentMonth, currentYear]);
 
   useEffect(() => {
     const loadHoDDepartment = async () => {

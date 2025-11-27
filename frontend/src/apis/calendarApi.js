@@ -24,9 +24,14 @@ const calendarApi = {
     const url = `/api/events/${eventId}/calendars/${calendarId}`;
     return axiosClient.delete(url);
   },
-  getMyCalendarInEvent: (eventId) => {
+  getMyCalendarInEvent: (eventId, month = null, year = null) => {
     const url = `/api/events/${eventId}/calendars/my-event-calendars`;
-    return axiosClient.get(url);
+    const params = {};
+    if (month !== null && year !== null) {
+      params.month = month;
+      params.year = year;
+    }
+    return axiosClient.get(url, { params });
   },
   updateParticipateStatus: (eventId, calendarId, data) => {
     const url = `/api/events/${eventId}/calendars/${calendarId}/participate-status`;

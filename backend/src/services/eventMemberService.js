@@ -71,10 +71,7 @@ export const groupMembersByDepartment = (members) => {
       // Không dùng avatarUrl (base64 quá lớn) → dùng UI Avatars API
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
       role: member.role,
-      status: member.status,
-      department: deptName,
-      departmentId: member.departmentId?._id,
-      joinedAt: member.createdAt
+      department: deptName
     });
   });
 
@@ -108,9 +105,7 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     // Use UI Avatars API instead of base64 from DB
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
     role: member.role,
-    status: member.status,
-    departmentId: member.departmentId,
-    joinedAt: member.createdAt
+    departmentId: member.departmentId
   }));
 };
 

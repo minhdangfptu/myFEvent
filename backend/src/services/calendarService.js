@@ -46,32 +46,41 @@ export const getCalendarByDepartmentId = async (departmentId) => {
         .lean();
 };
 
-export const getCalendarsInEventScope = async (eventId) => {
+export const getCalendarsInEventScope = async (eventId, startDate = null, endDate = null) => {
     const deptIds = await Department.find({ eventId }).select('_id').lean();
     const departmentIdList = deptIds.map(d => d._id);
-    return await Calendar.find({
+
+    const query = {
         $or: [
             { eventId },
             { departmentId: { $in: departmentIdList } }
         ]
-    })
+    };
+
+    // Add date range filter if provided
+    if (startDate && endDate) {
+        query.startAt = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate)
+        };
+    }
+
+    return await Calendar.find(query)
+        .select('name startAt endAt location locationType type participants createdBy')
         .populate({
             path: 'participants.member',
             model: 'EventMember',
+            select: 'userId',
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                select: '_id email'
             }
         })
         .populate({
             path: 'createdBy',
             model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: '_id'
-            }
+            select: 'userId'
         })
         .lean();
 };

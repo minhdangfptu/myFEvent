@@ -8,9 +8,9 @@ const calendarService = {
         throw error;
     }
   },
-  getMyCalendarInEvent: async (eventId) => {
+  getMyCalendarInEvent: async (eventId, month = null, year = null) => {
     try {
-        const response = await calendarApi.getMyCalendarInEvent(eventId);
+        const response = await calendarApi.getMyCalendarInEvent(eventId, month, year);
         return response.data;
     } catch (error) {
         throw error;
