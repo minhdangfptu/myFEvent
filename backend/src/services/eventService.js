@@ -314,39 +314,37 @@ export const eventService = {
 
     // Tối ưu: Tính status trực tiếp thay vì gọi ensureAutoStatusForDocs cho từng event
     const now = new Date();
-    const eventsFixed = events.map(event => {
-      if (event.status === 'cancelled') return event;
-      const start = new Date(event.eventStartDate);
-      const end = new Date(event.eventEndDate);
-      let computedStatus = event.status;
-      if (now > end) computedStatus = 'completed';
-      else if (now >= start && now <= end) computedStatus = 'ongoing';
-      else computedStatus = 'scheduled';
 
-      if (event.status !== computedStatus && event._id) {
-        // Update async, không chờ
-        Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
-          .catch(err => console.error('autoStatus persist error:', err));
-        event.status = computedStatus;
+    // Tạo Map để lookup nhanh events theo id
+    const eventMap = new Map(events.map(evt => [evt._id.toString(), evt]));
+
+    // GIỮ ĐÚNG THỨ TỰ MEMBERSHIPS (sorted by createdAt desc)
+    const eventsWithMembership = memberships.map((membership) => {
+      const event = eventMap.get(membership.eventId.toString());
+      if (!event) return null;
+
+      // Auto-update status
+      if (event.status !== 'cancelled') {
+        const start = new Date(event.eventStartDate);
+        const end = new Date(event.eventEndDate);
+        let computedStatus = event.status;
+        if (now > end) computedStatus = 'completed';
+        else if (now >= start && now <= end) computedStatus = 'ongoing';
+        else computedStatus = 'scheduled';
+
+        if (event.status !== computedStatus) {
+          // Update async, không chờ
+          Event.updateOne({ _id: event._id, status: { $ne: 'cancelled' } }, { $set: { status: computedStatus } })
+            .catch(err => console.error('autoStatus persist error:', err));
+          event.status = computedStatus;
+        }
       }
-      return event;
-    });
 
-    // Tạo map để tìm nhanh hơn thay vì find trong loop
-    const membershipMap = new Map();
-    memberships.forEach(m => {
-      membershipMap.set(m.eventId.toString(), m);
-    });
-
-    const eventsWithMembership = eventsFixed.map((event) => {
-      const membership = membershipMap.get(event._id.toString());
       return {
         ...event,
-        eventMember: membership
-          ? { role: membership.role, userId: userId.toString(), _id: membership._id }
-          : null
+        eventMember: { role: membership.role, userId: userId.toString(), _id: membership._id }
       };
-    });
+    }).filter(Boolean);
 
     return {
       data: eventsWithMembership,

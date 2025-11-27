@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom"
@@ -19,63 +19,23 @@ export default function EventCalendar() {
   const [hodDepartmentId, setHodDepartmentId] = useState(null);
   const [loadingHoDDepartment, setLoadingHoDDepartment] = useState(false);
 
-  useEffect(() => {
-    let mounted = true
-    const loadRole = async () => {
-      if (!eventId) {
-        if (mounted) setEventRole("")
-        return
-      }
-      try {
-        const role = await fetchEventRole(eventId)
-        if (mounted) setEventRole(role)
-      } catch (_) {
-        if (mounted) setEventRole("")
-      }
-    }
-    loadRole()
-    fetchCalendars();
-    return () => {
-      mounted = false
-    }
-  }, [eventId, fetchEventRole]);
+  const today = new Date();
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth();
+  const todayYear = today.getFullYear();
 
-  useEffect(() => {
-    const loadHoDDepartment = async () => {
-      if (!eventId || eventRole !== "HoD" || !user?.id) {
-        setHodDepartmentId(null);
-        return;
-      }
-      setLoadingHoDDepartment(true);
-      try {
-        const deptResponse = await departmentService.getDepartments(eventId);
-        if (Array.isArray(deptResponse)) {
-          const userIdCandidates = [user.id, user._id].filter(Boolean).map(v => v.toString());
-          const hodDept = deptResponse.find(dept => {
-            const leaderId = dept?.leaderId?._id || dept?.leaderId?.id || dept?.leaderId;
-            if (!leaderId) return false;
-            return userIdCandidates.includes(leaderId.toString());
-          });
-          setHodDepartmentId(hodDept?._id || hodDept?.id || null);
-        } else {
-          setHodDepartmentId(null);
-        }
-      } catch (error) {
-        console.error("Failed to load HoD department:", error);
-        setHodDepartmentId(null);
-      } finally {
-        setLoadingHoDDepartment(false);
-      }
-    };
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+  const [currentYear, setCurrentYear] = useState(todayYear);
+  const [selectedCalendar, setSelectedCalendar] = useState(null);
 
-    loadHoDDepartment();
-  }, [eventId, eventRole, user]);
+  const fetchCalendars = useCallback(async () => {
+    if (!eventId) return;
 
-  const fetchCalendars = async () => {
     setLoading(true);
     try {
+      console.log("Fetching calendars for:", { eventId, month: currentMonth + 1, year: currentYear });
       const [calendarResponse, milestoneResponse] = await Promise.all([
-        calendarService.getMyCalendarInEvent(eventId),
+        calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear),
         milestoneApi.listMilestonesByEvent(eventId)
       ]);
       console.log("Calendar API Response:", calendarResponse);
@@ -183,19 +143,67 @@ export default function EventCalendar() {
       setCalendars(grouped);
     } catch (error) {
       console.error("Failed to fetch calendars:", error);
+      console.error("Error details:", error.response?.data || error.message);
+      toast.error("Không thể tải lịch họp: " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, currentMonth, currentYear, user]);
 
-  const today = new Date();
-  const todayDay = today.getDate();
-  const todayMonth = today.getMonth();
-  const todayYear = today.getFullYear();
+  useEffect(() => {
+    let mounted = true
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("")
+        return
+      }
+      try {
+        const role = await fetchEventRole(eventId)
+        if (mounted) setEventRole(role)
+      } catch (_) {
+        if (mounted) setEventRole("")
+      }
+    }
+    loadRole()
+    return () => {
+      mounted = false
+    }
+  }, [eventId, fetchEventRole]);
 
-  const [currentMonth, setCurrentMonth] = useState(todayMonth);
-  const [currentYear, setCurrentYear] = useState(todayYear);
-  const [selectedCalendar, setSelectedCalendar] = useState(null);
+  useEffect(() => {
+    fetchCalendars();
+  }, [fetchCalendars]);
+
+  useEffect(() => {
+    const loadHoDDepartment = async () => {
+      if (!eventId || eventRole !== "HoD" || !user?.id) {
+        setHodDepartmentId(null);
+        return;
+      }
+      setLoadingHoDDepartment(true);
+      try {
+        const deptResponse = await departmentService.getDepartments(eventId);
+        if (Array.isArray(deptResponse)) {
+          const userIdCandidates = [user.id, user._id].filter(Boolean).map(v => v.toString());
+          const hodDept = deptResponse.find(dept => {
+            const leaderId = dept?.leaderId?._id || dept?.leaderId?.id || dept?.leaderId;
+            if (!leaderId) return false;
+            return userIdCandidates.includes(leaderId.toString());
+          });
+          setHodDepartmentId(hodDept?._id || hodDept?.id || null);
+        } else {
+          setHodDepartmentId(null);
+        }
+      } catch (error) {
+        console.error("Failed to load HoD department:", error);
+        setHodDepartmentId(null);
+      } finally {
+        setLoadingHoDDepartment(false);
+      }
+    };
+
+    loadHoDDepartment();
+  }, [eventId, eventRole, user]);
 
   const getCalendarsForDay = (day, month, year) => {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -250,7 +258,7 @@ export default function EventCalendar() {
   };
 
   const days = generateCalendarDays();
-  const weekDays = ["MON", "TUE", "WED", "THUR", "FRI", "SAT", "SUN"];
+  const weekDays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
   const handleCalendarClick = (calendar) => {
     setSelectedCalendar(calendar);
@@ -285,6 +293,12 @@ export default function EventCalendar() {
   return (
     <UserLayout title="Lịch sự kiện" sidebarType={eventRole} activePage="calendar" eventId={eventId}>
       <ToastContainer position="top-right" autoClose={3000} />
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <div style={{ padding: "20px", backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
         <div style={{
           backgroundColor: "white",
@@ -367,24 +381,26 @@ export default function EventCalendar() {
             >
               ⟳
             </button>
-            <button
-              onClick={handleCreateCalendar}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: "#ea4335",
-                color: "white",
-                cursor: "pointer",
-                fontSize: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
-              +
-            </button>
+            {eventRole !== "Member" && (
+              <button
+                onClick={handleCreateCalendar}
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "#ea4335",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                +
+              </button>
+            )}
           </div>
         </div>
 
@@ -393,8 +409,47 @@ export default function EventCalendar() {
           borderRadius: "8px",
           overflow: "hidden",
           boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-          border: "1px solid #e5e7eb"
+          border: "1px solid #e5e7eb",
+          position: "relative"
         }}>
+          {loading && (
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(255, 255, 255, 0.85)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 10,
+              backdropFilter: "blur(2px)"
+            }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "12px"
+              }}>
+                <div style={{
+                  width: "40px",
+                  height: "40px",
+                  border: "4px solid #e5e7eb",
+                  borderTop: "4px solid #4285f4",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite"
+                }}></div>
+                <div style={{
+                  fontSize: "14px",
+                  color: "#6b7280",
+                  fontWeight: "500"
+                }}>
+                  Đang tải lịch...
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
@@ -465,18 +520,45 @@ export default function EventCalendar() {
                         Hôm nay
                       </span>
                     )}
-                    {hasEvents && (
-                      <span style={{ 
-                        fontSize: "9px", 
-                        backgroundColor: isToday ? "#1976d2" : "#f57c00", 
-                        color: "white", 
-                        padding: "2px 5px", 
-                        borderRadius: "8px",
-                        fontWeight: "500"
-                      }}>
-                        {dayCalendars.length} sự kiện
-                      </span>
-                    )}
+                    {hasEvents && (() => {
+                      const milestones = dayCalendars.filter(item => item.itemType === 'milestone');
+                      const calendars = dayCalendars.filter(item => item.itemType === 'calendar');
+
+                      return (
+                        <>
+                          {milestones.length > 0 && (
+                            <span style={{
+                              fontSize: "9px",
+                              backgroundColor: "#dc2626",
+                              color: "white",
+                              padding: "2px 5px",
+                              borderRadius: "8px",
+                              fontWeight: "500",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "2px"
+                            }}>
+                              <i class="bi bi-pin-angle"></i> {milestones.length}
+                            </span>
+                          )}
+                          {calendars.length > 0 && (
+                            <span style={{
+                              fontSize: "9px",
+                              backgroundColor: isToday ? "#1976d2" : "#f57c00",
+                              color: "white",
+                              padding: "2px 5px",
+                              borderRadius: "8px",
+                              fontWeight: "500",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "2px"
+                            }}>
+                              <i class="bi bi-calendar"></i> {calendars.length}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -492,14 +574,32 @@ export default function EventCalendar() {
                       const textColor = isMilestone ? "#dc2626" :
                                        item.type === "event" ? "#1967d2" : "#f57c00";
 
+                      // Chip config
+                      const chipConfig = isMilestone ? {
+                        icon: "🎯",
+                        label: "Cột mốc",
+                        chipBg: "#fee2e2",
+                        chipText: "#991b1b"
+                      } : item.type === "event" ? {
+                        icon: "📅",
+                        label: "Lịch họp",
+                        chipBg: "#dbeafe",
+                        chipText: "#1e40af"
+                      } : {
+                        icon: "🏢",
+                        label: "Họp ban",
+                        chipBg: "#fed7aa",
+                        chipText: "#9a3412"
+                      };
+
                       return (
                         <div
                           key={item._id}
                           onClick={() => handleCalendarClick(item)}
                           style={{
                             fontSize: "11px",
-                            padding: "3px 6px",
-                            borderRadius: "3px",
+                            padding: "5px 7px",
+                            borderRadius: "4px",
                             cursor: "pointer",
                             backgroundColor: bgColor,
                             color: textColor,
@@ -514,10 +614,36 @@ export default function EventCalendar() {
                             e.currentTarget.style.opacity = "1";
                           }}
                         >
-                          <div style={{ fontWeight: "500", display: "flex", alignItems: "center", gap: "4px" }}>
-                            {isMilestone && <span style={{ fontSize: "12px" }}>🎯</span>}
-                            {!isMilestone && statusIcon && <span style={{ color: statusColor, fontSize: "12px" }}>{statusIcon}</span>}
-                            <span>{item.title}{!isMilestone && ` - ${item.time}`}</span>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "3px" }}>
+                            <span style={{
+                              fontSize: "8px",
+                              backgroundColor: chipConfig.chipBg,
+                              color: chipConfig.chipText,
+                              padding: "2px 5px",
+                              borderRadius: "4px",
+                              fontWeight: "600",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              lineHeight: 1
+                            }}>
+                              <span style={{ fontSize: "10px" }}>{chipConfig.icon}</span>
+                              <span>{chipConfig.label}</span>
+                            </span>
+                            {!isMilestone && statusIcon && (
+                              <span style={{ color: statusColor, fontSize: "11px", fontWeight: "700" }}>{statusIcon}</span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between" }}>
+                            <div style={{ fontWeight: "500", fontSize: "10.5px", color: "#1a1a1a", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {item.title}
+                            </div>
+                            {!isMilestone && (
+                              <div style={{ fontSize: "9px", opacity: 0.65, display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                                <span>⏰</span>
+                                <span>{item.time}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -561,20 +687,60 @@ export default function EventCalendar() {
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
-              <h3 style={{
+              <div style={{
                 margin: "0 0 20px 0",
-                fontSize: "18px",
-                fontWeight: "600",
-                color: "#1a1a1a",
                 borderBottom: "1px solid #e5e7eb",
-                paddingBottom: "12px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
+                paddingBottom: "12px"
               }}>
-                {selectedCalendar.itemType === 'milestone' && <span>🎯</span>}
-                {selectedCalendar.title}
-              </h3>
+                {(() => {
+                  const isMilestone = selectedCalendar.itemType === 'milestone';
+                  const chipConfig = isMilestone ? {
+                    icon: "🎯",
+                    label: "Cột mốc",
+                    bgColor: "#fee2e2",
+                    textColor: "#991b1b"
+                  } : selectedCalendar.type === "event" ? {
+                    icon: "📅",
+                    label: "Lịch sự kiện",
+                    bgColor: "#dbeafe",
+                    textColor: "#1e40af"
+                  } : {
+                    icon: "🏢",
+                    label: "Lịch họp ban",
+                    bgColor: "#fed7aa",
+                    textColor: "#9a3412"
+                  };
+
+                  return (
+                    <>
+                      <div style={{ marginBottom: "10px" }}>
+                        <span style={{
+                          fontSize: "11px",
+                          backgroundColor: chipConfig.bgColor,
+                          color: chipConfig.textColor,
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          fontWeight: "600",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}>
+                          <span style={{ fontSize: "14px" }}>{chipConfig.icon}</span>
+                          {chipConfig.label}
+                        </span>
+                      </div>
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: "18px",
+                        fontWeight: "600",
+                        color: "#1a1a1a"
+                      }}>
+                        {selectedCalendar.title}
+                      </h3>
+                    </>
+                  );
+                })()}
+              </div>
               <div style={{ marginBottom: "20px", fontSize: "14px", color: "#4b5563" }}>
                 {selectedCalendar.itemType === 'milestone' ? (
                   <>
