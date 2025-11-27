@@ -11,6 +11,28 @@ import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
 import { useAuth } from "~/contexts/AuthContext";
 
+const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Ho_Chi_Minh",
+});
+
+const formatDateTime = (value) => {
+  if (!value) return "";
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return dateTimeFormatter.format(date);
+  } catch (err) {
+    console.error("formatDateTime error:", err);
+    return "";
+  }
+};
+
 const STATUS_OPTIONS = [
   { value: "chua_bat_dau", label: "Chưa bắt đầu" },
   { value: "da_bat_dau", label: "Đang làm" },
@@ -113,6 +135,9 @@ export default function MemberTaskPage() {
         
         const mapped = myTasks.map((task) => {
           const statusCode = task?.status || "chua_bat_dau";
+          const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
+          const assignedAtDate = task?.createdAt ? new Date(task.createdAt) : null;
+          const updatedAtDate = task?.updatedAt ? new Date(task.updatedAt) : null;
           return {
             id: task?._id,
             name: task?.title || "",
@@ -121,14 +146,17 @@ export default function MemberTaskPage() {
             assignee: task?.assigneeId?.userId?.fullName || "Chưa phân công",
             assigneeId: task?.assigneeId?._id || task?.assigneeId || null,
             milestone: task?.milestoneId || "Chưa có",
-            due: task?.dueDate ? new Date(task.dueDate).toLocaleDateString("vi-VN") : "",
+            due: dueDate ? formatDateTime(dueDate) : "",
+            dueDateValue: dueDate ? dueDate.getTime() : 0,
             statusCode,
             status: STATUS_LABEL_MAP[statusCode] || "Không xác định",
             estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
             createdBy: task?.createdBy?.fullName || task?.createdBy?.name || "----",
             createdById: task?.createdBy?._id || task?.createdBy || null,
-            createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
-            updatedAt: task?.updatedAt ? new Date(task.updatedAt).toLocaleDateString("vi-VN") : "Thời gian",
+            assignedAt: assignedAtDate ? formatDateTime(assignedAtDate) : "",
+            assignedAtValue: assignedAtDate ? assignedAtDate.getTime() : 0,
+            createdAt: assignedAtDate ? formatDateTime(assignedAtDate) : "",
+            updatedAt: updatedAtDate ? formatDateTime(updatedAtDate) : "",
             progressPct: typeof task?.progressPct === "number" ? task.progressPct : "Tiến độ",
           };
         });
@@ -161,13 +189,10 @@ export default function MemberTaskPage() {
       return task.statusCode === filterStatus;
     })
     .sort((a, b) => {
-      const parse = (d) => {
-        if (!d) return new Date(0);
-        const [day, month, year] = d.split("/");
-        return new Date(`${year}-${month}-${day}`);
-      };
-      if (sortBy === "DeadlineAsc") return parse(a.due) - parse(b.due);
-      if (sortBy === "DeadlineDesc") return parse(b.due) - parse(a.due);
+      const aValue = typeof a.dueDateValue === "number" ? a.dueDateValue : 0;
+      const bValue = typeof b.dueDateValue === "number" ? b.dueDateValue : 0;
+      if (sortBy === "DeadlineAsc") return aValue - bValue;
+      if (sortBy === "DeadlineDesc") return bValue - aValue;
       return 0;
     });
     
@@ -443,6 +468,9 @@ export default function MemberTaskPage() {
                           Người giao việc
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
+                          Thời gian giao
+                        </th>
+                        <th className="py-3" style={{ width: "15%" }}>
                           Trạng thái
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
@@ -453,7 +481,7 @@ export default function MemberTaskPage() {
                     <tbody>
                       {filteredTasks.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="text-center py-5">
+                          <td colSpan="7" className="text-center py-5">
                             <div className="d-flex flex-column justify-content-center align-items-center py-4">
                               <img
                                 src={NoDataImg}
@@ -502,6 +530,9 @@ export default function MemberTaskPage() {
                               <td className="py-3 text-muted">
                                 {task.createdBy || "----"}
                               </td>
+                              <td className="py-3 text-muted small">
+                                {task.assignedAt || "----"}
+                              </td>
                               <td className="py-3">
                                 <span
                                   className="status-badge"
@@ -544,7 +575,7 @@ export default function MemberTaskPage() {
                 eventId={eventId}
                 listTask={statusGroup}
                 onTaskMove={fetchTasks}
-                currentUserId={user?._id}
+                currentEventMemberId={memberId}
               />
             </div>
           )}
@@ -605,6 +636,16 @@ export default function MemberTaskPage() {
                     <div className="d-flex align-items-center gap-2">
                       <span style={{ fontSize: 20 }}>📅</span>
                       <span>{selectedTask.due}</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="text-muted small mb-2">
+                      Thời gian giao
+                    </label>
+                    <div className="d-flex align-items-center gap-2">
+                      <span style={{ fontSize: 20 }}>🕒</span>
+                      <span>{selectedTask.assignedAt || "Chưa xác định"}</span>
                     </div>
                   </div>
 

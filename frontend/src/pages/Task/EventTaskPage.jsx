@@ -1217,7 +1217,6 @@ export default function EventTaskPage() {
                   eventId={eventId}
                   departmentId={hoDDepartmentId}
                   onTaskAssigned={fetchTasks}
-                  currentUserId={user?._id}
                 />
               )}
             </div>
@@ -1239,7 +1238,6 @@ export default function EventTaskPage() {
                     eventId={eventId}
                     listTask={statusGroup}
                     onTaskMove={fetchTasks}
-                    currentUserId={user?._id}
                   />
                 </div>
               </div>
