@@ -31,6 +31,17 @@ import {
 } from "../services/notificationService.js";
 import EventMember from '../models/eventMember.js';
 
+const extractUserIdsFromMembers = async (memberIds = []) => {
+  if (!Array.isArray(memberIds) || memberIds.length === 0) return [];
+  const members = await EventMember.find({ _id: { $in: memberIds } })
+    .populate('userId', '_id')
+    .lean();
+  return members
+    .map(m => m.userId?._id)
+    .filter(Boolean)
+    .map(id => id.toString());
+};
+
 const toIdString = (value) => {
     if (!value) return null;
     if (typeof value === 'string') return value;
@@ -323,6 +334,19 @@ export const createCalendarForEvent = async (req, res) => {
         };
 
         const calendar = await createCalendar(calendarData);
+        const participantMemberIds = calendar.participants?.map(p => p.member).filter(Boolean) || [];
+        const userIds = await extractUserIdsFromMembers(participantMemberIds);
+        const requesterUserId = req.user?.id;
+        const targetUserIds = userIds.filter(id => id !== requesterUserId?.toString());
+        if (targetUserIds.length > 0) {
+          await notifyAddedToCalendar({
+            eventId,
+            calendarId: calendar._id,
+            userIds: targetUserIds,
+            calendarName: calendar.name,
+            creatorUserId: requesterUserId,
+          });
+        }
         return res.status(201).json({ data: calendar });
     } catch (error) {
         console.error('createCalendarForEvent error:', error.message);
@@ -470,8 +494,22 @@ export const createCalendarForDepartment = async (req, res) => {
 			createdBy: ownerMemberid
 		};
 
-		const calendar = await createCalendar(calendarData);
-		return res.status(201).json({ data: calendar });
+        const calendar = await createCalendar(calendarData);
+        const participantMemberIds = calendar.participants?.map(p => p.member).filter(Boolean) || [];
+        const userIds = await extractUserIdsFromMembers(participantMemberIds);
+        const requesterUserId = req.user?.id;
+        const targetUserIds = userIds.filter(id => id !== requesterUserId?.toString());
+        if (targetUserIds.length > 0) {
+          const departmentEventId = department.eventId?.toString();
+          await notifyAddedToCalendar({
+            eventId: departmentEventId,
+            calendarId: calendar._id,
+            userIds: targetUserIds,
+            calendarName: calendar.name,
+            creatorUserId: requesterUserId,
+          });
+        }
+        return res.status(201).json({ data: calendar });
     } catch (error) {
         console.error('createCalendarForDepartment error:', error.message);
         return res.status(500).json({ message: 'Failed to create calendar' });
@@ -930,12 +968,23 @@ export const addParticipants = async (req, res) => {
 
     await addParticipantsToCalendar(calendarId, newParticipants);
 
-    await notifyAddedToCalendar(
+    const memberDocs = await EventMember.find({ _id: { $in: newMemberIds } })
+      .populate('userId', '_id')
+      .lean();
+    const targetUserIds = memberDocs
+      .map(doc => doc.userId?._id)
+      .filter(Boolean)
+      .map(id => id.toString());
+    const requesterUserId = requesterMembership?.userId?._id?.toString() || req.user?.id;
+    const userIdsToNotify = targetUserIds.filter(id => id !== requesterUserId?.toString());
+
+    await notifyAddedToCalendar({
       eventId,
       calendarId,
-      newMemberIds,
-      calendar.name
-    );
+      userIds: userIdsToNotify,
+      calendarName: calendar.name,
+      creatorUserId: requesterUserId
+    });
 
     const updatedCalendar = await getCalendarById(calendarId);
 
