@@ -4,6 +4,7 @@ import { toast, ToastContainer } from "react-toastify";
 import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
+import { useNotifications } from "~/contexts/NotificationsContext";
 import calendarService from "~/services/calendarService";
 import { departmentService } from "~/services/departmentService";
 import { eventService } from "~/services/eventService";
@@ -58,6 +59,7 @@ export default function CreateEventCalendarPage() {
     const navigate = useNavigate();
     const { eventId } = useParams();
     const { fetchEventRole } = useEvents();
+  const { refreshNotifications } = useNotifications();
     const [eventRole, setEventRole] = useState("");
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const todayISODate = useMemo(
@@ -269,6 +271,7 @@ export default function CreateEventCalendarPage() {
 
             if (response.data) {
                 toast.success('Tạo lịch thành công');
+                refreshNotifications?.();
                 setTimeout(() => navigate(`/events/${eventId}/my-calendar`), 500);
             } else {
                 throw new Error('Không nhận được dữ liệu từ server');
