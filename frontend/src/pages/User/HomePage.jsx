@@ -68,6 +68,14 @@ const dedupeById = (items = []) => {
 
 const normalizeEventList = (payload) => dedupeById(toArray(payload));
 
+const getEventImageSrc = (image) => {
+  if (!image) return "/default-events.jpg";
+  const source = Array.isArray(image) && image.length > 0 ? image[0] : image;
+  if (typeof source !== "string") return "/default-events.jpg";
+  if (source.startsWith("http") || source.startsWith("data:")) return source;
+  return `data:image/jpeg;base64,${source}`;
+};
+
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -111,7 +119,7 @@ export default function HomePage() {
     eventStartDate: "",
     eventEndDate: "",
     location: "",
-    images: [],
+    image: "",
   });
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -220,13 +228,11 @@ export default function HomePage() {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Vui lòng chọn file hình ảnh hợp lệ");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Kích thước file không được vượt quá 5MB");
       return;
@@ -237,7 +243,7 @@ export default function HomePage() {
       const base64 = e.target.result;
       setCreateForm((prev) => ({
         ...prev,
-        images: [...prev.images, base64],
+        image: base64,
       }));
     };
     reader.readAsDataURL(file);
@@ -249,7 +255,6 @@ export default function HomePage() {
       return;
     }
 
-    // Validate URL
     try {
       new URL(imageUrl);
     } catch {
@@ -259,15 +264,15 @@ export default function HomePage() {
 
     setCreateForm((prev) => ({
       ...prev,
-      images: [...prev.images, imageUrl.trim()],
+      image: imageUrl.trim(),
     }));
     setImageUrl("");
   };
 
-  const removeImage = (index) => {
+  const clearSelectedImage = () => {
     setCreateForm((prev) => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index),
+      image: "",
     }));
   };
 
@@ -629,11 +634,7 @@ export default function HomePage() {
                   <div className="event-card h-100">
                     <div className="position-relative">
                       <img
-                        src={
-                          event.image && event.image.length > 0
-                            ? event.image[0]
-                            : "/error_event.png"
-                        }
+                        src={getEventImageSrc(event.image)}
                         alt={event.name}
                         className="event-img"
                         style={{
@@ -644,14 +645,6 @@ export default function HomePage() {
                         }}
                       />
                       {/* Image count indicator */}
-                      {event.image && event.image.length > 1 && (
-                        <div className="position-absolute top-0 end-0 m-2">
-                          <span className="badge bg-dark bg-opacity-75 text-white">
-                            <i className="bi bi-images me-1"></i>
-                            {event.image.length}
-                          </span>
-                        </div>
-                      )}
                     </div>
                     <div
                       className="event-body pb-0 d-flex flex-column"
@@ -959,11 +952,7 @@ export default function HomePage() {
               <div className="blog-card h-100">
                 <div className="position-relative">
                   <img
-                    src={
-                      blog.image && blog.image.length > 0
-                        ? blog.image[0]
-                        : "/default-events.jpg"
-                    }
+                    src={getEventImageSrc(blog.image)}
                     alt={blog.name}
                     className="blog-img"
                     style={{
@@ -996,15 +985,6 @@ export default function HomePage() {
                   >
                     Xem chi tiết
                   </button>
-                  {/* Image count indicator */}
-                  {blog.image && blog.image.length > 1 && (
-                    <div className="position-absolute top-0 end-0 m-2">
-                      <span className="badge bg-dark bg-opacity-75 text-white">
-                        <i className="bi bi-images me-1"></i>
-                        {blog.image.length}
-                      </span>
-                    </div>
-                  )}
                 </div>
                 <div className="blog-body">
                   <div className="blog-title">{blog.name}</div>
@@ -1176,7 +1156,7 @@ export default function HomePage() {
                       eventStartDate: "",
                       eventEndDate: "",
                       location: "",
-                      images: [],
+                      image: "",
                     });
                     setImageUrl("");
                   }}
@@ -1214,6 +1194,10 @@ export default function HomePage() {
                     }
                     if (!createForm.description.trim()) {
                       toast.error("Vui lòng nhập mô tả sự kiện");
+                      return;
+                    }
+                    if (!createForm.image) {
+                      toast.error("Vui lòng chọn hình ảnh sự kiện");
                       return;
                     }
 
@@ -1260,7 +1244,7 @@ export default function HomePage() {
                         eventStartDate: "",
                         eventEndDate: "",
                         location: "",
-                        images: [],
+                        image: "",
                       });
                       setImageUrl("");
                       setJoinCodeForModal(res.data.joinCode);
@@ -1461,47 +1445,29 @@ export default function HomePage() {
                     )}
 
                     {/* Image Preview */}
-                    {createForm.images.length > 0 && (
+                    {createForm.image && (
                       <div className="mt-3">
                         <label className="form-label fw-semibold">
                           Hình ảnh đã chọn:
                         </label>
-                        <div className="row g-2">
-                          {createForm.images.map((img, index) => (
-                            <div key={index} className="col-md-3">
-                              <div className="position-relative">
-                                <img
-                                  src={img}
-                                  alt={`Preview ${index + 1}`}
-                                  className="img-fluid rounded"
-                                  style={{
-                                    width: "100%",
-                                    height: "100px",
-                                    objectFit: "cover",
-                                  }}
-                                  onError={(e) => {
-                                    e.target.src = "/default-events.jpg";
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
-                                  onClick={() => removeImage(index)}
-                                  disabled={createSubmitting}
-                                  style={{
-                                    width: "24px",
-                                    height: "24px",
-                                    padding: "0",
-                                  }}
-                                >
-                                  <i
-                                    className="bi bi-x"
-                                    style={{ fontSize: "12px" }}
-                                  ></i>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="position-relative">
+                          <img
+                            src={createForm.image}
+                            alt="Preview"
+                            className="img-fluid rounded"
+                            style={{ width: "100%", height: "200px", objectFit: "cover" }}
+                            onError={(e) => {
+                              e.target.src = "/default-events.jpg";
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
+                            onClick={clearSelectedImage}
+                            disabled={createSubmitting}
+                          >
+                            <i className="bi bi-x"></i>
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1519,7 +1485,7 @@ export default function HomePage() {
                           eventStartDate: "",
                           eventEndDate: "",
                           location: "",
-                          images: [],
+                          image: "",
                         });
                         setImageUrl("");
                       }}
