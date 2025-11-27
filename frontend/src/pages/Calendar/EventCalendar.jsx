@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom"
@@ -18,64 +18,21 @@ export default function EventCalendar() {
   const [hodDepartmentId, setHodDepartmentId] = useState(null);
   const [loadingHoDDepartment, setLoadingHoDDepartment] = useState(false);
 
-  useEffect(() => {
-    let mounted = true
-    const loadRole = async () => {
-      if (!eventId) {
-        if (mounted) setEventRole("")
-        return
-      }
-      try {
-        const role = await fetchEventRole(eventId)
-        if (mounted) setEventRole(role)
-      } catch (_) {
-        if (mounted) setEventRole("")
-      }
-    }
-    loadRole()
-    return () => {
-      mounted = false
-    }
-  }, [eventId, fetchEventRole]);
+  const today = new Date();
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth();
+  const todayYear = today.getFullYear();
 
-  useEffect(() => {
-    fetchCalendars();
-  }, [eventId, currentMonth, currentYear]);
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+  const [currentYear, setCurrentYear] = useState(todayYear);
+  const [selectedCalendar, setSelectedCalendar] = useState(null);
 
-  useEffect(() => {
-    const loadHoDDepartment = async () => {
-      if (!eventId || eventRole !== "HoD" || !user?.id) {
-        setHodDepartmentId(null);
-        return;
-      }
-      setLoadingHoDDepartment(true);
-      try {
-        const deptResponse = await departmentService.getDepartments(eventId);
-        if (Array.isArray(deptResponse)) {
-          const userIdCandidates = [user.id, user._id].filter(Boolean).map(v => v.toString());
-          const hodDept = deptResponse.find(dept => {
-            const leaderId = dept?.leaderId?._id || dept?.leaderId?.id || dept?.leaderId;
-            if (!leaderId) return false;
-            return userIdCandidates.includes(leaderId.toString());
-          });
-          setHodDepartmentId(hodDept?._id || hodDept?.id || null);
-        } else {
-          setHodDepartmentId(null);
-        }
-      } catch (error) {
-        console.error("Failed to load HoD department:", error);
-        setHodDepartmentId(null);
-      } finally {
-        setLoadingHoDDepartment(false);
-      }
-    };
+  const fetchCalendars = useCallback(async () => {
+    if (!eventId) return;
 
-    loadHoDDepartment();
-  }, [eventId, eventRole, user]);
-
-  const fetchCalendars = async () => {
     setLoading(true);
     try {
+      console.log("Fetching calendars for:", { eventId, month: currentMonth + 1, year: currentYear });
       const response = await calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear);
       console.log("API Response:", response);
 
@@ -147,19 +104,67 @@ export default function EventCalendar() {
       setCalendars(grouped);
     } catch (error) {
       console.error("Failed to fetch calendars:", error);
+      console.error("Error details:", error.response?.data || error.message);
+      toast.error("Không thể tải lịch họp: " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, currentMonth, currentYear, user]);
 
-  const today = new Date();
-  const todayDay = today.getDate();
-  const todayMonth = today.getMonth();
-  const todayYear = today.getFullYear();
+  useEffect(() => {
+    let mounted = true
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) setEventRole("")
+        return
+      }
+      try {
+        const role = await fetchEventRole(eventId)
+        if (mounted) setEventRole(role)
+      } catch (_) {
+        if (mounted) setEventRole("")
+      }
+    }
+    loadRole()
+    return () => {
+      mounted = false
+    }
+  }, [eventId, fetchEventRole]);
 
-  const [currentMonth, setCurrentMonth] = useState(todayMonth);
-  const [currentYear, setCurrentYear] = useState(todayYear);
-  const [selectedCalendar, setSelectedCalendar] = useState(null);
+  useEffect(() => {
+    fetchCalendars();
+  }, [fetchCalendars]);
+
+  useEffect(() => {
+    const loadHoDDepartment = async () => {
+      if (!eventId || eventRole !== "HoD" || !user?.id) {
+        setHodDepartmentId(null);
+        return;
+      }
+      setLoadingHoDDepartment(true);
+      try {
+        const deptResponse = await departmentService.getDepartments(eventId);
+        if (Array.isArray(deptResponse)) {
+          const userIdCandidates = [user.id, user._id].filter(Boolean).map(v => v.toString());
+          const hodDept = deptResponse.find(dept => {
+            const leaderId = dept?.leaderId?._id || dept?.leaderId?.id || dept?.leaderId;
+            if (!leaderId) return false;
+            return userIdCandidates.includes(leaderId.toString());
+          });
+          setHodDepartmentId(hodDept?._id || hodDept?.id || null);
+        } else {
+          setHodDepartmentId(null);
+        }
+      } catch (error) {
+        console.error("Failed to load HoD department:", error);
+        setHodDepartmentId(null);
+      } finally {
+        setLoadingHoDDepartment(false);
+      }
+    };
+
+    loadHoDDepartment();
+  }, [eventId, eventRole, user]);
 
   const getCalendarsForDay = (day, month, year) => {
     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
