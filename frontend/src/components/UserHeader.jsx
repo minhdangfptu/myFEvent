@@ -61,6 +61,11 @@ export default function UserHeader({
     // Backend can optionally send a direct URL
     if (n.targetUrl) return n.targetUrl;
 
+    // Calendar notifications
+    if (n.eventId && n.category === 'LỊCH HỌP') {
+      return `/events/${n.eventId}/my-calendar`;
+    }
+
     // Ưu tiên điều hướng về đúng công việc được giao nếu có taskId + eventId
     if (n.eventId && n.relatedTaskId) {
       return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;

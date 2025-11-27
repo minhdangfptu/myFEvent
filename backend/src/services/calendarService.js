@@ -9,7 +9,8 @@ export const getCalendarByEventId = async (eventId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                // Skip avatarUrl (base64) to keep payloads small
+                select: 'fullName email'
             }
         })
         .populate({
@@ -31,7 +32,7 @@ export const getCalendarByDepartmentId = async (departmentId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                select: 'fullName email'
             }
         })
         .populate({
@@ -74,7 +75,7 @@ export const getCalendarsInEventScope = async (eventId, startDate = null, endDat
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: '_id email'
+                select: '_id email fullName'
             }
         })
         .populate({
@@ -100,7 +101,7 @@ export const getCalendarById = async (calendarId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                select: 'fullName email'
             }
         }).populate({
             path: 'createdBy',

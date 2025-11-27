@@ -5,7 +5,7 @@ const AgendaItemSchema = new Schema({
     endTime: { type: Date, required: true },
     duration: { type: Number, required: true },
     content: { type: String, required: true },
-}, { _id: false }); 
+}); 
 
 const AgendaSchema = new Schema({
     date: { type: Date, required: true },

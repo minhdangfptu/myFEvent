@@ -1,7 +1,7 @@
 // components/AxiosInterceptor.jsx
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios"; // HOẶC import axiosClient from '../api/axiosClient';
+import axiosClient from "../apis/axiosClient";
 import { toast } from "react-toastify";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -10,7 +10,7 @@ const AxiosInterceptor = ({ children }) => {
   const { logout } = useAuth();
 
   useEffect(() => {
-    const resInterceptor = axios.interceptors.response.use(
+    const resInterceptor = axiosClient.interceptors.response.use(
       (response) => response,
       async (error) => {
         const prevRequest = error.config;
@@ -59,7 +59,7 @@ const AxiosInterceptor = ({ children }) => {
     );
 
     return () => {
-      axios.interceptors.response.eject(resInterceptor);
+      axiosClient.interceptors.response.eject(resInterceptor);
     };
   }, [navigate, logout]);
 

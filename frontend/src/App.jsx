@@ -210,12 +210,17 @@ export default function App() {
           <WifiOff size={20} />
           <span>Mạng không ổn định! Vui lòng kiểm tra kết nối.</span>
         </div>,
+        {
+          autoClose: 60000,
+          closeButton: true,
+          closeOnClick: true,
+          draggable: true,
+          onClose: () => {
+            setShowNetworkWarning(false);
+          }
+        }
       );
     }
-
-    setTimeout(() => {
-      setShowNetworkWarning(false);
-    }, 60000);
   }, []);
 
   useEffect(() => {

@@ -7,7 +7,7 @@ const EventSchema = new Schema({
     eventEndDate: { type: Date },
     location: { type: String },
     organizerName: { type: String, required: true },
-    image: [{ type: String, required: true }],
+    image: { type: String, required: true },
     status: { type: String, enum: ['cancelled', 'completed', 'ongoing', 'scheduled'], default: 'scheduled' },
     joinCode: { type: String, unique: true, index: true },
     banInfo: {

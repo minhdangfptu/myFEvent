@@ -97,33 +97,13 @@ export const deleteEvent = (req, res) =>
     return ok(res, 200, result);
   });
 
-// PUT /api/events/:id/images  (replace)
-export const replaceEventImages = (req, res) =>
+// PATCH /api/events/:id/image
+export const updateEventImage = (req, res) =>
   handle(res, async () => {
     const userId = req.user?.id;
     const { id } = req.params;
-    const { images } = req.body;
-    const result = await eventService.replaceEventImages({ userId, id, images });
-    return ok(res, 200, result);
-  });
-
-// POST /api/events/:id/images  (add)
-export const addEventImages = (req, res) =>
-  handle(res, async () => {
-    const userId = req.user?.id;
-    const { id } = req.params;
-    const { images } = req.body;
-    const result = await eventService.addEventImages({ userId, id, images });
-    return ok(res, 200, result);
-  });
-
-// DELETE /api/events/:id/images
-export const removeEventImages = (req, res) =>
-  handle(res, async () => {
-    const userId = req.user?.id;
-    const { id } = req.params;
-    const { indexes } = req.body;
-    const result = await eventService.removeEventImages({ userId, id, indexes });
+    const { image } = req.body;
+    const result = await eventService.updateEventImage({ userId, id, image });
     return ok(res, 200, result);
   });
 

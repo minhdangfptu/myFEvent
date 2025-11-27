@@ -6,6 +6,7 @@ import taskRoute from './taskRoute.js';
 import feedbackRoute from './feedbackRoute.js';
 import notificationRoute from './notificationRoute.js';
 import adminRoute from './adminRoute.js';
+import dashboardRoute from './dashboardRoute.js';
 
 
 const router = express.Router();
@@ -17,4 +18,5 @@ router.use('/tasks', taskRoute);
 router.use('/feedback', feedbackRoute);
 router.use('/notifications', notificationRoute);
 router.use('/admin', adminRoute);
+router.use('/dashboard', dashboardRoute);
 export default router;

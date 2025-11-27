@@ -1,4 +1,5 @@
 import Notification from '../models/notification.js';
+import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import Task from '../models/task.js';
 
@@ -385,32 +386,18 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
   }
 };
 
-export const notifyAddedToCalendar = async (eventId, calendarId, memberIds, calendarName) => {
+export const notifyAddedToCalendar = async ({ eventId, calendarId, userIds, calendarName, creatorUserId }) => {
   try {
-    const eventMembers = await EventMember.find({ 
-      _id: { $in: memberIds } 
-    })
-      .populate('userId', '_id fullName')
-      .lean();
-    
-    if (eventMembers.length === 0) {
-      console.log('No members found to notify');
-      return 0;
-    }
-
-    const userIds = eventMembers
-      .filter(member => member.userId)
-      .map(member => member.userId._id);
-
-    if (userIds.length === 0) {
-      console.log('No valid userIds to notify');
+    const filteredUserIds = (userIds || []).filter(Boolean);
+    if (filteredUserIds.length === 0) {
+      console.log('No valid userIds to notify for calendar');
       return 0;
     }
 
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện'
+    const eventName = ("Sự kiện" + event?.name) || 'Sự kiện';
 
-    await createNotificationsForUsers(userIds, {
+    await createNotificationsForUsers(filteredUserIds, {
       eventId,
       category: 'LỊCH HỌP',
       title: `[${eventName}] Bạn đã được thêm vào cuộc họp "${calendarName}"`,
@@ -420,8 +407,8 @@ export const notifyAddedToCalendar = async (eventId, calendarId, memberIds, cale
       unread: true,
     });
 
-    console.log(`Notification sent to ${userIds.length} users for being added to calendar:`, calendarName);
-    return userIds.length;
+    console.log(`Notification sent to ${filteredUserIds.length} users for calendar:`, calendarName);
+    return filteredUserIds.length;
   } catch (error) {
     console.error('Error notifying added to calendar:', error);
     return 0;
