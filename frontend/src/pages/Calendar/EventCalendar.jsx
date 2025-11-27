@@ -33,11 +33,14 @@ export default function EventCalendar() {
       }
     }
     loadRole()
-    fetchCalendars();
     return () => {
       mounted = false
     }
   }, [eventId, fetchEventRole]);
+
+  useEffect(() => {
+    fetchCalendars();
+  }, [eventId, currentMonth, currentYear]);
 
   useEffect(() => {
     const loadHoDDepartment = async () => {
@@ -73,7 +76,7 @@ export default function EventCalendar() {
   const fetchCalendars = async () => {
     setLoading(true);
     try {
-      const response = await calendarService.getMyCalendarInEvent(eventId);
+      const response = await calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear);
       console.log("API Response:", response);
 
       // Group calendars by date
