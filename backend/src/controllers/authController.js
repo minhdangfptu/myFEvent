@@ -132,6 +132,17 @@ export const login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Tài khoản không tồn tại' });
 
+    // Check if user registered with Google OAuth (no password)
+    if (!user.passwordHash) {
+      if (user.authProvider === 'google') {
+        return res.status(400).json({
+          message: 'Tài khoản này đã được đăng ký bằng Google. Vui lòng đăng nhập bằng Google.',
+          code: 'USE_GOOGLE_LOGIN'
+        });
+      }
+      return res.status(400).json({ message: 'Lỗi xác thực. Vui lòng liên hệ admin.' });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng' });
 
@@ -488,6 +499,14 @@ export const changePassword = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Check if user registered with Google (no password to change)
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        message: 'Tài khoản Google không có mật khẩu. Không thể đổi mật khẩu.',
+        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
+      });
+    }
+
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
 
@@ -507,6 +526,15 @@ export const checkPassWord = async (req, res) => {
     const { password } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Check if user registered with Google (no password)
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        message: 'Tài khoản Google không có mật khẩu.',
+        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Incorrect information' });
     return res.status(200).json({ message: 'Correct information' });

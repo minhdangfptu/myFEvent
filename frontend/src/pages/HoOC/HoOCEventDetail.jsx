@@ -209,8 +209,8 @@ export default function HoOCEventDetail() {
     if (!eventData.name || !eventData.name.trim()) missingFields.push("Tên sự kiện");
     if (!eventData.description || !eventData.description.trim()) missingFields.push("Mô tả");
     if (!eventData.organizerName || !eventData.organizerName.trim()) missingFields.push("Người tổ chức");
-    if (!eventData.eventStartDate) missingFields.push("Ngày bắt đầu");
-    if (!eventData.eventEndDate) missingFields.push("Ngày kết thúc");
+    if (!eventData.eventStartDate) missingFields.push("Ngày bắt đầu DDAY");
+    if (!eventData.eventEndDate) missingFields.push("Ngày kết thúc DDAY");
     if (!eventData.location || !eventData.location.trim()) missingFields.push("Địa điểm");
     const imageValue = Array.isArray(eventData.image)
       ? eventData.image.find((img) => typeof img === "string" && img.trim())
@@ -1357,7 +1357,7 @@ const handleImageUpload = async () => {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div className="form-group">
-                    <label className="form-label-modern">Ngày bắt đầu</label>
+                    <label className="form-label-modern">Ngày bắt đầu DDAY</label>
                     <input 
                       type="datetime-local" 
                       className="form-control-modern" 
@@ -1375,7 +1375,7 @@ const handleImageUpload = async () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label-modern">Ngày kết thúc</label>
+                    <label className="form-label-modern">Ngày kết thúc DDAY</label>
                     <input 
                       type="datetime-local" 
                       className="form-control-modern" 

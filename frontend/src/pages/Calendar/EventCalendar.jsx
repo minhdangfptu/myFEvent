@@ -478,12 +478,10 @@ export default function EventCalendar() {
               const isToday = dayObj.isCurrentMonth && dayObj.day === todayDay && dayObj.month === todayMonth && dayObj.year === todayYear;
               const hasEvents = dayCalendars.length > 0;
 
-              // Determine background color
+              // Determine background color - đơn giản hóa, chỉ có màu cho today
               let backgroundColor = dayObj.isCurrentMonth ? "white" : "#fafafa";
               if (isToday) {
-                backgroundColor = "#e3f2fd"; // Light blue for today
-              } else if (hasEvents && dayObj.isCurrentMonth) {
-                backgroundColor = "#fef3e8"; // Light orange for days with events
+                backgroundColor = "#ffeded"; // Light pink/red cho today
               }
 
               return (
@@ -496,71 +494,44 @@ export default function EventCalendar() {
                     minHeight: "160px",
                     backgroundColor: backgroundColor,
                     position: "relative",
-                    border: isToday ? "2px solid #4285f4" : "none",
-                    borderRadius: isToday ? "4px" : "0",
                   }}
                 >
                   <div style={{
                     fontSize: "13px",
                     fontWeight: isToday ? "700" : (dayObj.isCurrentMonth ? "500" : "normal"),
                     marginBottom: "8px",
-                    color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
+                    color: isToday ? "#dc2626" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
                     display: "flex",
                     alignItems: "center",
                     gap: "4px",
                     flexWrap: "wrap",
                   }}>
-                    <span style={{ fontSize: "14px" }}>{dayObj.day}</span>
-                    {isToday && (
-                      <span style={{ 
-                        fontSize: "10px", 
-                        backgroundColor: "#4285f4", 
-                        color: "white", 
-                        padding: "2px 6px", 
-                        borderRadius: "10px",
-                        fontWeight: "600"
-                      }}>
-                        Hôm nay
-                      </span>
-                    )}
+                    <span style={{ 
+                      fontSize: "14px",
+                      textDecoration: isToday ? "underline" : "none",
+                      textUnderlineOffset: isToday ? "3px" : undefined,
+                      textDecorationThickness: isToday ? "2px" : undefined,
+                    }}>{dayObj.day}</span>
                     {hasEvents && (() => {
                       const milestones = dayCalendars.filter(item => item.itemType === 'milestone');
                       const calendars = dayCalendars.filter(item => item.itemType === 'calendar');
+                      const hasBoth = milestones.length > 0 && calendars.length > 0;
 
-                      return (
-                        <>
-                          {milestones.length > 0 && (
-                            <span style={{
-                              fontSize: "9px",
-                              backgroundColor: "#dc2626",
-                              color: "white",
-                              padding: "2px 5px",
-                              borderRadius: "8px",
-                              fontWeight: "500",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "2px"
-                            }}>
-                              <i class="bi bi-pin-angle"></i> {milestones.length}
-                            </span>
-                          )}
-                          {calendars.length > 0 && (
-                            <span style={{
-                              fontSize: "9px",
-                              backgroundColor: isToday ? "#1976d2" : "#f57c00",
-                              color: "white",
-                              padding: "2px 5px",
-                              borderRadius: "8px",
-                              fontWeight: "500",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "2px"
-                            }}>
-                              <i class="bi bi-calendar"></i> {calendars.length}
-                            </span>
-                          )}
-                        </>
-                      );
+                      // Nếu có cả 2, chỉ hiển thị 1 icon ⭐
+                      if (hasBoth) {
+                        return (
+                          <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>
+                        );
+                      }
+                      // Nếu chỉ có milestone
+                      if (milestones.length > 0) {
+                        return <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>;
+                      }
+                      // Nếu chỉ có calendar
+                      if (calendars.length > 0) {
+                        return <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>;
+                      }
+                      return null;
                     })()}
                   </div>
 
@@ -572,27 +543,29 @@ export default function EventCalendar() {
                                         item.userParticipateStatus === 'absent' ? '#dc2626' : '';
 
                       const isMilestone = item.itemType === 'milestone';
-                      const bgColor = isMilestone ? "#fef2f2" :
-                                     item.type === "event" ? "#e8f0fe" : "#fef3e8";
-                      const textColor = isMilestone ? "#dc2626" :
-                                       item.type === "event" ? "#1967d2" : "#f57c00";
-
-                      // Chip config
+                      
+                      // Chip config - đồng bộ với dashboard
                       const chipConfig = isMilestone ? {
                         icon: "🎯",
                         label: "Cột mốc",
                         chipBg: "#fee2e2",
-                        chipText: "#991b1b"
+                        chipText: "#991b1b",
+                        borderColor: "#dc2626",
+                        bgColor: "#fef2f2"
                       } : item.type === "event" ? {
                         icon: "📅",
                         label: "Lịch họp",
                         chipBg: "#dbeafe",
-                        chipText: "#1e40af"
+                        chipText: "#1e40af",
+                        borderColor: "#3b82f6",
+                        bgColor: "#eff6ff"
                       } : {
                         icon: "🏢",
                         label: "Họp ban",
                         chipBg: "#fed7aa",
-                        chipText: "#9a3412"
+                        chipText: "#9a3412",
+                        borderColor: "#f57c00",
+                        bgColor: "#fef3e8"
                       };
 
                       return (
@@ -601,28 +574,26 @@ export default function EventCalendar() {
                           onClick={() => handleCalendarClick(item)}
                           style={{
                             fontSize: "11px",
-                            padding: "5px 7px",
-                            borderRadius: "4px",
+                            padding: "6px 8px",
+                            borderRadius: "6px",
                             cursor: "pointer",
-                            backgroundColor: bgColor,
-                            color: textColor,
+                            backgroundColor: chipConfig.bgColor,
                             lineHeight: "1.4",
-                            transition: "all 0.2s",
-                            borderLeft: isMilestone ? '3px solid #dc2626' : (statusColor ? `3px solid ${statusColor}` : 'none'),
+                            borderLeft: `3px solid ${chipConfig.borderColor}`,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = "0.8";
+                            e.currentTarget.style.opacity = "0.85";
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.opacity = "1";
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "3px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                             <span style={{
-                              fontSize: "8px",
+                              fontSize: "9px",
                               backgroundColor: chipConfig.chipBg,
                               color: chipConfig.chipText,
-                              padding: "2px 5px",
+                              padding: "2px 6px",
                               borderRadius: "4px",
                               fontWeight: "600",
                               display: "inline-flex",
@@ -638,11 +609,11 @@ export default function EventCalendar() {
                             )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between" }}>
-                            <div style={{ fontWeight: "500", fontSize: "10.5px", color: "#1a1a1a", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <div style={{ fontWeight: "500", fontSize: "10.5px", color: chipConfig.chipText, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {item.title}
                             </div>
                             {!isMilestone && (
-                              <div style={{ fontSize: "9px", opacity: 0.65, display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                              <div style={{ fontSize: "9px", color: "#6b7280", display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
                                 <span>⏰</span>
                                 <span>{item.time}</span>
                               </div>
@@ -704,12 +675,12 @@ export default function EventCalendar() {
                     textColor: "#991b1b"
                   } : selectedCalendar.type === "event" ? {
                     icon: "📅",
-                    label: "Lịch sự kiện",
+                    label: "Lịch họp",
                     bgColor: "#dbeafe",
                     textColor: "#1e40af"
                   } : {
                     icon: "🏢",
-                    label: "Lịch họp ban",
+                    label: "Họp ban",
                     bgColor: "#fed7aa",
                     textColor: "#9a3412"
                   };

@@ -31,7 +31,7 @@ const UserSchema = new Schema({
     default: 'active',
   },
   googleId: { type: String, unique: true, sparse: true },
-  authProvider: { type: String, enum: ['local', 'google'], default: 'google' },
+  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   role: {
     type: String,
     enum: ['user', 'admin'],
