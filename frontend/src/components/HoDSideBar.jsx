@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
 import { ArrowLeft, Bell, Bug, Calendar, Coins, Grid, HelpCircle, Menu, Moon, Settings, Sun, User, Users } from "lucide-react";
+import authStorage from "~/utils/authStorage";
 
 
 export default function HoDSideBar({
@@ -177,16 +178,11 @@ export default function HoDSideBar({
     if (userId) return userId;
     
     // Nếu không có trong context, thử từ localStorage
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        return parsedUser?._id || parsedUser?.id;
-      }
-    } catch (e) {
-      console.error("Error reading user from localStorage:", e);
+    const storedUser = authStorage.getUser();
+    if (storedUser) {
+      return storedUser?._id || storedUser?.id;
     }
-    
+
     return null;
   };
 

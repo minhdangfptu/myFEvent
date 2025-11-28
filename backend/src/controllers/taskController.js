@@ -511,8 +511,9 @@ export const deleteTask = async (req, res) => {
             return res.status(403).json({ message: 'Chỉ HoD được xóa task thường.' });
         }
 
-        // Không cho phép xóa task khi status là "đã bắt đầu"
-        if (task.status === TASK_STATUSES.IN_PROGRESS) {
+        // Không cho phép xóa task khi status là "đã bắt đầu" trừ khi chính người tạo
+        const isTaskCreator = task.createdBy && String(task.createdBy) === String(req.user.id);
+        if (task.status === TASK_STATUSES.IN_PROGRESS && !isTaskCreator) {
             return res.status(403).json({ 
                 message: 'Không thể xóa task khi đang ở trạng thái "đã bắt đầu".' 
             });

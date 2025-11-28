@@ -515,7 +515,7 @@ export default function MemberTaskPage() {
                           Công việc
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
-                          Người giao việc
+                          Người tạo
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
                           Thời gian giao

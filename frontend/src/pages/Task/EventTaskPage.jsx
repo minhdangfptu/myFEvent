@@ -47,6 +47,18 @@ const STATUS_STYLE_MAP = {
   huy: { bg: "#FEE2E2", color: "#991B1B" },
 };
 
+const createEmptyAddTaskForm = () => ({
+  title: "",
+  description: "",
+  departmentId: "",
+  assigneeId: "",
+  startDate: "",
+  dueDate: "",
+  milestoneId: "",
+  parentId: "",
+  taskType: "epic",
+});
+
 const STATUS_TRANSITIONS = {
   chua_bat_dau: ["da_bat_dau", "huy"],
   da_bat_dau: ["hoan_thanh", "huy"],
@@ -475,17 +487,7 @@ export default function EventTaskPage() {
     });
   };
 
-  const [addTaskForm, setAddTaskForm] = useState({
-    title: "",
-    description: "",
-    departmentId: "",
-    assigneeId: "",
-    startDate: "",
-    dueDate: "",
-    milestoneId: "",
-    parentId: "",
-    taskType: "epic",
-  });
+const [addTaskForm, setAddTaskForm] = useState(() => createEmptyAddTaskForm());
   const [assignees, setAssignees] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [parents, setParents] = useState([]);
@@ -493,6 +495,37 @@ export default function EventTaskPage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [assignNow, setAssignNow] = useState(false);
   const [isDeletingTasks, setIsDeletingTasks] = useState(false);
+const [addTaskMode, setAddTaskMode] = useState("epic");
+const [epicContext, setEpicContext] = useState(null);
+
+const openAddTaskModal = (mode = "epic", epic = null) => {
+  setAddTaskMode(mode);
+  setEpicContext(epic);
+  setAssignNow(false);
+  setAddTaskError("");
+  setAddTaskForm(() => {
+    const base = createEmptyAddTaskForm();
+    if (mode === "normal") {
+      return {
+        ...base,
+        taskType: "normal",
+        departmentId: epic?.departmentId || "",
+        parentId: epic?.id || "",
+      };
+    }
+    return base;
+  });
+  setShowAddModal(true);
+};
+
+const closeAddTaskModal = () => {
+  setShowAddModal(false);
+  setEpicContext(null);
+  setAddTaskMode("epic");
+  setAssignNow(false);
+  setAddTaskError("");
+  setAddTaskForm(() => createEmptyAddTaskForm());
+};
 
   const selectedDepartmentName = useMemo(() => (
     departments.find((d) => d._id === addTaskForm.departmentId)?.name || ""
@@ -585,19 +618,7 @@ export default function EventTaskPage() {
 
       toast.success("Tạo công việc thành công!");
 
-      setShowAddModal(false);
-      setAddTaskForm({
-        title: "",
-        description: "",
-        departmentId: "",
-        assigneeId: "",
-        startDate: "",
-        dueDate: "",
-        milestoneId: "",
-        parentId: "",
-        taskType: "epic",
-      });
-
+      closeAddTaskModal();
       fetchTasks();
     } catch (err) {
       const errorMessage = err?.response?.data?.message || "Thêm công việc thất bại!";
@@ -975,7 +996,7 @@ export default function EventTaskPage() {
                   )}
                   <button
                     className="add-btn btn btn-primary"
-                    onClick={() => setShowAddModal(true)}
+                    onClick={() => openAddTaskModal("epic")}
                   >
                     + Thêm công việc
                   </button>
@@ -1046,6 +1067,19 @@ export default function EventTaskPage() {
                               >
                                 {STATUS_LABEL_MAP[epic?.statusCode] || epic?.status || "Chưa bắt đầu"}
                               </span>
+                              {epicId !== "orphan" && (
+                                <button
+                                  className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openAddTaskModal("normal", epic);
+                                  }}
+                                  title="Thêm công việc"
+                                >
+                                  <i className="bi bi-plus-lg" />
+                                  <span className="d-none d-md-inline">Công việc</span>
+                                </button>
+                              )}
                               <i className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"} text-muted`} />
                             </div>
                           </div>
@@ -1078,7 +1112,7 @@ export default function EventTaskPage() {
                                       <th style={{ width: 180 }}>Ban phụ trách</th>
                                       <th>Công việc</th>
                                       <th style={{ width: 180 }}>Người phụ trách</th>
-                                      <th style={{ width: 150 }}>Người giao việc</th>
+                                      <th style={{ width: 150 }}>Người tạo</th>
                                       <th style={{ width: 140 }}>Trạng thái</th>
                                       <th style={{ width: 140 }}>Deadline</th>
                                     </tr>
@@ -1346,7 +1380,7 @@ export default function EventTaskPage() {
             <div
               className="modal-backdrop"
               style={{ position: "fixed", inset: 0, zIndex: 1050 }}
-              onClick={() => setShowAddModal(false)}
+              onClick={closeAddTaskModal}
             />
             <div
               className="modal d-block"
@@ -1356,17 +1390,27 @@ export default function EventTaskPage() {
               <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 900, width: '90%' }}>
                 <div className="modal-content" style={{ borderRadius: 16 }}>
                   <div className="modal-header">
-                    <h5 className="modal-title">➕ Thêm công việc mới</h5>
+                    <h5 className="modal-title">
+                      {addTaskMode === "epic" ? "➕ Thêm công việc lớn" : "➕ Thêm công việc"}
+                    </h5>
                     <button
                       type="button"
                       className="btn-close"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={closeAddTaskModal}
                     />
                   </div>
                   <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {addTaskError && (
                       <div className="alert alert-danger mb-2">
                         {addTaskError}
+                      </div>
+                    )}
+                    {addTaskMode === "normal" && epicContext && (
+                      <div className="alert alert-info d-flex align-items-center gap-2 mb-3">
+                        <i className="bi bi-info-circle-fill" />
+                        <div>
+                          Thêm công việc cho <strong>{epicContext.name}</strong> • Ban: {epicContext.department || "----"}
+                        </div>
                       </div>
                     )}
                     <div className="mb-3">
@@ -1394,17 +1438,16 @@ export default function EventTaskPage() {
                       />
                     </div>
                     <div className="mb-3">
-                      <label className="form-label">Loại công việc *</label>
-                      <select
-                        className="form-select"
-                        value={addTaskForm.taskType}
-                        onChange={(e) => handleAddTaskInput("taskType", e.target.value)}
-                      >
-                        <option value="epic">Công việc lớn</option>
-                        <option value="normal">Công việc</option>
-                      </select>
+                      <label className="form-label">Loại công việc</label>
+                      <input
+                        className="form-control"
+                        value={addTaskMode === "epic" ? "Công việc lớn" : "Công việc"}
+                        disabled
+                      />
                       <div className="form-text small text-muted">
-                        Công việc lớn giao cho ban, không chọn người phụ trách. Chọn công việc để giao cho thành viên.
+                        {addTaskMode === "epic"
+                          ? "Công việc lớn giao cho ban, không chọn người phụ trách."
+                          : "Công việc thường sẽ thuộc một công việc lớn và giao cho thành viên."}
                       </div>
                     </div>
                     <div className="mb-3">
@@ -1423,6 +1466,11 @@ export default function EventTaskPage() {
                           </option>
                         ))}
                       </select>
+                      {addTaskMode === "normal" && epicContext?.department && (
+                        <div className="form-text small text-muted">
+                          Đã tự động chọn ban {epicContext.department} từ công việc lớn.
+                        </div>
+                      )}
                     </div>
                     {addTaskForm.taskType === "normal" && (
                       <div className="mb-3">
@@ -1446,7 +1494,7 @@ export default function EventTaskPage() {
                       </div>
                     )}
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                           <label className="form-label">Thời gian bắt đầu</label>
                           <div className="form-check mb-2">
                             <input
@@ -1496,7 +1544,7 @@ export default function EventTaskPage() {
                             </div>
                           ) : null}
                       </div>
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Deadline *</label>
                         <input
                           type="datetime-local"
@@ -1539,7 +1587,7 @@ export default function EventTaskPage() {
                       </div>
                     </div>
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Cột mốc</label>
                         <select
                           className="form-select"
@@ -1556,27 +1604,27 @@ export default function EventTaskPage() {
                           ))}
                         </select>
                       </div>
-                      <div className="col-md-6 mb-3">
-                        <label className="form-label">Thuộc Công việc lớn</label>
-                        <select
-                          className="form-select"
-                          value={addTaskForm.parentId}
-                          onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
-                          disabled={!addTaskForm.departmentId || addTaskForm.taskType === "epic"}
-                        >
-                          <option value="">Không thuộc</option>
-                          {filteredParents.map((p) => (
-                            <option key={p._id} value={p._id}>
-                              {p.title}
-                            </option>
-                          ))}
-                        </select>
-                        {addTaskForm.taskType === "epic" && (
+                      {addTaskMode === "normal" && (
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">Thuộc Công việc lớn *</label>
+                          <select
+                            className="form-select"
+                            value={addTaskForm.parentId}
+                            onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
+                            disabled={!addTaskForm.departmentId}
+                          >
+                            <option value="">Chọn công việc lớn</option>
+                            {filteredParents.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {p.title}
+                              </option>
+                            ))}
+                          </select>
                           <div className="form-text small text-muted">
-                            Công việc lớn không thể chọn người phụ trách
+                            Công việc thường phải gắn với đúng công việc lớn.
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                     {/* Thành viên phụ trách - chỉ hiển thị cho Công việc (normal) */}
                     
@@ -1585,7 +1633,7 @@ export default function EventTaskPage() {
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={closeAddTaskModal}
                       disabled={isCreatingTask}
                     >
                       Hủy

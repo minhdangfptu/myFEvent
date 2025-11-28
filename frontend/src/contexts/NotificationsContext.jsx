@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { notificationApi } from '../apis/notificationApi'
+import authStorage from '../utils/authStorage'
 
 const NotificationsContext = createContext(null)
 
@@ -45,7 +46,7 @@ export function NotificationsProvider({ children }) {
 
   useEffect(() => {
     // Enable fetching only if token exists
-    const hasToken = !!localStorage.getItem('access_token')
+    const hasToken = authStorage.hasSession()
     setEnabled(hasToken)
 
     if (hasToken) {
