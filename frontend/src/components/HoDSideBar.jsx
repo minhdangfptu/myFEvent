@@ -795,6 +795,12 @@ export default function HoDSideBar({
                 {sidebarOpen && <span>Cài đặt</span>}
               </div>
             </button>
+            <button className={`btn-nav ${activePage === "support" ? "active" : ""}`} onClick={() => navigate("/support")} title="Hỗ trợ">
+              <div className="d-flex align-items-center">
+                <i className="bi bi-question-circle me-3" style={{ width: 20 }} />
+                {sidebarOpen && <span>Hỗ trợ</span>}
+              </div>
+            </button>
           </div>
         </div>
           </>

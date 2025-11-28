@@ -11,6 +11,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { useAuth } from "../../contexts/AuthContext"
+import { Calendar, Sparkles, Goal } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -809,9 +810,9 @@ export default function MemberDashBoard() {
                                       {dayData?.day}
                                     </span>
                                     {/* Icon calendar/milestone sát số */}
-                                    {isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>}
-                                    {!isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>}
-                                    {isMilestone && !isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>}
+                                    {isMilestone && isCalendar && <Sparkles size={16} style={{marginLeft: 3}} />}
+                                    {!isMilestone && isCalendar && <Calendar size={16} style={{marginLeft: 3}} />}
+                                    {isMilestone && !isCalendar && <Goal size={16} style={{marginLeft: 3}} />}
                                   </span>
                                 </div>
                               </td>
@@ -865,7 +866,7 @@ export default function MemberDashBoard() {
                           <div className="mt-4 pt-3 border-top">
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon}</span>
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}</span>
                                 <div style={{ flex: 1 }}>
                                   <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: chipConfig.bgColor === "#fef3c7" ? "#fef3c7" : chipConfig.bgColor, color: chipConfig.textColor, padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4, border: `1px solid ${chipConfig.borderColor}` }}>{chipConfig.label}</span>
                                   <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: chipConfig.textColor }}>
