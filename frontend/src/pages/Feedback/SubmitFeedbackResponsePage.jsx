@@ -5,6 +5,8 @@ import UserLayout from '../../components/UserLayout';
 import Loading from '../../components/Loading';
 import { feedbackApi } from '../../apis/feedbackApi';
 import { useEvents } from '../../contexts/EventContext';
+import { ArrowLeft, Clock } from "lucide-react";
+
 
 const getSidebarType = (role) => {
   if (role === 'HoOC') return 'HoOC';
@@ -175,7 +177,7 @@ export default function SubmitFeedbackResponsePage() {
               onClick={() => navigate(-1)}
               style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', marginBottom: '16px', fontWeight: '500', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <i className="bi bi-arrow-left"></i>
+              <ArrowLeft size={18} />
               Quay lại danh sách
             </button>
             <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', marginBottom: '12px' }}>{form.name}</h1>

@@ -8,6 +8,8 @@ import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
 import { useEvents } from "../../contexts/EventContext";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle, Clock, Inbox, Info, Pencil, RotateCw, Trash, Users, X } from "lucide-react";
+
 
 const DepartmentDetail = () => {
   const { eventId, id } = useParams();
@@ -1523,7 +1525,7 @@ const DepartmentDetail = () => {
                       </div>
                     </div>
                     <div>
-                      {selectedAssignLeader?._id === member._id && <i className="bi bi-check-circle-fill" style={{ fontSize: 20 }}></i>}
+                      {selectedAssignLeader?._id === member._id && <CheckCircle size={18} />}
                     </div>
                   </div>
                 ));

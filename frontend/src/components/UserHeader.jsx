@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { timeAgo } from "../utils/timeAgo";
+import { Clock, Bell, User } from "lucide-react";
 
 export default function UserHeader({
   title,
@@ -286,7 +287,7 @@ export default function UserHeader({
         >
           <div className="time-wrapper">
             <div className="d-flex align-items-center gap-2">
-              <i className="bi bi-clock" style={{ fontSize: '16px' }}></i>
+              <Clock size={16} />
               <span className="time-text">
                 {formatTime()}
                 {timeFormat === '24h' && (
@@ -313,7 +314,7 @@ export default function UserHeader({
               data-bs-toggle="dropdown"
               aria-expanded="false"
             >
-              <i className="bi bi-bell"></i>
+              <Bell size={20} />
               {unreadCount > 0 && (
                 <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
                   {unreadCount}
@@ -394,7 +395,7 @@ export default function UserHeader({
               aria-expanded="false"
               aria-label="Mở menu tài khoản"
             >
-              <i className="bi bi-person"></i>
+              <User size={20} />
               <span
                 className="text-muted"
                 style={{

@@ -2,6 +2,7 @@ import { useState } from "react"
 import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import { toast } from "react-toastify"
+import { MapPin } from "lucide-react"
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ export default function ContactPage() {
     subject: '',
     message: ''
   });
+
 
   // Hàm kiểm tra email hợp lệ
   const isValidEmail = (email) => {
@@ -145,7 +147,7 @@ export default function ContactPage() {
                 <div className="d-flex flex-column gap-3">
                   <div className="d-flex gap-3">
                     <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 44, height: 44, backgroundColor: '#fff3e0' }}>
-                      <i className="bi bi-geo-alt-fill" style={{ color: '#ff9800', fontSize: 20 }}></i>
+                      <MapPin size={20} style={{ color: "#ff9800" }} />
                     </div>
                     <div>
                       <div className="fw-semibold" style={{ fontSize: 15, color: '#333' }}>Địa chỉ</div>

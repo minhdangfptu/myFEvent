@@ -2,6 +2,7 @@ import UserLayout from '../../components/UserLayout'
 import { useNotifications } from '../../contexts/NotificationsContext'
 import { useNavigate } from 'react-router-dom'
 import { timeAgo } from '../../utils/timeAgo'
+import { Bell, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, Info } from 'lucide-react'
 
 export default function NotificationsPage() {
   const { notifications, markAllRead, markRead } = useNotifications()
@@ -23,6 +24,20 @@ export default function NotificationsPage() {
     }
 
     return '/notifications'
+  }
+
+  const ICON_BY_CATEGORY = {
+    'LỊCH HỌP': CalendarDays,
+    'CÔNG VIỆC': ClipboardCheck,
+    'NHẮC NHỞ': CalendarClock,
+    'HỆ THỐNG': Info,
+  }
+
+  const getIconComponent = (n) => {
+    if (n?.icon === 'bell') return Bell
+    if (n?.icon === 'calendar') return CalendarDays
+    if (n?.icon === 'task') return ClipboardList
+    return ICON_BY_CATEGORY[n?.category] || Bell
   }
 
   const handleNotificationClick = (n) => {
@@ -50,7 +65,10 @@ export default function NotificationsPage() {
         {notifications.map(n => (
           <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => handleNotificationClick(n)}>
             <div className="d-flex align-items-center justify-content-center" style={{ width:32, height:32 }}>
-              <i className={n.icon} style={{ color:'#ef4444' }} />
+              {(() => {
+                const Icon = getIconComponent(n)
+                return <Icon size={20} style={{ color: n.color || '#ef4444' }} />
+              })()}
             </div>
             <div className="flex-grow-1">
               <div className="d-flex align-items-center gap-2 mb-1">

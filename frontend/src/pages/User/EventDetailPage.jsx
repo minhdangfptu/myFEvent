@@ -6,6 +6,8 @@ import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
 import { getEventImage } from "../../utils/getEventImage";
 import { deriveEventStatus } from "../../utils/getEventStatus";
+import { CalendarDays, Copy, FileText, MapPin, User as UserIcon, Zap } from "lucide-react";
+import { toast } from "react-toastify";
 
 function EventDetailPage() {
   const { eventId } = useParams();
@@ -44,6 +46,16 @@ function EventDetailPage() {
   const address = event?.location || "";
   const statusText = deriveEventStatus(event).text;
   console.log(event);
+  const copyJoinCode = async () => {
+    if (!event?.joinCode) return;
+    try {
+      await navigator.clipboard.writeText(event.joinCode);
+      toast.success("Đã sao chép mã tham gia!");
+    } catch (err) {
+      toast.error("Không thể copy mã, vui lòng thử lại.");
+    }
+  };
+
   if (loading) {
     return (
       <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user" eventId={eventId}>
@@ -87,38 +99,73 @@ function EventDetailPage() {
           <div className="d-flex gap-2 flex-wrap mb-4">
             {event?.status && (
               <span className={`event-chip chip-status-${event.status}`}>
-                <i className="bi bi-lightning-charge-fill me-1" />
+                <Zap className="me-1" size={14} />
                 {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
               </span>
             )}
             {event?.eventStartDate && event?.eventEndDate ? (
               <span className="event-chip chip-date">
-                <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
+                <CalendarDays className="me-1" size={14} /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
               </span>
             ) : event?.eventDate ? (
               <span className="event-chip chip-date">
-                <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventDate)}
+                <CalendarDays className="me-1" size={14} /> {formatDate(event.eventDate)}
               </span>
             ) : null}
             {event?.location && (
               <span className="event-chip chip-location">
-                <i className="bi bi-geo-alt me-1" />{event.location}
+                <MapPin className="me-1" size={14} />{event.location}
               </span>
             )}
           </div>
           {error && <div className="text-danger mb-3">{error}</div>}
           {event && (
             <>
-              <div className="mt-4 pt-4 border-top">
-                <h5 className="fw-bold mb-3" style={{ fontSize: 18 }}>
-                  Chi tiết sự kiện
-                </h5>
-                <p
-                  className="text-secondary"
-                  style={{ fontSize: 15, lineHeight: 1.8 }}
-                >
-                  {event?.description || "Không có mô tả chi tiết."}
-                </p>
+              <div className="row g-4">
+                <div className="col-12 col-lg-8">
+                  <div className="event-info-card">
+                    <div className="d-flex align-items-center gap-2 mb-4">
+                      <div className="chip-status chip-status-scheduled d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: 12 }}>
+                        <InfoIcon />
+                      </div>
+                      <h5 className="fw-bold mb-0" style={{ fontSize: 18 }}>Thông tin sự kiện</h5>
+                    </div>
+                    <InfoItem icon={FileText} label="Tên sự kiện" value={event.name} />
+                    <InfoItem icon={UserIcon} label="Người tổ chức" value={event.organizerName || "Chưa cập nhật"} />
+                    <InfoItem icon={CalendarDays} label="Thời gian diễn ra" value={dateText} />
+                    <InfoItem icon={MapPin} label="Địa điểm" value={address || "Chưa xác định"} />
+                    <InfoItem icon={InfoIcon} label="Trạng thái" value={statusText} badge />
+                    <InfoItem icon={FileText} label="Mô tả" value={event.description || "Chưa có mô tả"} />
+                  </div>
+                </div>
+                <div className="col-12 col-lg-4">
+                  <div className="event-info-card" style={{ background: "#fff1f0" }}>
+                    <div className="d-flex align-items-center gap-2 mb-4">
+                      <div className="chip-status chip-status-scheduled d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: 12, background: "#fff", color: "#ef4444" }}>
+                        <LinkIcon />
+                      </div>
+                      <h5 className="fw-bold mb-0" style={{ fontSize: 18, color: "#b91c1c" }}>Mã mời tham gia</h5>
+                    </div>
+                    <div className="mb-3">
+                      <div className="text-muted small mb-2">Đường dẫn mời</div>
+                      <div className="input-group">
+                        <input className="form-control" value={`https://myfevent.vn/e/${event.joinCode || ""}`} readOnly />
+                        <button className="btn btn-light" onClick={copyJoinCode}>
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted small mb-2">Mã tham gia</div>
+                      <div className="input-group">
+                        <input className="form-control" value={event.joinCode || ""} readOnly />
+                        <button className="btn btn-light" onClick={copyJoinCode}>
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -142,3 +189,22 @@ function EventDetailPage() {
 }
 
 export default EventDetailPage;
+
+const InfoItem = ({ icon: Icon = FileText, label, value, badge }) => (
+  <div className="d-flex align-items-start gap-3 mb-3">
+    <div className="rounded-3" style={{ width: 44, height: 44, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Icon size={18} style={{ color: "#ef4444" }} />
+    </div>
+    <div>
+      <div className="text-muted small">{label}</div>
+      {badge ? (
+        <span className="badge bg-success-subtle text-success px-3 py-2">{value}</span>
+      ) : (
+        <div className="fw-semibold">{value}</div>
+      )}
+    </div>
+  </div>
+);
+
+const LinkIcon = () => <Copy size={18} />;
+const InfoIcon = () => <FileText size={18} />;

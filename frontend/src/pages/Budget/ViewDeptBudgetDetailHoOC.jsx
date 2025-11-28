@@ -7,6 +7,8 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
+import { ArrowLeft, Check, CheckCircle, Info, RotateCcw, Save, Search, X } from "lucide-react";
+
 
 const ViewDeptBudgetDetailHoOC = () => {
   const { eventId, departmentId } = useParams();
@@ -434,7 +436,7 @@ const ViewDeptBudgetDetailHoOC = () => {
             <div style={{ maxWidth: "300px", width: "100%" }}>
               <div className="input-group">
                 <span className="input-group-text bg-white" style={{ borderRight: "none" }}>
-                  <i className="bi bi-search"></i>
+                  <Search size={18} />
                 </span>
                 <input
                   type="text"
@@ -597,14 +599,14 @@ const ViewDeptBudgetDetailHoOC = () => {
                                   onClick={() => handleSaveFeedback(itemId)}
                                   style={{ fontSize: "11px", padding: "4px 8px" }}
                                 >
-                                  <i className="bi bi-check"></i>
+                                  <Check size={18} />
                                 </button>
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   onClick={handleCancelEditFeedback}
                                   style={{ fontSize: "11px", padding: "4px 8px" }}
                                 >
-                                  <i className="bi bi-x"></i>
+                                  <X size={18} />
                                 </button>
                               </div>
                             </div>
@@ -677,7 +679,7 @@ const ViewDeptBudgetDetailHoOC = () => {
           }}
         >
           <div className="d-flex align-items-start gap-2">
-            <i className="bi bi-info-circle" style={{ color: "#D97706", fontSize: "20px", marginTop: "2px" }}></i>
+            <Info size={24} style={{ color: "#D97706" }} />
             <p className="mb-0" style={{ color: "#92400E", fontSize: "14px" }}>
               Budget sẽ được đánh dấu là "Đã duyệt" chỉ khi bạn duyệt tất cả các hạng mục.
             </p>

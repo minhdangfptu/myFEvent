@@ -13,6 +13,8 @@ import {
   getExportedFiles,
   downloadExportedFile,
 } from "~/apis/exportApi";
+import { RotateCw, X } from "lucide-react";
+
 
 const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
   const [selectedSubItems, setSelectedSubItems] = useState({});
@@ -874,7 +876,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                 className="data-export-page__modal-close"
                 onClick={handleCloseOptions}
               >
-                <i className="bi bi-x-lg"></i>
+                <X size={18} />
               </button>
             </div>
 
@@ -905,7 +907,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                         className="data-export-page__selected-item-remove"
                         onClick={() => handleToggleItem(item.id)}
                       >
-                        <i className="bi bi-x"></i>
+                        <X size={18} />
                       </button>
                     </div>
                   ))}
@@ -956,7 +958,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                       className="data-export-page__modal-close"
                       onClick={handleCloseItemOptions}
                     >
-                      <i className="bi bi-x-lg"></i>
+                      <X size={18} />
                     </button>
                   </div>
 

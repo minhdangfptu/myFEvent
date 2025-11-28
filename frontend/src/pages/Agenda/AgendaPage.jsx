@@ -21,6 +21,8 @@ import {
   createDateWithItems,
 } from "~/apis/agendaApi";
 import ConfirmModal from "~/components/ConfirmModal";
+import { AlertTriangle, CheckCircle, Pencil, Plus, RotateCw, Trash, XCircle } from "lucide-react";
+
 
 export default function AgendaPage({ milestoneName = "" }) {
   // API data states
@@ -754,7 +756,7 @@ const validateDate = (dateString) => {
         {/* Permission Notice
         {!hasPermission && (
           <div className="alert alert-warning">
-            <i className="bi bi-exclamation-triangle"></i>
+            <AlertTriangle size={18} />
             Bạn chỉ có quyền xem agenda. Không thể chỉnh sửa.
           </div>
         )} */}
@@ -792,13 +794,13 @@ const validateDate = (dateString) => {
                           className="agenda-page__action-button agenda-page__action-button--confirm"
                           onClick={handleSaveDateEdit}
                         >
-                          <i className="bi bi-check-circle"></i>
+                          <CheckCircle size={18} />
                         </button>
                         <button
                           className="agenda-page__action-button agenda-page__action-button--delete"
                           onClick={handleCancelDateEdit}
                         >
-                          <i className="bi bi-x-circle"></i>
+                          <XCircle size={18} />
                         </button>
                       </div>
                     </div>
@@ -844,7 +846,7 @@ const validateDate = (dateString) => {
                   className="agenda-page__add-date-button"
                   onClick={handleShowAddDateModal}
                 >
-                  <i className="bi bi-plus"></i> Thêm ngày mới
+                  <Plus size={18} /> Thêm ngày mới
                 </button>
                 <ConfirmModal
                   show={showAddDateModal}
@@ -979,13 +981,13 @@ const validateDate = (dateString) => {
                                   className="agenda-page__action-button agenda-page__action-button--confirm"
                                   onClick={handleSaveEdit}
                                 >
-                                  <i className="bi bi-check-circle"></i>
+                                  <CheckCircle size={18} />
                                 </button>
                                 <button
                                   className="agenda-page__action-button agenda-page__action-button--delete"
                                   onClick={handleCancelEdit}
                                 >
-                                  <i className="bi bi-x-circle"></i>
+                                  <XCircle size={18} />
                                 </button>
                               </div>
                             ) : (
@@ -994,7 +996,7 @@ const validateDate = (dateString) => {
                                   className="agenda-page__action-button agenda-page__action-button--edit"
                                   onClick={() => handleStartEditing(schedule)}
                                 >
-                                  <i className="bi bi-pencil"></i>
+                                  <Pencil size={18} />
                                 </button>
                                 <button
                                   className="agenda-page__action-button agenda-page__action-button--delete"
@@ -1002,7 +1004,7 @@ const validateDate = (dateString) => {
                                     handleDeleteScheduleClick(schedule.id)
                                   }
                                 >
-                                  <i className="bi bi-trash"></i>
+                                  <Trash size={18} />
                                 </button>
                               </div>
                             )}
@@ -1079,7 +1081,7 @@ const validateDate = (dateString) => {
                     {isAddingSchedule ? (
                       <i className="bi bi-arrow-clockwise spin-animation"></i>
                     ) : (
-                      <i className="bi bi-check-circle"></i>
+                      <CheckCircle size={18} />
                     )}
                   </button>
                   <button
@@ -1092,7 +1094,7 @@ const validateDate = (dateString) => {
                       })
                     }
                   >
-                    <i className="bi bi-x-circle"></i>
+                    <XCircle size={18} />
                   </button>
                 </div>
               </div>
@@ -1102,7 +1104,7 @@ const validateDate = (dateString) => {
             {hasPermission && currentSchedules.length === 0 && (
               <div className="text-center mt-4">
                 <button className="agenda-page__add-activity-button">
-                  <i className="bi bi-plus"></i> Thêm lịch trình đầu tiên
+                  <Plus size={18} /> Thêm lịch trình đầu tiên
                 </button>
               </div>
             )}

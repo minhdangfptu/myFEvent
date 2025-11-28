@@ -20,6 +20,8 @@ import WBSPreviewModal from "~/components/WBSPreviewModal";
 import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
 import { aiApi } from "~/apis/aiApi";
 import ConfirmModal from "../../components/ConfirmModal";
+import { RotateCw, Trash } from "lucide-react";
+
 
 const TASK_TYPE_LABELS = {
   epic: "Công việc lớn",
@@ -1693,7 +1695,7 @@ export default function EventTaskPage() {
               {isDeletingTasks ? (
                 <i className="bi bi-arrow-clockwise spin-animation"></i>
               ) : (
-                <i className="bi bi-trash"></i>
+                <Trash size={18} />
               )}
               {isDeletingTasks ? "Đang xóa..." : "Xóa"}
             </button>

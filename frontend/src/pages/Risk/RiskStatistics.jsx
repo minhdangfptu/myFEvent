@@ -4,7 +4,9 @@ import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { getAllOccurredRisksByEvent, statisticRisk } from "~/apis/riskApi"; // Add statistics API import
 import { toast } from "react-toastify"; // Add for error handling
-import "./RiskStatistics.css"; // Import enhanced chart CSS
+import "./RiskStatistics.css";
+import { Check } from "lucide-react";
+ // Import enhanced chart CSS
 
 export default function RiskStatisticsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,7 +105,7 @@ export default function RiskStatisticsPage() {
         return {
           label: "Đã xử lý",
           color: "#10b981",
-          icon: <i className="bi bi-check-lg"></i>,
+          icon: <Check size={18} />,
         };
       case "resolving":
         return {

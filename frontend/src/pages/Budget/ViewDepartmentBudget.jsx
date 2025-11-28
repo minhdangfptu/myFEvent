@@ -9,6 +9,8 @@ import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useEvents } from "../../contexts/EventContext";
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle, Edit, ExternalLink, Eye, FileText, Image, Info, Link, Paperclip, Pencil, PlusCircle, RotateCcw, Search, Send, Trash, Upload, Users } from "lucide-react";
+
 
 const ViewDepartmentBudget = () => {
   const { eventId, departmentId, budgetId } = useParams();
@@ -630,7 +632,7 @@ const ViewDepartmentBudget = () => {
       // Thực tế < dự trù: màu đỏ + mũi tên xuống
       return (
         <span style={{ color: "#DC2626", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
-          <i className="bi bi-arrow-down" style={{ fontSize: "16px" }}></i>
+          <ArrowDown size={16} />
           {formatCurrency(estimated - actual)}
         </span>
       );
@@ -638,7 +640,7 @@ const ViewDepartmentBudget = () => {
       // Thực tế > dự trù: màu xanh + mũi tên lên
       return (
         <span style={{ color: "#10B981", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
-          <i className="bi bi-arrow-up" style={{ fontSize: "16px" }}></i>
+          <ArrowUp size={16} />
           {formatCurrency(actual - estimated)}
         </span>
       );
@@ -728,11 +730,11 @@ const ViewDepartmentBudget = () => {
               )}
             </div>
             <div className="d-flex align-items-center gap-2 text-muted">
-              <i className="bi bi-file-earmark-text"></i>
+              <FileText size={18} />
               <span>Tên đơn: {budgetName}</span>
             </div>
             <div className="d-flex align-items-center gap-2 text-muted">
-              <i className="bi bi-people-fill"></i>
+              <Users size={18} />
               <span>Ban: {department?.name || "Đang tải..."}</span>
             </div>
           </div>
@@ -861,7 +863,7 @@ const ViewDepartmentBudget = () => {
             <div style={{ maxWidth: "300px", width: "100%" }}>
               <div className="input-group">
                 <span className="input-group-text bg-white" style={{ borderRight: "none" }}>
-                  <i className="bi bi-search"></i>
+                  <Search size={18} />
                 </span>
                 <input
                   type="text"
@@ -1985,10 +1987,10 @@ const ViewDepartmentBudget = () => {
                                 }}
                               >
                                 {actualAmount < estimatedTotal && (
-                                  <i className="bi bi-arrow-down" style={{ fontSize: "16px" }}></i>
+                                  <ArrowDown size={16} />
                                 )}
                                 {actualAmount > estimatedTotal && (
-                                  <i className="bi bi-arrow-up" style={{ fontSize: "16px" }}></i>
+                                  <ArrowUp size={16} />
                                 )}
                                 {formatCurrency(actualAmount)}
                               </span>
@@ -2015,7 +2017,7 @@ const ViewDepartmentBudget = () => {
               }}
             >
               <div className="d-flex align-items-start gap-2">
-                <i className="bi bi-info-circle" style={{ color: "#D97706", fontSize: "20px", marginTop: "2px" }}></i>
+                <Info size={20} style={{ color: "#D97706" }} />
                 <p className="mb-0" style={{ color: "#92400E", fontSize: "14px" }}>
                   Một số mục trong ngân sách này bị từ chối, vui lòng chỉnh sửa lại trước khi gửi duyệt lại.
                 </p>
@@ -2033,7 +2035,7 @@ const ViewDepartmentBudget = () => {
               }}
             >
               <div className="d-flex align-items-start gap-2">
-                <i className="bi bi-check-circle" style={{ color: "#10B981", fontSize: "20px", marginTop: "2px" }}></i>
+                <CheckCircle size={20} style={{ color: "#10B981" }} />
                 <p className="mb-0" style={{ color: "#065F46", fontSize: "14px" }}>
                   Budget đã được gửi xuống các thành viên. Bạn có thể xem báo cáo chi tiêu của họ trong bảng trên.
                 </p>
@@ -2233,7 +2235,7 @@ const ViewDepartmentBudget = () => {
                                   setShowImageModal(true);
                                 }}
                               >
-                                <i className="bi bi-eye"></i>
+                                <Eye size={18} />
                               </button>
                             )}
                             {(ev.type === 'pdf' || ev.type === 'doc' || ev.type === 'link') && (
@@ -2243,14 +2245,14 @@ const ViewDepartmentBudget = () => {
                                 rel="noopener noreferrer"
                                 className="btn btn-sm btn-outline-primary"
                               >
-                                <i className="bi bi-box-arrow-up-right"></i>
+                                <ExternalLink size={18} />
                               </a>
                             )}
                             <button
                               className="btn btn-sm btn-outline-danger"
                               onClick={() => handleRemoveEvidence(idx)}
                             >
-                              <i className="bi bi-trash"></i>
+                              <Trash size={18} />
                             </button>
                           </div>
                         </div>

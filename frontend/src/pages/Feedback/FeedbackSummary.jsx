@@ -6,6 +6,8 @@ import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
+import { CheckCircle, Clock, FileText } from "lucide-react";
+
 
 export default function FeedbackSummary() {
   const { eventId, formId } = useParams();
@@ -183,7 +185,7 @@ export default function FeedbackSummary() {
                   gap: '8px'
                 }}
               >
-                <i className="bi bi-file-pdf"></i>
+                <FileText size={18} />
                 Xuất PDF
               </button>
             </div>
@@ -210,7 +212,7 @@ export default function FeedbackSummary() {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <i className="bi bi-check-circle" style={{ color: '#10b981', fontSize: '20px' }}></i>
+                <CheckCircle size={28} style={{ color: "#10b981" }} />
                 <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Tỷ lệ hoàn thành</span>
               </div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#111827' }}>
@@ -219,7 +221,7 @@ export default function FeedbackSummary() {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <i className="bi bi-clock" style={{ color: '#2563eb', fontSize: '20px' }}></i>
+                <Clock size={28} style={{ color: "#2563eb" }} />
                 <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Ngày cập nhật cuối</span>
               </div>
               <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
@@ -519,7 +521,7 @@ export default function FeedbackSummary() {
                               "{typeof answer === 'string' ? answer : answer.text || answer}"
                             </div>
                             <div style={{ fontSize: '12px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <i className="bi bi-clock"></i>
+                              <Clock size={18} />
                               {timeAgo}
                             </div>
                           </div>

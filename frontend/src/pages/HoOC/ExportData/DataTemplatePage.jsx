@@ -3,6 +3,8 @@ import "./DataTemplatePage.css";
 import UserLayout from "~/components/UserLayout";
 import { useNavigate, useParams } from "react-router-dom";
 import DataExportPreviewModal from "~/components/DataExportPreviewModal";
+import { Eye, RotateCw, Search, X } from "lucide-react";
+
 
 export default function DataTemplatePage() {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -292,7 +294,7 @@ export default function DataTemplatePage() {
                         className="data-template-page__search-clear"
                         onClick={() => setSearchTerm("")}
                       >
-                        <i className="bi bi-x"></i>
+                        <X size={18} />
                       </button>
                     )}
                   </div>
@@ -337,7 +339,7 @@ export default function DataTemplatePage() {
                           onClick={() => handlePreview(template.id, "data")}
                         >
                           <span className="data-template-page__btn-icon">
-                            <i className="bi bi-eye"></i>
+                            <Eye size={18} />
                           </span>
                           Preview dữ liệu
                         </button>
@@ -376,7 +378,7 @@ export default function DataTemplatePage() {
 
             {getCurrentTemplates().length === 0 && (
               <div className="data-template-page__no-results">
-                <i className="bi bi-search"></i>
+                <Search size={18} />
                 <p>Không tìm thấy template nào phù hợp với "{searchTerm}"</p>
               </div>
             )}

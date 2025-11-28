@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiChatApi } from '../../apis/aiChatApi.js';
+import { Send, User } from "lucide-react";
+
 
 export default function AIAssistantModal({ isOpen, onClose }) {
   const [sessionId, setSessionId] = useState(null);
@@ -227,7 +229,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
                 fontSize: 14,
                 flex: '0 0 auto',
               }}>
-                {m.role === 'assistant' ? <i className="bi bi-robot"></i> : <i className="bi bi-person"></i>}
+                {m.role === 'assistant' ? <i className="bi bi-robot"></i> : <User size={18} />}
               </div>
               <div style={{ background: 'white', border: '1px solid #eee', borderRadius: 12, padding: '8px 12px', maxWidth: '90%' }}>
                 <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>

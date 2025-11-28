@@ -14,6 +14,8 @@ import KanbanBoardTask from "~/components/KanbanBoardTask";
 import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
+import { Trash } from "lucide-react";
+
 
 const TASK_TYPE_LABELS = {
   epic: "Công việc lớn",
@@ -1735,7 +1737,7 @@ export default function HoDTaskPage() {
               onClick={handleDeleteSelected}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
-              <i className="bi bi-trash"></i>
+              <Trash size={18} />
               Delete
             </button>
             <button

@@ -6,6 +6,8 @@ import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
+import { Calendar, Inbox, RotateCw } from "lucide-react";
+
 
 export default function ManageFeedbackEventPage() {
   const { eventId } = useParams();
@@ -158,7 +160,7 @@ export default function ManageFeedbackEventPage() {
               </h1>
               {event && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6b7280', fontSize: '14px' }}>
-                  <i className="bi bi-calendar-event"></i>
+                  <Calendar size={18} />
                   <span>Sự kiện: {event.name}</span>
                 </div>
               )}
@@ -186,7 +188,7 @@ export default function ManageFeedbackEventPage() {
 
           {forms.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
-              <i className="bi bi-inbox" style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }}></i>
+              <Inbox size={28} />
               <p>Chưa có biểu mẫu phản hồi nào</p>
               <button
                 onClick={() => navigate(`/events/${eventId}/feedback/create`)}

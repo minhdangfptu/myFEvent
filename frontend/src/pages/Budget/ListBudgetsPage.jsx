@@ -7,6 +7,8 @@ import Loading from "../../components/Loading";
 import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { departmentService } from "../../services/departmentService";
+import { Bell, CheckCircle, ChevronLeft, ChevronRight, Clock, FileText, RotateCw, Search, Send, Trash } from "lucide-react";
+
 
 const ListBudgetsPage = () => {
   const { eventId } = useParams();
@@ -441,7 +443,7 @@ const ListBudgetsPage = () => {
                   position: "relative",
                 }}
               >
-                <i className="bi bi-file-earmark-text" style={{ fontSize: "60px", color: "#9CA3AF" }}></i>
+                <FileText size={24} style={{ color: "#9CA3AF" }} />
                 <div
                   style={{
                     position: "absolute",
@@ -457,7 +459,7 @@ const ListBudgetsPage = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <i className="bi bi-clock" style={{ fontSize: "14px", color: "#9CA3AF" }}></i>
+                  <Clock size={20} style={{ color: "#9CA3AF" }} />
                 </div>
               </div>
               
@@ -503,7 +505,7 @@ const ListBudgetsPage = () => {
                         justifyContent: "center",
                       }}
                     >
-                      <i className="bi bi-clock" style={{ fontSize: "32px", color: "#3B82F6" }}></i>
+                      <Clock size={16} style={{ color: "#3B82F6" }} />
                     </div>
                     <h5 className="card-title fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
                       Chờ nộp
@@ -536,7 +538,7 @@ const ListBudgetsPage = () => {
                         justifyContent: "center",
                       }}
                     >
-                      <i className="bi bi-check-circle" style={{ fontSize: "32px", color: "#10B981" }}></i>
+                      <CheckCircle size={16} style={{ color: "#10B981" }} />
                     </div>
                     <h5 className="card-title fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
                       Duyệt nhanh
@@ -569,7 +571,7 @@ const ListBudgetsPage = () => {
                         justifyContent: "center",
                       }}
                     >
-                      <i className="bi bi-bell" style={{ fontSize: "32px", color: "#8B5CF6" }}></i>
+                      <Bell size={16} style={{ color: "#8B5CF6" }} />
                     </div>
                     <h5 className="card-title fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
                       Thông báo
@@ -666,7 +668,7 @@ const ListBudgetsPage = () => {
             <div className="mb-4">
               <div className="input-group" style={{ maxWidth: "400px" }}>
                 <span className="input-group-text bg-white" style={{ borderRight: "none" }}>
-                  <i className="bi bi-search"></i>
+                  <Search size={18} />
                 </span>
                 <input
                   type="text"
@@ -833,7 +835,7 @@ const ListBudgetsPage = () => {
                     disabled={currentPage === 1}
                     style={{ borderRadius: "8px" }}
                   >
-                    <i className="bi bi-chevron-left"></i>
+                    <ChevronLeft size={18} />
                   </button>
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                     const page = i + 1;
@@ -854,7 +856,7 @@ const ListBudgetsPage = () => {
                     disabled={currentPage === totalPages}
                     style={{ borderRadius: "8px" }}
                   >
-                    <i className="bi bi-chevron-right"></i>
+                    <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
