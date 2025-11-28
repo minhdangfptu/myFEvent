@@ -15,6 +15,7 @@ import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
 import { Trash } from "lucide-react";
+import authStorage from "~/utils/authStorage";
 
 
 const TASK_TYPE_LABELS = {
@@ -47,6 +48,18 @@ const STATUS_TRANSITIONS = {
   hoan_thanh: [],
   huy: [],
 };
+
+const createEmptyAddTaskForm = (deptId = "") => ({
+  title: "",
+  description: "",
+  departmentId: deptId,
+  assigneeId: "",
+  startDate: "",
+  dueDate: "",
+  milestoneId: "",
+  parentId: "",
+  taskType: "epic",
+});
 
 export default function HoDTaskPage() {
   const { t } = useTranslation();
@@ -185,7 +198,7 @@ export default function HoDTaskPage() {
             statusCode,
             status: STATUS_LABEL_MAP[statusCode] || "Không xác định",
             taskType: task?.taskType || "normal",
-            createdBy: task?.createdBy?.fullName || task?.createdBy?.name || "----",
+            createdBy: task?.createdBy?.userId?.fullName || task?.createdBy?.fullName || task?.createdBy?.name || "----",
             createdById: task?.createdBy?._id || task?.createdBy || null,
             estimate: task?.estimate != null && task?.estimateUnit ? `${task.estimate}${task.estimateUnit}` : "Ước tính",
             createdAt: task?.createdAt ? new Date(task.createdAt).toLocaleDateString("vi-VN") : "Thời gian",
@@ -417,15 +430,9 @@ export default function HoDTaskPage() {
   const [currentUserId, setCurrentUserId] = useState(null);
   
   useEffect(() => {
-    // Lấy userId từ localStorage hoặc API
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setCurrentUserId(user?._id || user?.id);
-      } catch (e) {
-        console.error("Error parsing user:", e);
-      }
+    const storedUser = authStorage.getUser();
+    if (storedUser) {
+      setCurrentUserId(storedUser?._id || storedUser?.id);
     }
   }, []);
 
@@ -540,21 +547,43 @@ export default function HoDTaskPage() {
     navigate(`/events/${eventId}/tasks/${taskId}`);
   };
 
-  const [addTaskForm, setAddTaskForm] = useState({
-    title: "",
-    description: "",
-    departmentId: "",
-    assigneeId: "",
-    startDate: "",
-    dueDate: "",
-    milestoneId: "",
-    parentId: "",
-    taskType: "normal", // HoD chỉ tạo normal tasks
-  });
+  const [addTaskForm, setAddTaskForm] = useState(() => createEmptyAddTaskForm());
   const [assignees, setAssignees] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [parents, setParents] = useState([]);
   const [addTaskError, setAddTaskError] = useState("");
+  const [addTaskMode, setAddTaskMode] = useState("epic");
+  const [epicContext, setEpicContext] = useState(null);
+
+  const openAddTaskModal = (mode = "epic", epic = null) => {
+    setAddTaskMode(mode);
+    setEpicContext(epic);
+    setAddTaskError("");
+    setAddTaskForm(() => {
+      const baseDeptId = departmentId || epic?.departmentId || "";
+      const base = createEmptyAddTaskForm(baseDeptId);
+      if (mode === "normal") {
+        return {
+          ...base,
+          taskType: "normal",
+          parentId: epic?.id || "",
+        };
+      }
+      return {
+        ...base,
+        taskType: "epic",
+      };
+    });
+    setShowAddModal(true);
+  };
+
+  const closeAddTaskModal = () => {
+    setShowAddModal(false);
+    setEpicContext(null);
+    setAddTaskMode("epic");
+    setAddTaskError("");
+    setAddTaskForm(() => createEmptyAddTaskForm(departmentId || ""));
+  };
 
   const selectedDepartmentName = useMemo(() => (
     department?.name || ""
@@ -575,8 +604,9 @@ export default function HoDTaskPage() {
   useEffect(() => {
     if (!eventId || !showAddModal || !departmentId) return;
     
-    // Set departmentId tự động khi mở modal
-    setAddTaskForm((prev) => ({ ...prev, departmentId: departmentId }));
+    if (!addTaskForm.departmentId) {
+      setAddTaskForm((prev) => ({ ...prev, departmentId }));
+    }
     
     milestoneApi
       .listMilestonesByEvent(eventId)
@@ -591,7 +621,7 @@ export default function HoDTaskPage() {
       });
       setParents(deptTasks);
     });
-  }, [showAddModal, eventId, departmentId]);
+  }, [showAddModal, eventId, departmentId, addTaskForm.departmentId]);
 
   // Load members của ban mình
   useEffect(() => {
@@ -620,12 +650,14 @@ export default function HoDTaskPage() {
 
   const handleCreateTask = async () => {
     setAddTaskError("");
+    const taskType = addTaskForm.taskType || (addTaskMode === "normal" ? "normal" : "epic");
+    const effectiveDepartmentId = addTaskForm.departmentId || departmentId;
   
-    if (!addTaskForm.title || !addTaskForm.departmentId || !addTaskForm.dueDate) {
+    if (!addTaskForm.title || !effectiveDepartmentId || !addTaskForm.dueDate) {
       setAddTaskError("Vui lòng nhập đầy đủ các trường * bắt buộc!");
       return;
     }
-    if (addTaskForm.taskType === "normal" && !addTaskForm.parentId) {
+    if (taskType === "normal" && !addTaskForm.parentId) {
       setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
     }
@@ -636,32 +668,18 @@ export default function HoDTaskPage() {
     const payload = {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
-      departmentId: addTaskForm.departmentId,
-      assigneeId: orUndef(addTaskForm.assigneeId),
+      departmentId: effectiveDepartmentId,
+      assigneeId: taskType === "epic" ? undefined : orUndef(addTaskForm.assigneeId),
       startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
       dueDate: toISO(addTaskForm.dueDate),
       milestoneId: orUndef(addTaskForm.milestoneId),
-      parentId: orUndef(addTaskForm.parentId),
-      taskType: "normal", // HoD chỉ tạo normal tasks
+      parentId: taskType === "epic" ? undefined : orUndef(addTaskForm.parentId),
+      taskType,
     };
   
     try {
       await taskApi.createTask(eventId, payload);
-
-      setShowAddModal(false);
-      setAddTaskForm({
-        title: "",
-        description: "",
-        departmentId: departmentId, // Giữ departmentId của ban mình
-        assigneeId: "",
-        startDate: "",
-        dueDate: "",
-        milestoneId: "",
-        parentId: "",
-        taskType: "normal",
-      });
-
-      // Refresh tasks
+      closeAddTaskModal();
       fetchTasks();
       toast.success("Tạo công việc thành công!");
     } catch (err) {
@@ -930,14 +948,6 @@ export default function HoDTaskPage() {
                   ))}
                 </select>
 
-                <div className="ms-auto d-flex align-items-center gap-2">
-                  <button
-                    className="add-btn btn btn-primary"
-                    onClick={() => setShowAddModal(true)}
-                  >
-                    + Thêm công việc
-                  </button>
-                </div>
               </div>
 
               {/* Epic Groups */}
@@ -996,7 +1006,7 @@ export default function HoDTaskPage() {
                               <div>
                                 <div className="fw-semibold">{epic?.name || "Task chưa thuộc Epic"}</div>
                                 <div className="text-muted small">
-                                  Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"} • Người giao việc: {epic?.createdBy || "----"}
+                                  Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"} • Người tạo: {epic?.createdBy || "----"}
                                 </div>
                               </div>
                             </div>
@@ -1017,6 +1027,19 @@ export default function HoDTaskPage() {
                               >
                                 {STATUS_LABEL_MAP[epic?.statusCode] || epic?.status || "Chưa bắt đầu"}
                               </span>
+                              {epicId !== "orphan" && (
+                                <button
+                                  className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openAddTaskModal("normal", epic);
+                                  }}
+                                  title="Thêm công việc"
+                                >
+                                  <i className="bi bi-plus-lg" />
+                                  <span className="d-none d-md-inline">+ Công việc</span>
+                                </button>
+                              )}
                               <i className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"} text-muted`} />
                             </div>
                           </div>
@@ -1049,7 +1072,7 @@ export default function HoDTaskPage() {
                                       <th style={{ width: 180 }}>Ban phụ trách</th>
                                       <th>Công việc</th>
                                       <th style={{ width: 180 }}>Người phụ trách</th>
-                                      <th style={{ width: 150 }}>Người giao việc</th>
+                                      <th style={{ width: 150 }}>Người tạo</th>
                                       <th style={{ width: 140 }}>Trạng thái</th>
                                       <th style={{ width: 140 }}>Deadline</th>
                                     </tr>
@@ -1374,7 +1397,7 @@ export default function HoDTaskPage() {
             <div
               className="modal-backdrop"
               style={{ position: "fixed", inset: 0, zIndex: 1050 }}
-              onClick={() => setShowAddModal(false)}
+              onClick={closeAddTaskModal}
             />
             <div
               className="modal d-block"
@@ -1384,11 +1407,13 @@ export default function HoDTaskPage() {
               <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 900, width: '90%' }}>
                 <div className="modal-content" style={{ borderRadius: 16 }}>
                   <div className="modal-header">
-                    <h5 className="modal-title">➕ Thêm công việc mới</h5>
+                    <h5 className="modal-title">
+                      {addTaskMode === "epic" ? "➕ Thêm công việc lớn" : "➕ Thêm công việc"}
+                    </h5>
                     <button
                       type="button"
                       className="btn-close"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={closeAddTaskModal}
                     />
                   </div>
                   <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
@@ -1397,6 +1422,27 @@ export default function HoDTaskPage() {
                         {addTaskError}
                       </div>
                     )}
+                    {addTaskMode === "normal" && epicContext && (
+                      <div className="alert alert-info d-flex align-items-center gap-2 mb-3">
+                        <i className="bi bi-info-circle-fill" />
+                        <div>
+                          Thêm công việc cho <strong>{epicContext.name}</strong>. Ban mặc định: {epicContext.department || department?.name || "----"}.
+                        </div>
+                      </div>
+                    )}
+                    <div className="mb-3">
+                      <label className="form-label">Loại công việc</label>
+                      <input
+                        className="form-control"
+                        value={addTaskMode === "epic" ? "Công việc lớn" : "Công việc"}
+                        disabled
+                      />
+                      <div className="form-text small text-muted">
+                        {addTaskMode === "epic"
+                          ? "Công việc lớn giao cho ban, không chọn người phụ trách."
+                          : "Công việc thường sẽ thuộc một công việc lớn và giao cho thành viên."}
+                      </div>
+                    </div>
                     <div className="mb-3">
                       <label className="form-label">Tên công việc *</label>
                       <input
@@ -1422,7 +1468,7 @@ export default function HoDTaskPage() {
                       />
                     </div>
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Ban phụ trách *</label>
                         <input
                           type="text"
@@ -1432,32 +1478,34 @@ export default function HoDTaskPage() {
                           style={{ backgroundColor: "#F3F4F6", cursor: "not-allowed" }}
                         />
                         <div className="form-text small text-muted">
-                          Bạn chỉ có thể tạo công việc cho ban của mình
+                          Ban đã được tự động cố định là {department?.name || "ban của bạn"}
                         </div>
                       </div>
-                      <div className="col-md-6 mb-3">
-                        <label className="form-label">Người phụ trách *</label>
-                        <select
-                          className="form-select"
-                          value={addTaskForm.assigneeId}
-                          onChange={(e) =>
-                            handleAddTaskInput("assigneeId", e.target.value)
-                          }
-                        >
-                          <option value="">Chọn người phụ trách</option>
-                          {assignees.map((m) => (
-                            <option key={m._id || m.id || m.userId} value={m._id || m.id || m.userId}>
-                              {m.userId?.fullName || m.fullName || m.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="form-text small text-muted">
-                          Chỉ hiển thị thành viên trong ban của bạn
+                      {addTaskMode === "normal" && (
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">Người phụ trách *</label>
+                          <select
+                            className="form-select"
+                            value={addTaskForm.assigneeId}
+                            onChange={(e) =>
+                              handleAddTaskInput("assigneeId", e.target.value)
+                            }
+                          >
+                            <option value="">Chọn người phụ trách</option>
+                            {assignees.map((m) => (
+                              <option key={m._id || m.id || m.userId} value={m._id || m.id || m.userId}>
+                                {m.userId?.fullName || m.fullName || m.name}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="form-text small text-muted">
+                            Chỉ hiển thị thành viên trong ban của bạn
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Thời gian bắt đầu</label>
                         <input
                           type="datetime-local"
@@ -1485,7 +1533,7 @@ export default function HoDTaskPage() {
                           </div>
                         )}
                       </div>
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Deadline *</label>
                         <input
                           type="datetime-local"
@@ -1528,7 +1576,7 @@ export default function HoDTaskPage() {
                       </div>
                     </div>
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Cột mốc</label>
                         <select
                           className="form-select"
@@ -1545,31 +1593,33 @@ export default function HoDTaskPage() {
                           ))}
                         </select>
                       </div>
-                      <div className="col-md-6 mb-3">
-                        <label className="form-label">Thuộc Epic Task</label>
-                        <select
-                          className="form-select"
-                          value={addTaskForm.parentId}
-                          onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
-                        >
-                          <option value="">Không thuộc</option>
-                          {filteredParents.map((p) => (
-                            <option key={p._id} value={p._id}>
-                              {p.title}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="form-text small text-muted">
-                          Chỉ hiển thị epic tasks của ban bạn
+                      {addTaskMode === "normal" && (
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">Thuộc Công việc lớn *</label>
+                          <select
+                            className="form-select"
+                            value={addTaskForm.parentId}
+                            onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
+                          >
+                            <option value="">Chọn công việc lớn</option>
+                            {filteredParents.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {p.title}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="form-text small text-muted">
+                            Chỉ hiển thị công việc lớn trong ban của bạn
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                   <div className="modal-footer">
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={closeAddTaskModal}
                     >
                       Hủy
                     </button>
@@ -1578,7 +1628,7 @@ export default function HoDTaskPage() {
                       className="btn btn-primary"
                       onClick={handleCreateTask}
                     >
-                      Thêm công việc
+                      {addTaskMode === "epic" ? "Thêm công việc lớn" : "Thêm công việc"}
                     </button>
                   </div>
                 </div>

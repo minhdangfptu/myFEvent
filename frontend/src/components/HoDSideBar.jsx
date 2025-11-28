@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
 import { Bell, Bug, Calendar, Coins, Grid, HelpCircle, Menu, Moon, Settings, Sun, User, Users, Home, FileText, MessageSquareText, Database, ChevronUp, ChevronDown } from "lucide-react";
+import authStorage from "~/utils/authStorage";
 
 
 export default function HoDSideBar({
@@ -161,8 +162,8 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hod-dashboard?eventId=${eventId}` },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` },
-    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${selectedEvent || ''}/milestones` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hod-event-detail` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` }
   ];
 
   const workSubItems = [
@@ -178,16 +179,11 @@ export default function HoDSideBar({
     if (userId) return userId;
     
     // Nếu không có trong context, thử từ localStorage
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        return parsedUser?._id || parsedUser?.id;
-      }
-    } catch (e) {
-      console.error("Error reading user from localStorage:", e);
+    const storedUser = authStorage.getUser();
+    if (storedUser) {
+      return storedUser?._id || storedUser?.id;
     }
-    
+
     return null;
   };
 

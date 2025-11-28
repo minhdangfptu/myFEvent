@@ -80,6 +80,9 @@ export default function EventTaskDetailPage() {
     createdAt: "",
     updatedAt: "",
   });
+  const [taskCreatorId, setTaskCreatorId] = useState("");
+  const [taskCreatorName, setTaskCreatorName] = useState("");
+  const [taskCreatorRole, setTaskCreatorRole] = useState("");
   const [relatedTasks, setRelatedTasks] = useState({
     parent: null, // { id, title }
     dependencies: [], // [{ id, title }]
@@ -93,6 +96,32 @@ export default function EventTaskDetailPage() {
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
+
+  const getTaskCreatorId = (task) =>
+    toId(task?.createdBy?.userId) || toId(task?.createdBy);
+
+  const getTaskCreatorInfo = (task) => ({
+    id: getTaskCreatorId(task),
+    name:
+      task?.createdBy?.userId?.fullName ||
+      task?.createdBy?.fullName ||
+      task?.createdBy?.name ||
+      "",
+    role:
+      task?.createdBy?.eventRole ||
+      task?.createdBy?.role ||
+      (task?.createdBy?.userId?.eventRole || task?.createdBy?.userId?.role) ||
+      "",
+  });
+
+const getRoleLabel = (role) => {
+  const key = (role || "").toLowerCase();
+  if (key === "hooc") return "Trưởng ban Tổ chức";
+  if (key === "hod") return "Trưởng ban";
+  if (key === "member") return "Thành viên";
+  if (!role) return "";
+  return role;
+};
 
   const normalizedRole = (eventRole || "").trim().toLowerCase();
   const getSidebarType = () => {
@@ -182,6 +211,10 @@ export default function EventTaskDetailPage() {
           createdAt: task?.createdAt || "",
           updatedAt: task?.updatedAt || "",
         });
+        const creatorInfo = getTaskCreatorInfo(task);
+        setTaskCreatorId(creatorInfo.id);
+        setTaskCreatorName(creatorInfo.name);
+        setTaskCreatorRole(creatorInfo.role);
 
         // Fetch thông tin parent task và dependencies tasks
         const fetchRelatedTasks = async () => {
@@ -258,6 +291,11 @@ export default function EventTaskDetailPage() {
     }));
 
   const handleStatusChange = async (newStatusCode) => {
+    if (!canUpdateStatus) {
+      toast.error("Bạn không có quyền cập nhật trạng thái công việc này.");
+      setShowStatusModal(false);
+      return;
+    }
     const targetStatus = newStatusCode || STATUS.NOT_STARTED;
     setUpdatingStatus(true);
     try {
@@ -328,16 +366,6 @@ export default function EventTaskDetailPage() {
       setIsEditing(false);
       return;
     }
-    // Kiểm tra xem có thể edit không
-    const canEditCurrent = form.status === STATUS.NOT_STARTED;
-    if (!canEditCurrent) {
-      toast.error(
-        "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
-      );
-      setIsEditing(false);
-      return;
-    }
-
     if (!form.title || !form.dueDate) {
       toast.error("Vui lòng điền đủ các trường bắt buộc");
       return;
@@ -470,6 +498,10 @@ export default function EventTaskDetailPage() {
         createdAt: task?.createdAt || "",
         updatedAt: task?.updatedAt || "",
       });
+      const creatorInfo = getTaskCreatorInfo(task);
+      setTaskCreatorId(creatorInfo.id);
+      setTaskCreatorName(creatorInfo.name);
+      setTaskCreatorRole(creatorInfo.role);
 
       // Fetch thông tin parent task và dependencies tasks
       const fetchRelatedTasks = async () => {
@@ -632,17 +664,32 @@ export default function EventTaskDetailPage() {
     (!!form.departmentId
       ? String(form.departmentId) === String(currentMembershipDeptId || form.departmentId)
       : true);
-
-  const isManagerRole =
-    normalizedRole === "hooc" || normalizedRole === "hod";
-
-  const canUpdateStatus = isSelfAssigned || isManagerRole;
-
-  // Kiểm tra xem có thể edit không (chỉ khi status = "todo"/"Chưa bắt đầu")
-  const canEdit = form.status === STATUS.NOT_STARTED && isManagerRole;
-
+  const isHoD = normalizedRole === "hod";
+  const isHoOC = normalizedRole === "hooc";
   const isMemberRole = normalizedRole === "member";
-  const canModifyTask = isManagerRole;
+  const isTaskCreator =
+    !!taskCreatorId &&
+    !!currentUserId &&
+    String(taskCreatorId) === String(currentUserId);
+  const canManageTask = isHoOC || (isHoD && isTaskCreator);
+  const canModifyTask = canManageTask;
+  const assignedToOther =
+    !!form.assigneeId &&
+    (!currentMembershipId ||
+      String(form.assigneeId) !== String(currentMembershipId));
+
+  const canUpdateStatus =
+    isHoOC ||
+    isSelfAssigned ||
+    (isHoD && canManageTask && !assignedToOther);
+
+  // HoOC hoặc HoD tạo task có thể chỉnh sửa ở mọi trạng thái
+  const canEdit = canManageTask;
+  const creatorRoleLabel = getRoleLabel(taskCreatorRole);
+  const creatorBadgeLabel = creatorRoleLabel || taskCreatorRole || "";
+  const isTaskFromHoOC = (taskCreatorRole || "").toLowerCase() === "hooc";
+  const creatorNoticeLabel =
+    creatorBadgeLabel || (isTaskFromHoOC ? "Trưởng ban Tổ chức" : "người giao việc");
   useEffect(() => {
     if (!canModifyTask && isEditing) {
       setIsEditing(false);
@@ -669,8 +716,8 @@ export default function EventTaskDetailPage() {
   // Hiển thị thông báo khi không thể edit
   const editDisabledMessage = !canEditFields
     ? !canModifyTask
-      ? "Chỉ HoOC hoặc HoD mới có quyền chỉnh sửa."
-      : "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'. Chỉ có thể cập nhật trạng thái."
+      ? "Chỉ HoOC hoặc HoD tạo công việc này mới có quyền chỉnh sửa."
+      : "Bạn không thể chỉnh sửa công việc này."
     : null;
 
   const leftBlock = (
@@ -1151,6 +1198,28 @@ export default function EventTaskDetailPage() {
         <div className="text-muted small">Người thực hiện</div>
         <div className="fw-medium">{assigneeName}</div>
       </div>
+      {taskCreatorName && (
+        <div className="soft-card p-3 mb-3">
+          <div className="text-muted small">Người tạo</div>
+          <div className="fw-medium d-flex align-items-center gap-2">
+            <span>{taskCreatorName}</span>
+            {creatorBadgeLabel && (
+              <span
+                className="badge rounded-pill text-bg-light"
+                style={{ border: "1px solid #e5e7eb" }}
+              >
+                {creatorBadgeLabel}
+              </span>
+            )}
+          </div>
+          {!canManageTask && isHoD && (
+            <div className="text-danger small mt-2">
+              Công việc do {creatorNoticeLabel} giao. Bạn chỉ có thể
+              cập nhật trạng thái.
+            </div>
+          )}
+        </div>
+      )}
       <div className="soft-card p-3 mb-3">
         <div className="text-muted small">Cột mốc</div>
         <div className="fw-medium">
@@ -1242,6 +1311,13 @@ export default function EventTaskDetailPage() {
                   ⚠️ {editDisabledMessage}
                 </div>
               )}
+              {!canManageTask && isHoD && taskCreatorName && (
+                <div className="alert alert-info py-2 px-3 mt-2 mb-0">
+                  Công việc này được giao bởi {taskCreatorName}
+                  {creatorBadgeLabel ? ` (${creatorBadgeLabel})` : ""}. Bạn chỉ
+                  có thể cập nhật trạng thái hoặc theo dõi tiến độ.
+                </div>
+              )}
             </div>
             <div className="d-flex align-items-center gap-2">
               <button className="btn btn-warning" onClick={() => navigate(-1)}>
@@ -1249,32 +1325,20 @@ export default function EventTaskDetailPage() {
               </button>
               {!isEditing ? (
                 <>
-                  {isManagerRole && (
+                  {canManageTask && (
                     <button
                       className="btn btn-outline-secondary"
                       onClick={() => {
                         setIsEditing(true);
                       }}
-                      disabled={form.status !== STATUS.NOT_STARTED}
-                      title={
-                        form.status !== STATUS.NOT_STARTED
-                          ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'"
-                          : ""
-                      }
                     >
                       Chỉnh sửa
                     </button>
                   )}
-                  {isManagerRole && (
+                  {canManageTask && (
                     <button
                       className="btn btn-danger"
                       onClick={handleDelete}
-                      disabled={form.status === STATUS.IN_PROGRESS}
-                      title={
-                        form.status === STATUS.IN_PROGRESS
-                          ? "Không thể xóa task khi đang ở trạng thái 'Đang làm'"
-                          : ""
-                      }
                     >
                       Xóa
                     </button>

@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient.js';
+import authStorage from '../utils/authStorage.js';
 
 // === EXPORT APIs ===
 
@@ -46,11 +47,12 @@ export const getExportedFiles = async (eventId) => {
 // Download exported file - Updated to use fetch for blob handling
 export const downloadExportedFile = async (filename) => {
   try {
+    const token = authStorage.getAccessToken();
     const response = await fetch(`/api/events/exports/download/${filename}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth header
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       }
     });
 
