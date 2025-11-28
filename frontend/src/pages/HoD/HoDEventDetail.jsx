@@ -6,6 +6,8 @@ import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import { useEvents } from "../../contexts/EventContext";
 import { formatDate } from "../../utils/formatDate";
+import { AlignLeft, Calendar, CalendarCheck, ClipboardList, Copy, FileText, Grid, Info, Link, MapPin, User, Users } from "lucide-react";
+
 
 export default function HoDEventDetail() {
   const { eventId } = useParams();
@@ -407,11 +409,11 @@ export default function HoDEventDetail() {
             <h1 className="event-hero-title">{event.name}</h1>
             <div className="event-hero-meta">
               <div className="hero-meta-item">
-                <i className="bi bi-people-fill"></i>
+                <Users size={18} />
                 <span>{members.length} Thành viên</span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-calendar-event"></i>
+                <Calendar size={18} />
                 <span>
                   {event.eventStartDate && event.eventEndDate
                     ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
@@ -419,7 +421,7 @@ export default function HoDEventDetail() {
                 </span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-geo-alt-fill"></i>
+                <MapPin size={18} />
                 <span>{event.location || "Chưa cập nhật"}</span>
               </div>
               <div className="status-badge" style={{ background: statusConfig.bg, color: statusConfig.color }}>
@@ -432,11 +434,11 @@ export default function HoDEventDetail() {
 
         <div className="nav-tabs-modern">
           <button className={`tab-button ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>
-            <i className="bi bi-grid"></i>
+            <Grid size={18} />
             Tổng quan
           </button>
           <button className={`tab-button ${activeTab === "invite" ? "active" : ""}`} onClick={() => setActiveTab("invite")}>
-            <i className="bi bi-link-45deg"></i>
+            <Link size={18} />
             Mã mời
           </button>
         </div>
@@ -454,7 +456,7 @@ export default function HoDEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-info-circle"></i>
+                      <Info size={18} />
                     </div>
                     Thông tin sự kiện
                   </div>
@@ -462,7 +464,7 @@ export default function HoDEventDetail() {
                 <div className="info-grid">
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-card-heading"></i>
+                      <FileText size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Tên sự kiện</div>
@@ -471,7 +473,7 @@ export default function HoDEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-person"></i>
+                      <User size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Người tổ chức</div>
@@ -480,7 +482,7 @@ export default function HoDEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-calendar-check"></i>
+                      <CalendarCheck size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Thời gian</div>
@@ -493,7 +495,7 @@ export default function HoDEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-geo-alt"></i>
+                      <MapPin size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Địa điểm</div>
@@ -517,7 +519,7 @@ export default function HoDEventDetail() {
                   {event.description && (
                     <div className="info-item">
                       <div className="info-icon">
-                        <i className="bi bi-text-paragraph"></i>
+                        <AlignLeft size={18} />
                       </div>
                       <div className="info-content">
                         <div className="info-label">Mô tả</div>
@@ -536,7 +538,7 @@ export default function HoDEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-people"></i>
+                      <Users size={18} />
                     </div>
                     Thành viên ({members.length})
                   </div>
@@ -568,7 +570,7 @@ export default function HoDEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-clipboard-data"></i>
+                      <ClipboardList size={18} />
                     </div>
                     Thông tin bổ sung
                   </div>
@@ -603,7 +605,7 @@ export default function HoDEventDetail() {
             <div>
               <div className="join-code-card">
                 <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem" }}>
-                  <i className="bi bi-link-45deg" style={{ marginRight: "0.5rem" }}></i>
+                  <Link size={20} />
                   Mã mời tham gia
                 </h3>
                 <p style={{ marginBottom: "1.5rem", opacity: 0.9 }}>
@@ -614,7 +616,7 @@ export default function HoDEventDetail() {
                   <div className="join-code-input-group">
                     <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
-                      <i className="bi bi-copy"></i>
+                      <Copy size={18} />
                     </button>
                   </div>
                 </div>
@@ -623,7 +625,7 @@ export default function HoDEventDetail() {
                   <div className="join-code-input-group">
                     <input type="text" className="join-code-input" value={event.joinCode} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(event.joinCode)}>
-                      <i className="bi bi-copy"></i>
+                      <Copy size={18} />
                     </button>
                   </div>
                 </div>

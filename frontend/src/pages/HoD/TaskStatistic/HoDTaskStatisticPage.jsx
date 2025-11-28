@@ -6,6 +6,8 @@ import { taskApi } from "~/apis/taskApi";
 import { milestoneApi } from "~/apis/milestoneApi";
 import { departmentApi } from "~/apis/departmentApi";
 import Loading from "~/components/Loading";
+import { CheckCircle } from "lucide-react";
+
 
 export default function HoDTaskStatisticPage() {
   const { eventId } = useParams();
@@ -233,7 +235,7 @@ export default function HoDTaskStatisticPage() {
 
               <div className="hod-task-statistic-page__kpi-card hod-task-statistic-page__kpi-card--completed">
                 <div className="hod-task-statistic-page__kpi-icon">
-                  <i className="bi bi-check-circle"></i>
+                  <CheckCircle size={18} />
                 </div>
                 <div className="hod-task-statistic-page__kpi-content">
                   <div className="hod-task-statistic-page__kpi-value">

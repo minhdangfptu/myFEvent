@@ -5,6 +5,8 @@ import { useAuth } from "~/contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
+import { ArrowLeft, Bell, Bug, Calendar, Coins, Grid, HelpCircle, Menu, Moon, Settings, Sun, User, Users } from "lucide-react";
+
 
 export default function HoDSideBar({
   sidebarOpen,
@@ -369,7 +371,7 @@ export default function HoDSideBar({
 
           {sidebarOpen && (
             <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
-              <i className="bi bi-arrow-left"></i>
+              <ArrowLeft size={18} />
             </button>
           )}
         </div>
@@ -820,14 +822,14 @@ export default function HoDSideBar({
                 className={`theme-option ${theme === "light" ? "active" : ""}`}
                 onClick={() => setTheme("light")}
               >
-                <i className="bi bi-sun"></i>
+                <Sun size={18} />
                 <span>Sáng</span>
               </button>
               <button
                 className={`theme-option ${theme === "dark" ? "active" : ""}`}
                 onClick={() => setTheme("dark")}
               >
-                <i className="bi bi-moon"></i>
+                <Moon size={18} />
                 <span>Tối</span>
               </button>
             </div>
@@ -883,7 +885,7 @@ export default function HoDSideBar({
             title="Mở rộng"
             aria-label="Mở/đóng thanh bên"
           >
-            <i className="bi bi-list"></i>
+            <Menu size={18} />
           </button>
         )}
       </div>

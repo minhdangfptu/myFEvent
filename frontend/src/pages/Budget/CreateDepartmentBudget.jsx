@@ -5,6 +5,7 @@ import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { ArrowLeft, Users, RotateCw, Save, Send, PlusCircle, CheckCircle, AlertTriangle, XCircle, Upload, Trash, Image, FileText, Link, Paperclip } from "lucide-react";
 
 const CreateDepartmentBudget = () => {
   const { eventId, departmentId, budgetId: budgetIdFromParams } = useParams();
@@ -333,18 +334,18 @@ const CreateDepartmentBudget = () => {
     window.open(evidence.url, "_blank", "noopener,noreferrer");
   };
 
-  const getEvidenceIconClass = (type) => {
+  const getEvidenceIcon = (type) => {
     switch (type) {
       case "image":
-        return "bi-image";
+        return Image;
       case "pdf":
-        return "bi-file-pdf";
+        return FileText;
       case "doc":
-        return "bi-file-earmark-text";
+        return FileText;
       case "link":
-        return "bi-link-45deg";
+        return Link;
       default:
-        return "bi-paperclip";
+        return Paperclip;
     }
   };
 
@@ -671,13 +672,13 @@ const CreateDepartmentBudget = () => {
               onClick={handleCancel}
               style={{ color: "#6b7280" }}
             >
-              <i className="bi bi-arrow-left me-2"></i>
+              <ArrowLeft className="me-2" size={20} />
               <span className="fw-bold" style={{ fontSize: "20px", color: "#111827" }}>
                 {isEditMode ? "Chỉnh Sửa Budget" : "Tạo Budget Mới"}
               </span>
             </button>
             <div className="d-flex align-items-center gap-2 text-muted">
-              <i className="bi bi-people-fill"></i>
+              <Users size={18} />
               <span>Ban: {department?.name || "Đang tải..."}</span>
             </div>
           </div>
@@ -697,9 +698,9 @@ const CreateDepartmentBudget = () => {
               style={{ borderRadius: "8px" }}
             >
               {isSavingDraft ? (
-                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                <RotateCw className="spin-animation me-2" size={18} />
               ) : (
-                <i className="bi bi-save me-2"></i>
+                <Save className="me-2" size={18} />
               )}
               {isSavingDraft ? "Đang lưu..." : "Lưu Nháp"}
             </button>
@@ -710,9 +711,9 @@ const CreateDepartmentBudget = () => {
               style={{ borderRadius: "8px" }}
             >
               {isSubmitting ? (
-                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                <RotateCw className="spin-animation me-2" size={18} />
               ) : (
-                <i className="bi bi-send me-2"></i>
+                <Send className="me-2" size={18} />
               )}
               {isSubmitting ? "Đang gửi..." : (budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "Gửi lại" : "Gửi Duyệt")}
             </button>
@@ -789,7 +790,7 @@ const CreateDepartmentBudget = () => {
                 onClick={handleAddCategory}
                 style={{ borderRadius: "8px" }}
               >
-                <i className="bi bi-plus-circle me-1"></i>
+                <PlusCircle className="me-1" size={18} />
                 Thêm
               </button>
             </div>
@@ -912,7 +913,7 @@ const CreateDepartmentBudget = () => {
                       <div style={{ position: "relative" }}>
                         {isApproved ? (
                           <span style={{ color: "#10B981", fontWeight: "500", fontSize: "14px" }}>
-                            {item.name} <i className="bi bi-check-circle ms-1"></i>
+                            {item.name} <CheckCircle className="ms-1" size={16} />
                           </span>
                         ) : (
                           <input
@@ -952,7 +953,7 @@ const CreateDepartmentBudget = () => {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            <i className="bi bi-exclamation-triangle me-1"></i>
+                            <AlertTriangle className="me-1" size={14} />
                             Nội dung đã tồn tại
                           </div>
                         )}
@@ -1068,7 +1069,7 @@ const CreateDepartmentBudget = () => {
                                 fontSize: "13px",
                               }}
                             >
-                              <i className={`bi ${getEvidenceIconClass(ev.type)} text-primary`}></i>
+                              {React.createElement(getEvidenceIcon(ev.type), { className: "text-primary", size: 16 })}
                               <button
                                 type="button"
                                 className="btn btn-link p-0"
@@ -1083,7 +1084,7 @@ const CreateDepartmentBudget = () => {
                                   className="btn btn-link text-danger p-0 ms-auto"
                                   onClick={() => handleRemoveEvidence(item.id, idx)}
                                 >
-                                  <i className="bi bi-x-circle"></i>
+                                  <XCircle size={16} />
                                 </button>
                               )}
                             </div>
@@ -1122,7 +1123,7 @@ const CreateDepartmentBudget = () => {
                                 padding: "4px 6px",
                               }}
                             >
-                              <i className="bi bi-upload" style={{ fontSize: "105%" }}></i>
+                              <Upload style={{ fontSize: "105%" }} size={16} />
                               <span className="text-center">Tải file</span>
                               <input
                                 type="file"
@@ -1194,7 +1195,7 @@ const CreateDepartmentBudget = () => {
                             style={{ textDecoration: "none", opacity: !isEditable ? 0.5 : 1, fontSize: "14px" }}
                             title="Xóa mục"
                           >
-                            <i className="bi bi-trash"></i>
+                            <Trash size={16} />
                           </button>
                         </div>
                       )}
@@ -1216,7 +1217,7 @@ const CreateDepartmentBudget = () => {
               fontWeight: "600",
             }}
           >
-            <i className="bi bi-plus-circle me-2"></i>
+            <PlusCircle className="me-2" size={18} />
             Thêm Mục Mới
           </button>
         </div>

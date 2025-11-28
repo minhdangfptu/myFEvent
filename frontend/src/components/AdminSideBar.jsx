@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar, Grid, Menu, Moon, Settings, Sun, Users } from "lucide-react";
+
 
 export default function AdminSidebar({
   sidebarOpen,
@@ -161,7 +163,7 @@ export default function AdminSidebar({
               onClick={() => setSidebarOpen(false)}
               style={{ padding: "4px 8px" }}
             >
-              <i className="bi bi-arrow-left"></i>
+              <ArrowLeft size={18} />
             </button>
           )}
         </div>
@@ -244,14 +246,14 @@ export default function AdminSidebar({
               className={`theme-option ${theme === "light" ? "active" : ""}`}
               onClick={() => setTheme("light")}
             >
-              <i className="bi bi-sun"></i>
+              <Sun size={18} />
               <span>Sáng</span>
             </button>
             <button
               className={`theme-option ${theme === "dark" ? "active" : ""}`}
               onClick={() => setTheme("dark")}
             >
-              <i className="bi bi-moon"></i>
+              <Moon size={18} />
               <span>Tối</span>
             </button>
           </div>
@@ -263,7 +265,7 @@ export default function AdminSidebar({
             title="Mở rộng"
             aria-label="Mở/đóng thanh bên"
           >
-            <i className="bi bi-list"></i>
+            <Menu size={18} />
           </button>
         )}
       </div>

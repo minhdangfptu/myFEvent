@@ -9,6 +9,8 @@ import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
 import { formatDate, formatDateForInput } from "../../utils/formatDate";
+import { AlertTriangle, AlignLeft, Calendar, CalendarCheck, Check, CheckCircle, Copy, Edit, Eye, FileText, Grid, Hash, Image, Info, Link, Lock, MapPin, Pencil, PlayCircle, ShieldCheck, Sliders, Trash, Upload, User, Users, X, XCircle, XOctagon, Zap } from "lucide-react";
+
 
 function toDMY(value) {
   const d = new Date(value);
@@ -58,8 +60,6 @@ export default function HoOCEventDetail() {
 
   // Image upload state
   const [imagePreview, setImagePreview] = useState("");
-  const [imageInputType, setImageInputType] = useState("file");
-  const [imageUrl, setImageUrl] = useState("");
 
   // Modal state
   const [confirmModal, setConfirmModal] = useState({
@@ -327,21 +327,6 @@ export default function HoOCEventDetail() {
     reader.readAsDataURL(file);
   };
 
-  const handleUrlAdd = () => {
-    if (!imageUrl.trim()) {
-      setError("Vui lòng nhập URL hình ảnh");
-      return;
-    }
-    try {
-      new URL(imageUrl);
-    } catch {
-      setError("URL không hợp lệ");
-      return;
-    }
-    setImagePreview(imageUrl.trim());
-    setImageUrl("");
-    setError("");
-  };
 
   const removeImagePreview = () => {
     setImagePreview("");
@@ -459,10 +444,10 @@ const handleImageUpload = async () => {
 
   const getStatusConfig = (status) => {
     const configs = {
-      scheduled: { text: "Sắp diễn ra", color: "#3b82f6", bg: "#eff6ff", icon: "clock" },
-      ongoing: { text: "Đang diễn ra", color: "#10b981", bg: "#f0fdf4", icon: "play-circle" },
-      completed: { text: "Đã kết thúc", color: "#6b7280", bg: "#f9fafb", icon: "check-circle" },
-      cancelled: { text: "Đã hủy", color: "#ef4444", bg: "#fef2f2", icon: "x-circle" },
+      scheduled: { text: "Sắp diễn ra", color: "#3b82f6", bg: "#eff6ff", icon: Calendar },
+      ongoing: { text: "Đang diễn ra", color: "#10b981", bg: "#f0fdf4", icon: PlayCircle },
+      completed: { text: "Đã kết thúc", color: "#6b7280", bg: "#f9fafb", icon: CheckCircle },
+      cancelled: { text: "Đã hủy", color: "#ef4444", bg: "#fef2f2", icon: XCircle },
     };
     return configs[status] || configs.scheduled;
   };
@@ -490,6 +475,7 @@ const handleImageUpload = async () => {
   }
 
   const statusConfig = getStatusConfig(event.status);
+  const StatusIcon = statusConfig.icon || Info;
 
   return (
     <UserLayout title="Chi tiết sự kiện" sidebarType={sidebarType} activePage="overview-detail" eventId={eventId}>
@@ -875,8 +861,19 @@ const handleImageUpload = async () => {
 
         .join-code-input-group {
           display: flex;
+          align-items: center;
           gap: 0.5rem;
           margin-top: 0.75rem;
+        }
+        .join-code-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
         }
 
         .join-code-input {
@@ -1046,9 +1043,14 @@ const handleImageUpload = async () => {
           grid-template-columns: repeat(6, 1fr);
           gap: 0.75rem;
           margin: 1.5rem 0;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .otp-input {
+          width: 100%;
+          max-width: 100%;
           aspect-ratio: 1;
           text-align: center;
           font-size: 1.5rem;
@@ -1056,6 +1058,8 @@ const handleImageUpload = async () => {
           border: 2px solid #e2e8f0;
           border-radius: 12px;
           transition: all 0.3s ease;
+          box-sizing: border-box;
+          padding: 0;
         }
 
         .otp-input:focus {
@@ -1098,6 +1102,14 @@ const handleImageUpload = async () => {
           .action-buttons .btn-modern {
             width: 100%;
           }
+
+          .otp-grid {
+            gap: 0.5rem;
+          }
+
+          .otp-input {
+            font-size: 1.25rem;
+          }
         }
       `}</style>
 
@@ -1110,11 +1122,11 @@ const handleImageUpload = async () => {
             <h1 className="event-hero-title">{event.name}</h1>
             <div className="event-hero-meta">
               <div className="hero-meta-item">
-                <i className="bi bi-people-fill"></i>
+                <Users size={18} />
                 <span>{members.length} Thành viên</span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-calendar-event"></i>
+                <Calendar size={18} />
                 <span>
                   {(() => {
                     if (!event?.eventStartDate || !event?.eventEndDate) return "Chưa có thông tin";
@@ -1128,11 +1140,11 @@ const handleImageUpload = async () => {
                 </span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-geo-alt-fill"></i>
+                <MapPin size={18} />
                 <span>{event.location || "Chưa cập nhật"}</span>
               </div>
               <div className="status-badge" style={{ background: statusConfig.bg, color: statusConfig.color }}>
-                <i className={`bi bi-${statusConfig.icon}`}></i>
+                <StatusIcon size={16} />
                 {statusConfig.text}
               </div>
             </div>
@@ -1142,18 +1154,18 @@ const handleImageUpload = async () => {
         {/* Navigation Tabs */}
         <div className="nav-tabs-modern">
           <button className={`tab-button ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>
-            <i className="bi bi-grid"></i>
+            <Grid size={18} />
             Tổng quan
           </button>
           {!isMember && (
             <button className={`tab-button ${activeTab === "edit" ? "active" : ""}`} onClick={() => setActiveTab("edit")}>
-              <i className="bi bi-pencil-square"></i>
+              <Edit size={18} />
               Chỉnh sửa
             </button>
           )}
           {!isMember && (
             <button className={`tab-button ${activeTab === "manage" ? "active" : ""}`} onClick={() => setActiveTab("manage")}>
-              <i className="bi bi-sliders"></i>
+              <Sliders size={18} />
               Quản lý
             </button>
           )}
@@ -1162,7 +1174,7 @@ const handleImageUpload = async () => {
         {/* Error Alert */}
         {error && (
           <div className="alert-modern alert-danger">
-            <i className="bi bi-exclamation-triangle-fill"></i>
+            <AlertTriangle size={18} />
             <span>{error}</span>
           </div>
         )}
@@ -1177,7 +1189,7 @@ const handleImageUpload = async () => {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-info-circle"></i>
+                      <Info size={18} />
                     </div>
                     Thông tin sự kiện
                   </div>
@@ -1185,7 +1197,7 @@ const handleImageUpload = async () => {
                 <div className="info-grid">
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-card-heading"></i>
+                      <FileText size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Tên sự kiện</div>
@@ -1194,7 +1206,7 @@ const handleImageUpload = async () => {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-person"></i>
+                      <User size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Người tổ chức</div>
@@ -1203,7 +1215,7 @@ const handleImageUpload = async () => {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-calendar-check"></i>
+                      <CalendarCheck size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Thời gian diễn ra</div>
@@ -1216,7 +1228,7 @@ const handleImageUpload = async () => {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-geo-alt"></i>
+                      <MapPin size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Địa điểm</div>
@@ -1225,13 +1237,13 @@ const handleImageUpload = async () => {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className={`bi bi-${statusConfig.icon}`}></i>
+                      <StatusIcon size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Trạng thái</div>
                       <div className="info-value">
                         <span className="status-badge" style={{ background: statusConfig.bg, color: statusConfig.color }}>
-                          <i className={`bi bi-${statusConfig.icon}`}></i>
+                          <StatusIcon size={14} className="me-1" />
                           {statusConfig.text}
                         </span>
                       </div>
@@ -1240,7 +1252,7 @@ const handleImageUpload = async () => {
                   {event.description && (
                     <div className="info-item">
                       <div className="info-icon">
-                        <i className="bi bi-text-paragraph"></i>
+                        <AlignLeft size={18} />
                       </div>
                       <div className="info-content">
                         <div className="info-label">Mô tả</div>
@@ -1259,7 +1271,7 @@ const handleImageUpload = async () => {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-people"></i>
+                      <Users size={18} />
                     </div>
                     Thành viên ({members.length})
                   </div>
@@ -1287,24 +1299,30 @@ const handleImageUpload = async () => {
               {/* Join Code */}
               <div className="join-code-card">
                 <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem" }}>
-                  <i className="bi bi-link-45deg" style={{ marginRight: "0.5rem" }}></i>
+                  <Link size={20} />
                   Mã mời tham gia
                 </h3>
                 <div style={{ marginBottom: "1rem" }}>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
                   <div className="join-code-input-group">
+                    <div className="join-code-icon">
+                      <Link size={16} />
+                    </div>
                     <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
-                      <i className="bi bi-copy"></i>
+                      <Copy size={18} />
                     </button>
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">
+                    <div className="join-code-icon">
+                      <Hash size={16} />
+                    </div>
                     <input type="text" className="join-code-input" value={event.joinCode} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(event.joinCode)}>
-                      <i className="bi bi-copy"></i>
+                      <Copy size={18} />
                     </button>
                   </div>
                 </div>
@@ -1321,13 +1339,13 @@ const handleImageUpload = async () => {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-pencil-square"></i>
+                      <Edit size={18} />
                     </div>
                     Chỉnh sửa thông tin
                   </div>
                   {!editing && event?.status !== "completed" && (
                     <button className="btn-modern btn-primary-modern" onClick={() => setEditing(true)}>
-                      <i className="bi bi-pencil"></i>
+                      <Pencil size={18} />
                       Chỉnh sửa
                     </button>
                   )}
@@ -1335,7 +1353,7 @@ const handleImageUpload = async () => {
 
                 {event?.status === "completed" && (
                   <div className="alert-modern alert-warning">
-                    <i className="bi bi-info-circle-fill"></i>
+                    <Info size={18} />
                     <span>Sự kiện đã kết thúc, không thể chỉnh sửa.</span>
                   </div>
                 )}
@@ -1413,11 +1431,11 @@ const handleImageUpload = async () => {
                         status: event.status,
                       });
                     }} disabled={submitting} style={{ flex: 1 }}>
-                      <i className="bi bi-x"></i>
+                      <X size={18} />
                       Hủy
                     </button>
                     <button className="btn-modern btn-primary-modern" onClick={handleSave} disabled={submitting} style={{ flex: 1 }}>
-                      <i className="bi bi-check"></i>
+                      <Check size={18} />
                       {submitting ? "Đang lưu..." : "Lưu thay đổi"}
                     </button>
                   </div>
@@ -1431,7 +1449,7 @@ const handleImageUpload = async () => {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-image"></i>
+                      <Image size={18} />
                     </div>
                     Hình ảnh
                   </div>
@@ -1460,41 +1478,19 @@ const handleImageUpload = async () => {
                         paddingLeft: "2px",
                       }}
                     >
-                      <i className="bi bi-trash"></i>
+                      <Trash size={18} />
                     </button>
                   )}
                 </div>
 
                 {canEditImages && (
                   <>
-                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                      <button className={`btn-modern ${imageInputType === "file" ? "btn-primary-modern" : "btn-secondary-modern"}`} onClick={() => setImageInputType("file")} style={{ flex: 1, fontSize: "0.875rem" }}>
-                        <i className="bi bi-upload"></i>
-                        File
-                      </button>
-                      <button className={`btn-modern ${imageInputType === "url" ? "btn-primary-modern" : "btn-secondary-modern"}`} onClick={() => setImageInputType("url")} style={{ flex: 1, fontSize: "0.875rem" }}>
-                        <i className="bi bi-link-45deg"></i>
-                        URL
-                      </button>
+                    <div className="form-group">
+                      <input type="file" className="form-control-modern" accept="image/*" onChange={handleFileUpload} disabled={submitting} />
+                      <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.5rem", display: "block" }}>
+                        JPG, PNG, GIF. Tối đa 5MB
+                      </small>
                     </div>
-
-                    {imageInputType === "file" && (
-                      <div className="form-group">
-                        <input type="file" className="form-control-modern" accept="image/*" onChange={handleFileUpload} disabled={submitting} />
-                        <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.5rem", display: "block" }}>
-                          JPG, PNG, GIF. Tối đa 5MB
-                        </small>
-                      </div>
-                    )}
-
-                    {imageInputType === "url" && (
-                      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                        <input type="url" className="form-control-modern" placeholder="Nhập URL hình ảnh" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} disabled={submitting} />
-                        <button className="btn-modern btn-primary-modern" onClick={handleUrlAdd} disabled={submitting || !imageUrl.trim()} style={{ minWidth: "50px", padding: "0" }}>
-                          <i className="bi bi-plus"></i>
-                        </button>
-                      </div>
-                    )}
 
                     {imagePreview && (
                       <>
@@ -1502,7 +1498,7 @@ const handleImageUpload = async () => {
                           <div className="image-preview-item">
                             <img src={imagePreview} alt="Preview" onError={(e) => e.target.src = "/default-events.jpg"} />
                             <button className="image-preview-remove" onClick={removeImagePreview} disabled={submitting}>
-                              <i className="bi bi-x"></i>
+                              <X size={18} />
                             </button>
                           </div>
                         </div>
@@ -1512,7 +1508,6 @@ const handleImageUpload = async () => {
                           </button>
                           <button className="btn-modern btn-secondary-modern" onClick={() => {
                             setImagePreview("");
-                            setImageUrl("");
                             setError("");
                           }} disabled={submitting} style={{ flex: 1 }}>
                             Hủy
@@ -1535,7 +1530,7 @@ const handleImageUpload = async () => {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-sliders"></i>
+                      <Sliders size={18} />
                     </div>
                     Quản lý sự kiện
                   </div>
@@ -1543,21 +1538,21 @@ const handleImageUpload = async () => {
 
                 <div className="action-buttons">
                   <button className="btn-modern btn-success-modern" onClick={handleChangeType} disabled={(event.type === "public" && event.status === "cancelled") || event.status === "completed"}>
-                    <i className="bi bi-eye"></i>
+                    <Eye size={18} />
                     Công khai sự kiện
                   </button>
                   <button className="btn-modern btn-warning-modern" onClick={handleCancelEvent} disabled={event.status === "completed" || event.status === "cancelled"}>
-                    <i className="bi bi-x-octagon"></i>
+                    <XOctagon size={18} />
                     Hủy sự kiện
                   </button>
                   <button className="btn-modern btn-danger-modern" onClick={handleDelete}>
-                    <i className="bi bi-trash"></i>
+                    <Trash size={18} />
                     Xóa sự kiện
                   </button>
                 </div>
 
                 <div className="alert-modern alert-warning" style={{ marginTop: "1.5rem" }}>
-                  <i className="bi bi-exclamation-triangle-fill"></i>
+                  <AlertTriangle size={18} />
                   <span>Các hành động này sẽ ảnh hưởng tới toàn bộ sự kiện và không thể hoàn tác.</span>
                 </div>
               </div>
@@ -1576,7 +1571,7 @@ const handleImageUpload = async () => {
           <div className="modal-card">
             <div className="modal-header">
               <div className="modal-icon danger">
-                <i className="bi bi-shield-lock-fill"></i>
+                <Lock size={18} />
               </div>
               <div>
                 <div className="modal-title">Xác nhận xóa</div>
@@ -1602,7 +1597,7 @@ const handleImageUpload = async () => {
           <div className="modal-card">
             <div className="modal-header">
               <div className="modal-icon danger">
-                <i className="bi bi-shield-check-fill"></i>
+                <ShieldCheck size={18} />
               </div>
               <div>
                 <div className="modal-title">Xác nhận OTP</div>
@@ -1650,7 +1645,7 @@ const handleImageUpload = async () => {
           <div className="modal-card">
             <div className="modal-header">
               <div className="modal-icon danger">
-                <i className="bi bi-exclamation-triangle-fill"></i>
+                <AlertTriangle size={18} />
               </div>
               <div>
                 <div className="modal-title">Không thể công khai</div>
@@ -1673,7 +1668,7 @@ const handleImageUpload = async () => {
                 setActiveTab("edit");
                 setEditing(true);
               }}>
-                <i className="bi bi-pencil"></i>
+                <Pencil size={18} />
                 Cập nhật ngay
               </button>
             </div>

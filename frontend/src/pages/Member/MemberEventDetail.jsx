@@ -7,6 +7,8 @@ import Loading from "../../components/Loading";
 import { useEvents } from "../../contexts/EventContext";
 import { toast } from "react-toastify";
 import { formatDate } from "../../utils/formatDate";
+import { AlertTriangle, AlignLeft, Calendar, CalendarClock, ClipboardList, Copy, FileText, Grid, Hash, Info, Link, Lock, LogOut, MapPin, Tag, User, Users, Zap } from "lucide-react";
+
 
 export default function MemberEventDetail() {
   const { eventId } = useParams();
@@ -473,11 +475,11 @@ export default function MemberEventDetail() {
             <h1 className="event-hero-title">{event.name}</h1>
             <div className="event-hero-meta">
               <div className="hero-meta-item">
-                <i className="bi bi-people-fill"></i>
+                <Users size={18} />
                 <span>{memberCount} Thành viên</span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-calendar-event"></i>
+                <Calendar size={18} />
                 <span>
                   {event.eventStartDate && event.eventEndDate
                     ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
@@ -485,7 +487,7 @@ export default function MemberEventDetail() {
                 </span>
               </div>
               <div className="hero-meta-item">
-                <i className="bi bi-geo-alt-fill"></i>
+                <MapPin size={18} />
                 <span>{event.location || "Chưa cập nhật"}</span>
               </div>
               <div className="status-badge" style={{ background: statusConfig.bg, color: statusConfig.color }}>
@@ -498,11 +500,11 @@ export default function MemberEventDetail() {
 
         <div className="nav-tabs-modern">
           <button className={`tab-button ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>
-            <i className="bi bi-grid"></i>
+            <Grid size={18} />
             Tổng quan
           </button>
           <button className={`tab-button ${activeTab === "actions" ? "active" : ""}`} onClick={() => setActiveTab("actions")}>
-            <i className="bi bi-rocket-takeoff"></i>
+            <Zap size={18} />
             Hành động
           </button>
         </div>
@@ -520,7 +522,7 @@ export default function MemberEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-info-circle"></i>
+                      <Info size={18} />
                     </div>
                     Thông tin sự kiện
                   </div>
@@ -528,7 +530,7 @@ export default function MemberEventDetail() {
                 <div className="info-grid">
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-card-heading"></i>
+                      <FileText size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Tên sự kiện</div>
@@ -537,7 +539,7 @@ export default function MemberEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-person"></i>
+                      <User size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Người tổ chức</div>
@@ -546,7 +548,7 @@ export default function MemberEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-geo-alt"></i>
+                      <MapPin size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Địa điểm</div>
@@ -556,7 +558,7 @@ export default function MemberEventDetail() {
                   {event.description && (
                     <div className="info-item">
                       <div className="info-icon">
-                        <i className="bi bi-text-paragraph"></i>
+                        <AlignLeft size={18} />
                       </div>
                       <div className="info-content">
                         <div className="info-label">Mô tả</div>
@@ -571,7 +573,7 @@ export default function MemberEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-calendar-event"></i>
+                      <Calendar size={18} />
                     </div>
                     Lịch & quyền truy cập
                   </div>
@@ -579,7 +581,7 @@ export default function MemberEventDetail() {
                 <div className="info-grid">
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-clock-history"></i>
+                      <CalendarClock size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Thời gian</div>
@@ -592,7 +594,7 @@ export default function MemberEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-unlock"></i>
+                      <Lock size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Loại sự kiện</div>
@@ -601,11 +603,11 @@ export default function MemberEventDetail() {
                   </div>
                   <div className="info-item">
                     <div className="info-icon">
-                      <i className="bi bi-badge-ad"></i>
+                      <Tag size={18} />
                     </div>
                     <div className="info-content">
                       <div className="info-label">Vai trò của bạn</div>
-                      <div className="info-value">{eventRole || "Thành viên"}</div>
+                      <div className="info-value">{eventRole === "Member" ? "Thành viên" : (eventRole || "Thành viên")}</div>
                     </div>
                   </div>
                 </div>
@@ -617,7 +619,7 @@ export default function MemberEventDetail() {
                 <div className="card-header">
                   <div className="card-title">
                     <div className="card-icon">
-                      <i className="bi bi-people"></i>
+                      <Users size={18} />
                     </div>
                     Thành viên ({memberCount})
                   </div>
@@ -650,15 +652,15 @@ export default function MemberEventDetail() {
 
               <div className="join-code-card">
                 <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem" }}>
-                  <i className="bi bi-link-45deg" style={{ marginRight: "0.5rem" }}></i>
+                  <Link size={20} />
                   Mã mời tham gia
                 </h3>
                 <div style={{ marginBottom: "1rem" }}>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
                   <div className="join-code-input-group">
                     <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
-                    <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
-                      <i className="bi bi-copy"></i>
+                    <button className="copy-btn-modern" style={{ width: 52, height: 52 }} onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
+                      <Copy size={22} />
                     </button>
                   </div>
                 </div>
@@ -666,8 +668,8 @@ export default function MemberEventDetail() {
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">
                     <input type="text" className="join-code-input" value={event.joinCode} readOnly />
-                    <button className="copy-btn-modern" onClick={() => copyToClipboard(event.joinCode)}>
-                      <i className="bi bi-copy"></i>
+                    <button className="copy-btn-modern" style={{ width: 52, height: 52 }} onClick={() => copyToClipboard(event.joinCode)}>
+                      <Copy size={22} />
                     </button>
                   </div>
                 </div>
@@ -681,27 +683,27 @@ export default function MemberEventDetail() {
             <div className="card-header">
               <div className="card-title">
                 <div className="card-icon">
-                  <i className="bi bi-lightning-charge"></i>
+                  <Zap size={18} />
                 </div>
                 Trung tâm hành động
               </div>
             </div>
             <div className="action-buttons">
               <button className="btn-modern btn-outline" onClick={() => navigate(`/events/${eventId}/member-tasks`)}>
-                <i className="bi bi-list-task"></i>
+                <ClipboardList size={18} />
                 Xem công việc
               </button>
               <button className="btn-modern btn-outline" onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
-                <i className="bi bi-calendar3"></i>
+                <Calendar size={18} />
                 Lịch cá nhân
               </button>
               <button className="btn-modern btn-outline" onClick={() => navigate(`/events/${eventId}/risks`)}>
-                <i className="bi bi-exclamation-triangle"></i>
+                <AlertTriangle size={18} />
                 Rủi ro sự kiện
               </button>
               {eventRole === "Member" && (
                 <button className="btn-modern btn-danger-modern" onClick={handleLeaveEvent}>
-                  <i className="bi bi-box-arrow-right"></i>
+                  <LogOut size={18} />
                   Rời sự kiện
                 </button>
               )}

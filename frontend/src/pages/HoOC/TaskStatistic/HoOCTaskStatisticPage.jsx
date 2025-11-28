@@ -6,6 +6,8 @@ import { taskApi } from "~/apis/taskApi";
 import { milestoneApi } from "~/apis/milestoneApi";
 import Loading from "~/components/Loading";
 import HoOCTaskStatisticModal from "./HoOCTaskStatisticModal";
+import { CheckCircle } from "lucide-react";
+
 
 export default function HoOCTaskStatisticPage() {
   const { eventId } = useParams();
@@ -354,7 +356,7 @@ export default function HoOCTaskStatisticPage() {
 
               <div className="hooc-task-statistic-page__kpi-card">
                 <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--completed">
-                  <i className="bi bi-check-circle"></i>
+                  <CheckCircle size={18} />
                 </div>
                 <div className="hooc-task-statistic-page__kpi-content">
                   <div className="hooc-task-statistic-page__kpi-label">

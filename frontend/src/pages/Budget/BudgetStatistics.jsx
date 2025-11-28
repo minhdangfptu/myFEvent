@@ -4,6 +4,7 @@ import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { Calculator, Coins, CheckCircle } from "lucide-react";
 
 const BudgetStatistics = () => {
   const { eventId } = useParams();
@@ -86,7 +87,7 @@ const BudgetStatistics = () => {
                 <span className="text-muted" style={{ fontSize: "14px" }}>
                   Tổng dự trù
                 </span>
-                <i className="bi bi-calculator" style={{ fontSize: "24px", color: "#3B82F6" }}></i>
+                <Calculator size={24} style={{ color: "#3B82F6" }} />
               </div>
               <div
                 className="fw-bold"
@@ -110,7 +111,7 @@ const BudgetStatistics = () => {
                 <span className="text-muted" style={{ fontSize: "14px" }}>
                   Tổng thực tế
                 </span>
-                <i className="bi bi-cash-stack" style={{ fontSize: "24px", color: "#10B981" }}></i>
+                <Coins size={24} style={{ color: "#10B981" }} />
               </div>
               <div
                 className="fw-bold"
@@ -134,7 +135,7 @@ const BudgetStatistics = () => {
                 <span className="text-muted" style={{ fontSize: "14px" }}>
                   Đã thanh toán
                 </span>
-                <i className="bi bi-check-circle" style={{ fontSize: "24px", color: "#8B5CF6" }}></i>
+                <CheckCircle size={24} style={{ color: "#8B5CF6" }} />
               </div>
               <div
                 className="fw-bold"

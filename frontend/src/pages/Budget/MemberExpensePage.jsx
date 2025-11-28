@@ -6,6 +6,8 @@ import { departmentService } from "../../services/departmentService";
 import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { ArrowDown, ArrowDownCircle, ArrowUp, ArrowUpCircle, CheckCircle, Clock, Coins, ExternalLink, Eye, FileText, Image, Inbox, Link, ListChecks, MessageSquare, Paperclip, Search, Send, Table, Trash, TrendingUp, Upload, Users, Wallet, XCircle } from "lucide-react";
+
 
 const MemberExpensePage = () => {
   const { eventId } = useParams();
@@ -350,7 +352,7 @@ const MemberExpensePage = () => {
           <div className="row justify-content-center">
             <div className="col-12 col-lg-10 col-xl-8">
               <div className="text-center py-5">
-                <i className="bi bi-inbox" style={{ fontSize: "4rem", color: "#9CA3AF" }}></i>
+                <Inbox size={32} style={{ color: "#9CA3AF" }} />
                 <h4 className="mt-3">Chưa có budget được gửi xuống</h4>
                 <p className="text-muted">
                   Trưởng ban sẽ gửi budget xuống cho bạn sau khi được duyệt. Vui lòng quay lại sau.
@@ -408,7 +410,7 @@ const MemberExpensePage = () => {
                   Báo cáo chi tiêu
                 </h2>
                 <div className="d-flex align-items-center gap-2 text-muted">
-                          <i className="bi bi-people-fill"></i>
+                          <Users size={18} />
                           <span>Ban: {budget.departmentName || "Đang tải..."}</span>
                     </div>
                   </div>
@@ -439,7 +441,7 @@ const MemberExpensePage = () => {
                         fontSize: "24px",
                       }}
                     >
-                        <i className="bi bi-wallet2"></i>
+                        <Wallet size={18} />
                       </div>
                     <div>
                       <div className="fw-bold" style={{ fontSize: "24px", color: "#111827" }}>
@@ -476,7 +478,7 @@ const MemberExpensePage = () => {
                         fontSize: "24px",
                       }}
                     >
-                        <i className="bi bi-cash-coin"></i>
+                        <Coins size={18} />
                       </div>
                     <div>
                       <div className="fw-bold" style={{ fontSize: "24px", color: "#111827" }}>
@@ -513,7 +515,7 @@ const MemberExpensePage = () => {
                         fontSize: "24px",
                       }}
                     >
-                        <i className="bi bi-list-check"></i>
+                        <ListChecks size={18} />
                       </div>
                     <div>
                       <div className="fw-bold" style={{ fontSize: "24px", color: "#111827" }}>
@@ -555,7 +557,7 @@ const MemberExpensePage = () => {
                         fontSize: "24px",
                       }}
                     >
-                        <i className="bi bi-graph-up-arrow"></i>
+                        <TrendingUp size={18} />
                       </div>
                     <div>
                       <div className="fw-bold" style={{ fontSize: "24px", color: "#111827" }}>
@@ -609,7 +611,7 @@ const MemberExpensePage = () => {
                   <div style={{ maxWidth: "300px", width: "100%" }}>
                     <div className="input-group">
                       <span className="input-group-text bg-white" style={{ borderRight: "none" }}>
-                      <i className="bi bi-search"></i>
+                      <Search size={18} />
                       </span>
                       <input
                         type="text"
@@ -1021,10 +1023,10 @@ const MemberExpensePage = () => {
                                     color: actualAmount > estimatedTotal ? "#10B981" : actualAmount < estimatedTotal ? "#EF4444" : "#111827"
                                   }}>
                                         {actualAmount > estimatedTotal && (
-                                          <i className="bi bi-arrow-up-circle-fill"></i>
+                                          <ArrowUpCircle size={18} />
                                         )}
                                         {actualAmount < estimatedTotal && (
-                                          <i className="bi bi-arrow-down-circle-fill"></i>
+                                          <ArrowDownCircle size={18} />
                                         )}
                                         {formatCurrency(actualAmount)}
                                       </span>
@@ -1206,7 +1208,7 @@ const MemberExpensePage = () => {
                                   setShowImageModal(true);
                                 }}
                               >
-                                <i className="bi bi-eye"></i>
+                                <Eye size={18} />
                               </button>
                             )}
                             {ev.type === 'link' && (
@@ -1216,14 +1218,14 @@ const MemberExpensePage = () => {
                                 rel="noopener noreferrer"
                                   className="btn btn-sm btn-outline-primary"
                               >
-                                <i className="bi bi-box-arrow-up-right"></i>
+                                <ExternalLink size={18} />
                               </a>
                             )}
                             <button
                                 className="btn btn-sm btn-outline-danger"
                               onClick={() => handleRemoveEvidence(idx)}
                             >
-                              <i className="bi bi-trash"></i>
+                              <Trash size={18} />
                             </button>
                           </div>
                         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
+import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu } from "lucide-react";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -261,7 +262,7 @@ export default function MemberSidebar({
               onClick={() => setSidebarOpen(false)}
               style={{ padding: "4px 8px" }}
             >
-              <i className="bi bi-arrow-left"></i>
+              <ArrowLeft size={16} />
             </button>
           )}
         </div>
@@ -284,7 +285,7 @@ export default function MemberSidebar({
               }}
             >
               
-              <i className="bi bi-calendar-event me-2"></i>
+              <Calendar size={18} className="me-2" />
               <span 
                 style={{ 
                   overflow: "hidden", 
@@ -334,7 +335,7 @@ export default function MemberSidebar({
               title="Trang chủ"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-list me-3" style={{ width: 20 }} />
+                <List size={20} className="me-3" />
                 {sidebarOpen && <span>Trang chủ</span>}
               </div>
             </button>
@@ -369,15 +370,11 @@ export default function MemberSidebar({
                   title="Tổng quan"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-grid me-3" style={{ width: 20 }} />
+                    <Grid size={20} className="me-3" />
                     {sidebarOpen && <span>Tổng quan</span>}
                   </div>
                   {sidebarOpen && (
-                    <i
-                      className={`bi ${
-                        overviewOpen ? "bi-chevron-up" : "bi-chevron-down"
-                      }`}
-                    />
+                    overviewOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                   )}
                 </button>
 
@@ -433,7 +430,7 @@ export default function MemberSidebar({
               title="Ban của bạn"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-people me-3" style={{ width: 20 }} />
+                <Users size={20} className="me-3" />
                 {sidebarOpen && <span>Ban sự kiện</span>}
               </div>
             </button>
@@ -447,7 +444,7 @@ export default function MemberSidebar({
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-person me-3" style={{ width: 20 }} />
+                <User size={20} className="me-3" />
                 {sidebarOpen && <span>Thành viên</span>}
               </div>
             </button>
@@ -461,7 +458,7 @@ export default function MemberSidebar({
               title="Lịch sự kiện"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-calendar me-3" style={{ width: 20 }} />
+                <Calendar size={20} className="me-3" />
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
@@ -473,7 +470,7 @@ export default function MemberSidebar({
                 title="Phản hồi sự kiện"
               >
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
+                  <HelpCircle size={20} className="me-3" />
                   {sidebarOpen && <span>Feedback</span>}
                 </div>
               </button>
@@ -504,18 +501,11 @@ export default function MemberSidebar({
                     title="Công việc"
                   >
                     <div className="d-flex align-items-center">
-                      <i
-                        className="bi bi-file-text me-3"
-                        style={{ width: 20 }}
-                      />
+                      <FileText size={20} className="me-3" />
                       {sidebarOpen && <span>Công việc</span>}
                     </div>
                     {sidebarOpen && (
-                      <i
-                        className={`bi ${
-                          workOpen ? "bi-chevron-up" : "bi-chevron-down"
-                        }`}
-                      />
+                      workOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -585,15 +575,11 @@ export default function MemberSidebar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
+                      <Coins size={20} className="me-3" />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
-                      <i
-                        className={`bi ${
-                          financeOpen ? "bi-chevron-up" : "bi-chevron-down"
-                        }`}
-                      />
+                      financeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -652,11 +638,11 @@ export default function MemberSidebar({
                     title="Rủi ro"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-bug me-3" style={{ width: 20 }} />
+                      <Bug size={20} className="me-3" />
                       {sidebarOpen && <span>Rủi ro</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      risksOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -710,7 +696,7 @@ export default function MemberSidebar({
               title="Thông báo"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                <Bell size={20} className="me-3" />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
@@ -720,7 +706,7 @@ export default function MemberSidebar({
               title="Cài đặt"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                <Settings size={20} className="me-3" />
                 {sidebarOpen && <span>Cài đặt</span>}
               </div>
             </button>
@@ -730,7 +716,7 @@ export default function MemberSidebar({
               title="Hỗ trợ"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-question-circle me-3" style={{ width: 20 }} />
+                <HelpCircle size={20} className="me-3" />
                 {sidebarOpen && <span>Hỗ trợ</span>}
               </div>
             </button>
@@ -753,14 +739,14 @@ export default function MemberSidebar({
                 className={`theme-option ${theme === "light" ? "active" : ""}`}
                 onClick={() => setTheme("light")}
               >
-                <i className="bi bi-sun"></i>
+                <Sun size={18} />
                 <span>Sáng</span>
               </button>
               <button
                 className={`theme-option ${theme === "dark" ? "active" : ""}`}
                 onClick={() => setTheme("dark")}
               >
-                <i className="bi bi-moon"></i>
+                <Moon size={18} />
                 <span>Tối</span>
               </button>
             </div>
@@ -816,7 +802,7 @@ export default function MemberSidebar({
             title="Mở rộng"
             aria-label="Mở/đóng thanh bên"
           >
-            <i className="bi bi-list"></i>
+            <Menu size={18} />
           </button>
         )}
       </div>

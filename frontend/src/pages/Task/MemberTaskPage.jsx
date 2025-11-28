@@ -571,7 +571,18 @@ export default function MemberTaskPage() {
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <KanbanBoardTask 
+              <div
+                className="alert alert-info d-flex align-items-start gap-2"
+                style={{ fontSize: 13, borderRadius: 12 }}
+              >
+                <span style={{ fontSize: 18 }}>💡</span>
+                <div>
+                  Bạn có thể đổi trạng thái công việc bằng cách bấm trực tiếp vào
+                  badge trạng thái trong bảng danh sách hoặc kéo thả trong bảng Kanban
+                  (chỉ áp dụng cho các task bạn được giao).
+                </div>
+              </div>
+              <KanbanBoardTask
                 eventId={eventId}
                 listTask={statusGroup}
                 onTaskMove={fetchTasks}

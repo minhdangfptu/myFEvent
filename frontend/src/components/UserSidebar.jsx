@@ -4,6 +4,8 @@ import { eventApi } from "../apis/eventApi";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 import { APP_VERSION } from "../config";
+import { ArrowLeft, Bell, HelpCircle, Menu, Moon, Settings, Sun, Home, User as UserIcon } from "lucide-react";
+
 
 export default function UserSidebar({
   sidebarOpen,
@@ -138,7 +140,7 @@ export default function UserSidebar({
               onClick={() => setSidebarOpen(false)}
               style={{ padding: "4px 8px" }}
             >
-              <i className="bi bi-arrow-left"></i>
+              <ArrowLeft size={18} />
             </button>
           )}
         </div>
@@ -176,7 +178,7 @@ export default function UserSidebar({
                   title="Trang chủ"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    <Home className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
                   </div>
                 </button>
@@ -188,7 +190,7 @@ export default function UserSidebar({
                   title="Hồ sơ"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-person-circle me-3" style={{ width: 20 }} />
+                    <UserIcon className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Hồ sơ</span>}
                   </div>
                 </button>
@@ -206,7 +208,7 @@ export default function UserSidebar({
                   title="Thông báo"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                    <Bell className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Thông báo</span>}
                   </div>
                 </button>
@@ -218,7 +220,7 @@ export default function UserSidebar({
                   title="Cài đặt"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                    <Settings className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Cài đặt</span>}
                   </div>
                 </button>
@@ -230,7 +232,7 @@ export default function UserSidebar({
                   title="Hỗ trợ"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-question-circle me-3" style={{ width: 20 }} />
+                    <HelpCircle className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Hỗ trợ</span>}
                   </div>
                 </button>
@@ -253,14 +255,14 @@ export default function UserSidebar({
                 className={`theme-option ${theme === "light" ? "active" : ""}`}
                 onClick={() => setTheme("light")}
               >
-                <i className="bi bi-sun"></i>
+                <Sun size={18} />
                 <span>Sáng</span>
               </button>
               <button
                 className={`theme-option ${theme === "dark" ? "active" : ""}`}
                 onClick={() => setTheme("dark")}
               >
-                <i className="bi bi-moon"></i>
+                <Moon size={18} />
                 <span>Tối</span>
               </button>
             </div>
@@ -316,7 +318,7 @@ export default function UserSidebar({
             title="Mở rộng"
             aria-label="Mở/đóng thanh bên"
           >
-            <i className="bi bi-list"></i>
+            <Menu size={18} />
           </button>
         )}
       </div>
