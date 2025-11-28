@@ -5,20 +5,63 @@ import { budgetApi } from "../../apis/budgetApi";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import { Calculator, Coins, CheckCircle } from "lucide-react";
+import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { departmentService } from "../../services/departmentService";
 
 const BudgetStatistics = () => {
   const { eventId } = useParams();
+  const { fetchEventRole } = useEvents();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [statistics, setStatistics] = useState(null);
+  const [eventRole, setEventRole] = useState("");
+  const [hodDepartmentId, setHodDepartmentId] = useState(null);
 
   useEffect(() => {
-    fetchStatistics();
-  }, [eventId]);
+    const checkRole = async () => {
+      if (eventId) {
+        try {
+          const role = await fetchEventRole(eventId);
+          setEventRole(role);
+          
+          // Nếu là HoD, lấy department mà họ là leader
+          if (role === 'HoD' && user) {
+            try {
+              const departments = await departmentService.getDepartments(eventId);
+              const userId = user._id || user.id;
+              const userDepartment = departments.find(dept => {
+                const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+                return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
+              });
+              
+              if (userDepartment) {
+                setHodDepartmentId(userDepartment._id || userDepartment.id);
+              }
+            } catch (error) {
+              console.error("Error fetching HoD department:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking role:", error);
+        }
+      }
+    };
+    
+    checkRole();
+  }, [eventId, fetchEventRole, user]);
+
+  useEffect(() => {
+    if (eventRole) {
+      fetchStatistics();
+    }
+  }, [eventId, eventRole, hodDepartmentId]);
 
   const fetchStatistics = async () => {
     try {
       setLoading(true);
-      const data = await budgetApi.getBudgetStatistics(eventId);
+      const departmentId = eventRole === 'HoD' ? hodDepartmentId : null;
+      const data = await budgetApi.getBudgetStatistics(eventId, departmentId);
       setStatistics(data);
     } catch (error) {
       console.error("Error fetching statistics:", error);
@@ -32,12 +75,12 @@ const BudgetStatistics = () => {
     return new Intl.NumberFormat("vi-VN").format(amount || 0);
   };
 
-  if (loading) {
+  if (loading || !eventRole) {
     return (
       <UserLayout
         title="Thống kê thu chi"
         activePage="budget"
-        sidebarType="hooc"
+        sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
         eventId={eventId}
       >
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -58,17 +101,19 @@ const BudgetStatistics = () => {
     <UserLayout
       title="Thống kê thu chi"
       activePage="budget"
-      sidebarType="hooc"
+      sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
       eventId={eventId}
     >
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
         {/* Title Section */}
         <div className="mb-4">
           <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-            Thống kê thu chi
+            {eventRole === 'HoD' ? 'Thống kê thu chi của ban' : 'Thống kê thu chi'}
           </h2>
           <p className="text-muted mb-0">
-            Tổng quan về tình hình tài chính của sự kiện
+            {eventRole === 'HoD' 
+              ? 'Tổng quan về tình hình tài chính của ban bạn'
+              : 'Tổng quan về tình hình tài chính của sự kiện'}
           </p>
         </div>
 

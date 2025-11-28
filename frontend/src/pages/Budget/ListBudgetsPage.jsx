@@ -715,6 +715,11 @@ const ListBudgetsPage = () => {
                         Tiến độ
                       </th>
                     )}
+                    {eventRole === 'HoOC' && (
+                      <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
+                        Công khai
+                      </th>
+                    )}
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                       Hành Động
                     </th>
@@ -723,7 +728,7 @@ const ListBudgetsPage = () => {
                 <tbody>
                   {paginatedBudgets.length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === "completed" ? 8 : 7} className="text-center text-muted py-4">
+                      <td colSpan={activeTab === "completed" ? (eventRole === 'HoOC' ? 9 : 8) : (eventRole === 'HoOC' ? 8 : 7)} className="text-center text-muted py-4">
                         {isEmpty && hasAnyBudgets 
                           ? `Không có ngân sách nào ở tab "${activeTab === 'all' ? 'Tất cả' : activeTab === 'submitted' ? 'Chờ duyệt' : activeTab === 'approved' ? 'Đã duyệt' : activeTab === 'changes_requested' ? 'Bị từ chối' : 'Đã hoàn thành'}", vui lòng chuyển sang tab khác.`
                           : "Không tìm thấy ngân sách nào"}
@@ -758,6 +763,28 @@ const ListBudgetsPage = () => {
                                 <i className="bi bi-check-circle-fill text-success" title="Tất cả items đã hoàn thành"></i>
                               )}
                             </div>
+                          </td>
+                        )}
+                        {eventRole === 'HoOC' && (
+                          <td style={{ padding: "12px" }}>
+                            <button
+                              className={`btn btn-sm ${budget.isPublic ? 'btn-success' : 'btn-outline-secondary'}`}
+                              onClick={async () => {
+                                try {
+                                  const budgetId = budget._id || budget.id || budget.budgetId;
+                                  const deptId = budget.departmentId || budget.department?._id;
+                                  const newIsPublic = !budget.isPublic;
+                                  await budgetApi.updateBudgetVisibility(eventId, deptId, budgetId, newIsPublic);
+                                  toast.success(newIsPublic ? "Đã công khai ngân sách" : "Đã ẩn ngân sách");
+                                  fetchBudgets();
+                                } catch (error) {
+                                  toast.error(error?.response?.data?.message || "Thay đổi trạng thái thất bại");
+                                }
+                              }}
+                              style={{ borderRadius: "8px", minWidth: "100px" }}
+                            >
+                              {budget.isPublic ? "Công khai" : "Riêng tư"}
+                            </button>
                           </td>
                         )}
                         <td style={{ padding: "12px" }}>
