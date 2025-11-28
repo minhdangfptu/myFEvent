@@ -8,6 +8,7 @@ import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
+import { Calendar, Sparkles, Goal } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -869,9 +870,9 @@ export default function HoOCDashBoard() {
                                       {dayData?.day}
                                     </span>
                                     {/* Icon calendar/milestone sát số */}
-                                    {isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>}
-                                    {!isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>}
-                                    {isMilestone && !isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>}
+                                    {isMilestone && isCalendar && <Sparkles size={16} style={{marginLeft: 3}} />}
+                                    {!isMilestone && isCalendar && <Calendar size={16} style={{marginLeft: 3}} />}
+                                    {isMilestone && !isCalendar && <Goal size={16} style={{marginLeft: 3}} />}
                                   </span>
                                 </div>
                               </td>
@@ -925,7 +926,7 @@ export default function HoOCDashBoard() {
                           <div className="mt-4 pt-3 border-top">
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon}</span>
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}</span>
                                 <div style={{ flex: 1 }}>
                                   <div style={{
                                     display: "inline-block",

@@ -9,6 +9,8 @@ import aiRoute from './aiRoute.js';
 import { getAllBudgetsForEvent, getBudgetStatistics } from '../controllers/budgetController.js';
 import calendarRoute from './calendarRoute.js';
 import exportRoute from './exportRoute.js'
+import { aiBulkCreateEpics } from '../controllers/AIController/aiEpicController.js';
+import { aiBulkCreateTasksForEpic } from '../controllers/AIController/aiTaskController.js';
 
 
 const router = express.Router();
@@ -25,6 +27,14 @@ router.use('/:eventId/risks', riskRoute);
 router.use('/:eventId/ai', aiRoute);
 router.use('/:eventId/calendars',calendarRoute);
 router.use('/:eventId/exports', exportRoute );
+
+//AI ROUTE
+router.post('/:eventId/epics/ai-bulk-create', authenticateToken, aiBulkCreateEpics);
+router.post(
+  '/:eventId/epics/:epicId/tasks/ai-bulk-create',
+  authenticateToken,
+  aiBulkCreateTasksForEpic
+);
 
 // Public events
 router.get('/public', listPublicEvents);
