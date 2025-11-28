@@ -6,6 +6,8 @@ import { budgetApi } from "../../apis/budgetApi";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import { useAuth } from "../../contexts/AuthContext";
+import { Eye, Info, Wallet } from "lucide-react";
+
 
 const MemberBudgetPage = () => {
   const { eventId } = useParams();
@@ -139,7 +141,7 @@ const MemberBudgetPage = () => {
     return (
       <UserLayout
         title="Danh sách Ngân sách của Ban"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="member"
         eventId={eventId}
       >
@@ -154,7 +156,7 @@ const MemberBudgetPage = () => {
   return (
     <UserLayout
       title="Danh sách Ngân sách của Ban"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="member"
       eventId={eventId}
     >
@@ -179,7 +181,7 @@ const MemberBudgetPage = () => {
               textAlign: "center",
             }}
           >
-            <i className="bi bi-info-circle" style={{ fontSize: "48px", color: "#6b7280", marginBottom: "16px" }}></i>
+            <Info size={24} style={{ color: "#6b7280" }} />
             <h4 style={{ color: "#374151", marginBottom: "8px" }}>Chưa thuộc ban nào</h4>
             <p className="text-muted">Bạn chưa được thêm vào ban nào trong sự kiện này.</p>
           </div>
@@ -194,7 +196,7 @@ const MemberBudgetPage = () => {
           >
             {budgets.length === 0 ? (
               <div className="text-center py-5">
-                <i className="bi bi-wallet2" style={{ fontSize: "48px", color: "#6b7280", marginBottom: "16px" }}></i>
+                <Wallet size={32} style={{ color: "#6b7280" }} />
                 <p className="text-muted">Chưa có budget nào đã được duyệt</p>
                 <p className="text-muted small">Vui lòng đợi Trưởng ban tạo và HoOC duyệt ngân sách.</p>
               </div>

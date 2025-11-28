@@ -7,6 +7,8 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
+import { ArrowLeft, Check, CheckCircle, Info, RotateCcw, Save, Search, X } from "lucide-react";
+
 
 const ViewDeptBudgetDetailHoOC = () => {
   const { eventId, departmentId } = useParams();
@@ -81,12 +83,24 @@ const ViewDeptBudgetDetailHoOC = () => {
       setDepartment(deptData);
 
       // Initialize item statuses and feedbacks
+      // Nếu budget chưa được review (status là draft hoặc submitted), các items mặc định là pending
+      // Chỉ giữ status approved/rejected nếu budget đã được approved
       const initialStatuses = {};
       const initialFeedbacks = {};
+      const budgetStatus = budgetData.status || "draft";
+      const isBudgetApproved = budgetStatus === "approved";
+      
       if (budgetData.items && Array.isArray(budgetData.items)) {
         budgetData.items.forEach((item) => {
           const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-          initialStatuses[itemId] = item.status || "pending";
+          // Nếu budget đã approved, giữ nguyên status của item
+          // Nếu budget chưa approved (draft/submitted), mặc định là pending
+          if (isBudgetApproved) {
+            initialStatuses[itemId] = item.status || "pending";
+          } else {
+            // Budget chưa được review, reset về pending
+            initialStatuses[itemId] = "pending";
+          }
           initialFeedbacks[itemId] = item.feedback || "";
         });
       }
@@ -258,7 +272,7 @@ const ViewDeptBudgetDetailHoOC = () => {
     return (
       <UserLayout
         title="Không có quyền truy cập"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="hooc"
         eventId={eventId}
       >
@@ -285,7 +299,7 @@ const ViewDeptBudgetDetailHoOC = () => {
     return (
       <UserLayout
         title="View Dept Budget Detail (HoOC)"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="hooc"
         eventId={eventId}
       >
@@ -304,7 +318,7 @@ const ViewDeptBudgetDetailHoOC = () => {
   return (
     <UserLayout
       title="View Dept Budget Detail (HoOC)"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hooc"
       eventId={eventId}
     >
@@ -422,7 +436,7 @@ const ViewDeptBudgetDetailHoOC = () => {
             <div style={{ maxWidth: "300px", width: "100%" }}>
               <div className="input-group">
                 <span className="input-group-text bg-white" style={{ borderRight: "none" }}>
-                  <i className="bi bi-search"></i>
+                  <Search size={18} />
                 </span>
                 <input
                   type="text"
@@ -458,6 +472,9 @@ const ViewDeptBudgetDetailHoOC = () => {
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Ghi Chú
                   </th>
+                  <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "220px" }}>
+                    Bằng chứng
+                  </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Trạng Thái
                   </th>
@@ -472,7 +489,7 @@ const ViewDeptBudgetDetailHoOC = () => {
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="text-center text-muted py-4">
+                    <td colSpan="9" className="text-center text-muted py-4">
                       Không tìm thấy mục nào
                     </td>
                   </tr>
@@ -513,6 +530,55 @@ const ViewDeptBudgetDetailHoOC = () => {
                             {item.note || "—"}
                           </span>
                         </td>
+                        {/* Evidence */}
+                        <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
+                          {item.evidence && item.evidence.length > 0 ? (
+                            <div className="d-flex flex-column gap-1">
+                              {item.evidence.map((ev, idx) => (
+                                <div
+                                  key={idx}
+                                  className="d-flex align-items-center gap-2"
+                                  style={{
+                                    background: "#F3F4F6",
+                                    borderRadius: "6px",
+                                    padding: "4px 8px",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  <i
+                                    className={`bi ${
+                                      ev.type === "image"
+                                        ? "bi-image"
+                                        : ev.type === "pdf"
+                                        ? "bi-file-pdf"
+                                        : ev.type === "doc"
+                                        ? "bi-file-earmark-text"
+                                        : "bi-link-45deg"
+                                    }`}
+                                  ></i>
+                                  {ev.url ? (
+                                    <a
+                                      href={ev.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ fontSize: "12px" }}
+                                    >
+                                      {ev.name || "Xem bằng chứng"}
+                                    </a>
+                                  ) : (
+                                    <span style={{ fontSize: "12px" }}>
+                                      {ev.name || "Bằng chứng"}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: "12px" }}>
+                              Chưa có
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
                           {getStatusBadge(status)}
                         </td>
@@ -533,14 +599,14 @@ const ViewDeptBudgetDetailHoOC = () => {
                                   onClick={() => handleSaveFeedback(itemId)}
                                   style={{ fontSize: "11px", padding: "4px 8px" }}
                                 >
-                                  <i className="bi bi-check"></i>
+                                  <Check size={18} />
                                 </button>
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   onClick={handleCancelEditFeedback}
                                   style={{ fontSize: "11px", padding: "4px 8px" }}
                                 >
-                                  <i className="bi bi-x"></i>
+                                  <X size={18} />
                                 </button>
                               </div>
                             </div>
@@ -613,7 +679,7 @@ const ViewDeptBudgetDetailHoOC = () => {
           }}
         >
           <div className="d-flex align-items-start gap-2">
-            <i className="bi bi-info-circle" style={{ color: "#D97706", fontSize: "20px", marginTop: "2px" }}></i>
+            <Info size={24} style={{ color: "#D97706" }} />
             <p className="mb-0" style={{ color: "#92400E", fontSize: "14px" }}>
               Budget sẽ được đánh dấu là "Đã duyệt" chỉ khi bạn duyệt tất cả các hạng mục.
             </p>

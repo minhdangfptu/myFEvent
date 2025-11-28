@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { useEvents } from "../../contexts/EventContext";
 import { departmentService } from "../../services/departmentService";
+import { FileText, PlusCircle, Users } from "lucide-react";
+
 
 const DepartmentBudgetEmpty = () => {
   const { eventId, departmentId } = useParams();
@@ -45,7 +47,7 @@ const DepartmentBudgetEmpty = () => {
   return (
     <UserLayout
       title="View Department Budget / Empty"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hod"
       eventId={eventId}
     >
@@ -53,10 +55,10 @@ const DepartmentBudgetEmpty = () => {
         {/* Title Section */}
         <div className="mb-4">
           <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-            Budget Ban
+            Đơn ngân sách của ban
           </h2>
           <div className="d-flex align-items-center gap-2 text-muted">
-            <i className="bi bi-people-fill"></i>
+            <Users size={18} />
             <span>Ban: {department?.name || "Đang tải..."}</span>
           </div>
         </div>
@@ -137,7 +139,7 @@ const DepartmentBudgetEmpty = () => {
               gap: "8px",
             }}
           >
-            <i className="bi bi-plus-circle"></i>
+            <PlusCircle size={18} />
             Tạo Budget Mới
           </button>
         </div>
@@ -199,7 +201,7 @@ const DepartmentBudgetEmpty = () => {
                   marginBottom: "16px",
                 }}
               >
-                <i className="bi bi-people" style={{ fontSize: "24px", color: "#10B981" }}></i>
+                <Users size={32} style={{ color: "#10B981" }} />
               </div>
               <h5 className="fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
                 Phân quyền ban
@@ -232,7 +234,7 @@ const DepartmentBudgetEmpty = () => {
                   marginBottom: "16px",
                 }}
               >
-                <i className="bi bi-file-earmark-text" style={{ fontSize: "24px", color: "#8B5CF6" }}></i>
+                <FileText size={32} style={{ color: "#8B5CF6" }} />
               </div>
               <h5 className="fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
                 Báo cáo tự động

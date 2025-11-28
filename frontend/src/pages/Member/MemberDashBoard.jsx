@@ -11,6 +11,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { useAuth } from "../../contexts/AuthContext"
+import { Calendar, Sparkles, Goal, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -553,11 +554,11 @@ export default function MemberDashBoard() {
                       style={{
                         width: "56px",
                         height: "56px",
-                        backgroundColor: "#dbeafe",
+                        backgroundColor: "#e9d5ff",
                         fontSize: "24px",
                       }}
                     >
-                      📋
+                      <LaptopMinimalCheck style={{ color: "#8b5cf6" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -583,10 +584,10 @@ export default function MemberDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ✓
+                      <CircleCheckBig style={{ color: "#22c55e" }} />
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#10b981", lineHeight: "1" }}>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
                     {completedTasksPercent}%
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
@@ -609,7 +610,7 @@ export default function MemberDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ⚠️
+                      <FileExclamationPoint style={{ color: "#ef4444" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#ef4444", lineHeight: "1" }}>
@@ -682,7 +683,9 @@ export default function MemberDashBoard() {
                     </div>
                   ) : (
                     <div className="text-center text-muted py-4">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📋</div>
+                      <div style={{ fontSize: "48px", opacity: 0.3 }}>
+                        <LaptopMinimalCheck size={48} />
+                      </div>
                       <div className="mt-2">Chưa có công việc</div>
                     </div>
                   )}
@@ -809,9 +812,9 @@ export default function MemberDashBoard() {
                                       {dayData?.day}
                                     </span>
                                     {/* Icon calendar/milestone sát số */}
-                                    {isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>}
-                                    {!isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>}
-                                    {isMilestone && !isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>}
+                                    {isMilestone && isCalendar && <Sparkles size={16} style={{marginLeft: 3}} />}
+                                    {!isMilestone && isCalendar && <Calendar size={16} style={{marginLeft: 3}} />}
+                                    {isMilestone && !isCalendar && <Goal size={16} style={{marginLeft: 3}} />}
                                   </span>
                                 </div>
                               </td>
@@ -865,7 +868,7 @@ export default function MemberDashBoard() {
                           <div className="mt-4 pt-3 border-top">
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon}</span>
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}</span>
                                 <div style={{ flex: 1 }}>
                                   <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: chipConfig.bgColor === "#fef3c7" ? "#fef3c7" : chipConfig.bgColor, color: chipConfig.textColor, padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4, border: `1px solid ${chipConfig.borderColor}` }}>{chipConfig.label}</span>
                                   <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: chipConfig.textColor }}>

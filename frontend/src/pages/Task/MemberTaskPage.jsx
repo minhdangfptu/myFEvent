@@ -3,6 +3,7 @@ import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import NoDataImg from "~/assets/no-data.png";
+import Loading from "../../components/Loading";
 import { taskApi } from "~/apis/taskApi";
 import { eventApi } from "~/apis/eventApi";
 import { userApi } from "~/apis/userApi";
@@ -69,39 +70,67 @@ export default function MemberTaskPage() {
 
   const [eventRole, setEventRole] = useState("");
   const [memberId, setMemberId] = useState(null);
+  const [memberInfoLoading, setMemberInfoLoading] = useState(true);
   const { user } = useAuth();
 
   // Load event role and memberId
   useEffect(() => {
-    if (!eventId) return;
-    userApi
-      .getUserRoleByEvent(eventId)
-      .then((roleResponse) => {
+    if (!eventId || !user) {
+      setMemberInfoLoading(false);
+      return;
+    }
+
+    const fetchRoleAndMember = async () => {
+      try {
+        const roleResponse = await userApi.getUserRoleByEvent(eventId);
         const role = roleResponse?.role || "";
         setEventRole(role);
-        
-        // Get memberId from response if Member
-        // The API returns eventMemberId, memberId, or _id
-        if (role === "Member") {
-          // Try multiple possible paths for memberId
-          const memId = roleResponse?.eventMemberId || 
-                       roleResponse?.memberId || 
-                       roleResponse?._id;
-          
-          if (memId) {
-            console.log("Member ID found:", memId);
-            setMemberId(String(memId));
-          } else {
-            console.error("Member ID not found in response:", roleResponse);
+
+        let memId =
+          roleResponse?.eventMemberId ||
+          roleResponse?.memberId ||
+          roleResponse?._id;
+
+        if (!memId) {
+          const summary = await eventApi.getEventSummary(eventId);
+          const members =
+            summary?.data?.members ||
+            summary?.members ||
+            [];
+          const foundMember = members.find((member) => {
+            const memberUserId =
+              member?.userId?._id ||
+              member?.userId?.id ||
+              member?.userId;
+            return (
+              (memberUserId && String(memberUserId) === String(user._id)) ||
+              (member?.userId?.email &&
+                member.userId.email.toLowerCase() ===
+                  user.email?.toLowerCase())
+            );
+          });
+          if (foundMember?._id) {
+            memId = foundMember._id;
           }
         }
-      })
-      .catch((err) => {
-        console.error("Error getting user role:", err);
+
+        if (memId) {
+          setMemberId(String(memId));
+        } else {
+          console.warn("Không tìm thấy memberId cho người dùng hiện tại.");
+          setMemberId(null);
+        }
+      } catch (err) {
+        console.error("Error getting user role/memberId:", err);
         setEventRole("");
         setMemberId(null);
-      });
-  }, [eventId]);
+      } finally {
+        setMemberInfoLoading(false);
+      }
+    };
+
+    fetchRoleAndMember();
+  }, [eventId, user]);
 
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
@@ -209,6 +238,11 @@ export default function MemberTaskPage() {
     const previousSelectedTask = selectedTask;
     
     const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (String(task.assigneeId) !== String(memberId)) {
+      toast.error("Bạn chỉ có thể cập nhật công việc được giao cho mình.");
+      return;
+    }
     const allowedTransitions = STATUS_TRANSITIONS[task?.statusCode] || [];
     
     if (!allowedTransitions.includes(newStatusCode)) {
@@ -252,6 +286,22 @@ export default function MemberTaskPage() {
     },
     { notStarted: [], inProgress: [], done: [] }
   );
+
+  if (memberInfoLoading) {
+    return (
+      <UserLayout
+        title="Danh sách công việc"
+        activePage="work-board"
+        sidebarType="member"
+        eventId={eventId}
+      >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+          <Loading />
+          <p className="text-muted mt-3">Đang tải thông tin thành viên...</p>
+        </div>
+      </UserLayout>
+    );
+  }
 
   if (!memberId) {
     return (
@@ -465,7 +515,7 @@ export default function MemberTaskPage() {
                           Công việc
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
-                          Người giao việc
+                          Người tạo
                         </th>
                         <th className="py-3" style={{ width: "15%" }}>
                           Thời gian giao
@@ -571,7 +621,18 @@ export default function MemberTaskPage() {
 
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
-              <KanbanBoardTask 
+              <div
+                className="alert alert-info d-flex align-items-start gap-2"
+                style={{ fontSize: 13, borderRadius: 12 }}
+              >
+                <span style={{ fontSize: 18 }}>💡</span>
+                <div>
+                  Bạn có thể đổi trạng thái công việc bằng cách bấm trực tiếp vào
+                  badge trạng thái trong bảng danh sách hoặc kéo thả trong bảng Kanban
+                  (chỉ áp dụng cho các task bạn được giao).
+                </div>
+              </div>
+              <KanbanBoardTask
                 eventId={eventId}
                 listTask={statusGroup}
                 onTaskMove={fetchTasks}

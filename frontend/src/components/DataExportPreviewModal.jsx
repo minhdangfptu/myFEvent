@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Info, X } from "lucide-react";
+
 
 export default function DataExportPreviewModal({ 
   show, 
@@ -82,7 +84,7 @@ export default function DataExportPreviewModal({
             onClick={onClose}
             aria-label="Close modal"
           >
-            <i className="bi bi-x-lg"></i>
+            <X size={18} />
           </button>
         </div>
               

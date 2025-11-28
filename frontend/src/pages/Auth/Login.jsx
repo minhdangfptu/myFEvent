@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { authApi } from "../../apis/authApi";
+import authStorage from "../../utils/authStorage";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -45,8 +46,8 @@ export default function LoginPage() {
     setLoading(true);
     setIsLoggingIn(true);
     try {
-      await login(email, password);
-      if (user?.role === "admin") {
+      const { user: loggedInUser } = await login(email, password);
+      if (loggedInUser?.role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else {
         navigate("/home-page", { replace: true, state: { loginSuccess: true } });
@@ -92,9 +93,9 @@ export default function LoginPage() {
         response.refreshToken || response.tokens?.refreshToken;
       const userData = response.user || null;
 
-      if (accessToken) localStorage.setItem("access_token", accessToken);
-      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
-      if (userData) localStorage.setItem("user", JSON.stringify(userData));
+      if (accessToken) authStorage.setAccessToken(accessToken);
+      if (refreshToken) authStorage.setRefreshToken(refreshToken);
+      if (userData) authStorage.setUser(userData);
 
       if (userData) {
         window.dispatchEvent(

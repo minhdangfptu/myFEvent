@@ -4,7 +4,9 @@ import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { getAllOccurredRisksByEvent, statisticRisk } from "~/apis/riskApi"; // Add statistics API import
 import { toast } from "react-toastify"; // Add for error handling
-import "./RiskStatistics.css"; // Import enhanced chart CSS
+import "./RiskStatistics.css";
+import { Check } from "lucide-react";
+ // Import enhanced chart CSS
 
 export default function RiskStatisticsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,7 +105,7 @@ export default function RiskStatisticsPage() {
         return {
           label: "Đã xử lý",
           color: "#10b981",
-          icon: <i className="bi bi-check-lg"></i>,
+          icon: <Check size={18} />,
         };
       case "resolving":
         return {
@@ -377,16 +379,7 @@ export default function RiskStatisticsPage() {
               Tổng quan và phân tích chi tiết rủi ro sau sự kiện
             </p>
           </div>
-          <div className="d-flex gap-2">
-            {/* <button className="btn btn-success d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-excel"></i>
-              Xuất Excel
-            </button> */}
-            <button onClick={()=>navigate(`/events/${eventId}/export/data`)} className="btn btn-danger d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-pdf"></i>
-              Xuất tài liệu
-            </button>
-          </div>
+
         </div>
 
         {/* KPI Cards - KEEP ORIGINAL */}

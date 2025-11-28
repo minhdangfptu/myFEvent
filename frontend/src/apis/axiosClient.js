@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { baseUrl } from '../config/index.js';
+import authStorage from '../utils/authStorage.js';
 
 const axiosClient = axios.create({
   baseURL: baseUrl,
@@ -12,7 +13,7 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = authStorage.getAccessToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
@@ -47,7 +48,7 @@ axiosClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const refreshToken = authStorage.getRefreshToken();
         if (!refreshToken) throw new Error('No refresh token available');
 
         const response = await axios.post(
@@ -61,16 +62,14 @@ axiosClient.interceptors.response.use(
         const newRefreshToken = data.refreshToken || data.refresh_token;
         if (!newAccessToken) throw new Error('No access token in refresh response');
 
-        localStorage.setItem('access_token', newAccessToken);
+        authStorage.setAccessToken(newAccessToken);
         if (newRefreshToken) {
-          localStorage.setItem('refresh_token', newRefreshToken);
+          authStorage.setRefreshToken(newRefreshToken);
         }
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosClient(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        authStorage.clearAll();
 
         window.dispatchEvent(new CustomEvent('auth:logout'));
 

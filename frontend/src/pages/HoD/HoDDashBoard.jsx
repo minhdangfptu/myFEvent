@@ -12,6 +12,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { userApi } from "../../apis/userApi"
+import { Calendar, Sparkles, Goal, User, Users, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -568,7 +569,7 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      👥
+                      <Users style={{ color: "#3b82f6" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -594,7 +595,7 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      📋
+                      <LaptopMinimalCheck style={{ color: "#8b5cf6" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -620,7 +621,7 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ✓
+                      <CircleCheckBig style={{ color: "#22c55e" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -646,7 +647,7 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ⚠️
+                      <FileExclamationPoint style={{ color: "#ef4444" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -709,7 +710,7 @@ export default function HoDDashBoard() {
                     ))
                   ) : (
                     <div className="text-center text-muted py-5">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📊</div>
+                      <div style={{ fontSize: "48px", opacity: 0.3 }}><LaptopMinimalCheck /></div>
                       <div className="mt-2">Chưa có dữ liệu công việc</div>
                     </div>
                   )}
@@ -785,8 +786,8 @@ export default function HoDDashBoard() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center text-muted py-4">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📋</div>
+                    <div className="text-center text-muted py-5">
+                      <div style={{ fontSize: "48px", opacity: 0.3 }}><FileExclamationPoint /></div>
                       <div className="mt-2">Chưa có công việc chi tiết</div>
                     </div>
                   )}
@@ -915,9 +916,9 @@ export default function HoDDashBoard() {
                                       {dayData?.day}
                                     </span>
                                     {/* Icon calendar/milestone sát số */}
-                                    {isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>}
-                                    {!isMilestone && isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>}
-                                    {isMilestone && !isCalendar && <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>}
+                                    {isMilestone && isCalendar && <Sparkles size={16} color="#dca800ff" style={{marginLeft: 3}} />}
+                                    {!isMilestone && isCalendar && <Calendar size={16} style={{marginLeft: 3}} />}
+                                    {isMilestone && !isCalendar && <Goal size={16} style={{marginLeft: 3}} />}
                                   </span>
                                 </div>
                               </td>
@@ -949,7 +950,7 @@ export default function HoDDashBoard() {
                           }
                         } else if (hasMilestone) {
                           chipConfig = {
-                            icon: "🎯",
+                            icon: <Goal size={16} />,
                             label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc",
                             bgColor: "#fef2f2",
                             borderColor: "#dc2626",
@@ -957,7 +958,7 @@ export default function HoDDashBoard() {
                           }
                         } else {
                           chipConfig = {
-                            icon: "📅",
+                            icon: <Calendar size={16} />,
                             label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp",
                             bgColor: "#eff6ff",
                             borderColor: "#3b82f6",
@@ -971,7 +972,7 @@ export default function HoDDashBoard() {
                           <div className="mt-4 pt-3 border-top">
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon}</span>
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}</span>
                                 <div style={{ flex: 1 }}>
                                   <div style={{
                                     display: "inline-block",
@@ -1014,7 +1015,7 @@ export default function HoDDashBoard() {
                                     borderLeft: "3px solid #dc2626"
                                   }}>
                                     <div className="d-flex align-items-start gap-2">
-                                      <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+                                      <span style={{ fontSize: "16px", flexShrink: 0 }}><Goal size="24px" color="#dc2626" /></span>
                                       <div style={{ flex: 1 }}>
                                         <div style={{
                                           display: "inline-block",
@@ -1069,7 +1070,7 @@ export default function HoDDashBoard() {
                                   borderLeft: "3px solid #3b82f6"
                                 }}>
                                   <div className="d-flex align-items-start gap-2">
-                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📅</span>
+                                    <span style={{ fontSize: "16px", flexShrink: 0 }}><Calendar size="24px" color="#3b82f6" /></span>
                                     <div style={{ flex: 1 }}>
                                       <div style={{
                                         display: "inline-block",
@@ -1142,7 +1143,7 @@ export default function HoDDashBoard() {
                       return (
                         <div className="mt-4 pt-3 border-top">
                           <div className="d-flex align-items-center gap-2">
-                            <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                            <span style={{ color: "#dc2626", fontSize: "16px" }}><Calendar size="24px" color="#dc2626" /></span>
                             <div>
                               <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
                                 {upcomingMilestone?.name || "Cột mốc"}
@@ -1177,7 +1178,7 @@ export default function HoDDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      🎯
+                      <Goal style={{ color: "#dc2626" }} />
                     </div>
                     <div className="flex-grow-1">
                       <h6 className="fw-bold mb-1" style={{ fontSize: "18px", color: "#1f2937" }}>
@@ -1216,7 +1217,7 @@ export default function HoDDashBoard() {
                       className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
                       style={{ backgroundColor: "#fef2f2" }}
                     >
-                      <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                      <span style={{ color: "#dc2626", fontSize: "16px" }}><Calendar style={{ color: "#dc2626" }} /></span>
                       <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
                         Tiếp theo: {eventTimeline.find(m => !m.completed)?.name || eventTimeline[0]?.name}
                       </span>

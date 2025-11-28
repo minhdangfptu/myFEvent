@@ -151,14 +151,6 @@ export const inactiveEventMember = async (memberId) => {
     { new: true }
   );
 };
-export const createEventMember = async (userId, eventId) => {
-  return EventMember.create({
-    userId,
-    eventId,
-    role: 'Member',
-    status: 'active'
-  });
-};
 export const getActiveEventMembers = async (eventId) => {
   return await EventMember.find({
     eventId: eventId,
@@ -170,13 +162,6 @@ export const getActiveEventMembers = async (eventId) => {
 
 export const getEventMemberById = async (memberId) => {
   return await EventMember.findById(memberId)
-    .populate('userId', '_id fullName')
-    .lean();
-};
-export const getEventMembersByIds = async (memberIds) => {
-  return await EventMember.find({ 
-    _id: { $in: memberIds } 
-  })
     .populate('userId', '_id fullName')
     .lean();
 };

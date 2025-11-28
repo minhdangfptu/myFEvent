@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import "./DataExportPage.css";
 import UserLayout from "~/components/UserLayout";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { getAgendaName } from "~/apis/agendaApi";
 import { feedbackApi } from "~/apis/feedbackApi";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import {
   exportItem,
   exportAllItemsZip,
@@ -13,6 +13,23 @@ import {
   getExportedFiles,
   downloadExportedFile,
 } from "~/apis/exportApi";
+import {
+  RotateCw,
+  X,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Users,
+  User,
+  CalendarDays,
+  ListChecks,
+  MessageCircle,
+  Wallet,
+  ShieldAlert,
+  AlertTriangle,
+  CheckSquare,
+  Square,
+} from "lucide-react";
 
 const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
   const [selectedSubItems, setSelectedSubItems] = useState({});
@@ -41,8 +58,10 @@ const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
   };
 
   const handleDownload = () => {
-    const selected = Object.keys(selectedSubItems).filter(key => selectedSubItems[key]);
-    
+    const selected = Object.keys(selectedSubItems).filter(
+      (key) => selectedSubItems[key]
+    );
+
     if (selected.length === 0) {
       toast.error("Vui lòng chọn ít nhất một mục!");
       return;
@@ -96,10 +115,10 @@ const ItemOptionsComponent = ({ item, onDownload, onClose }) => {
         </button>
         <button
           className="data-export-page__btn data-export-page__btn--primary"
-          onClick={handleDownload} // ✅ Gọi function đã fix
+          onClick={handleDownload}
           disabled={getSelectedCount() === 0}
         >
-          <i className="bi bi-download me-2"></i>
+          <Download size={16} style={{ marginRight: 6 }} />
           Tải Xuống ({getSelectedCount()} mục)
         </button>
       </div>
@@ -114,13 +133,13 @@ export default function DataExportPage() {
   const [downloadingItems, setDownloadingItems] = useState(new Set());
   const [agendaSubItems, setAgendaSubItems] = useState([]);
   const [loadingAgendas, setLoadingAgendas] = useState(true);
-   const [feedbackSubItems, setFeedbackSubItems] = useState([]); 
-  const [loadingFeedbacks, setLoadingFeedbacks] = useState(true); 
+  const [feedbackSubItems, setFeedbackSubItems] = useState([]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(true);
   const [exportedFiles, setExportedFiles] = useState([]);
   const navigate = useNavigate();
   const { eventId } = useParams();
 
-  // Fetch agenda và feedback data on component mount
+  // Fetch agenda & feedback & exported files
   useEffect(() => {
     const fetchAgendas = async () => {
       try {
@@ -154,13 +173,17 @@ export default function DataExportPage() {
     const fetchFeedbackForms = async () => {
       try {
         setLoadingFeedbacks(true);
-        const response = await feedbackApi.listFormsNameByEvent(eventId, 1, 100); 
+        const response = await feedbackApi.listFormsNameByEvent(
+          eventId,
+          1,
+          100
+        );
 
         if (response.status === 200 && response.data) {
           const formattedForms = response.data.map((form) => ({
             id: form._id,
             title: form.name,
-            description: form.description || 'Không có mô tả',
+            description: form.description || "Không có mô tả",
           }));
 
           setFeedbackSubItems(formattedForms);
@@ -184,18 +207,16 @@ export default function DataExportPage() {
 
     if (eventId) {
       fetchAgendas();
-      fetchFeedbackForms(); 
+      fetchFeedbackForms();
       fetchExportedFiles();
     }
   }, [eventId]);
-
-  
 
   const exportItems = [
     {
       id: "team",
       title: "Danh sách Ban sự kiện",
-      icon: "bi-people-fill",
+      icon: Users,
       color: "#f3f3f3",
       iconColor: "#1976D2",
       description:
@@ -211,7 +232,7 @@ export default function DataExportPage() {
     {
       id: "members",
       title: "Danh sách Thành viên",
-      icon: "bi-person-lines-fill",
+      icon: User,
       color: "#f3f3f3",
       iconColor: "#F57C00",
       description:
@@ -227,7 +248,7 @@ export default function DataExportPage() {
     {
       id: "timeline",
       title: "Timeline Sự kiện",
-      icon: "bi-calendar3",
+      icon: CalendarDays,
       color: "#f3f3f3",
       iconColor: "#388E3C",
       description:
@@ -243,13 +264,19 @@ export default function DataExportPage() {
     {
       id: "agenda",
       title: "Agenda Sự kiện",
-      icon: "bi-calendar2-week",
+      icon: CalendarDays,
       color: "#f3f4f6",
       iconColor: "#7B1FA2",
       description:
         "Xuất agenda Sự kiện theo milestone: Ngày, Giờ, Hoạt động, Thời lượng",
       subItems: loadingAgendas
-        ? [{ id: "loading", title: "Đang tải...", description: "Vui lòng đợi" }]
+        ? [
+            {
+              id: "loading",
+              title: "Đang tải...",
+              description: "Vui lòng đợi",
+            },
+          ]
         : agendaSubItems.length > 0
         ? agendaSubItems
         : [
@@ -263,7 +290,7 @@ export default function DataExportPage() {
     {
       id: "tasks",
       title: "Danh sách Công việc",
-      icon: "bi-check2-square",
+      icon: ListChecks,
       color: "#f3f3f3",
       iconColor: "#00ACC1",
       description:
@@ -279,28 +306,34 @@ export default function DataExportPage() {
     {
       id: "feedback",
       title: "Danh sách Phản hồi",
-      icon: "bi-chat-square-dots",
+      icon: MessageCircle,
       color: "#f3f3f3",
       iconColor: "#F9A825",
       description:
         "Xuất phản hồi từ người tham gia: Câu hỏi, Câu trả lời, Đánh giá",
-      // ✅ Cập nhật subItems với data động
       subItems: loadingFeedbacks
-        ? [{ id: "loading", title: "Đang tải...", description: "Vui lòng đợi" }]
+        ? [
+            {
+              id: "loading",
+              title: "Đang tải...",
+              description: "Vui lòng đợi",
+            },
+          ]
         : feedbackSubItems.length > 0
         ? feedbackSubItems
         : [
             {
               id: "no-feedback",
               title: "Chưa có biểu mẫu",
-              description: "Chưa có biểu mẫu phản hồi nào được tạo cho sự kiện này",
+              description:
+                "Chưa có biểu mẫu phản hồi nào được tạo cho sự kiện này",
             },
           ],
     },
     {
       id: "budget",
       title: "Kinh phí sự kiện",
-      icon: "bi-currency-dollar",
+      icon: Wallet,
       color: "#f3f3f3",
       iconColor: "#E53935",
       description:
@@ -331,7 +364,7 @@ export default function DataExportPage() {
     {
       id: "risks",
       title: "Danh sách Rủi ro",
-      icon: "bi-shield-exclamation",
+      icon: ShieldAlert,
       color: "#f3f3f3",
       iconColor: "#FB8C00",
       description:
@@ -347,7 +380,7 @@ export default function DataExportPage() {
     {
       id: "incidents",
       title: "Danh sách Sự cố",
-      icon: "bi-exclamation-triangle-fill",
+      icon: AlertTriangle,
       color: "#f3f3f3",
       iconColor: "#1976D2",
       description:
@@ -378,14 +411,13 @@ export default function DataExportPage() {
   };
 
   const handleShowItemOptions = (itemId) => {
-  setShowOptionsModal(String(itemId)); // Ensure string
-};
+    setShowOptionsModal(String(itemId));
+  };
 
   const handleCloseItemOptions = () => {
     setShowOptionsModal(null);
   };
 
-  // Main download function 
   const handleDownload = async (itemId, subItems = []) => {
     const implementedItems = [
       "team",
@@ -400,45 +432,46 @@ export default function DataExportPage() {
     ];
 
     if (!implementedItems.includes(itemId)) {
-      toast.error(`Chức năng xuất ${itemId} sẽ được cập nhật trong phiên bản sau!`);
+      toast.error(
+        `Chức năng xuất ${itemId} sẽ được cập nhật trong phiên bản sau!`
+      );
       return;
     }
 
     setDownloadingItems((prev) => new Set(prev).add(itemId));
 
     try {
-
-      // Gọi API export, axios trả về file blob
       const response = await exportItem(eventId, itemId, subItems);
 
-      // Xử lý tải về
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      // Lấy tên file từ header nếu có
-      let fileName = 'export.xlsx';
-      const disposition = response.headers && response.headers['content-disposition'];
+
+      let fileName = "export.xlsx";
+      const disposition =
+        response.headers && response.headers["content-disposition"];
       if (disposition) {
         const match = disposition.match(/filename="?([^";]+)"?/);
-        if (match && match.length > 1) fileName = decodeURIComponent(match[1]);
+        if (match && match.length > 1)
+          fileName = decodeURIComponent(match[1]);
       }
-      link.setAttribute('download', fileName);
+
+      link.setAttribute("download", fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
       toast.success(`Xuất dữ liệu thành công! File: ${fileName}`);
     } catch (error) {
-      // Đọc lỗi backend trả về dạng text nếu có
       if (error.response && error.response.data) {
         const reader = new FileReader();
         reader.onload = function (e) {
-          toast.error('Xuất dữ liệu thất bại: ' + e.target.result);
-          console.error('Lỗi BE trả về:', e.target.result);
+          toast.error("Xuất dữ liệu thất bại: " + e.target.result);
+          console.error("Lỗi BE trả về:", e.target.result);
         };
         reader.readAsText(error.response.data);
       } else {
-        toast.error('Export failed: ' + error.message);
+        toast.error("Export failed: " + error.message);
         console.error("❌ Export failed:", error);
       }
     } finally {
@@ -454,7 +487,6 @@ export default function DataExportPage() {
     try {
       const response = await downloadExportedFile(filename);
 
-      // Get filename from Content-Disposition header if available
       const contentDisposition = response.headers.get("Content-Disposition");
       let downloadFilename = filename;
 
@@ -468,21 +500,17 @@ export default function DataExportPage() {
         }
       }
 
-      // Convert to blob
       const blob = await response.blob();
 
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", downloadFilename);
 
-      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      // Cleanup
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("❌ Download failed:", error);
@@ -508,114 +536,109 @@ export default function DataExportPage() {
       return;
     }
 
-    setDownloadingItems((prev) => new Set(prev).add('selected'));
+    setDownloadingItems((prev) => new Set(prev).add("selected"));
 
     try {
-      // Gọi API export selected items thành file ZIP
       const response = await exportSelectedItemsZip(eventId, selected);
 
-      // Xử lý tải về file ZIP
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      
-      // Lấy tên file từ header nếu có
+
       let fileName = `Du_Lieu_Da_Chon_${eventId}.zip`;
-      const disposition = response.headers && response.headers['content-disposition'];
+      const disposition =
+        response.headers && response.headers["content-disposition"];
       if (disposition) {
         const match = disposition.match(/filename="?([^";]+)"?/);
-        if (match && match.length > 1) fileName = decodeURIComponent(match[1]);
+        if (match && match.length > 1)
+          fileName = decodeURIComponent(match[1]);
       }
-      
-      link.setAttribute('download', fileName);
+
+      link.setAttribute("download", fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
-      toast.success(`Đã xuất ${selected.length} mục đã chọn thành file ZIP: ${fileName}`);
+
+      toast.success(
+        `Đã xuất ${selected.length} mục đã chọn thành file ZIP: ${fileName}`
+      );
       setShowOptions(false);
     } catch (error) {
-      // Đọc lỗi backend trả về dạng text nếu có
       if (error.response && error.response.data) {
         const reader = new FileReader();
         reader.onload = function (e) {
-          toast.error('Xuất dữ liệu ZIP thất bại: ' + e.target.result);
-          console.error('Lỗi BE trả về:', e.target.result);
+          toast.error("Xuất dữ liệu ZIP thất bại: " + e.target.result);
+          console.error("Lỗi BE trả về:", e.target.result);
         };
         reader.readAsText(error.response.data);
       } else {
-        toast.error('Export ZIP failed: ' + error.message);
+        toast.error("Export ZIP failed: " + error.message);
         console.error("❌ Export ZIP failed:", error);
       }
     } finally {
       setDownloadingItems((prev) => {
         const newSet = new Set(prev);
-        newSet.delete('selected');
+        newSet.delete("selected");
         return newSet;
       });
     }
   };
 
-  // Trong DataExportPage.jsx - Cập nhật handleDownloadItemOptions
-const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
-  
-  // Ensure itemId is string
-  const cleanItemId = String(itemId);
-  
-  // Ensure selectedSubItems is array
-  const cleanSubItems = Array.isArray(selectedSubItems) ? selectedSubItems : [];
-  
-  await handleDownload(cleanItemId, cleanSubItems);
-  setShowOptionsModal(null);
-};
+  const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
+    const cleanItemId = String(itemId);
+    const cleanSubItems = Array.isArray(selectedSubItems)
+      ? selectedSubItems
+      : [];
+
+    await handleDownload(cleanItemId, cleanSubItems);
+    setShowOptionsModal(null);
+  };
 
   const handleDownloadAll = async () => {
-    setDownloadingItems((prev) => new Set(prev).add('all'));
+    setDownloadingItems((prev) => new Set(prev).add("all"));
 
     try {
-      console.log("🚀 Starting download all as ZIP...");
-
-      // Gọi API export all items thành file ZIP
       const response = await exportAllItemsZip(eventId);
 
-      // Xử lý tải về file ZIP
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      
-      // Lấy tên file từ header nếu có
+
       let fileName = `Tat_Ca_Du_Lieu_${eventId}.zip`;
-      const disposition = response.headers && response.headers['content-disposition'];
+      const disposition =
+        response.headers && response.headers["content-disposition"];
       if (disposition) {
         const match = disposition.match(/filename="?([^";]+)"?/);
-        if (match && match.length > 1) fileName = decodeURIComponent(match[1]);
+        if (match && match.length > 1)
+          fileName = decodeURIComponent(match[1]);
       }
-      
-      link.setAttribute('download', fileName);
+
+      link.setAttribute("download", fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
-      toast.success(`Đã xuất tất cả dữ liệu thành file ZIP: ${fileName}`);
+
+      toast.success(
+        `Đã xuất tất cả dữ liệu thành file ZIP: ${fileName}`
+      );
     } catch (error) {
-      // Đọc lỗi backend trả về dạng text nếu có
       if (error.response && error.response.data) {
         const reader = new FileReader();
         reader.onload = function (e) {
-          toast.error('Xuất dữ liệu ZIP thất bại: ' + e.target.result);
-          console.error('Lỗi BE trả về:', e.target.result);
+          toast.error("Xuất dữ liệu ZIP thất bại: " + e.target.result);
+          console.error("Lỗi BE trả về:", e.target.result);
         };
         reader.readAsText(error.response.data);
       } else {
-        toast.error('Export ZIP failed: ' + error.message);
+        toast.error("Export ZIP failed: " + error.message);
         console.error("❌ Export ZIP failed:", error);
       }
     } finally {
       setDownloadingItems((prev) => {
         const newSet = new Set(prev);
-        newSet.delete('all');
+        newSet.delete("all");
         return newSet;
       });
     }
@@ -648,22 +671,22 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                 Xuất Tất Cả Dữ Liệu Sự Kiện
               </h2>
               <p className="data-export-page__section-description">
-                Xuất toàn bộ thông tin về Thành viên, Ban, Timeline, Agenda, Rủi
-                ro, và Sự cố thành các file Excel riêng biệt.
+                Xuất toàn bộ thông tin về Thành viên, Ban, Timeline, Agenda,
+                Rủi ro, và Sự cố thành các file Excel riêng biệt.
               </p>
               <button
                 className="data-export-page__btn data-export-page__btn--primary"
                 onClick={handleDownloadAll}
-                disabled={downloadingItems.size > 0}
+                disabled={downloadingItems.has("all")}
               >
                 <span className="data-export-page__btn-icon">
-                  {downloadingItems.size > 0 ? (
-                    <i className="bi bi-arrow-clockwise spin-animation"></i>
+                  {downloadingItems.has("all") ? (
+                    <RotateCw size={18} className="spin-animation" />
                   ) : (
-                    <i className="bi bi-download"></i>
+                    <Download size={18} />
                   )}
                 </span>
-                {downloadingItems.size > 0
+                {downloadingItems.has("all")
                   ? "Đang xuất..."
                   : "Tải Dữ Liệu Đã Hỗ Trợ"}
               </button>
@@ -683,7 +706,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                 onClick={handleViewTemplate}
               >
                 <span className="data-export-page__btn-icon">
-                  <i className="bi bi-file-earmark-fill"></i>
+                  <FileText size={18} />
                 </span>
                 Xem & Tải Template
               </button>
@@ -700,13 +723,13 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                     key={file.filename}
                     className="data-export-page__file-item"
                   >
-                    <i className="bi bi-file-earmark-excel"></i>
+                    <FileSpreadsheet size={18} />
                     <span>{file.filename}</span>
                     <button
                       onClick={() => handleFileDownload(file.filename)}
                       className="data-export-page__btn data-export-page__btn--text"
                     >
-                      <i className="bi bi-download"></i>
+                      <Download size={16} />
                     </button>
                   </div>
                 ))}
@@ -730,10 +753,10 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                 <button
                   className="data-export-page__btn data-export-page__btn--primary"
                   onClick={handleShowOptions}
-                  disabled={downloadingItems.size > 0}
+                  disabled={downloadingItems.has("selected")}
                 >
                   <span className="data-export-page__btn-icon">
-                    <i className="bi bi-check2-all"></i>
+                    <ListChecks size={18} />
                   </span>
                   Tùy Chọn Xuất ({getSelectedCount()})
                 </button>
@@ -754,6 +777,8 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                   "incidents",
                 ].includes(item.id);
 
+                const Icon = item.icon;
+
                 return (
                   <div
                     key={item.id}
@@ -761,7 +786,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                       !isImplemented ? "data-export-page__card--disabled" : ""
                     }`}
                   >
-                    {/* Checkbox ở góc trên phải */}
+                    {/* Checkbox góc trên phải */}
                     <div className="data-export-page__card-checkbox">
                       <input
                         type="checkbox"
@@ -769,19 +794,17 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                         checked={selectedItems[item.id] || false}
                         onChange={() => handleToggleItem(item.id)}
                         className="data-export-page__checkbox"
-                        disabled={downloadingItems.has(item.id)}
+                        disabled={downloadingItems.has(item.id) || !isImplemented}
                       />
                       <label
                         htmlFor={`checkbox-${item.id}`}
                         className="data-export-page__checkbox-label"
                       >
-                        <i
-                          className={
-                            selectedItems[item.id]
-                              ? "bi bi-check-square-fill"
-                              : "bi bi-square"
-                          }
-                        ></i>
+                        {selectedItems[item.id] ? (
+                          <CheckSquare size={18} />
+                        ) : (
+                          <Square size={18} />
+                        )}
                       </label>
                     </div>
 
@@ -793,18 +816,11 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                         className="data-export-page__card-icon"
                         style={{ backgroundColor: item.iconColor }}
                       >
-                        <i
-                          className={item.icon}
-                          style={{
-                            fontSize: "1.5rem",
-                            color: "white",
-                          }}
-                        ></i>
+                        <Icon size={22} color="white" />
                       </div>
                       <div className="data-export-page__card-title-section">
                         <h3 className="data-export-page__card-title">
                           {item.title}
-                          {/* {!isImplemented && <span className="data-export-page__card-badge">Sắp có</span>} */}
                         </h3>
                         <span className="data-export-page__card-filetype">
                           XLSX
@@ -825,7 +841,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                         disabled={!isImplemented}
                       >
                         <span className="data-export-page__btn-icon">
-                          <i className="bi bi-check2-square"></i>
+                          <ListChecks size={18} />
                         </span>
                         Tùy chọn
                       </button>
@@ -838,9 +854,12 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                       >
                         <span className="data-export-page__btn-icon">
                           {downloadingItems.has(item.id) ? (
-                            <i className="bi bi-arrow-clockwise spin-animation"></i>
+                            <RotateCw
+                              size={18}
+                              className="spin-animation"
+                            />
                           ) : (
-                            <i className="bi bi-download"></i>
+                            <Download size={18} />
                           )}
                         </span>
                         {downloadingItems.has(item.id)
@@ -874,7 +893,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                 className="data-export-page__modal-close"
                 onClick={handleCloseOptions}
               >
-                <i className="bi bi-x-lg"></i>
+                <X size={18} />
               </button>
             </div>
 
@@ -886,29 +905,29 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
               <div className="data-export-page__selected-list">
                 {exportItems
                   .filter((item) => selectedItems[item.id])
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="data-export-page__selected-item"
-                    >
-                      <div className="data-export-page__selected-item-icon">
-                        <i
-                          className={item.icon}
-                          style={{ color: item.iconColor }}
-                        ></i>
-                      </div>
-                      <div className="data-export-page__selected-item-content">
-                        <h4>{item.title}</h4>
-                        <p>{item.description}</p>
-                      </div>
-                      <button
-                        className="data-export-page__selected-item-remove"
-                        onClick={() => handleToggleItem(item.id)}
+                  .map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.id}
+                        className="data-export-page__selected-item"
                       >
-                        <i className="bi bi-x"></i>
-                      </button>
-                    </div>
-                  ))}
+                        <div className="data-export-page__selected-item-icon">
+                          <Icon size={18} color={item.iconColor} />
+                        </div>
+                        <div className="data-export-page__selected-item-content">
+                          <h4>{item.title}</h4>
+                          <p>{item.description}</p>
+                        </div>
+                        <button
+                          className="data-export-page__selected-item-remove"
+                          onClick={() => handleToggleItem(item.id)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
 
@@ -922,10 +941,21 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
               <button
                 className="data-export-page__btn data-export-page__btn--primary"
                 onClick={handleDownloadSelected}
-                disabled={downloadingItems.size > 0}
+                disabled={downloadingItems.has("selected")}
               >
-                <i className="bi bi-download me-2"></i>
-                {downloadingItems.size > 0
+                {downloadingItems.has("selected") ? (
+                  <RotateCw
+                    size={16}
+                    className="spin-animation"
+                    style={{ marginRight: 6 }}
+                  />
+                ) : (
+                  <Download
+                    size={16}
+                    style={{ marginRight: 6 }}
+                  />
+                )}
+                {downloadingItems.has("selected")
                   ? "Đang xuất..."
                   : `Tải Xuống (${getSelectedCount()} mục)`}
               </button>
@@ -956,7 +986,7 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                       className="data-export-page__modal-close"
                       onClick={handleCloseItemOptions}
                     >
-                      <i className="bi bi-x-lg"></i>
+                      <X size={18} />
                     </button>
                   </div>
 
@@ -965,11 +995,13 @@ const handleDownloadItemOptions = async (itemId, selectedSubItems) => {
                       Chọn các mục bạn muốn xuất:
                     </p>
 
-                    <ItemOptionsComponent
-                      item={currentItem}
-                      onDownload={handleDownloadItemOptions}
-                      onClose={handleCloseItemOptions}
-                    />
+                    {currentItem && (
+                      <ItemOptionsComponent
+                        item={currentItem}
+                        onDownload={handleDownloadItemOptions}
+                        onClose={handleCloseItemOptions}
+                      />
+                    )}
                   </div>
                 </>
               );

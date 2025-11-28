@@ -34,7 +34,7 @@ const PlanItemSchema = new Schema({
   category: { type: String, required: true, default: 'general' },     
   name:     { type: String, required: true },
   qty:      { type: Schema.Types.Decimal128, default: 1, min: 0 },
-  unit:     { type: String, enum: ['cm', 'mm', 'm', 'km', 'cái', 'lít'], default: 'cái' }, // Đơn vị tính
+  unit:     { type: String, default: 'cái', trim: true, maxlength: 50 },
   unitCost: { type: Schema.Types.Decimal128, default: 0, min: 0 },
   total:    { type: Schema.Types.Decimal128, default: 0, min: 0 },
   note:     { type: String, default: '' },
@@ -65,6 +65,7 @@ const PlanItemSchema = new Schema({
 const EventBudgetPlanSchema = new Schema({
   eventId:      { type: Types.ObjectId, ref: 'Event', required: true, index: true },
   departmentId: { type: Types.ObjectId, ref: 'Department', required: true, index: true },
+  name:         { type: String, default: 'Budget Ban', trim: true },
 
   status:   { type: String, enum: ['draft','submitted','changes_requested','approved','locked','sent_to_members'], default: 'draft' },
   version:  { type: Number, default: 1, min: 1 },      // tăng mỗi lần submit
@@ -79,6 +80,7 @@ const EventBudgetPlanSchema = new Schema({
   sentToMembersAt: Date,
   sentToMembersBy: { type: Types.ObjectId, ref: 'User' },
   notes:       String,
+  createdBy:   { type: Types.ObjectId, ref: 'User' },
 
   items:       { type: [PlanItemSchema], validate: v => Array.isArray(v) && v.length > 0 },
   attachments: [{ name: String, url: String }],

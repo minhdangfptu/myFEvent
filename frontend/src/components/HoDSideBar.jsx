@@ -5,6 +5,9 @@ import { useAuth } from "~/contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
+import { Bell, Bug, Calendar, Coins, Grid, HelpCircle, Menu, Moon, Settings, Sun, User, Users, Home, FileText, MessageSquareText, Database, ChevronUp, ChevronDown } from "lucide-react";
+import authStorage from "~/utils/authStorage";
+
 
 export default function HoDSideBar({
   sidebarOpen,
@@ -126,6 +129,7 @@ export default function HoDSideBar({
       setWorkOpen(false);
       setFinanceOpen(false);
       setOverviewOpen(false);
+      setRisksOpen(false);
       setExportOpen(false);
     }
   }, [sidebarOpen]);
@@ -158,13 +162,13 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hod-dashboard?eventId=${eventId}` },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` },
-    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${selectedEvent || ''}/milestones` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hod-event-detail` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/hod-tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
+    { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
     // { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     // { id: "work-stats", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hod-statistic` },
   ];
@@ -175,16 +179,11 @@ export default function HoDSideBar({
     if (userId) return userId;
     
     // Nếu không có trong context, thử từ localStorage
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        return parsedUser?._id || parsedUser?.id;
-      }
-    } catch (e) {
-      console.error("Error reading user from localStorage:", e);
+    const storedUser = authStorage.getUser();
+    if (storedUser) {
+      return storedUser?._id || storedUser?.id;
     }
-    
+
     return null;
   };
 
@@ -279,12 +278,12 @@ export default function HoDSideBar({
   };
 
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
+    { id: "finance-budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
     { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || selectedEvent || ''}/budgets/statistics` },
   ];
 
   const exportSubItems = [
-    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId || selectedEvent || ''}/export/data` },
+    // { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId || selectedEvent || ''}/export/data` },
     { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId || selectedEvent || ''}/export/templates` },
   ];
 
@@ -297,14 +296,33 @@ export default function HoDSideBar({
   const showLoading = ctxLoading && ctxEvents.length === 0;
 
   return (
-    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
+    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
-        .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
+        .group-title {
+          font-size:.75rem;
+          font-weight:600;
+          letter-spacing:.05em;
+          color:#374151;
+          margin:16px 0 8px;
+          text-transform:uppercase;
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .group-title {
+          opacity: 0;
+        }
         .btn-nav{ border:0;background:transparent;color:#374151;border-radius:8px;padding:10px 12px;text-align:left;
           transition:all .2s ease;width:100%;display:flex;align-items:center;justify-content:space-between;}
         .btn-nav:hover{ background:#e9ecef; }
         .btn-nav.active{ background:#e9ecef;color:#111827; }
+        .btn-nav span {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .btn-nav span {
+          opacity: 0;
+        }
         .menu-item-hover:hover .btn-nav{ background:#e9ecef; }
         .btn-submenu{ border:0;background:transparent;color:#6b7280;border-radius:6px;padding:8px 12px 8px 24px;
           text-align:left;transition:all .2s ease;width:100%;font-size:.9rem;}
@@ -314,6 +332,39 @@ export default function HoDSideBar({
         .theme-option{ flex:1;padding:8px 12px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;
           align-items:center;justify-content:center;gap:6px;font-size:.85rem;color:#6b7280;transition:all .2s;}
         .theme-option.active{ background:#fff;color:#374151;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+        .menu-button {
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #030303;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .menu-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .menu-button:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          transform: scale(0.95);
+        }
+        .menu-button svg {
+          transition: transform 0.2s ease;
+        }
+
+        .fade-content {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .fade-content {
+          opacity: 0;
+          pointer-events: none;
+        }
 
         .hover-submenu{
           position: absolute;
@@ -350,26 +401,44 @@ export default function HoDSideBar({
       {/* Header */}
       <div className="p-3 pb-0" style={{ flexShrink: 0, paddingBottom: "0px" }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <div
-            className="logo-container"
-            style={{cursor: "pointer"}}
-          >
-            <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+          {sidebarOpen ? (
+            <>
+              <div
+                className="logo-container"
+                style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
+              >
+                <img
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
+                <img
+                  className="fade-content"
+                  onClick={() => navigate("/home-page")}
+                  src="/logo-03.png"
+                  alt="myFEvent"
+                  style={{ width: "auto", height: 40 }}
+                />
               </div>
-              {sidebarOpen &&  <img
-              onClick={() => navigate("/home-page")}
-              src="/logo-03.png"
-              alt="myFEvent"
-              style={{ width: "auto", height: 40 }}
-            />}
-            </div>
-          </div>
 
-          {sidebarOpen && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
-              <i className="bi bi-arrow-left"></i>
+              <button
+                className="menu-button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Đóng sidebar"
+              >
+                <Menu size={20} />
+              </button>
+            </>
+          ) : (
+            <button
+              className="menu-button"
+              onClick={() => setSidebarOpen(true)}
+              style={{ width: "100%" }}
+              aria-label="Mở sidebar"
+            >
+              <Menu size={20} />
             </button>
           )}
         </div>
@@ -392,7 +461,7 @@ export default function HoDSideBar({
               }}
             >
 
-              <i className="bi bi-calendar-event me-2"></i>
+              <Calendar className="me-2" size={18} />
               <span
                 style={{
                   overflow: "hidden",
@@ -437,7 +506,7 @@ export default function HoDSideBar({
               <div className="d-flex flex-column gap-1">
                 <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    <Home className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
                   </div>
                 </button>
@@ -461,11 +530,11 @@ export default function HoDSideBar({
                   title="Tổng quan"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-grid me-3" style={{ width: 20 }} />
+                    <Grid className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Tổng quan</span>}
                   </div>
                   {sidebarOpen && (
-                    <i className={`bi ${overviewOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    overviewOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                   )}
                 </button>
 
@@ -506,13 +575,13 @@ export default function HoDSideBar({
 
             {/* Ban sự kiện */}
             <button
-              className={`btn-nav ${activePage === "event-board" ? "active" : ""
+              className={`btn-nav ${activePage === "department-management" ? "active" : ""
                 }`}
               onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-people me-3" style={{ width: 20 }} />
+                <Users className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Ban sự kiện</span>}
               </div>
             </button>
@@ -525,7 +594,7 @@ export default function HoDSideBar({
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-person me-3" style={{ width: 20 }} />
+                <User className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Thành viên</span>}
               </div>
             </button>
@@ -538,7 +607,7 @@ export default function HoDSideBar({
               title="Lịch sự kiện"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-calendar me-3" style={{ width: 20 }} />
+                <Calendar className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
@@ -552,8 +621,8 @@ export default function HoDSideBar({
                   title="Phản hồi sự kiện"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-chat-dots me-3" style={{ width: 20 }} />
-                    {sidebarOpen && <span>Feedback</span>}
+                    <MessageSquareText className="me-3" size={18} style={{ width: 20 }} />
+                    {sidebarOpen && <span>Phản hồi</span>}
                   </div>
                 </button>
 
@@ -569,11 +638,11 @@ export default function HoDSideBar({
                     title="Công việc"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-file-text me-3" style={{ width: 20 }} />
+                      <FileText className="me-3" size={18} style={{ width: 20 }} />
                       {sidebarOpen && <span>Công việc</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${workOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      workOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -623,11 +692,11 @@ export default function HoDSideBar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-cash-coin me-3" style={{ width: 20 }} />
+                      <Coins className="me-3" size={18} style={{ width: 20 }} />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${financeOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      financeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -677,11 +746,11 @@ export default function HoDSideBar({
                     title="Rủi ro"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-bug me-3" style={{ width: 20 }} />
+                      <Bug className="me-3" size={18} style={{ width: 20 }} />
                       {sidebarOpen && <span>Rủi ro</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      risksOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -731,11 +800,11 @@ export default function HoDSideBar({
                     title="Tải xuống"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-download me-3" style={{ width: 20 }} />
+                      <Database className="me-3" size={18} style={{ width: 20 }} />
                       {sidebarOpen && <span>Tải xuống</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${exportOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      exportOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
@@ -785,14 +854,20 @@ export default function HoDSideBar({
           <div className="d-flex flex-column gap-1">
             <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
               <div className="d-flex align-items-center">
-                <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                <Bell className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
             <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
               <div className="d-flex align-items-center">
-                <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                <Settings className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Cài đặt</span>}
+              </div>
+            </button>
+            <button className={`btn-nav ${activePage === "support" ? "active" : ""}`} onClick={() => navigate("/support")} title="Hỗ trợ">
+              <div className="d-flex align-items-center">
+                <HelpCircle className="me-3" size={18} style={{ width: 20 }} />
+                {sidebarOpen && <span>Hỗ trợ</span>}
               </div>
             </button>
           </div>
@@ -807,21 +882,21 @@ export default function HoDSideBar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{ margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button
                 className={`theme-option ${theme === "light" ? "active" : ""}`}
                 onClick={() => setTheme("light")}
               >
-                <i className="bi bi-sun"></i>
+                <Sun size={18} />
                 <span>Sáng</span>
               </button>
               <button
                 className={`theme-option ${theme === "dark" ? "active" : ""}`}
                 onClick={() => setTheme("dark")}
               >
-                <i className="bi bi-moon"></i>
+                <Moon size={18} />
                 <span>Tối</span>
               </button>
             </div>
@@ -829,6 +904,7 @@ export default function HoDSideBar({
 
             {/* App Version + Dev info + Logo Bộ Công Thương */}
             <div
+              className="fade-content"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -870,15 +946,15 @@ export default function HoDSideBar({
             </div>
           </div>
         ) : (
-          <button
-            className="btn btn-ghost btn-sm w-100"
-            onClick={() => setSidebarOpen(true)}
-            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
-            title="Mở rộng"
-            aria-label="Mở/đóng thanh bên"
-          >
-            <i className="bi bi-list"></i>
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
+            <img
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover-rotate"
+              src="/website-icon-fix@3x.png"
+              alt="myFEvent"
+              style={{ width: 40, height: 40, cursor: "pointer" }}
+            />
+          </div>
         )}
       </div>
 

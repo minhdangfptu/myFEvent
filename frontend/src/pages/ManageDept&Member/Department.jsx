@@ -6,6 +6,7 @@ import { departmentService } from '../../services/departmentService';
 import NoDataImg from '~/assets/no-data.png';
 import Loading from '~/components/Loading';
 import { useEvents } from '~/contexts/EventContext';
+import { ArrowUp, Plus, Check, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Department = () => {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ const Department = () => {
   const [evenntRole, setEventRole] = useState('');
   const [roleLoading, setRoleLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const { fetchEventRole } = useEvents();
 
@@ -121,6 +124,24 @@ const Department = () => {
     dept.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentDepartments = filteredDepartments.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Auto scroll to top when pagination changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentPage]);
+
   // Show loading while fetching role to prevent showing wrong sidebar
   if (roleLoading) {
     return (
@@ -154,18 +175,18 @@ const Department = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: '250px', borderRadius: '8px' }}
               />
-              {evenntRole === 'HoOC' && (<button 
+              {evenntRole === 'HoOC' && (<button
                 className="btn btn-danger d-flex align-items-center"
                 onClick={handleCreateDepartment}
-                style={{ 
-                  backgroundColor: '#dc2626', 
+                style={{
+                  backgroundColor: '#dc2626',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '10px 20px',
                   fontWeight: '500'
                 }}
               >
-                <i className="bi bi-plus-lg me-2"></i>
+                <Plus className="me-2" size={18} />
                  Tạo ban
               </button>
               )}
@@ -189,28 +210,28 @@ const Department = () => {
                 <thead>
                   <tr>
                     <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      <ArrowUp className="text-success me-1" size={16} />
                       Tên Ban
                     </th>
                     <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      <ArrowUp className="text-success me-1" size={16} />
                       Trưởng Ban
                     </th>
                     <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      <ArrowUp className="text-success me-1" size={16} />
                       Số thành viên
                     </th>
                     <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <i className="bi bi-arrow-up text-success me-1"></i>
+                      <ArrowUp className="text-success me-1" size={16} />
                       Hành động
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDepartments.map((dept, index) => (
-                    <tr 
+                  {currentDepartments.map((dept, index) => (
+                    <tr
                       key={dept.id}
-                      style={{ 
+                      style={{
                         backgroundColor: index === 0 ? '#f8fafc' : 'transparent',
                         cursor: 'pointer'
                       }}
@@ -245,21 +266,66 @@ const Department = () => {
           )}
 
           {/* Pagination */}
-          <div className="d-flex justify-content-center mt-4">
-            <nav>
-              <ul className="pagination">
-                <li className="page-item">
-                  <span className="page-link" style={{ color: '#6b7280' }}>&lt;</span>
-                </li>
-                <li className="page-item active">
-                  <span className="page-link" style={{ backgroundColor: '#dc2626', borderColor: '#dc2626', color: 'white' }}>1</span>
-                </li>
-                <li className="page-item">
-                  <span className="page-link" style={{ color: '#6b7280' }}>&gt;</span>
-                </li>
-              </ul>
-            </nav>
-          </div>
+          {totalPages > 1 && (
+            <div className="d-flex justify-content-center mt-4">
+              <div className="d-flex align-items-center" style={{ gap: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage <= 1 || loading}
+                  className="btn"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    border: '1px solid #e5e7eb',
+                    background: '#fff',
+                    color: '#9ca3af',
+                    padding: 0,
+                  }}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setCurrentPage(n)}
+                    disabled={loading}
+                    className="btn"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: '1px solid ' + (n === currentPage ? '#dc2626' : '#e5e7eb'),
+                      background: n === currentPage ? '#dc2626' : '#fff',
+                      color: n === currentPage ? '#fff' : '#111827',
+                      padding: 0,
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= totalPages || loading}
+                  className="btn"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    border: '1px solid #e5e7eb',
+                    background: '#fff',
+                    color: '#9ca3af',
+                    padding: 0,
+                  }}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
       </div>
 
       {/* Create Department Modal */}
@@ -347,9 +413,9 @@ const Department = () => {
                   disabled={isCreating}
                 >
                   {isCreating ? (
-                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                    <RefreshCw className="spin-animation me-2" size={18} />
                   ) : (
-                    <i className="bi bi-check-lg me-2"></i>
+                    <Check className="me-2" size={18} />
                   )}
                   {isCreating ? 'Đang tạo...' : 'Xác nhận'}
                 </button>

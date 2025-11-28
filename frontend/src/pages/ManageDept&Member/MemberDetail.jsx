@@ -9,6 +9,8 @@ import { eventService } from '~/services/eventService';
 import { departmentService } from '~/services/departmentService';
 import { formatDate } from '~/utils/formatDate';
 import ConfirmModal from '../../components/ConfirmModal';
+import { ArrowLeft, ArrowLeftRight, Check, ClipboardList, FileText, Info, RotateCw, Settings, Shield, Star, Tag, Trash, User, Building2 } from "lucide-react";
+
 
 export default function MemberProfilePage() {
   const { eventId, memberId } = useParams();
@@ -241,30 +243,14 @@ export default function MemberProfilePage() {
   };
 
   // Show loading while fetching role to prevent showing wrong sidebar
-  if (roleLoading) {
-    return (
-      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <Loading />
-        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
-      </div>
-    );
-  }
-
-  if (loading) {
+  if (roleLoading || loading) {
     return (
       <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members" eventId={eventId}>
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh', padding: '40px' }}>
           <Loading size={80} />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>
+            {roleLoading ? 'Đang tải thông tin sự kiện...' : 'Đang tải thông tin thành viên...'}
+          </div>
         </div>
       </UserLayout>
     );
@@ -514,10 +500,10 @@ export default function MemberProfilePage() {
       <div className="container-fluid" style={{ maxWidth: 1100 }}>
         {/* Back Button */}
         <button 
-          className="btn btn-outline-secondary mb-3"
+          className="btn btn-outline-secondary mb-3 d-inline-flex align-items-center"
           onClick={() => navigate(`/events/${eventId}/members`)}
         >
-          <i className="bi bi-arrow-left me-2"></i>
+          <ArrowLeft size={16} className="me-2" />
           Quay lại danh sách thành viên
         </button>
 
@@ -550,8 +536,8 @@ export default function MemberProfilePage() {
           <div className="col-lg-7">
             <div className="profile-card">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5 className="fw-bold mb-0">
-                  <i className="bi bi-person-circle me-2 text-danger"></i>
+                <h5 className="fw-bold mb-0 d-flex align-items-center">
+                  <User className="me-2 text-danger" size={20} />
                   Thông tin cá nhân
                 </h5>
               </div>
@@ -579,8 +565,8 @@ export default function MemberProfilePage() {
             </div>
 
             <div className="profile-card">
-              <h5 className="fw-bold mb-3">
-                <i className="bi bi-file-text me-2 text-danger"></i>
+              <h5 className="fw-bold mb-3 d-flex align-items-center">
+                <FileText className="me-2 text-danger" size={20} />
                 Bio
               </h5>
               <p className="text-muted mb-0">{memberBio || 'Chưa có thông tin'}</p>
@@ -592,8 +578,8 @@ export default function MemberProfilePage() {
             {/* Department Info */}
             {shouldShowDepartmentInfo && (
               <div className="profile-card">
-                <h5 className="fw-bold mb-3">
-                  <i className="bi bi-building me-2 text-danger"></i>
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Building2 className="me-2 text-danger" size={20} />
                   Thông tin chuyên môn chính
                 </h5>
                 
@@ -601,7 +587,7 @@ export default function MemberProfilePage() {
                   <div className="small text-muted mb-1">Chuyên môn chính</div>
                   <div className="d-flex align-items-center gap-2">
                     <span className="badge bg-light text-dark px-3 py-2">
-                      <i className="bi bi-star-fill text-warning me-1"></i>
+                      <Star className="text-warning me-1" size={14} />
                       {memberDepartment}
                     </span>
                   </div>
@@ -610,7 +596,7 @@ export default function MemberProfilePage() {
                 {memberStats.totalTasks !== undefined && (
                   <div className="mb-2">
                     <div className="fw-bold text-dark">
-                      <i className="bi bi-list-task me-2 text-primary"></i>
+                      <ClipboardList className="me-2 text-primary" size={18} />
                       {memberStats.totalTasks} nhiệm vụ
                     </div>
                   </div>
@@ -623,8 +609,8 @@ export default function MemberProfilePage() {
             {/* Thông tin chi tiết */}
             {memberHighlight && (
               <div className="profile-card">
-                <h5 className="fw-bold mb-3">
-                  <i className="bi bi-star me-2 text-danger"></i>
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Star className="me-2 text-danger" size={20} />
                   Thông tin chi tiết
                 </h5>
                 <p className="text-muted small mb-0">{memberHighlight}</p>
@@ -634,8 +620,8 @@ export default function MemberProfilePage() {
             {/* Tags */}
             {shouldShowDepartmentInfo && memberTags && memberTags.length > 0 && (
               <div className="profile-card">
-                <h5 className="fw-bold mb-3">
-                  <i className="bi bi-tags me-2 text-danger"></i>
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Tag className="me-2 text-danger" size={20} />
                   Ban đã tham gia
                 </h5>
                 <div className="d-flex flex-wrap gap-2">
@@ -650,8 +636,8 @@ export default function MemberProfilePage() {
 
             {/* Thông tin khác */}
             <div className="profile-card">
-              <h5 className="fw-bold mb-3">
-                <i className="bi bi-info-circle me-2 text-danger"></i>
+              <h5 className="fw-bold mb-3 d-flex align-items-center">
+                <Info className="me-2 text-danger" size={20} />
                 Thông tin khác
               </h5>
               
@@ -671,8 +657,8 @@ export default function MemberProfilePage() {
             {/* Actions (Only for HoOC/HoD) */}
             {canManage && (
               <div className="profile-card">
-                <h5 className="fw-bold mb-3">
-                  <i className="bi bi-gear me-2 text-danger"></i>
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Settings className="me-2 text-danger" size={20} />
                   Hành động
                 </h5>
                 <div className="d-grid gap-2">
@@ -681,7 +667,7 @@ export default function MemberProfilePage() {
                       className="action-btn action-btn-secondary"
                       onClick={handleOpenDepartmentModal}
                     >
-                      <i className="bi bi-arrow-left-right"></i>
+                      <ArrowLeftRight size={16} />
                       Chuyển ban
                     </button>
                   )}
@@ -691,7 +677,7 @@ export default function MemberProfilePage() {
                       className="action-btn action-btn-secondary"
                       onClick={handleOpenRoleModal}
                     >
-                      <i className="bi bi-shield"></i>
+                      <Shield size={16} />
                       Thay đổi vai trò
                     </button>
                   )}
@@ -700,7 +686,7 @@ export default function MemberProfilePage() {
                     className="action-btn action-btn-danger"
                     onClick={handleRemoveMember}
                   >
-                    <i className="bi bi-trash"></i>
+                    <Trash size={18} />
                     Xóa khỏi sự kiện
                   </button>
                 </div>
@@ -763,9 +749,9 @@ export default function MemberProfilePage() {
                     disabled={departmentModalSaving || departmentModalLoading}
                   >
                     {departmentModalSaving ? (
-                      <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      <RotateCw className="spin-animation me-2" size={16} />
                     ) : (
-                      <i className="bi bi-check-lg me-2"></i>
+                      <Check className="me-2" size={16} />
                     )}
                     {departmentModalSaving ? 'Đang xác nhận...' : 'Xác nhận'}
                   </button>
@@ -780,7 +766,7 @@ export default function MemberProfilePage() {
         <div className="custom-modal-overlay">
           <div className="custom-modal-card">
             <div className="d-flex align-items-center mb-3">
-              <i className="bi bi-shield text-danger fs-5 me-2"></i>
+              <Shield className="text-danger fs-5 me-2" size={18} />
               <h5 className="mb-0">Thay đổi vai trò</h5>
             </div>
             <p className="text-muted small mb-3">
@@ -821,9 +807,9 @@ export default function MemberProfilePage() {
                 disabled={roleSaving}
               >
                 {roleSaving ? (
-                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  <RotateCw className="spin-animation me-2" size={16} />
                 ) : (
-                  <i className="bi bi-check-lg me-2"></i>
+                  <Check className="me-2" size={16} />
                 )}
                 {roleSaving ? 'Đang xác nhận...' : 'Xác nhận'}
               </button>

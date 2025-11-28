@@ -5,25 +5,29 @@ import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { ArrowLeft, Users, RotateCw, Save, Send, PlusCircle, CheckCircle, AlertTriangle, XCircle, Upload, Trash, Image, FileText, Link, Paperclip } from "lucide-react";
 
 const CreateDepartmentBudget = () => {
-  const { eventId, departmentId } = useParams();
+  const { eventId, departmentId, budgetId: budgetIdFromParams } = useParams();
   const navigate = useNavigate();
   const location = window.location.pathname;
   const isEditMode = location.includes('/edit');
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [department, setDepartment] = useState(null);
   const [budget, setBudget] = useState(null);
+  const [requestName, setRequestName] = useState("");
+  const [requestNameTouched, setRequestNameTouched] = useState(false);
   const [budgetItems, setBudgetItems] = useState([
     {
       id: Date.now(),
       name: "",
       category: "",
-      unit: "cái",
+      unit: "",
       unitPrice: "",
       quantity: "",
       total: 0,
       note: "",
+      evidence: [],
       feedback: "",
       status: "pending",
       itemId: null,
@@ -35,6 +39,7 @@ const CreateDepartmentBudget = () => {
   const [members, setMembers] = useState([]); // Danh sách members để assign
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({}); // Track validation errors: { itemId: { field: true } }
 
   useEffect(() => {
     fetchDepartment();
@@ -42,6 +47,13 @@ const CreateDepartmentBudget = () => {
       fetchBudget();
     }
   }, [eventId, departmentId, isEditMode]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      setRequestName("");
+      setRequestNameTouched(false);
+    }
+  }, [isEditMode]);
 
   useEffect(() => {
     if (departmentId && departmentId !== "current" && departmentId !== "") {
@@ -112,24 +124,49 @@ const CreateDepartmentBudget = () => {
 
     try {
       setInitialLoading(true);
-      const budgetData = await budgetApi.getDepartmentBudget(eventId, departmentId);
+      // Nếu có budgetId từ URL params, dùng getDepartmentBudgetById để lấy đúng budget
+      // Nếu không, dùng getDepartmentBudget (sẽ ưu tiên lấy approved budget)
+      const budgetData = budgetIdFromParams 
+        ? await budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetIdFromParams)
+        : await budgetApi.getDepartmentBudget(eventId, departmentId);
+      
+      // Kiểm tra status của budget - chỉ cho phép edit nếu status là draft, changes_requested, hoặc submitted
+      const allowedStatuses = ['draft', 'changes_requested', 'submitted'];
+      if (budgetData?.status && !allowedStatuses.includes(budgetData.status)) {
+        toast.error(`Budget này đã ở trạng thái "${budgetData.status === 'approved' ? 'Đã phê duyệt' : budgetData.status}" và không thể chỉnh sửa.`);
+        navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+        return;
+      }
+      
       setBudget(budgetData);
+      setRequestName(budgetData?.name || "");
+      setRequestNameTouched(false);
       if (budgetData?.items) {
+        // Nếu budget status là draft hoặc submitted, đảm bảo item status là pending (trừ khi đã được approved và budget đã approved)
+        const budgetStatus = budgetData.status || "draft";
+        const isBudgetApproved = budgetStatus === "approved" || budgetStatus === "sent_to_members" || budgetStatus === "locked";
+        
         setBudgetItems(
           budgetData.items.map((item) => {
             const unitCost = parseFloat(item.unitCost) || 0;
             const qty = parseFloat(item.qty) || 0;
+            // Nếu budget chưa approved, item status phải là pending (trừ khi đã được approved trước đó và budget đã approved)
+            let itemStatus = item.status || "pending";
+            if (!isBudgetApproved && itemStatus === "approved") {
+              itemStatus = "pending"; // Reset về pending nếu budget chưa approved
+            }
             return {
               id: item.itemId || Date.now() + Math.random(),
               name: item.name || "",
               category: item.category || "",
-              unit: item.unit || "cái",
+              unit: item.unit || "",
               unitPrice: unitCost > 0 ? formatNumber(unitCost.toString()) : "",
               quantity: qty > 0 ? formatNumber(qty.toString()) : "",
               total: parseFloat(item.total) || 0,
               note: item.note || "",
+              evidence: Array.isArray(item.evidence) ? item.evidence : [],
               feedback: item.feedback || "",
-              status: item.status || "pending", // Lưu status của item
+              status: itemStatus, // Sử dụng itemStatus đã được xử lý
               itemId: item.itemId, // Lưu itemId để gửi lên backend
               assignedTo: item.assignedTo?._id || item.assignedTo?.id || item.assignedTo || null, // Lưu assignedTo
             };
@@ -166,6 +203,21 @@ const CreateDepartmentBudget = () => {
   };
 
   const handleItemChange = (id, field, value) => {
+    // Clear validation error for this field when user starts typing
+    setValidationErrors((prev) => {
+      const newErrors = { ...prev };
+      if (newErrors[id]) {
+        const itemErrors = { ...newErrors[id] };
+        delete itemErrors[field];
+        if (Object.keys(itemErrors).length === 0) {
+          delete newErrors[id];
+        } else {
+          newErrors[id] = itemErrors;
+        }
+      }
+      return newErrors;
+    });
+
     setBudgetItems((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -211,6 +263,92 @@ const CreateDepartmentBudget = () => {
     }
   };
 
+  const handleAddEvidenceLink = (itemId) => {
+    const link = prompt("Nhập link bằng chứng:");
+    if (!link || !link.trim()) return;
+    setBudgetItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const nextEvidence = [
+            ...(item.evidence || []),
+            {
+              type: "link",
+              url: link.trim(),
+              name: `Link ${(item.evidence || []).length + 1}`,
+            },
+          ];
+          return { ...item, evidence: nextEvidence };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleAddEvidenceFile = (itemId, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const fileType = file.type.startsWith("image/")
+        ? "image"
+        : file.type === "application/pdf"
+        ? "pdf"
+        : "doc";
+      const filePayload = {
+        type: fileType,
+        url: e.target.result,
+        name: file.name,
+      };
+      setBudgetItems((prev) =>
+        prev.map((item) => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              evidence: [...(item.evidence || []), filePayload],
+            };
+          }
+          return item;
+        })
+      );
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleRemoveEvidence = (itemId, index) => {
+    setBudgetItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            evidence: (item.evidence || []).filter((_, idx) => idx !== index),
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleOpenEvidence = (evidence) => {
+    if (!evidence?.url) return;
+    window.open(evidence.url, "_blank", "noopener,noreferrer");
+  };
+
+  const getEvidenceIcon = (type) => {
+    switch (type) {
+      case "image":
+        return Image;
+      case "pdf":
+        return FileText;
+      case "doc":
+        return FileText;
+      case "link":
+        return Link;
+      default:
+        return Paperclip;
+    }
+  };
+
   const handleAddItem = () => {
     setBudgetItems([
       ...budgetItems,
@@ -218,11 +356,12 @@ const CreateDepartmentBudget = () => {
         id: Date.now(),
         name: "",
         category: "",
-        unit: "cái",
+        unit: "",
         unitPrice: "",
         quantity: "",
         total: 0,
         note: "",
+        evidence: [],
         feedback: "",
         status: "pending",
         itemId: null,
@@ -258,43 +397,136 @@ const CreateDepartmentBudget = () => {
     return new Intl.NumberFormat("vi-VN").format(amount);
   };
 
+  const isRequestNameInvalid = requestNameTouched && !requestName.trim();
+
   const validateForm = () => {
-    // Kiểm tra các trường bắt buộc
-    for (const item of budgetItems) {
-      const unitPriceNum = parseNumber(item.unitPrice);
-      const quantityNum = parseNumber(item.quantity);
-      if (!item.name || !item.name.trim()) {
-        toast.error("Vui lòng điền đầy đủ nội dung cho tất cả các dòng.");
-        return false;
-      }
-      if (categories.length > 0 && (!item.category || !item.category.trim())) {
-        toast.error("Vui lòng chọn hạng mục cho tất cả các mục.");
-        return false;
-      }
-      if (!unitPriceNum) {
-        toast.error("Vui lòng điền đầy đủ đơn giá cho tất cả các mục.");
-        return false;
-      }
-      if (!quantityNum) {
-        toast.error("Vui lòng điền đầy đủ số lượng cho tất cả các mục.");
-        return false;
+    const errors = {};
+    let firstErrorElement = null;
+    let firstErrorItemId = null;
+    let firstErrorField = null;
+
+    // Validate request name
+    if (!requestName.trim()) {
+      setRequestNameTouched(true);
+      errors.requestName = true;
+      const nameInput = document.querySelector('input[data-field="requestName"]');
+      if (nameInput) {
+        firstErrorElement = nameInput;
+        firstErrorField = 'requestName';
       }
     }
-    
+
+    // Validate items
+    for (let i = 0; i < budgetItems.length; i++) {
+      const item = budgetItems[i];
+      const itemErrors = {};
+      const unitPriceNum = parseNumber(item.unitPrice);
+      const quantityNum = parseNumber(item.quantity);
+
+      if (!item.name || !item.name.trim()) {
+        itemErrors.name = true;
+        if (!firstErrorElement) {
+          firstErrorElement = document.querySelector(`input[data-item-id="${item.id}"][data-field="name"]`);
+          firstErrorItemId = item.id;
+          firstErrorField = 'name';
+        }
+      }
+      if (categories.length > 0 && (!item.category || !item.category.trim())) {
+        itemErrors.category = true;
+        if (!firstErrorElement) {
+          firstErrorElement = document.querySelector(`select[data-item-id="${item.id}"][data-field="category"]`);
+          firstErrorItemId = item.id;
+          firstErrorField = 'category';
+        }
+      }
+      if (!unitPriceNum) {
+        itemErrors.unitPrice = true;
+        if (!firstErrorElement) {
+          firstErrorElement = document.querySelector(`input[data-item-id="${item.id}"][data-field="unitPrice"]`);
+          firstErrorItemId = item.id;
+          firstErrorField = 'unitPrice';
+        }
+      }
+      if (!quantityNum) {
+        itemErrors.quantity = true;
+        if (!firstErrorElement) {
+          firstErrorElement = document.querySelector(`input[data-item-id="${item.id}"][data-field="quantity"]`);
+          firstErrorItemId = item.id;
+          firstErrorField = 'quantity';
+        }
+      }
+      if (!item.unit || !item.unit.trim()) {
+        itemErrors.unit = true;
+        if (!firstErrorElement) {
+          firstErrorElement = document.querySelector(`input[data-item-id="${item.id}"][data-field="unit"]`);
+          firstErrorItemId = item.id;
+          firstErrorField = 'unit';
+        }
+      }
+
+      if (Object.keys(itemErrors).length > 0) {
+        errors[item.id] = itemErrors;
+      }
+    }
+
     // Kiểm tra tên mục trùng
     const names = budgetItems.map((item) => item.name?.trim().toLowerCase()).filter(Boolean);
     const uniqueNames = new Set(names);
     if (names.length !== uniqueNames.size) {
       toast.error("Có nội dung bị trùng. Vui lòng kiểm tra và sửa lại.");
+      setValidationErrors(errors);
       return false;
     }
-    
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      
+      // Show error message
+      if (errors.requestName) {
+        toast.error("Vui lòng nhập tên đơn ngân sách.");
+      } else {
+        const errorCount = Object.keys(errors).filter(key => key !== 'requestName').length;
+        if (errorCount === 1) {
+          toast.error("Vui lòng điền đầy đủ thông tin cho mục này.");
+        } else {
+          toast.error(`Vui lòng điền đầy đủ thông tin cho ${errorCount} mục.`);
+        }
+      }
+
+      // Scroll and focus to first error
+      if (firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          firstErrorElement.focus();
+          firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      } else if (firstErrorItemId) {
+        // Fallback: scroll to the row
+        const rowElement = document.querySelector(`tr[data-item-id="${firstErrorItemId}"]`);
+        if (rowElement) {
+          rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+
+      return false;
+    }
+
+    // Clear errors if validation passes
+    setValidationErrors({});
     return true;
   };
 
   const handleSaveDraft = async () => {
     if (!validateForm()) {
       // validateForm đã có thông báo lỗi riêng
+      return;
+    }
+
+    // Kiểm tra status trước khi save
+    const allowedStatuses = ['draft', 'changes_requested', 'submitted'];
+    if (budget?._id && budget?.status && !allowedStatuses.includes(budget.status)) {
+      toast.error(`Budget này đã ở trạng thái "${budget.status === 'approved' ? 'Đã phê duyệt' : budget.status}" và không thể chỉnh sửa.`);
+      navigate(`/events/${eventId}/departments/${departmentId}/budget`);
       return;
     }
 
@@ -305,15 +537,17 @@ const CreateDepartmentBudget = () => {
           itemId: item.itemId || item.id, // Giữ nguyên itemId nếu có
           name: item.name,
           category: item.category || "general",
-          unit: item.unit || "cái",
+          unit: item.unit?.trim() || "",
           unitCost: parseNumber(item.unitPrice),
           qty: parseNumber(item.quantity),
           total: item.total,
           note: item.note || "",
+          evidence: item.evidence || [],
           status: item.status || "pending", // Giữ nguyên status nếu có
           assignedTo: item.assignedTo || null, // Thêm assignedTo
         })),
         status: "draft",
+        name: requestName.trim(),
       };
 
       let budgetId = budget?._id;
@@ -329,9 +563,18 @@ const CreateDepartmentBudget = () => {
         await budgetApi.updateCategories(eventId, departmentId, budgetId, categories);
       }
       toast.success("Đã lưu nháp thành công!");
-      navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+      // Navigate với budgetId cụ thể để đảm bảo hiển thị đúng budget vừa lưu
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Lưu nháp thất bại!");
+      const errorMessage = error?.response?.data?.message || "Lưu nháp thất bại!";
+      toast.error(errorMessage);
+      
+      // Nếu lỗi do status không cho phép update, redirect về trang view
+      if (error?.response?.status === 400 && errorMessage.includes("Cannot update budget")) {
+        setTimeout(() => {
+          navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+        }, 2000);
+      }
     } finally {
       setIsSavingDraft(false);
     }
@@ -343,6 +586,14 @@ const CreateDepartmentBudget = () => {
       return;
     }
 
+    // Kiểm tra status trước khi submit
+    const allowedStatuses = ['draft', 'changes_requested', 'submitted'];
+    if (budget?._id && budget?.status && !allowedStatuses.includes(budget.status)) {
+      toast.error(`Budget này đã ở trạng thái "${budget.status === 'approved' ? 'Đã phê duyệt' : budget.status}" và không thể chỉnh sửa.`);
+      navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const data = {
@@ -350,15 +601,17 @@ const CreateDepartmentBudget = () => {
           itemId: item.itemId || item.id, // Giữ nguyên itemId nếu có
           name: item.name,
           category: item.category || "general",
-          unit: item.unit || "cái",
+          unit: item.unit?.trim() || "",
           unitCost: parseNumber(item.unitPrice),
           qty: parseNumber(item.quantity),
           total: item.total,
           note: item.note || "",
+          evidence: item.evidence || [],
           status: item.status || "pending", // Giữ nguyên status nếu có
           assignedTo: item.assignedTo || null, // Thêm assignedTo
         })),
         status: "submitted",
+        name: requestName.trim(),
       };
 
       let budgetId = budget?._id;
@@ -378,9 +631,18 @@ const CreateDepartmentBudget = () => {
         await budgetApi.submitBudget(eventId, departmentId, budgetId);
       }
       toast.success("Gửi duyệt thành công!");
-      navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+      // Navigate với budgetId cụ thể để đảm bảo hiển thị đúng budget vừa gửi
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
+      const errorMessage = error?.response?.data?.message || "Gửi duyệt thất bại!";
+      toast.error(errorMessage);
+      
+      // Nếu lỗi do status không cho phép update, redirect về trang view
+      if (error?.response?.status === 400 && errorMessage.includes("Cannot update budget")) {
+        setTimeout(() => {
+          navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+        }, 2000);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -396,8 +658,8 @@ const CreateDepartmentBudget = () => {
 
   return (
     <UserLayout
-      title="Create Department Budget"
-      activePage="budget"
+      title="Tạo ngân sách"
+      activePage="finance-budget"
       sidebarType="hod"
       eventId={eventId}
     >
@@ -410,13 +672,13 @@ const CreateDepartmentBudget = () => {
               onClick={handleCancel}
               style={{ color: "#6b7280" }}
             >
-              <i className="bi bi-arrow-left me-2"></i>
+              <ArrowLeft className="me-2" size={20} />
               <span className="fw-bold" style={{ fontSize: "20px", color: "#111827" }}>
                 {isEditMode ? "Chỉnh Sửa Budget" : "Tạo Budget Mới"}
               </span>
             </button>
             <div className="d-flex align-items-center gap-2 text-muted">
-              <i className="bi bi-people-fill"></i>
+              <Users size={18} />
               <span>Ban: {department?.name || "Đang tải..."}</span>
             </div>
           </div>
@@ -436,9 +698,9 @@ const CreateDepartmentBudget = () => {
               style={{ borderRadius: "8px" }}
             >
               {isSavingDraft ? (
-                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                <RotateCw className="spin-animation me-2" size={18} />
               ) : (
-                <i className="bi bi-save me-2"></i>
+                <Save className="me-2" size={18} />
               )}
               {isSavingDraft ? "Đang lưu..." : "Lưu Nháp"}
             </button>
@@ -449,9 +711,9 @@ const CreateDepartmentBudget = () => {
               style={{ borderRadius: "8px" }}
             >
               {isSubmitting ? (
-                <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                <RotateCw className="spin-animation me-2" size={18} />
               ) : (
-                <i className="bi bi-send me-2"></i>
+                <Send className="me-2" size={18} />
               )}
               {isSubmitting ? "Đang gửi..." : (budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "Gửi lại" : "Gửi Duyệt")}
             </button>
@@ -471,6 +733,42 @@ const CreateDepartmentBudget = () => {
           <h5 className="fw-bold mb-4" style={{ fontSize: "18px", color: "#111827" }}>
             Budget chi tiết
           </h5>
+
+          <div className="mb-4">
+            <label className="fw-semibold mb-1" style={{ fontSize: "14px", color: "#374151" }}>
+              Tên đơn ngân sách <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              value={requestName}
+              onChange={(e) => {
+                setRequestName(e.target.value);
+                // Clear validation error when user starts typing
+                if (requestNameTouched && e.target.value.trim()) {
+                  setRequestNameTouched(false);
+                }
+              }}
+              onBlur={() => setRequestNameTouched(true)}
+              placeholder="Ví dụ: Ngân sách truyền thông Giai đoạn 1"
+              data-field="requestName"
+              style={{
+                borderRadius: "8px",
+                border: (isRequestNameInvalid || validationErrors.requestName) 
+                  ? "1px solid #EF4444" 
+                  : "1px solid #d1d5db",
+              }}
+            />
+            {isRequestNameInvalid ? (
+              <div className="text-danger mt-1" style={{ fontSize: "13px" }}>
+                Vui lòng nhập tên đơn.
+              </div>
+            ) : (
+              <div className="text-muted mt-1" style={{ fontSize: "13px" }}>
+                Tên đơn sẽ hiển thị trong danh sách ngân sách và trang chi tiết.
+              </div>
+            )}
+          </div>
 
           {/* Category Management */}
           <div className="mb-4 p-3" style={{ background: "#F9FAFB", borderRadius: "8px", border: "1px solid #E5E7EB" }}>
@@ -492,7 +790,7 @@ const CreateDepartmentBudget = () => {
                 onClick={handleAddCategory}
                 style={{ borderRadius: "8px" }}
               >
-                <i className="bi bi-plus-circle me-1"></i>
+                <PlusCircle className="me-1" size={18} />
                 Thêm
               </button>
             </div>
@@ -539,10 +837,13 @@ const CreateDepartmentBudget = () => {
                     Số Lượng<span className="text-danger">*</span>
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "110px" }}>
-                    Đơn Vị Tính
+                    Đơn Vị Tính<span className="text-danger">*</span>
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "140px" }}>
                     Tổng Tiền (VNĐ)
+                  </th>
+                  <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "180px" }}>
+                    Bằng Chứng
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "150px" }}>
                     Ghi Chú
@@ -560,12 +861,15 @@ const CreateDepartmentBudget = () => {
               <tbody>
                 {budgetItems.map((item) => {
                   const hasFeedback = item.feedback && item.feedback.trim() !== "";
-                  const isApproved = item.status === "approved";
+                  // Chỉ hiển thị approved khi budget đã được approved VÀ item đó thực sự được approved
+                  const isApproved = budget?.status === "approved" && item.status === "approved";
                   const isRejected = item.status === "rejected";
-                  const isEditable = !isApproved; // Chỉ cho phép chỉnh sửa nếu chưa được duyệt
+                  // Chỉ cho phép chỉnh sửa nếu budget chưa được approved hoặc item chưa được duyệt
+                  const isEditable = budget?.status !== "approved" && !isApproved;
                   return (
                   <tr 
                     key={item.id}
+                    data-item-id={item.id}
                     style={{
                       background: hasFeedback ? "#FEE2E2" : isApproved ? "#D1FAE5" : "transparent",
                     }}
@@ -583,9 +887,13 @@ const CreateDepartmentBudget = () => {
                           onChange={(e) => handleItemChange(item.id, "category", e.target.value)}
                           disabled={!isEditable}
                           required
+                          data-item-id={item.id}
+                          data-field="category"
                           style={{
                             borderRadius: "8px",
-                            border: !item.category && categories.length > 0 ? "1px solid #EF4444" : "1px solid #d1d5db",
+                            border: (validationErrors[item.id]?.category || (!item.category && categories.length > 0)) 
+                              ? "1px solid #EF4444" 
+                              : "1px solid #d1d5db",
                             backgroundColor: !isEditable ? "#F3F4F6" : "white",
                             cursor: !isEditable ? "not-allowed" : "pointer",
                             fontSize: "14px",
@@ -605,7 +913,7 @@ const CreateDepartmentBudget = () => {
                       <div style={{ position: "relative" }}>
                         {isApproved ? (
                           <span style={{ color: "#10B981", fontWeight: "500", fontSize: "14px" }}>
-                            {item.name} <i className="bi bi-check-circle ms-1"></i>
+                            {item.name} <CheckCircle className="ms-1" size={16} />
                           </span>
                         ) : (
                           <input
@@ -616,9 +924,11 @@ const CreateDepartmentBudget = () => {
                             onBlur={(e) => handleNameBlur(item.id, e.target.value)}
                             placeholder="Nhập nội dung"
                             disabled={!isEditable}
+                            data-item-id={item.id}
+                            data-field="name"
                             style={{
                               borderRadius: "8px",
-                              border: checkDuplicateName(item.name, item.id)
+                              border: (validationErrors[item.id]?.name || checkDuplicateName(item.name, item.id))
                                 ? "1px solid #EF4444"
                                 : "1px solid #d1d5db",
                               backgroundColor: !isEditable ? "#F3F4F6" : "white",
@@ -643,7 +953,7 @@ const CreateDepartmentBudget = () => {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            <i className="bi bi-exclamation-triangle me-1"></i>
+                            <AlertTriangle className="me-1" size={14} />
                             Nội dung đã tồn tại
                           </div>
                         )}
@@ -663,9 +973,13 @@ const CreateDepartmentBudget = () => {
                           onChange={(e) => handleItemChange(item.id, "unitPrice", e.target.value)}
                           placeholder="0"
                           disabled={!isEditable}
+                          data-item-id={item.id}
+                          data-field="unitPrice"
                           style={{ 
                             borderRadius: "8px", 
-                            border: "1px solid #d1d5db",
+                            border: validationErrors[item.id]?.unitPrice 
+                              ? "1px solid #EF4444" 
+                              : "1px solid #d1d5db",
                             backgroundColor: !isEditable ? "#F3F4F6" : "white",
                             cursor: !isEditable ? "not-allowed" : "text",
                             fontSize: "14px",
@@ -710,29 +1024,28 @@ const CreateDepartmentBudget = () => {
                     <td style={{ padding: "12px" }}>
                       {isApproved ? (
                         <span style={{ color: "#10B981", fontSize: "14px" }}>
-                          {item.unit || "cái"}
+                          {item.unit || "—"}
                         </span>
                       ) : (
-                        <select
-                          className="form-select form-select-sm"
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
                           value={item.unit}
                           onChange={(e) => handleItemChange(item.id, "unit", e.target.value)}
+                          placeholder="Ví dụ: cái, bộ..."
                           disabled={!isEditable}
+                          data-item-id={item.id}
+                          data-field="unit"
                           style={{
                             borderRadius: "8px",
-                            border: "1px solid #d1d5db",
+                            border: validationErrors[item.id]?.unit || (!item.unit && !isEditable) 
+                              ? "1px solid #EF4444" 
+                              : "1px solid #d1d5db",
                             backgroundColor: !isEditable ? "#F3F4F6" : "white",
-                            cursor: !isEditable ? "not-allowed" : "pointer",
+                            cursor: !isEditable ? "not-allowed" : "text",
                             fontSize: "14px",
                           }}
-                        >
-                          <option value="cm">cm</option>
-                          <option value="mm">mm</option>
-                          <option value="m">m</option>
-                          <option value="km">km</option>
-                          <option value="cái">cái</option>
-                          <option value="lít">lít</option>
-                        </select>
+                        />
                       )}
                     </td>
                     {/* Tổng Tiền */}
@@ -740,6 +1053,88 @@ const CreateDepartmentBudget = () => {
                       <span className="fw-semibold" style={{ color: isApproved ? "#10B981" : "#111827", fontSize: "14px" }}>
                         {formatCurrency(item.total)}
                       </span>
+                    </td>
+                    {/* Bằng chứng */}
+                    <td style={{ padding: "12px" }}>
+                      {item.evidence && item.evidence.length > 0 ? (
+                        <div className="d-flex flex-column gap-2">
+                          {item.evidence.map((ev, idx) => (
+                            <div
+                              key={idx}
+                              className="d-flex align-items-center gap-2"
+                              style={{
+                                background: "#F3F4F6",
+                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {React.createElement(getEvidenceIcon(ev.type), { className: "text-primary", size: 16 })}
+                              <button
+                                type="button"
+                                className="btn btn-link p-0"
+                                onClick={() => handleOpenEvidence(ev)}
+                                style={{ fontSize: "13px" }}
+                              >
+                                {ev.name || "Bằng chứng"}
+                              </button>
+                              {isEditable && (
+                                <button
+                                  type="button"
+                                  className="btn btn-link text-danger p-0 ms-auto"
+                                  onClick={() => handleRemoveEvidence(item.id, idx)}
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: "13px" }}>
+                          Chưa có
+                        </span>
+                      )}
+                      {isEditable && (
+                        <div className="row g-2 mt-2">
+                          <div className="col-12 col-md-6 d-flex">
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary flex-fill"
+                              onClick={() => handleAddEvidenceLink(item.id)}
+                              style={{
+                                fontSize: "70%",
+                                padding: "4px 6px",
+                                display: "inline-flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: "1px",
+                              }}
+                            >
+                              <span style={{ fontSize: "105%" }}>+</span>
+                              <span className="text-center">Thêm link</span>
+                            </button>
+                          </div>
+                          <div className="col-12 col-md-6 d-flex">
+                            <label
+                              className="btn btn-outline-primary mb-0 d-flex flex-column align-items-center gap-1 flex-fill"
+                              style={{
+                                fontSize: "70%",
+                                padding: "4px 6px",
+                              }}
+                            >
+                              <Upload style={{ fontSize: "105%" }} size={16} />
+                              <span className="text-center">Tải file</span>
+                              <input
+                                type="file"
+                                className="d-none"
+                                accept="image/*,application/pdf,.doc,.docx"
+                                onChange={(e) => handleAddEvidenceFile(item.id, e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
                     </td>
                     {/* Ghi Chú */}
                     <td style={{ padding: "12px" }}>
@@ -800,7 +1195,7 @@ const CreateDepartmentBudget = () => {
                             style={{ textDecoration: "none", opacity: !isEditable ? 0.5 : 1, fontSize: "14px" }}
                             title="Xóa mục"
                           >
-                            <i className="bi bi-trash"></i>
+                            <Trash size={16} />
                           </button>
                         </div>
                       )}
@@ -822,7 +1217,7 @@ const CreateDepartmentBudget = () => {
               fontWeight: "600",
             }}
           >
-            <i className="bi bi-plus-circle me-2"></i>
+            <PlusCircle className="me-2" size={18} />
             Thêm Mục Mới
           </button>
         </div>

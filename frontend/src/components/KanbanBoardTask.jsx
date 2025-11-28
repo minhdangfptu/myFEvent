@@ -22,15 +22,27 @@ import { toast } from 'react-toastify';
 
 const normalizeAssigneeId = (assignee) => {
   if (!assignee) return null;
-  if (typeof assignee === 'string') return assignee;
-  if (typeof assignee === 'object') {
-    return (
-      assignee.id ||
-      assignee._id ||
-      (typeof assignee.toString === 'function' ? assignee.toString() : null)
-    );
+  if (typeof assignee === 'string' || typeof assignee === 'number') {
+    return String(assignee);
   }
-  return String(assignee);
+  if (typeof assignee === 'object') {
+    if (assignee._id) return String(assignee._id);
+    if (assignee.id) return String(assignee.id);
+    if (assignee.userId) {
+      const userId = assignee.userId;
+      if (typeof userId === 'object') {
+        return (
+          (userId && (userId._id || userId.id)) ? String(userId._id || userId.id) :
+          (typeof userId.toString === 'function' ? userId.toString() : null)
+        );
+      }
+      return String(userId);
+    }
+    if (typeof assignee.toString === 'function') {
+      return assignee.toString();
+    }
+  }
+  return null;
 };
 
 export default function KanbanBoardTask({
@@ -105,7 +117,10 @@ export default function KanbanBoardTask({
 
   const canCurrentMemberUpdate = (task) => {
     if (!normalizedCurrentMemberId) return true;
-    const taskAssigneeId = normalizeAssigneeId(task?.assigneeId);
+    const taskAssigneeId =
+      normalizeAssigneeId(task?.assigneeId) ||
+      normalizeAssigneeId(task?.assignee) ||
+      normalizeAssigneeId(task?.assignedTo);
     if (!taskAssigneeId) return false;
     return String(taskAssigneeId) === normalizedCurrentMemberId;
   };

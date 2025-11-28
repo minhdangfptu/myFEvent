@@ -107,6 +107,8 @@ import ErrorPage503 from "./pages/Errors/ErrorPage503";
 import ErrorPage500 from "./pages/Errors/ErrorPage500";
 import AxiosInterceptor from "./components/AxiosInterceptor";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SupportPage from "./pages/User/SupportPage";
+import SupportButton from "./components/SupportButton";
 
 // Network Warning Overlay Component
 function NetworkWarningOverlay({ isVisible, onClose }) {
@@ -247,6 +249,7 @@ export default function App() {
       <BrowserRouter>
       <AxiosInterceptor>
         <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
+        <SupportButton />
         <NotificationsProvider>
           <EventProvider>
             <ErrorBoundary>
@@ -701,6 +704,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/departments/:departmentId/budget/edit" 
             element={
               <ProtectedRoute>
@@ -810,6 +821,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/:eventId/departments/:departmentId/budget/edit" 
             element={
               <ProtectedRoute>
@@ -915,6 +934,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <UserDetailManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <ProtectedRoute>
+                <SupportPage/>
               </ProtectedRoute>
             }
           />

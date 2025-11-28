@@ -6,6 +6,8 @@ import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
+import { ArrowDown, ArrowUp, Eye, Menu, RotateCw, Trash, X } from "lucide-react";
+
 
 const formatDateTimeLocal = (value) => {
   if (!value) return '';
@@ -529,7 +531,7 @@ export default function CreateFeedbackForm() {
                 }}
                 disabled={isReadOnly}
               >
-                <i className="bi bi-eye"></i>
+                <Eye size={18} />
                 Xem trước
               </button>
               {!isReadOnly && (
@@ -663,7 +665,7 @@ export default function CreateFeedbackForm() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px' }}>
-                    <i className="bi bi-list"></i>
+                    <Menu size={18} />
                   </div>
                   <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Câu hỏi phản hồi</h2>
                 </div>
@@ -693,20 +695,20 @@ export default function CreateFeedbackForm() {
                             disabled={index === 0}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                           >
-                            <i className="bi bi-arrow-up"></i>
+                            <ArrowUp size={18} />
                           </button>
                           <button
                             onClick={() => handleMoveQuestion(index, 'down')}
                             disabled={index === formData.questions.length - 1}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                           >
-                            <i className="bi bi-arrow-down"></i>
+                            <ArrowDown size={18} />
                           </button>
                           <button
                             onClick={() => handleRemoveQuestion(index)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#ef4444' }}
                           >
-                            <i className="bi bi-trash"></i>
+                            <Trash size={18} />
                           </button>
                         </div>
                       </div>
@@ -787,7 +789,7 @@ export default function CreateFeedbackForm() {
                                       fontSize: '18px'
                                     }}
                                   >
-                                    <i className="bi bi-x"></i>
+                                    <X size={18} />
                                   </button>
                                 </div>
                               );

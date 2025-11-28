@@ -859,7 +859,6 @@ export const getRiskStatistics = async (eventId) => {
         const risks = await Risk.find({ eventId })
             .populate('departmentId', 'name')
             .lean();
-
         const categoryLabels = {
             'infrastructure': 'Cơ sở vật chất',
             'mc-guests': 'MC & Khách mời',

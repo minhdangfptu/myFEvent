@@ -12,6 +12,8 @@ import { useEvents } from "../../contexts/EventContext";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
+import { Calendar, CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Copy, Flag, LogIn, MapPin, Plus, Search, Ticket, Upload, UserCheck, X, Zap } from "lucide-react";
+
 
 const unwrapApiData = (payload) => {
   let current = payload;
@@ -124,11 +126,10 @@ export default function HomePage() {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
-  const [imageInputType, setImageInputType] = useState("url");
-  const [imageUrl, setImageUrl] = useState("");
   const [blogs, setBlogs] = useState([]);
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
+  const minStartDate = new Date().toISOString().slice(0, 16);
 
   const { events, loading: eventsLoading, pagination: myEventsPagination, changePage: changeMyEventsPage, refetchEvents } = useEvents();
   const myEvents = useMemo(() => dedupeById(events || []), [events]);
@@ -249,25 +250,6 @@ export default function HomePage() {
     reader.readAsDataURL(file);
   };
 
-  const handleUrlAdd = () => {
-    if (!imageUrl.trim()) {
-      toast.error("Vui lòng nhập URL hình ảnh");
-      return;
-    }
-
-    try {
-      new URL(imageUrl);
-    } catch {
-      toast.error("URL không hợp lệ");
-      return;
-    }
-
-    setCreateForm((prev) => ({
-      ...prev,
-      image: imageUrl.trim(),
-    }));
-    setImageUrl("");
-  };
 
   const clearSelectedImage = () => {
     setCreateForm((prev) => ({
@@ -365,9 +347,10 @@ export default function HomePage() {
         <div className="d-flex gap-3 align-items-center flex-wrap">
           <div className="flex-grow-1" style={{ minWidth: 200 }}>
             <div className="position-relative">
-              <i
-                className="bi bi-search position-absolute"
+              <Search
+                className="position-absolute"
                 style={{ left: 12, top: 12, color: "#9CA3AF" }}
+                size={18}
                 aria-hidden="true"
               />
               <input
@@ -390,7 +373,7 @@ export default function HomePage() {
               }}
               disabled={eventsLoading}
             >
-              <i className="bi bi-x-lg me-1"></i>
+              <X className="me-1" size={18} />
               Xóa tìm kiếm
             </button>
           )}
@@ -404,9 +387,9 @@ export default function HomePage() {
               aria-expanded="false"
               aria-label="Mở menu tạo/tham gia sự kiện"
             >
-              <i className="bi bi-plus" />
+              <Plus size={18} />
               {t("createEvent")}/{t("joinEvent")}
-              <i className="bi bi-chevron-down" />
+              <ChevronDown size={18} />
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
               <li>
@@ -415,7 +398,7 @@ export default function HomePage() {
                   onClick={() => setShowCreateModal(true)}
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
-                  <i className="bi bi-calendar-plus me-2" />
+                  <CalendarPlus className="me-2" size={18} />
                   {t("createEvent")}
                 </button>
               </li>
@@ -425,7 +408,7 @@ export default function HomePage() {
                   onClick={() => setShowJoinModal(true)}
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
-                  <i className="bi bi-box-arrow-in-right me-2" />
+                  <LogIn className="me-2" size={18} />
                   {t("joinEvent")}
                 </button>
               </li>
@@ -524,13 +507,7 @@ export default function HomePage() {
                       }
                     </strong>
                   </span>
-                  <i
-                    className={`bi ${
-                      openMenu === "status"
-                        ? "bi-chevron-up"
-                        : "bi-chevron-down"
-                    }`}
-                  />
+                  {openMenu === "status" ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
                 {openMenu === "status" && (
                   <div className="dropdown-panel">
@@ -548,7 +525,7 @@ export default function HomePage() {
                       >
                         <span>{opt.label}</span>
                         {statusFilter === opt.key && (
-                          <i className="bi bi-check-lg" />
+                          <Check size={18} />
                         )}
                       </div>
                     ))}
@@ -575,11 +552,7 @@ export default function HomePage() {
                       {SORT_OPTIONS.find((o) => o.key === sortBy)?.label}
                     </strong>
                   </span>
-                  <i
-                    className={`bi ${
-                      openMenu === "sort" ? "bi-chevron-up" : "bi-chevron-down"
-                    }`}
-                  />
+                  {openMenu === "sort" ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
                 {openMenu === "sort" && (
                   <div className="dropdown-panel">
@@ -596,7 +569,7 @@ export default function HomePage() {
                         }}
                       >
                         <span>{opt.label}</span>
-                        {sortBy === opt.key && <i className="bi bi-check-lg" />}
+                        {sortBy === opt.key && <Check size={18} />}
                       </div>
                     ))}
                   </div>
@@ -662,7 +635,7 @@ export default function HomePage() {
                           <span
                             className={`event-chip chip-status-${event.status}`}
                           >
-                            <i className="bi bi-lightning-charge-fill me-1" />
+                            <Zap className="me-1" size={18} />
                             {event.status === "scheduled"
                               ? "Sắp diễn ra"
                               : event.status === "ongoing"
@@ -731,9 +704,10 @@ export default function HomePage() {
                             style={{ fontSize: "14px" }}
                             className="d-flex align-items-center"
                           >
-                            <i
-                              className="bi bi-geo-alt me-2 text-danger"
-                              style={{ fontSize: "12px", width: "12px" }}
+                            <MapPin
+                              className="me-2 text-danger"
+                              size={12}
+                              style={{ width: "12px" }}
                             />
                             <small className="text-muted fw-medium text-truncate">
                               {event.location}
@@ -746,9 +720,10 @@ export default function HomePage() {
                             style={{ fontSize: "14px" }}
                             className="d-flex align-items-center"
                           >
-                            <i
-                              className="bi bi-calendar-event me-2 text-danger"
+                            <Calendar
+                              className="me-2 text-danger"
                               style={{ fontSize: "12px", width: "12px" }}
+                              size={12}
                             />
                             {event.eventStartDate && event.eventEndDate ? (
                               <small className="text-muted fw-medium text-truncate">
@@ -775,9 +750,10 @@ export default function HomePage() {
                         className="d-flex align-items-center gap-2 text-dark"
                         style={{ fontSize: 13, fontWeight: 500 }}
                       >
-                        <i
-                          className="bi bi-person-badge me-1"
+                        <UserCheck
+                          className="me-1"
                           style={{ color: "#dc2626" }}
+                          size={16}
                         />
                         {event.eventMember?.role === "Member"
                           ? "Thành viên"
@@ -841,7 +817,7 @@ export default function HomePage() {
                   padding: 0,
                 }}
               >
-                <i className="bi bi-chevron-left" />
+                <ChevronLeft size={18} />
               </button>
               {Array.from({ length: myEventsPagination.totalPages }, (_, i) => i + 1).map(
                 (n) => (
@@ -880,7 +856,7 @@ export default function HomePage() {
                   padding: 0,
                 }}
               >
-                <i className="bi bi-chevron-right" />
+                <ChevronRight size={18} />
               </button>
             </div>
           </div>
@@ -898,9 +874,10 @@ export default function HomePage() {
         {/* Search and Filter for Public Events */}
         <div className="d-flex gap-3 mb-4 flex-wrap align-items-center">
           <div className="position-relative flex-grow-1" style={{ maxWidth: 400 }}>
-            <i
-              className="bi bi-search position-absolute"
+            <Search
+              className="position-absolute"
               style={{ left: 12, top: 12, color: "#9CA3AF" }}
+              size={18}
             />
             <input
               type="text"
@@ -933,7 +910,7 @@ export default function HomePage() {
               }}
               disabled={blogsLoading}
             >
-              <i className="bi bi-x-lg me-1"></i>
+              <X className="me-1" size={18} />
               Xóa bộ lọc
             </button>
           )}
@@ -991,7 +968,7 @@ export default function HomePage() {
                   <div className="blog-meta">
                     {blog.status ? (
                       <span className={`badge-soft chip-status-${blog.status}`}>
-                        <i className="bi bi-lightning-charge-fill me-1" />
+                        <Zap size={14} className="me-1" />
                         {blog.status === "scheduled"
                           ? "Sắp diễn ra"
                           : blog.status === "ongoing"
@@ -1014,9 +991,9 @@ export default function HomePage() {
                         style={{ fontSize: "14px" }}
                         className="d-flex align-items-center"
                       >
-                        <i
-                          className="bi bi-geo-alt me-2 text-danger"
-                          style={{ fontSize: "12px", width: "12px" }}
+                        <MapPin
+                          size={12}
+                          className="me-2 text-danger"
                         />
                         <small className="text-muted fw-medium text-truncate">
                           {blog.location}
@@ -1029,8 +1006,9 @@ export default function HomePage() {
                         style={{ fontSize: "14px" }}
                         className="d-flex align-items-center"
                       >
-                        <i
-                          className="bi bi-calendar-event me-2 text-danger"
+                        <Calendar
+                          size={12}
+                          className="me-2 text-danger"
                           style={{ fontSize: "12px", width: "12px" }}
                         />
                         {blog.eventStartDate && blog.eventEndDate ? (
@@ -1085,7 +1063,7 @@ export default function HomePage() {
                   padding: 0,
                 }}
               >
-                <i className="bi bi-chevron-left" />
+                <ChevronLeft size={18} />
               </button>
               {Array.from({ length: blogsPagination.totalPages }, (_, i) => i + 1).map(
                 (n) => (
@@ -1124,7 +1102,7 @@ export default function HomePage() {
                   padding: 0,
                 }}
               >
-                <i className="bi bi-chevron-right" />
+                <ChevronRight size={18} />
               </button>
             </div>
           </div>
@@ -1141,7 +1119,7 @@ export default function HomePage() {
             <div className="modal-content">
               <div className="modal-header border-0">
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-flag brand-red me-2"></i>
+                  <Flag className="brand-red me-2" size={18} />
                   <h5 className="modal-title fw-bold">Tạo sự kiện</h5>
                 </div>
                 <button
@@ -1158,7 +1136,6 @@ export default function HomePage() {
                       location: "",
                       image: "",
                     });
-                    setImageUrl("");
                   }}
                 />
               </div>
@@ -1234,8 +1211,6 @@ export default function HomePage() {
                         ...createForm,
                         type: "private",
                       });
-                      toast.success("Tạo sự kiện thành công!");
-
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",
@@ -1246,9 +1221,19 @@ export default function HomePage() {
                         location: "",
                         image: "",
                       });
-                      setImageUrl("");
-                      setJoinCodeForModal(res.data.joinCode);
-                      setShowJoinCodeModal(true);
+                      const joinCode =
+                        res?.data?.joinCode ||
+                        res?.data?.event?.joinCode ||
+                        res?.data?.code ||
+                        res?.data?.join_code;
+                      if (joinCode) {
+                        toast.success(`Tạo sự kiện thành công! Mã tham gia: ${joinCode}`);
+                        setJoinCodeForModal(joinCode);
+                        setShowJoinCodeModal(true);
+                      } else {
+                        toast.success("Tạo sự kiện thành công!");
+                        toast.warn("Tạo sự kiện thành công, nhưng chưa lấy được mã tham gia.");
+                      }
                     } catch (err) {
                       const msg =
                         err?.response?.data?.message ||
@@ -1304,6 +1289,7 @@ export default function HomePage() {
                         type="datetime-local"
                         className="form-control soft-input"
                         value={createForm.eventStartDate}
+                        min={minStartDate}
                         onChange={(e) =>
                           setCreateForm((f) => ({
                             ...f,
@@ -1376,73 +1362,19 @@ export default function HomePage() {
                       Hình ảnh sự kiện
                     </label>
 
-                    {/* Image Input Type Toggle */}
-                    <div className="d-flex gap-2 mb-3">
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${
-                          imageInputType === "url"
-                            ? "btn-primary"
-                            : "btn-outline-primary"
-                        }`}
-                        onClick={() => setImageInputType("url")}
-                        disabled={createSubmitting}
-                      >
-                        <i className="bi bi-link-45deg me-1"></i>
-                        URL
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${
-                          imageInputType === "file"
-                            ? "btn-primary"
-                            : "btn-outline-primary"
-                        }`}
-                        onClick={() => setImageInputType("file")}
-                        disabled={createSubmitting}
-                      >
-                        <i className="bi bi-upload me-1"></i>
-                        Upload File
-                      </button>
-                    </div>
-
-                    {/* URL Input */}
-                    {imageInputType === "url" && (
-                      <div className="d-flex gap-2 mb-3">
-                        <input
-                          type="url"
-                          className="form-control soft-input"
-                          placeholder="Nhập URL hình ảnh..."
-                          value={imageUrl}
-                          onChange={(e) => setImageUrl(e.target.value)}
-                          disabled={createSubmitting}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary"
-                          onClick={handleUrlAdd}
-                          disabled={createSubmitting || !imageUrl.trim()}
-                        >
-                          <i className="bi bi-plus"></i>
-                        </button>
-                      </div>
-                    )}
-
                     {/* File Upload */}
-                    {imageInputType === "file" && (
-                      <div className="mb-3">
-                        <input
-                          type="file"
-                          className="form-control soft-input"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          disabled={createSubmitting}
-                        />
-                        <small className="text-muted">
-                          Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
-                        </small>
-                      </div>
-                    )}
+                    <div className="mb-3">
+                      <input
+                        type="file"
+                        className="form-control soft-input"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        disabled={createSubmitting}
+                      />
+                      <small className="text-muted">
+                        Chấp nhận: JPG, PNG, GIF. Kích thước tối đa: 5MB
+                      </small>
+                    </div>
 
                     {/* Image Preview */}
                     {createForm.image && (
@@ -1466,7 +1398,7 @@ export default function HomePage() {
                             onClick={clearSelectedImage}
                             disabled={createSubmitting}
                           >
-                            <i className="bi bi-x"></i>
+                            <X size={18} />
                           </button>
                         </div>
                       </div>
@@ -1487,7 +1419,6 @@ export default function HomePage() {
                           location: "",
                           image: "",
                         });
-                        setImageUrl("");
                       }}
                     >
                       Hủy
@@ -1517,7 +1448,7 @@ export default function HomePage() {
             <div className="modal-content">
               <div className="modal-header border-0">
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-clipboard-data brand-red me-2" />
+                  <ClipboardList className="brand-red me-2" size={18} />
                   <h5 className="modal-title fw-bold">{t("joinEvent")}</h5>
                 </div>
                 <button
@@ -1668,10 +1599,7 @@ export default function HomePage() {
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
               }}
             >
-              <i
-                className="bi bi-ticket-perforated"
-                style={{ fontSize: '32px', color: '#dc2626' }}
-              ></i>
+              <Ticket size={32} style={{ color: "#dc2626" }} />
             </div>
 
             {/* Title */}
@@ -1792,7 +1720,7 @@ export default function HomePage() {
                   e.target.style.background = '#dc2626';
                 }}
               >
-                <i className="bi bi-copy"></i>
+                <Copy size={18} />
                 Copy
               </button>
               <button
@@ -1825,7 +1753,7 @@ export default function HomePage() {
                   e.target.style.borderColor = '#e5e7eb';
                 }}
               >
-                <i className="bi bi-x-lg"></i>
+                <X size={18} />
                 Đóng
               </button>
             </div>
