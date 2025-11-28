@@ -24,28 +24,6 @@ export const getCalendarByEventId = async (eventId) => {
         })
         .lean();
 };
-export const getCalendarByDepartmentId = async (departmentId) => {
-    return await Calendar.find({ departmentId })
-        .populate({
-            path: 'participants.member',
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: 'fullName email'
-            }
-        })
-        .populate({
-            path: 'createdBy',
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: '_id'
-            }
-        })
-        .lean();
-};
 
 export const getCalendarsInEventScope = async (eventId, startDate = null, endDate = null) => {
     const deptIds = await Department.find({ eventId }).select('_id').lean();

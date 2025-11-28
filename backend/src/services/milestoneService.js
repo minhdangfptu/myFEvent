@@ -57,10 +57,6 @@ export const softDeleteMilestoneIfNoTasks = async (eventId, milestoneId) => {
   return { code: 'OK' };
 };
 
-export const getMilestoneById = async (milestoneId) => {
-  return await Milestone.findById(milestoneId).lean();
-}
-
 
 
 

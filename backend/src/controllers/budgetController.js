@@ -5,6 +5,18 @@ import Department from '../models/department.js';
 import User from '../models/user.js';
 import mongoose from 'mongoose';
 
+const normalizeEvidenceArray = (evidence = []) => {
+  if (!Array.isArray(evidence)) return [];
+  const allowedTypes = new Set(['image', 'pdf', 'doc', 'link']);
+  return evidence
+    .filter(ev => ev && (ev.url || ev.name))
+    .map(ev => ({
+      type: allowedTypes.has(ev.type) ? ev.type : 'link',
+      url: ev.url || '',
+      name: ev.name || ''
+    }));
+};
+
 // GET /api/events/:eventId/departments/:departmentId/budget/:budgetId
 export const getDepartmentBudgetById = async (req, res) => {
   try {
@@ -26,6 +38,11 @@ export const getDepartmentBudgetById = async (req, res) => {
       eventId: new mongoose.Types.ObjectId(eventId),
       departmentId: new mongoose.Types.ObjectId(departmentId)
     })
+      .populate({
+        path: 'createdBy',
+        select: 'fullName email',
+        options: { strictPopulate: false }
+      })
       .populate({
         path: 'reviewedBy',
         select: 'fullName email',
@@ -72,35 +89,47 @@ export const getDepartmentBudgetById = async (req, res) => {
     );
 
     // Format items
+    // Nếu budget chưa được approved, các items không nên có status "approved"
+    // Chỉ giữ status "approved" khi budget đã được approved
+    const budgetStatus = budget.status || 'draft';
+    const isBudgetApproved = budgetStatus === 'approved' || budgetStatus === 'sent_to_members' || budgetStatus === 'locked';
+    
     const formattedBudget = {
       ...budget,
       categories: budget.categories || [],
-      items: itemsWithAssigned.map(item => ({
-        itemId: item.itemId,
-        name: item.name,
-        category: item.category || 'general',
-        unit: item.unit || 'cái',
-        unitCost: item.unitCost ? parseFloat(item.unitCost.toString()) : 0,
-        qty: item.qty ? parseFloat(item.qty.toString()) : 0,
-        total: item.total ? parseFloat(item.total.toString()) : 0,
-        note: item.note || '',
-        feedback: item.feedback || '',
-        status: item.status || 'pending',
-        // Expense reporting fields
-        evidence: item.evidence || [],
-        actualAmount: item.actualAmount ? parseFloat(item.actualAmount.toString()) : 0,
-        isPaid: item.isPaid || false,
-        memberNote: item.memberNote || '',
-        comparison: item.comparison || null,
-        reportedBy: item.reportedBy,
-        reportedAt: item.reportedAt,
-        // Assignment fields
-        assignedTo: item.assignedTo,
-        assignedAt: item.assignedAt,
-        assignedBy: item.assignedBy,
-        assignedToInfo: item.assignedToInfo,
-        submittedStatus: item.submittedStatus || 'draft'
-      }))
+      items: itemsWithAssigned.map(item => {
+        let itemStatus = item.status || 'pending';
+        // Nếu budget chưa được approved, đảm bảo items không có status "approved"
+        if (!isBudgetApproved && itemStatus === 'approved') {
+          itemStatus = 'pending';
+        }
+        return {
+          itemId: item.itemId,
+          name: item.name,
+          category: item.category || 'general',
+          unit: item.unit || 'cái',
+          unitCost: item.unitCost ? parseFloat(item.unitCost.toString()) : 0,
+          qty: item.qty ? parseFloat(item.qty.toString()) : 0,
+          total: item.total ? parseFloat(item.total.toString()) : 0,
+          note: item.note || '',
+          feedback: item.feedback || '',
+          status: itemStatus,
+          // Expense reporting fields
+          evidence: item.evidence || [],
+          actualAmount: item.actualAmount ? parseFloat(item.actualAmount.toString()) : 0,
+          isPaid: item.isPaid || false,
+          memberNote: item.memberNote || '',
+          comparison: item.comparison || null,
+          reportedBy: item.reportedBy,
+          reportedAt: item.reportedAt,
+          // Assignment fields
+          assignedTo: item.assignedTo,
+          assignedAt: item.assignedAt,
+          assignedBy: item.assignedBy,
+          assignedToInfo: item.assignedToInfo,
+          submittedStatus: item.submittedStatus || 'draft'
+        };
+      })
     };
 
     return res.status(200).json({ data: formattedBudget });
@@ -141,6 +170,11 @@ export const getDepartmentBudget = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .populate({
+        path: 'createdBy',
+        select: 'fullName email',
+        options: { strictPopulate: false }
+      })
+      .populate({
         path: 'reviewedBy',
         select: 'fullName email',
         options: { strictPopulate: false }
@@ -159,6 +193,11 @@ export const getDepartmentBudget = async (req, res) => {
         departmentId: new mongoose.Types.ObjectId(departmentId)
       })
         .sort({ createdAt: -1 }) // Get the latest budget
+        .populate({
+          path: 'createdBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
         .populate({
           path: 'reviewedBy',
           select: 'fullName email',
@@ -206,35 +245,47 @@ export const getDepartmentBudget = async (req, res) => {
     );
 
     // Format items
+    // Nếu budget chưa được approved, các items không nên có status "approved"
+    // Chỉ giữ status "approved" khi budget đã được approved
+    const budgetStatus = budget.status || 'draft';
+    const isBudgetApproved = budgetStatus === 'approved' || budgetStatus === 'sent_to_members' || budgetStatus === 'locked';
+    
     const formattedBudget = {
       ...budget,
       categories: budget.categories || [],
-      items: itemsWithAssigned.map(item => ({
-        itemId: item.itemId,
-        name: item.name,
-        category: item.category || 'general',
-        unit: item.unit || 'cái',
-        unitCost: item.unitCost ? parseFloat(item.unitCost.toString()) : 0,
-        qty: item.qty ? parseFloat(item.qty.toString()) : 0,
-        total: item.total ? parseFloat(item.total.toString()) : 0,
-        note: item.note || '',
-        feedback: item.feedback || '',
-        status: item.status || 'pending',
-        // Expense reporting fields
-        evidence: item.evidence || [],
-        actualAmount: item.actualAmount ? parseFloat(item.actualAmount.toString()) : 0,
-        isPaid: item.isPaid || false,
-        memberNote: item.memberNote || '',
-        comparison: item.comparison || null,
-        reportedBy: item.reportedBy,
-        reportedAt: item.reportedAt,
-        // Assignment fields
-        assignedTo: item.assignedTo,
-        assignedAt: item.assignedAt,
-        assignedBy: item.assignedBy,
-        assignedToInfo: item.assignedToInfo,
-        submittedStatus: item.submittedStatus || 'draft'
-      }))
+      items: itemsWithAssigned.map(item => {
+        let itemStatus = item.status || 'pending';
+        // Nếu budget chưa được approved, đảm bảo items không có status "approved"
+        if (!isBudgetApproved && itemStatus === 'approved') {
+          itemStatus = 'pending';
+        }
+        return {
+          itemId: item.itemId,
+          name: item.name,
+          category: item.category || 'general',
+          unit: item.unit || 'cái',
+          unitCost: item.unitCost ? parseFloat(item.unitCost.toString()) : 0,
+          qty: item.qty ? parseFloat(item.qty.toString()) : 0,
+          total: item.total ? parseFloat(item.total.toString()) : 0,
+          note: item.note || '',
+          feedback: item.feedback || '',
+          status: itemStatus,
+          // Expense reporting fields
+          evidence: item.evidence || [],
+          actualAmount: item.actualAmount ? parseFloat(item.actualAmount.toString()) : 0,
+          isPaid: item.isPaid || false,
+          memberNote: item.memberNote || '',
+          comparison: item.comparison || null,
+          reportedBy: item.reportedBy,
+          reportedAt: item.reportedAt,
+          // Assignment fields
+          assignedTo: item.assignedTo,
+          assignedAt: item.assignedAt,
+          assignedBy: item.assignedBy,
+          assignedToInfo: item.assignedToInfo,
+          submittedStatus: item.submittedStatus || 'draft'
+        };
+      })
     };
 
     return res.status(200).json({ data: formattedBudget });
@@ -256,10 +307,13 @@ export const createDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
-    const { items, status = 'draft' } = req.body;
+    const { items, status = 'draft', name } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Items are required and must be a non-empty array' });
+    }
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Tên đơn ngân sách là bắt buộc' });
     }
 
     // Ensure event exists
@@ -314,13 +368,14 @@ export const createDepartmentBudget = async (req, res) => {
         itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
         category: item.category || 'general',
         name: item.name || '',
-        unit: item.unit || 'cái',
+        unit: item.unit?.trim() || 'cái',
         qty: toDecimal128(qty, '1'),
         unitCost: toDecimal128(unitCost, '0'),
         total: toDecimal128(total, '0'),
         note: item.note || '',
         feedback: item.feedback || '',
-        status: item.status || 'pending'
+        status: item.status || 'pending',
+        evidence: normalizeEvidenceArray(item.evidence),
       };
     });
 
@@ -330,7 +385,9 @@ export const createDepartmentBudget = async (req, res) => {
       departmentId: new mongoose.Types.ObjectId(departmentId),
       status: status,
       currency: 'VND',
-      items: formattedItems
+      items: formattedItems,
+      name: name.trim(),
+      createdBy: userId ? new mongoose.Types.ObjectId(userId) : undefined,
     });
 
     await budget.save();
@@ -375,7 +432,7 @@ export const updateDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
-    const { items, status } = req.body;
+    const { items, status, name } = req.body;
 
     // Ensure event exists
     await ensureEventExists(eventId);
@@ -417,19 +474,34 @@ export const updateDepartmentBudget = async (req, res) => {
           (item.itemId && old.itemId?.toString() === new mongoose.Types.ObjectId(item.itemId).toString())
         );
         
+        // Nếu budget chưa được approved, không cho phép set item.status thành "approved"
+        let itemStatus = item.status || oldItem?.status || 'pending';
+        const currentBudgetStatus = budget.status || 'draft';
+        const isBudgetApproved = currentBudgetStatus === 'approved' || currentBudgetStatus === 'sent_to_members' || currentBudgetStatus === 'locked';
+        
+        if (!isBudgetApproved && itemStatus === 'approved') {
+          itemStatus = 'pending';
+        }
+        
         return {
           itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
           category: item.category || 'general',
           name: item.name,
-          unit: item.unit || 'cái',
+          unit: item.unit?.trim() || 'cái',
           qty: parseFloat(item.qty) || 1,
           unitCost: parseFloat(item.unitCost) || 0,
           total: parseFloat(item.total) || (parseFloat(item.qty) || 1) * (parseFloat(item.unitCost) || 0),
           note: item.note || '',
-          feedback: item.feedback || oldItem?.feedback || '' // Giữ lại feedback cũ nếu không có feedback mới
+          feedback: item.feedback || oldItem?.feedback || '', // Giữ lại feedback cũ nếu không có feedback mới
+          status: itemStatus, // Đảm bảo status hợp lệ
+          evidence: normalizeEvidenceArray(item.evidence || oldItem?.evidence || [])
         };
       });
       budget.items = formattedItems;
+    }
+
+    if (typeof name === 'string' && name.trim()) {
+      budget.name = name.trim();
     }
 
     // Update status if provided (chỉ khi không phải auto-change từ submitted)
@@ -1060,6 +1132,7 @@ export const getAllBudgetsForDepartment = async (req, res) => {
     const [budgets, total] = await Promise.all([
       EventBudgetPlan.find(filter)
         .populate('departmentId', 'name')
+        .populate('createdBy', 'fullName email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -1078,11 +1151,14 @@ export const getAllBudgetsForDepartment = async (req, res) => {
         id: budget._id,
         departmentId: budget.departmentId?._id || budget.departmentId,
         departmentName: budget.departmentId?.name || 'Unknown',
+        name: budget.name || 'Budget Ban',
+        creatorName: budget.createdBy?.fullName || budget.createdBy?.name || null,
         status: budget.status,
         totalCost: totalCost,
         totalItems: budget.items?.length || 0,
         submittedAt: budget.submittedAt || budget.createdAt,
         createdAt: budget.createdAt,
+        updatedAt: budget.updatedAt,
       };
     });
 
@@ -1143,6 +1219,7 @@ export const getAllBudgetsForEvent = async (req, res) => {
       EventBudgetPlan.find(filter)
         .populate('departmentId', 'name description leaderId')
         .populate('reviewedBy', 'fullName email')
+        .populate('createdBy', 'fullName email')
         .sort({ submittedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -1164,14 +1241,14 @@ export const getAllBudgetsForEvent = async (req, res) => {
       const totalItems = budget.items?.length || 0;
 
       // Get creator name from department leader
-      let creatorName = 'Chưa có';
-      if (department?.leaderId) {
+      let creatorName = budget.createdBy?.fullName || budget.createdBy?.name || '';
+      if (!creatorName && department?.leaderId) {
         const leaderId = typeof department.leaderId === 'object' 
           ? department.leaderId._id || department.leaderId 
           : department.leaderId;
         if (leaderId) {
           const leader = await User.findById(leaderId).select('fullName').lean();
-          creatorName = leader?.fullName || 'Chưa có';
+          creatorName = leader?.fullName || '';
         }
       }
 
@@ -1185,6 +1262,7 @@ export const getAllBudgetsForEvent = async (req, res) => {
         id: budget._id,
         departmentId: budget.departmentId?._id || budget.departmentId,
         departmentName: department?.name || 'Chưa có',
+        name: budget.name || 'Budget Ban',
         creatorName: creatorName,
         submittedAt: budget.submittedAt || budget.createdAt,
         createdAt: budget.createdAt,
@@ -1497,36 +1575,51 @@ export const reportExpense = async (req, res) => {
       ? userId 
       : new mongoose.Types.ObjectId(userId);
 
+    // Kiểm tra xem user có phải là HoD (Head of Department) không
+    const userIdStr = userIdObj.toString();
+    let leaderId = null;
+    if (department.leaderId) {
+      if (typeof department.leaderId === 'object' && department.leaderId._id) {
+        leaderId = department.leaderId._id.toString();
+      } else {
+        leaderId = department.leaderId.toString();
+      }
+    }
+    const isHoD = leaderId && leaderId === userIdStr;
+
     const userMember = await getRequesterMembership(eventId, userIdObj);
 
-    if (!userMember) {
-      console.error('EventMember not found:', { eventId, userId: userIdObj.toString(), userIdType: typeof userId });
-      return res.status(403).json({ message: 'You are not a member of this event' });
-    }
-
-    // Nếu budget chỉ mới approved (chưa gửi xuống), kiểm tra xem item có được assign cho user này không
-    if (budget.status === 'approved') {
-      if (!item.assignedTo) {
-        return res.status(400).json({ message: 'Item is not assigned to anyone. Please wait for HoD to assign it.' });
+    // Nếu không phải HoD, kiểm tra quyền member như bình thường
+    if (!isHoD) {
+      if (!userMember) {
+        console.error('EventMember not found:', { eventId, userId: userIdObj.toString(), userIdType: typeof userId });
+        return res.status(403).json({ message: 'You are not a member of this event' });
       }
 
-      // Kiểm tra xem member có thuộc department này không
-      // departmentId có thể là null hoặc không khớp, nên cần kiểm tra linh hoạt
-      const userDeptId = userMember.departmentId ? userMember.departmentId.toString() : null;
-      const reqDeptId = departmentId.toString();
-      
-      if (userDeptId && userDeptId !== reqDeptId) {
-        return res.status(403).json({ message: 'You are not a member of this department' });
-      }
+      // Nếu budget chỉ mới approved (chưa gửi xuống), kiểm tra xem item có được assign cho user này không
+      if (budget.status === 'approved') {
+        if (!item.assignedTo) {
+          return res.status(400).json({ message: 'Item is not assigned to anyone. Please wait for HoD to assign it.' });
+        }
 
-      if (item.assignedTo.toString() !== userMember._id.toString()) {
-        return res.status(403).json({ message: 'You are not assigned to this item' });
-      }
-    } else if (budget.status === 'sent_to_members') {
-      // Khi budget đã được gửi xuống, vẫn cần kiểm tra xem item có được assign cho user này không
-      // (trừ khi item chưa được assign cho ai)
-      if (item.assignedTo && item.assignedTo.toString() !== userMember._id.toString()) {
-        return res.status(403).json({ message: 'You are not assigned to this item' });
+        // Kiểm tra xem member có thuộc department này không
+        // departmentId có thể là null hoặc không khớp, nên cần kiểm tra linh hoạt
+        const userDeptId = userMember.departmentId ? userMember.departmentId.toString() : null;
+        const reqDeptId = departmentId.toString();
+        
+        if (userDeptId && userDeptId !== reqDeptId) {
+          return res.status(403).json({ message: 'You are not a member of this department' });
+        }
+
+        if (item.assignedTo.toString() !== userMember._id.toString()) {
+          return res.status(403).json({ message: 'You are not assigned to this item' });
+        }
+      } else if (budget.status === 'sent_to_members') {
+        // Khi budget đã được gửi xuống, vẫn cần kiểm tra xem item có được assign cho user này không
+        // (trừ khi item chưa được assign cho ai)
+        if (item.assignedTo && item.assignedTo.toString() !== userMember._id.toString()) {
+          return res.status(403).json({ message: 'You are not assigned to this item' });
+        }
       }
     }
 

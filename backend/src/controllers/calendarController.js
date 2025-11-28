@@ -1,6 +1,5 @@
 import {
 	getCalendarByEventId,
-	getCalendarByDepartmentId,
 	createCalendar,
 	updateCalendar,
 	getCalendarById,
@@ -95,59 +94,6 @@ export const getCalendarsForEvent = async (req, res) => {
     }
 };
 
-export const getCalendarsForDepartment = async (req, res) => {
-    try {
-        const { departmentId } = req.params;
-		const department = await findDepartmentById(departmentId);
-        if (!department) {
-            return res.status(404).json({ message: 'Department not found' });
-        }
-        const calendars = await getCalendarByDepartmentId(departmentId);
-        return res.status(200).json({ data: calendars });
-    } catch (error) {
-        console.error('getCalendarForDepartment error:', error);
-        return res.status(500).json({ message: 'Failed to load calendar' });
-    }
-};
-
-export const createCalendarForEntity = async (req, res) => {
-    try {
-
-        const { entityType, entityId, calendarData } = req.body;
-        let entity;
-        if (entityType === 'event') {
-            entity = await findEventById(entityId);
-            if (!entity) {
-                return res.status(404).json({ message: 'Event not found' });
-            };
-            const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            const isHoOC = requesterMembership?.role === 'HoOC';
-            if (!isHoOC) {
-                return res.status(403).json({ message: 'Only HoOC can create calendar for event!' });
-            }
-            const calendar = await createCalendar(calendarData);
-            return res.status(200).json({ data: calendar });
-
-        } else if (entityType === 'department') {
-            entity = await findDepartmentById(entityId);
-            if (!entity) {
-                return res.status(404).json({ message: 'Department not found' });
-            }
-            const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId.toString() === entityId;
-            if (!isHoDOfDepartment) {
-                return res.status(403).json({ message: 'Only HoD of this department can create calendar for this department!' });
-            }
-            const calendar = await createCalendar(calendarData);
-            return res.status(200).json({ data: calendar });
-        } else {
-            return res.status(400).json({ message: 'Invalid entity type' });
-        }
-    } catch (error) {
-        console.error('createCalendarForEntity error:', error);
-        return res.status(500).json({ message: 'Failed to create calendar' });
-    }
-};
 export const createCalendarForEvent = async (req, res) => {
     try {
         const { eventId } = req.params;

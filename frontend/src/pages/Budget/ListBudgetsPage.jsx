@@ -172,7 +172,8 @@ const ListBudgetsPage = () => {
           budgetId: budget._id || budget.id,
           departmentId: budget.departmentId || hodDepartmentId,
           departmentName: budget.departmentName || "Ban của tôi",
-          creatorName: "Trưởng ban",
+          name: budget.name || "Budget Ban",
+          creatorName: budget.creatorName || "Trưởng ban",
           totalCost: budget.totalCost || 0,
           status: budget.status,
           submittedAt: budget.submittedAt || budget.createdAt,
@@ -323,10 +324,14 @@ const ListBudgetsPage = () => {
     }
   };
 
-  const filteredBudgets = budgets.filter((budget) =>
-    budget.departmentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    budget.creatorName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBudgets = budgets.filter((budget) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      budget.departmentName?.toLowerCase().includes(q) ||
+      budget.creatorName?.toLowerCase().includes(q) ||
+      budget.name?.toLowerCase().includes(q)
+    );
+  });
 
   const paginatedBudgets = filteredBudgets.slice(
     (currentPage - 1) * itemsPerPage,
@@ -686,7 +691,7 @@ const ListBudgetsPage = () => {
                 <thead>
                   <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
-                      Tên Ngân Sách
+                      Tên đơn ngân sách
                     </th>
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                       Ban Gửi
@@ -727,7 +732,7 @@ const ListBudgetsPage = () => {
                       <tr key={budget._id || budget.id}>
                         <td style={{ padding: "12px" }}>
                           <span className="fw-semibold">
-                            Ngân sách {budget.departmentName || "Ban"}
+                            {budget.name || `Ngân sách ${budget.departmentName || "Ban"}`}
                           </span>
                         </td>
                         <td style={{ padding: "12px" }}>{budget.departmentName || "—"}</td>

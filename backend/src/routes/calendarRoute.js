@@ -1,8 +1,6 @@
 import express from 'express';
 import {
     getCalendarsForEvent,
-    getCalendarsForDepartment,
-    createCalendarForEntity,
     createCalendarForEvent,
     createCalendarForDepartment,
     updateCalendarForEvent,

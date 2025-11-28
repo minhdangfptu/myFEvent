@@ -81,12 +81,24 @@ const ViewDeptBudgetDetailHoOC = () => {
       setDepartment(deptData);
 
       // Initialize item statuses and feedbacks
+      // Nếu budget chưa được review (status là draft hoặc submitted), các items mặc định là pending
+      // Chỉ giữ status approved/rejected nếu budget đã được approved
       const initialStatuses = {};
       const initialFeedbacks = {};
+      const budgetStatus = budgetData.status || "draft";
+      const isBudgetApproved = budgetStatus === "approved";
+      
       if (budgetData.items && Array.isArray(budgetData.items)) {
         budgetData.items.forEach((item) => {
           const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-          initialStatuses[itemId] = item.status || "pending";
+          // Nếu budget đã approved, giữ nguyên status của item
+          // Nếu budget chưa approved (draft/submitted), mặc định là pending
+          if (isBudgetApproved) {
+            initialStatuses[itemId] = item.status || "pending";
+          } else {
+            // Budget chưa được review, reset về pending
+            initialStatuses[itemId] = "pending";
+          }
           initialFeedbacks[itemId] = item.feedback || "";
         });
       }
@@ -458,6 +470,9 @@ const ViewDeptBudgetDetailHoOC = () => {
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Ghi Chú
                   </th>
+                  <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "220px" }}>
+                    Bằng chứng
+                  </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Trạng Thái
                   </th>
@@ -472,7 +487,7 @@ const ViewDeptBudgetDetailHoOC = () => {
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="text-center text-muted py-4">
+                    <td colSpan="9" className="text-center text-muted py-4">
                       Không tìm thấy mục nào
                     </td>
                   </tr>
@@ -512,6 +527,55 @@ const ViewDeptBudgetDetailHoOC = () => {
                           <span style={{ color: "#6B7280" }}>
                             {item.note || "—"}
                           </span>
+                        </td>
+                        {/* Evidence */}
+                        <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
+                          {item.evidence && item.evidence.length > 0 ? (
+                            <div className="d-flex flex-column gap-1">
+                              {item.evidence.map((ev, idx) => (
+                                <div
+                                  key={idx}
+                                  className="d-flex align-items-center gap-2"
+                                  style={{
+                                    background: "#F3F4F6",
+                                    borderRadius: "6px",
+                                    padding: "4px 8px",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  <i
+                                    className={`bi ${
+                                      ev.type === "image"
+                                        ? "bi-image"
+                                        : ev.type === "pdf"
+                                        ? "bi-file-pdf"
+                                        : ev.type === "doc"
+                                        ? "bi-file-earmark-text"
+                                        : "bi-link-45deg"
+                                    }`}
+                                  ></i>
+                                  {ev.url ? (
+                                    <a
+                                      href={ev.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ fontSize: "12px" }}
+                                    >
+                                      {ev.name || "Xem bằng chứng"}
+                                    </a>
+                                  ) : (
+                                    <span style={{ fontSize: "12px" }}>
+                                      {ev.name || "Bằng chứng"}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: "12px" }}>
+                              Chưa có
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
                           {getStatusBadge(status)}

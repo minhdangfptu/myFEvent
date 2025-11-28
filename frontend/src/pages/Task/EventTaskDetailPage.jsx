@@ -38,8 +38,8 @@ const STATUS_STYLE_MAP = {
 const STATUS_TRANSITIONS = {
   [STATUS.NOT_STARTED]: [STATUS.IN_PROGRESS, STATUS.CANCELLED],
   [STATUS.IN_PROGRESS]: [STATUS.DONE, STATUS.CANCELLED],
-  [STATUS.DONE]: [],
-  [STATUS.CANCELLED]: [],
+  [STATUS.DONE]: [STATUS.IN_PROGRESS],
+  [STATUS.CANCELLED]: [STATUS.IN_PROGRESS],
 };
 
 const statusToLabel = (code) => STATUS_LABELS[code] || "Không xác định";
@@ -94,7 +94,7 @@ export default function EventTaskDetailPage() {
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
 
-  const normalizedRole = (eventRole || "").toLowerCase();
+  const normalizedRole = (eventRole || "").trim().toLowerCase();
   const getSidebarType = () => {
     if (normalizedRole === "hooc") return "hooc";
     if (normalizedRole === "hod") return "HoD";
@@ -868,13 +868,14 @@ export default function EventTaskDetailPage() {
                 </div>
               </div>
             </div>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={handleRemoveAssignee}
-              disabled={!canModifyTask}
-            >
-              🗑
-            </button>
+            {canModifyTask && (
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={handleRemoveAssignee}
+              >
+                🗑
+              </button>
+            )}
           </div>
         )}
         {canHoDClaim && (
