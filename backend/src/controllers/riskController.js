@@ -78,30 +78,6 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
     }
 };
 
-export const getOccurredRisksByDepartmentController = async (req, res) => {
-   try {
-       const { eventId, departmentId } = req.params;
-
-       // Gọi service: không truyền filter/search gì cả
-       const result = await RiskService.getOccurredRisksByDepartment(eventId, departmentId);
-
-       if (!result || result.success === false) {
-           return res.status(400).json({
-               success: false,
-               message: result?.message || 'Failed to get occurred risks by department',
-           });
-       }
-
-       return res.status(200).json(result);
-   } catch (error) {
-       console.error('Error in getOccurredRisksByDepartmentController:', error);
-       return res.status(500).json({
-           success: false,
-           message: 'Internal server error while getting occurred risks by department',
-       });
-   }
-};
-
 export const getAllOccurredRisksByEventController = async (req, res) => {
     try {
         const { eventId } = req.params;
