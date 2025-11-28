@@ -160,8 +160,8 @@ export default function HoDSideBar({
   // Submenu Tổng quan - HoD có quyền xem
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hod-dashboard?eventId=${eventId}` },
-    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${selectedEvent || ''}/hod-event-detail` },
-    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${selectedEvent || ''}/milestones` }
+    { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hod-event-detail` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` }
   ];
 
   const workSubItems = [

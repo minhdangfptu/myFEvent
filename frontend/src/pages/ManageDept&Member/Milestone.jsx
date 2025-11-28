@@ -354,6 +354,13 @@ const Milestone = () => {
     }
   }, [eventId, fetchEventRole])
 
+  const getSidebarType = () => {
+    if (eventRole === "HoOC") return "HoOC"
+    if (eventRole === "HoD") return "HoD"
+    if (eventRole === "Member") return "Member"
+    return "user"
+  }
+
   const parseAnyDate = (value) => {
     if (!value) return null
     const d = new Date(value)
@@ -455,7 +462,13 @@ const Milestone = () => {
   }
 
   return (
-    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện' eventId={eventId}>
+    <UserLayout
+      eventRole={eventRole}
+      activePage="overview-timeline"
+      sidebarType={getSidebarType()}
+      title='Cột mốc sự kiện'
+      eventId={eventId}
+    >
       <style>{animationStyles}</style>
       <ToastContainer position="top-right" autoClose={3000} />
 
