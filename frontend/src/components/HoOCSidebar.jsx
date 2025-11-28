@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
-import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Database } from "lucide-react";
+import { Calendar, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Database, Menu, Home, MessageSquareText } from "lucide-react";
 
 export default function HoOCSidebar({
   sidebarOpen,
@@ -117,14 +117,31 @@ export default function HoOCSidebar({
     { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId}/export/templates` },
   ];
 
+  // Đóng các submenu khi sidebar đóng
+  useEffect(() => {
+    if (!sidebarOpen) {
+      setWorkOpen(false);
+      setFinanceOpen(false);
+      setOverviewOpen(false);
+      setRisksOpen(false);
+      setExportsOpen(false);
+    }
+  }, [sidebarOpen]);
+
+  // Cleanup hover timeout
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    };
+  }, [hoverTimeout]);
+
   // Hover handlers giữ nguyên
   const handleMouseEnter = (menuType, e) => {
     if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); }
-    if (sidebarRef.current && e?.currentTarget) {
+    if (e?.currentTarget) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const sidebarRect = sidebarRef.current.getBoundingClientRect();
-      const top = rect.top - sidebarRect.top;
-      const left = rect.right - sidebarRect.left + 8;
+      const top = rect.top;
+      const left = rect.right + 8;
       setHoverPos({ top, left });
     }
     setHoveredMenu(menuType);
@@ -137,14 +154,33 @@ export default function HoOCSidebar({
   const handlePopupMouseLeave = () => { setHoveredMenu(null); };
 
   return (
-    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
+    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
-        .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
+        .group-title {
+          font-size:.75rem;
+          font-weight:600;
+          letter-spacing:.05em;
+          color:#374151;
+          margin:16px 0 8px;
+          text-transform:uppercase;
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .group-title {
+          opacity: 0;
+        }
         .btn-nav{ border:0;background:transparent;color:#374151;border-radius:8px;padding:10px 12px;text-align:left;
           transition:all .2s ease;width:100%;display:flex;align-items:center;justify-content:space-between;}
         .btn-nav:hover{ background:#e9ecef; }
         .btn-nav.active{ background:#e9ecef;color:#111827; }
+        .btn-nav span {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .btn-nav span {
+          opacity: 0;
+        }
         .menu-item-hover:hover .btn-nav{ background:#e9ecef; }
         .btn-submenu{ border:0;background:transparent;color:#6b7280;border-radius:6px;padding:8px 12px 8px 24px;
           text-align:left;transition:all .2s ease;width:100%;font-size:.9rem;}
@@ -155,10 +191,41 @@ export default function HoOCSidebar({
           align-items:center;justify-content:center;gap:6px;font-size:.85rem;color:#6b7280;transition:all .2s;}
         .theme-option.active{ background:#fff;color:#374151;box-shadow:0 1px 3px rgba(0,0,0,.1); }
 
+        .menu-button {
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #030303;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .menu-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .menu-button:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          transform: scale(0.95);
+        }
+        .menu-button svg {
+          transition: transform 0.2s ease;
+        }
+
+        .fade-content {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .fade-content {
+          opacity: 0;
+          pointer-events: none;
+        }
+
         .hover-submenu{
-          position: absolute;
-          left: 50px;
-          top: 0;
+          position: fixed;
           background:#fff;
           border-radius:12px;
           box-shadow:0 4px 24px rgba(0,0,0,0.12);
@@ -190,26 +257,44 @@ export default function HoOCSidebar({
       {/* Header */}
       <div className="p-3 pb-0" style={{ flexShrink: 0, paddingBottom: "0px" }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <div
-            className="logo-container"
-            style={{cursor: "pointer"}}
-          >
-            <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+          {sidebarOpen ? (
+            <>
+              <div
+                className="logo-container"
+                style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
+              >
+                <img
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
+                <img
+                  className="fade-content"
+                  onClick={() => navigate("/home-page")}
+                  src="/logo-03.png"
+                  alt="myFEvent"
+                  style={{ width: "auto", height: 40 }}
+                />
               </div>
-              {sidebarOpen &&  <img
-              onClick={() => navigate("/home-page")}
-              src="/logo-03.png"
-              alt="myFEvent"
-              style={{ width: "auto", height: 40 }}
-            />}
-            </div>
-          </div>
 
-          {sidebarOpen && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
-              <ArrowLeft size={16} />
+              <button
+                className="menu-button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Đóng sidebar"
+              >
+                <Menu size={20} />
+              </button>
+            </>
+          ) : (
+            <button
+              className="menu-button"
+              onClick={() => setSidebarOpen(true)}
+              style={{ width: "100%" }}
+              aria-label="Mở sidebar"
+            >
+              <Menu size={20} />
             </button>
           )}
         </div>
@@ -259,7 +344,7 @@ export default function HoOCSidebar({
               <div className="d-flex flex-column gap-1">
                 <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
-                    <List size={20} className="me-3" />
+                    <Home className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
                   </div>
                 </button>
@@ -293,7 +378,7 @@ export default function HoOCSidebar({
                 {!sidebarOpen && hoveredMenu === "overview" && (
                   <div
                     className="hover-submenu"
-                    style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                    style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                     onMouseEnter={handlePopupMouseEnter}
                     onMouseLeave={handlePopupMouseLeave}
                   >
@@ -377,8 +462,8 @@ export default function HoOCSidebar({
                     title="Phản hồi sự kiện"
                   >
                     <div className="d-flex align-items-center">
-                      <HelpCircle size={20} className="me-3" />
-                      {sidebarOpen && <span>Feedback</span>}
+                      <MessageSquareText size={20} className="me-3" />
+                      {sidebarOpen && <span>Phản hồi</span>}
                     </div>
                   </button>
                 )}
@@ -406,7 +491,7 @@ export default function HoOCSidebar({
                   {!sidebarOpen && hoveredMenu === "work" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -460,7 +545,7 @@ export default function HoOCSidebar({
                   {!sidebarOpen && hoveredMenu === "finance" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -515,7 +600,7 @@ export default function HoOCSidebar({
                   {!sidebarOpen && hoveredMenu === "risk" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -569,7 +654,7 @@ export default function HoOCSidebar({
                   {!sidebarOpen && hoveredMenu === "export" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -661,6 +746,7 @@ export default function HoOCSidebar({
 
             {/* App Version + Dev info + Logo Bộ Công Thương */}
             <div
+              className="fade-content"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -702,15 +788,15 @@ export default function HoOCSidebar({
             </div>
           </div>
         ) : (
-          <button
-            className="btn btn-ghost btn-sm w-100"
-            onClick={() => setSidebarOpen(true)}
-            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
-            title="Mở rộng"
-            aria-label="Mở/đóng thanh bên"
-          >
-            <Menu size={18} />
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
+            <img
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover-rotate"
+              src="/website-icon-fix@3x.png"
+              alt="myFEvent"
+              style={{ width: 40, height: 40, cursor: "pointer" }}
+            />
+          </div>
         )}
       </div>
 
