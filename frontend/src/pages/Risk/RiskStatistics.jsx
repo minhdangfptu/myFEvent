@@ -379,16 +379,7 @@ export default function RiskStatisticsPage() {
               Tổng quan và phân tích chi tiết rủi ro sau sự kiện
             </p>
           </div>
-          <div className="d-flex gap-2">
-            {/* <button className="btn btn-success d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-excel"></i>
-              Xuất Excel
-            </button> */}
-            <button onClick={()=>navigate(`/events/${eventId}/export/data`)} className="btn btn-danger d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-pdf"></i>
-              Xuất tài liệu
-            </button>
-          </div>
+
         </div>
 
         {/* KPI Cards - KEEP ORIGINAL */}

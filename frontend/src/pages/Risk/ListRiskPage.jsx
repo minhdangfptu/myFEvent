@@ -316,12 +316,7 @@ export default function ListRiskPage() {
       const departmentsList = response?.data || [];
       setDepartments(departmentsList);
 
-      if (departmentsList.length > 0) {
-        setNewRisk((prev) => ({
-          ...prev,
-          departmentId: departmentsList[0]._id,
-        }));
-      }
+      // Don't auto-select first department - let user choose manually
     } catch (error) {
       console.error("Error fetching departments:", error);
       toast.error("Lỗi khi tải dữ liệu ban");
@@ -350,9 +345,16 @@ export default function ListRiskPage() {
 
     try {
       setSubmitting(true);
+
+      // Prepare payload - exclude departmentId if scope is "event"
+      const payload = { ...newRisk };
+      if (payload.scope === "event") {
+        delete payload.departmentId;
+      }
+
       const response = await riskApiWithErrorHandling.createRisk(
         eventId,
-        newRisk
+        payload
       );
 
       if (response.success) {
@@ -361,7 +363,7 @@ export default function ListRiskPage() {
         setNewRisk({
           name: "",
           scope: "department",
-          departmentId: departments.length > 0 ? departments[0]._id : "",
+          departmentId: "",
           risk_category: "others",
           impact: "medium",
           likelihood: "medium",
@@ -437,7 +439,7 @@ export default function ListRiskPage() {
     setNewRisk({
       name: "",
       scope: "department",
-      departmentId: departments.length > 0 ? departments[0]._id : "",
+      departmentId: "",
       risk_category: "others",
       impact: "medium",
       likelihood: "medium",
