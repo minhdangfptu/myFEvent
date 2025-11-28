@@ -8,7 +8,7 @@ import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
-import { Calendar, Sparkles, Goal } from "lucide-react";
+import { Calendar, Sparkles, Goal, CircleCheckBig, Users, Coins } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -519,7 +519,7 @@ export default function HoOCDashBoard() {
                         fontSize: "20px",
                       }}
                     >
-                      📅
+                      <Calendar style={{ color: "#ff5757" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
@@ -545,7 +545,7 @@ export default function HoOCDashBoard() {
                         fontSize: "20px",
                       }}
                     >
-                      ✓
+                      <CircleCheckBig style={{ color: "#10b981" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
@@ -571,7 +571,7 @@ export default function HoOCDashBoard() {
                         fontSize: "20px",
                       }}
                     >
-                      👥
+                      <Users style={{ color: "#f59e0b" }} /> 
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
@@ -597,7 +597,7 @@ export default function HoOCDashBoard() {
                         fontSize: "20px",
                       }}
                     >
-                      💰
+                      <Coins  style={{ color: "#f97316" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "32px", color: "#1f2937" }}>
@@ -1106,7 +1106,7 @@ export default function HoOCDashBoard() {
                         fontSize: "20px",
                       }}
                     >
-                      🎃
+                      <Goal style={{ color: "#f59e0b" }} />
                     </div>
                     <h6 className="fw-bold mb-0 flex-grow-1" style={{ fontSize: "18px", color: "#1f2937" }}>
                       {eventData.name}

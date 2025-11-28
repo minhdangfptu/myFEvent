@@ -243,30 +243,14 @@ export default function MemberProfilePage() {
   };
 
   // Show loading while fetching role to prevent showing wrong sidebar
-  if (roleLoading) {
-    return (
-      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <Loading />
-        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
-      </div>
-    );
-  }
-
-  if (loading) {
+  if (roleLoading || loading) {
     return (
       <UserLayout title="Thông tin thành viên" sidebarType={getSidebarType()} activePage="members" eventId={eventId}>
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh', padding: '40px' }}>
           <Loading size={80} />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>
+            {roleLoading ? 'Đang tải thông tin sự kiện...' : 'Đang tải thông tin thành viên...'}
+          </div>
         </div>
       </UserLayout>
     );

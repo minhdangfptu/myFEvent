@@ -105,7 +105,7 @@ export default function HoOCSidebar({
     { id: "work-statitics", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hooc-statistic` },
   ];
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
+    { id: "finance-budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
     { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/statistics` },
   ];
   const risksSubItems = [
@@ -724,7 +724,7 @@ export default function HoOCSidebar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{  margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button

@@ -11,7 +11,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { useAuth } from "../../contexts/AuthContext"
-import { Calendar, Sparkles, Goal } from "lucide-react";
+import { Calendar, Sparkles, Goal, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -554,11 +554,11 @@ export default function MemberDashBoard() {
                       style={{
                         width: "56px",
                         height: "56px",
-                        backgroundColor: "#dbeafe",
+                        backgroundColor: "#e9d5ff",
                         fontSize: "24px",
                       }}
                     >
-                      📋
+                      <LaptopMinimalCheck style={{ color: "#8b5cf6" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
@@ -584,10 +584,10 @@ export default function MemberDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ✓
+                      <CircleCheckBig style={{ color: "#22c55e" }} />
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#10b981", lineHeight: "1" }}>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
                     {completedTasksPercent}%
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
@@ -610,7 +610,7 @@ export default function MemberDashBoard() {
                         fontSize: "24px",
                       }}
                     >
-                      ⚠️
+                      <FileExclamationPoint style={{ color: "#ef4444" }} />
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#ef4444", lineHeight: "1" }}>
@@ -683,7 +683,9 @@ export default function MemberDashBoard() {
                     </div>
                   ) : (
                     <div className="text-center text-muted py-4">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📋</div>
+                      <div style={{ fontSize: "48px", opacity: 0.3 }}>
+                        <LaptopMinimalCheck size={48} />
+                      </div>
                       <div className="mt-2">Chưa có công việc</div>
                     </div>
                   )}

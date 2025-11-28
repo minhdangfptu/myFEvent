@@ -36,7 +36,7 @@ const BudgetStatistics = () => {
     return (
       <UserLayout
         title="Thống kê thu chi"
-        activePage="budget"
+        activePage="finance-stats" 
         sidebarType="hooc"
         eventId={eventId}
       >
@@ -57,7 +57,7 @@ const BudgetStatistics = () => {
   return (
     <UserLayout
       title="Thống kê thu chi"
-      activePage="budget"
+      activePage="finance-stats"
       sidebarType="hooc"
       eventId={eventId}
     >

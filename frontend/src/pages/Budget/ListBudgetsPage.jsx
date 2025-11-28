@@ -349,7 +349,7 @@ const ListBudgetsPage = () => {
     return (
       <UserLayout
         title="Không có quyền truy cập"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
         eventId={eventId}
       >
@@ -376,7 +376,7 @@ const ListBudgetsPage = () => {
     return (
       <UserLayout
         title={eventRole === 'HoD' ? "Ngân sách của ban" : "Danh sách Ngân sách của Ban"}
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
         eventId={eventId}
       >
@@ -397,7 +397,7 @@ const ListBudgetsPage = () => {
       title={isEmpty && !hasAnyBudgets ?
         (eventRole === 'HoD' ? "Ngân sách của ban (trống)" : "Danh sách Ngân sách của Ban (trống)") :
         (eventRole === 'HoD' ? "Ngân sách của ban" : "Danh sách Ngân sách của Ban")}
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
       eventId={eventId}
     >

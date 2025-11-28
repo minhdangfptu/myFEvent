@@ -314,7 +314,7 @@ export default function UserSidebar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{  margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button

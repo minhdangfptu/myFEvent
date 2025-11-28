@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "./HoOCTaskStatisticPage.css";
 import UserLayout from "~/components/UserLayout";
 import { taskApi } from "~/apis/taskApi";
 import { milestoneApi } from "~/apis/milestoneApi";
 import Loading from "~/components/Loading";
 import HoOCTaskStatisticModal from "./HoOCTaskStatisticModal";
-import { CheckCircle } from "lucide-react";
+import { ChartArea, ChartPie, CheckCircle, FileChartColumn, PinOff } from "lucide-react";
 
 
 export default function HoOCTaskStatisticPage() {
@@ -17,12 +17,14 @@ export default function HoOCTaskStatisticPage() {
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const navigate = useNavigate();
   // Fetch milestones
   useEffect(() => {
     if (!eventId) return;
 
     const fetchMilestones = async () => {
       try {
+        setLoading(true);
         const response = await milestoneApi.listMilestonesByEvent(eventId);
         const milestoneList = response?.data || response || [];
         setMilestones(milestoneList);
@@ -42,9 +44,11 @@ export default function HoOCTaskStatisticPage() {
         } else {
           console.log("⚠️ No milestones found in event");
           setSelectedMilestoneId("");
+          setLoading(false); // ✅ Set loading false khi không có milestone
         }
       } catch (error) {
         console.error("Error fetching milestones:", error);
+        setLoading(false); // ✅ Set loading false khi có lỗi
       }
     };
 
@@ -191,10 +195,183 @@ export default function HoOCTaskStatisticPage() {
         sidebarType="HoOC"
         eventId={eventId}
       >
-        <div className="hooc-task-statistic-page">
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <h2>Không có milestone nào trong sự kiện này</h2>
-            <p>Vui lòng tạo milestone trước khi xem thống kê.</p>
+        <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+          {/* Title Section */}
+          <div className="mb-4">
+            <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
+              Thống kê công việc toàn sự kiện
+            </h2>
+            <p className="text-muted" style={{ fontSize: "14px" }}>
+              Theo dõi tiến độ công việc theo milestone và department
+            </p>
+          </div>
+
+          {/* Empty State */}
+          <div
+            className="d-flex flex-column align-items-center justify-content-center"
+            style={{
+              minHeight: "500px",
+              padding: "60px 20px",
+              background: "#fff",
+              borderRadius: "16px",
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            {/* Icon */}
+            <div
+              style={{
+                width: "120px",
+                height: "120px",
+                background: "#FEF3C7",
+                borderRadius: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "24px",
+              }}
+            >
+              <div style={{ position: "relative" }}>
+                <i
+                  className="bi bi-calendar-event"
+                  style={{ fontSize: "48px", color: "#F59E0B" }}
+                ></i>
+              </div>
+            </div>
+
+            {/* Text */}
+            <h3 className="fw-bold mb-3" style={{ fontSize: "24px", color: "#111827" }}>
+              Chưa có milestone nào được tạo
+            </h3>
+            <p
+              className="text-muted mb-4 text-center"
+              style={{ fontSize: "16px", maxWidth: "500px" }}
+            >
+              Milestone giúp bạn theo dõi tiến độ công việc theo từng giai đoạn của sự kiện.
+              Hãy tạo milestone đầu tiên để bắt đầu quản lý và thống kê công việc hiệu quả.
+            </p>
+
+            {/* Create Button */}
+            <button
+              className="btn btn-warning"
+              onClick={() => navigate( `/events/${eventId}/milestones`)}
+              style={{
+                padding: "12px 24px",
+                fontSize: "16px",
+                fontWeight: "600",
+                borderRadius: "12px",
+                background: "#F59E0B",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                color: "#fff",
+              }}
+            >
+              <i className="bi bi-plus-circle" style={{ fontSize: "18px" }}></i>
+              Tạo Milestone Đầu Tiên
+            </button>
+          </div>
+
+          {/* Feature Cards */}
+          <div className="row g-4 mt-4">
+            <div className="col-md-4">
+              <div
+                style={{
+                  padding: "24px",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  border: "1px solid #e5e7eb",
+                  height: "100%",
+                }}
+              >
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    background: "#EFF6FF",
+                    borderRadius: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <ChartArea size=" 24px" color="#3B82F6" />
+                </div>
+                <h5 className="fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
+                  Theo dõi tiến độ
+                </h5>
+                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                  Xem biểu đồ Burnup và tiến độ hoàn thành công việc theo từng milestone.
+                </p>
+              </div>
+            </div>
+
+            <div className="col-md-4">
+              <div
+                style={{
+                  padding: "24px",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  border: "1px solid #e5e7eb",
+                  height: "100%",
+                }}
+              >
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    background: "#ECFDF5",
+                    borderRadius: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <ChartPie size=" 24px" color="#10B981" />
+                </div>
+                <h5 className="fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
+                  Thống kê theo ban
+                </h5>
+                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                  So sánh hiệu suất và tiến độ công việc giữa các ban trong sự kiện.
+                </p>
+              </div>
+            </div>
+
+            <div className="col-md-4">
+              <div
+                style={{
+                  padding: "24px",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  border: "1px solid #e5e7eb",
+                  height: "100%",
+                }}
+              >
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    background: "#F5F3FF",
+                    borderRadius: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <FileChartColumn size=" 24px" color="#8B5CF6" />
+                </div>
+                <h5 className="fw-bold mb-2" style={{ fontSize: "18px", color: "#111827" }}>
+                  Báo cáo chi tiết
+                </h5>
+                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                  Xem báo cáo tổng hợp về công việc lớn, công việc cá nhân và tỷ lệ hoàn thành.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </UserLayout>

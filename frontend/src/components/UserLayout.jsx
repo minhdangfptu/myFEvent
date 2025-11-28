@@ -39,8 +39,8 @@ export default function UserLayout({
   }, []);
 
   return (
-    <div className="d-flex flex-column" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
-      <div className="d-flex flex-grow-1">
+    <div className="d-flex flex-column" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', overflowX: 'hidden' }}>
+      <div className="d-flex flex-grow-1" style={{ overflowX: 'hidden' }}>
         {normalizedSidebarType === 'hooc' ? (
           <HoOCSidebar
             sidebarOpen={sidebarOpen}
@@ -82,7 +82,9 @@ export default function UserLayout({
           className="flex-grow-1 d-flex flex-column"
           style={{
             marginLeft: sidebarOpen ? '230px' : '70px',
-            transition: 'margin-left 0.3s ease'
+            transition: 'margin-left 0.3s ease',
+            overflowX: 'hidden',
+            maxWidth: '100%'
           }}
         >
           {/* Header */}
@@ -95,7 +97,7 @@ export default function UserLayout({
           />
 
           {/* Main Content Area */}
-          <main style={{ minHeight: '85vh' }} className="flex-grow-1 px-4 pb-4 pt-4">
+          <main style={{ minHeight: '85vh', overflowX: 'hidden' }} className="flex-grow-1 px-4 pb-4 pt-4">
             {children}
           </main>
         </div>

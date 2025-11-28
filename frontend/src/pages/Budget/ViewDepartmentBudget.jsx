@@ -658,7 +658,7 @@ const ViewDepartmentBudget = () => {
     return (
       <UserLayout
         title="Xem Ngân sách của Ban"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="hod"
         eventId={eventId}
       >
@@ -696,7 +696,7 @@ const ViewDepartmentBudget = () => {
   return (
     <UserLayout
       title="Xem Ngân sách của Ban"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hod"
       eventId={eventId}
     >

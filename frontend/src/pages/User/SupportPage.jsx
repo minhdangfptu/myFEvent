@@ -1,6 +1,7 @@
 import { useState } from "react"
 import UserLayout from "../../components/UserLayout"
 import ContactPage from "../Public/Contact"
+import { Coins, SquareCheckBig, SquareMousePointer, User, Users } from "lucide-react"
 
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState("faq")
@@ -251,32 +252,32 @@ export default function SupportPage() {
 
   const documents = [
     {
-      icon: "📘",
+      icon: <SquareMousePointer color="red" />,
       title: "Hướng dẫn sử dụng tổng quan",
       filename: "huong-dan-tong-quan.pdf",
     },
     {
-      icon: "👤",
+      icon: <User color="red" />,
       title: "Hướng dẫn cho Trưởng ban Tổ chức",
-      filename: "huong-dan-Trưởng ban Tổ chức.pdf",
+      filename: "huong-dan-hooc.pdf",
     },
     {
-      icon: "👥",
+      icon: <User color="red" />,
       title: "Hướng dẫn cho Trưởng ban",
-      filename: "huong-dan-Trưởng ban.pdf",
+      filename: "huong-dan-hod.pdf",
     },
     {
-      icon: "🙋",
+      icon: <User color="red" />,
       title: "Hướng dẫn cho Thành viên",
-      filename: "huong-dan-Thành viên.pdf",
+      filename: "huong-dan-member.pdf",
     },
     {
-      icon: "⚙️",
+      icon: <SquareCheckBig color="red" />,
       title: "Hướng dẫn quản lý công việc",
       filename: "huong-dan-cong-viec.pdf",
     },
     {
-      icon: "💰",
+      icon: <Coins color="red" />,
       title: "Hướng dẫn quản lý ngân sách",
       filename: "huong-dan-ngan-sach.pdf",
     },

@@ -8,8 +8,21 @@ import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
 import { useEvents } from "../../contexts/EventContext";
-import { AlertTriangle, ArrowLeft, Check, CheckCircle, Clock, Inbox, Info, Pencil, RotateCw, Trash, Users, X } from "lucide-react";
-
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  CheckCircle,
+  Clock,
+  Inbox,
+  Info,
+  Pencil,
+  RotateCw,
+  Trash,
+  Users,
+  X,
+  Plus
+} from "lucide-react";
 
 const DepartmentDetail = () => {
   const { eventId, id } = useParams();
@@ -47,10 +60,9 @@ const DepartmentDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
-  const [isAssigningLeader, setIsAssigningLeader] = useState(false);
   const [isSavingChanges, setIsSavingChanges] = useState(false);
   const { fetchEventRole } = useEvents();
-  
+
   const getMemberDisplayName = (member) =>
     (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
   const getMemberEmail = (member) =>
@@ -72,69 +84,36 @@ const DepartmentDetail = () => {
     return 'user';
   };
 
-  // ===== FIX: Fetch department with better error handling =====
   const fetchMembersAndDepartment = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('=== Fetching Department Details ===');
-      console.log('API Call Parameters:');
-      console.log('- eventId:', eventId);
-      console.log('- departmentId:', id);
-
-      // Kiểm tra params trước khi gọi API
       if (!eventId || !id) {
-        console.error('Missing required parameters!');
-        console.log('eventId:', eventId, 'id:', id);
         throw new Error('Missing eventId or departmentId');
       }
 
-      // Fetch department details
-      console.log('Calling departmentService.getDepartmentDetail...');
       const dep = await departmentService.getDepartmentDetail(eventId, id);
-      console.log('Department API Response:', dep);
-      console.log('Department type:', typeof dep);
-      console.log('Department keys:', dep ? Object.keys(dep) : 'null');
-
       if (!dep) {
-        console.warn('Department response is null/undefined');
         throw new Error('Department not found');
       }
 
       setDepartment(dep);
-      console.log('✓ Department state updated successfully');
 
-      // Fetch members
-      console.log('Calling departmentService.getMembersByDepartment...');
       const mems = await departmentService.getMembersByDepartment(eventId, id);
-      console.log('Members API Response:', mems);
-      console.log('Members count:', mems?.length || 0);
-
       setMembers(mems || []);
-      console.log('✓ Members state updated successfully');
 
-      // Update userDepartmentId if needed
       if (!userDepartmentId && eventRole === 'HoD' && mems) {
         const hodMember = mems.find(m => m.role === 'HoD');
         if (hodMember) {
           const memberDeptId = hodMember.departmentId || hodMember.department?._id || hodMember.department?.id;
           if (memberDeptId === id) {
             setUserDepartmentId(id);
-            console.log('✓ UserDepartmentId set to:', id);
           }
         }
       }
 
-      console.log('=== Fetch Complete ===');
-
     } catch (error) {
-      console.error("=== ERROR in fetchMembersAndDepartment ===");
-      console.error('Error object:', error);
-      console.error('Error message:', error?.message);
-      console.error('Error response:', error?.response);
-      console.error('Error response data:', error?.response?.data);
-
       setError(error?.response?.data?.message || error?.message || "Không thể tải thông tin ban");
       toast.error("Lỗi khi tải thông tin ban: " + (error?.response?.data?.message || error?.message));
     } finally {
@@ -142,19 +121,13 @@ const DepartmentDetail = () => {
     }
   };
 
-
   useEffect(() => {
-    console.log('=== useEffect [id] triggered ===');
-    console.log('Current id:', id);
-    console.log('Current eventId:', eventId);
-
     if (id && eventId) {
       fetchMembersAndDepartment();
     } else {
-      console.warn('Missing id or eventId, skipping fetch');
       setError('Missing required parameters');
     }
-  }, [id, eventId]); // Thêm eventId vào dependencies
+  }, [id, eventId]);
 
   // Fetch role
   useEffect(() => {
@@ -170,11 +143,8 @@ const DepartmentDetail = () => {
       }
       try {
         setRoleLoading(true);
-        console.log('Fetching event role for eventId:', eventId);
         const r = await fetchEventRole(eventId);
-        console.log('Role response:', r);
 
-        // normalize returned value to string role name
         let normalized = '';
         let deptId = null;
 
@@ -193,10 +163,8 @@ const DepartmentDetail = () => {
           setEventRole(normalized);
           setUserDepartmentId(deptId);
           setRoleLoading(false);
-          console.log('✓ Role set to:', normalized);
         }
       } catch (err) {
-        console.error('Error fetching role:', err);
         if (mounted) {
           setEventRole('');
           setUserDepartmentId(null);
@@ -209,7 +177,7 @@ const DepartmentDetail = () => {
   }, [eventId, fetchEventRole]);
 
   const canManage = eventRole === 'HoOC' || (eventRole === 'HoD');
-  console.log('Can manage department:', canManage);
+
   const handleEdit = async () => {
     setIsEditing(true);
     try {
@@ -264,7 +232,6 @@ const DepartmentDetail = () => {
         setShowDeleteModal(false);
         setDeleteConfirmName("");
 
-        // Navigate với state để trang đích hiện toast
         navigate(`/events/${eventId}/departments`, {
           state: {
             showToast: true,
@@ -273,7 +240,6 @@ const DepartmentDetail = () => {
           },
         });
       } catch (error) {
-        console.error("Delete department error:", error);
         toast.error(error?.response?.data?.message || "Xóa ban thất bại!");
       } finally {
         setIsDeleting(false);
@@ -313,7 +279,6 @@ const DepartmentDetail = () => {
       setMemberToRemove(null);
       await fetchMembersAndDepartment();
     } catch (error) {
-      console.error("Error removing member:", error);
       toast.error("Không thể xóa thành viên khỏi ban");
     } finally {
       setIsRemovingMember(false);
@@ -334,12 +299,9 @@ const DepartmentDetail = () => {
     try {
       setLoadingMembers(true);
       const response = await eventService.getUnassignedMembersByEvent(eventId);
-      // eventService đã unwrap response, nên response có thể là array trực tiếp hoặc có data wrapper
       const members = Array.isArray(response) ? response : (response?.data || []);
-      console.log('Unassigned members loaded:', members);
       setUnassignedMembers(members);
     } catch (error) {
-      console.error("Error loading unassigned members:", error);
       toast.error("Không thể tải danh sách thành viên");
       setUnassignedMembers([]);
     } finally {
@@ -374,7 +336,6 @@ const DepartmentDetail = () => {
       setMemberSearchQuery("");
       await fetchMembersAndDepartment();
     } catch (error) {
-      console.error("Error adding members:", error);
       toast.error("Không thể thêm thành viên vào ban");
     } finally {
       setIsAddingMembers(false);
@@ -411,7 +372,6 @@ const DepartmentDetail = () => {
       setSelectedNewLeader(null);
       await fetchMembersAndDepartment();
     } catch (error) {
-      console.error("Error changing leader:", error);
       toast.error("Không thể thay đổi trưởng ban");
     } finally {
       setChangingLeader(false);
@@ -439,7 +399,7 @@ const DepartmentDetail = () => {
       return;
     }
 
-    setIsAssigningLeader(true);
+    setAssigningLeader(true);
     try {
       const newHoDUserId =
         selectedAssignLeader.userId ||
@@ -451,10 +411,9 @@ const DepartmentDetail = () => {
       setSelectedAssignLeader(null);
       await fetchMembersAndDepartment();
     } catch (error) {
-      console.error("Assign HoD error:", error);
       toast.error("Không thể gán trưởng ban");
     } finally {
-      setIsAssigningLeader(false);
+      setAssigningLeader(false);
     }
   };
 
@@ -475,35 +434,21 @@ const DepartmentDetail = () => {
         .includes(memberSearchQuery.toLowerCase())
   );
 
-  // Show loading while fetching role to prevent showing wrong sidebar
-  if (roleLoading) {
+  if (roleLoading || loading) {
     return (
-      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <Loading />
-        <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
-      </div>
-    );
-  }
-
-  // ===== IMPROVED LOADING & ERROR HANDLING =====
-  if (loading) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(255,255,255,1)",
-          zIndex: 2000,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: "20px"
-        }}
+      <UserLayout
+        title="Chi tiết phân ban"
+        sidebarType={getSidebarType()}
+        activePage="department-management"
+        eventId={eventId}
       >
-        <Loading size={80} />
-        <p style={{ color: "#6b7280", fontSize: "16px" }}>Đang tải thông tin ban...</p>
-      </div>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh', padding: '40px' }}>
+          <Loading size={80} />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>
+            {roleLoading ? 'Đang tải thông tin sự kiện...' : 'Đang tải thông tin ban...'}
+          </div>
+        </div>
+      </UserLayout>
     );
   }
 
@@ -516,17 +461,17 @@ const DepartmentDetail = () => {
         eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
-          <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: "4rem" }}></i>
+          <AlertTriangle size={64} color="#dc2626" />
           <h3 className="mt-3 mb-2" style={{ color: "#dc2626" }}>Lỗi tải dữ liệu</h3>
           <p style={{ color: "#6b7280" }}>{error}</p>
           <button
-            className="btn btn-danger mt-3"
+            className="btn btn-danger mt-3 d-inline-flex align-items-center"
             onClick={() => {
               setError(null);
               fetchMembersAndDepartment();
             }}
           >
-            <i className="bi bi-arrow-clockwise me-2"></i>
+            <RotateCw size={18} className="me-2" />
             Thử lại
           </button>
         </div>
@@ -543,14 +488,14 @@ const DepartmentDetail = () => {
         eventId={eventId}
       >
         <div className="bg-white rounded-3 shadow-sm p-5 text-center">
-          <i className="bi bi-inbox text-muted" style={{ fontSize: "4rem" }}></i>
+          <Inbox size={64} className="text-muted" />
           <h3 className="mt-3 mb-2" style={{ color: "#6b7280" }}>Không tìm thấy ban</h3>
           <p style={{ color: "#9ca3af" }}>Ban này có thể đã bị xóa hoặc không tồn tại.</p>
           <button
-            className="btn btn-outline-danger mt-3"
+            className="btn btn-outline-danger mt-3 d-inline-flex align-items-center"
             onClick={() => navigate(`/events/${eventId}/`)}
           >
-            <i className="bi bi-arrow-left me-2"></i>
+            <ArrowLeft size={16} className="me-2" />
             Quay lại danh sách ban
           </button>
         </div>
@@ -565,7 +510,7 @@ const DepartmentDetail = () => {
       activePage="department-management"
       eventId={eventId}
     >
-    <ToastContainer position="top-right" autoClose={2000}/>
+      <ToastContainer position="top-right" autoClose={2000} />
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: "30px" }}>
         {/* Department Header */}
@@ -583,32 +528,32 @@ const DepartmentDetail = () => {
         {(eventRole === "HoD" || eventRole === "HoOC") && (
           <div className="row mb-4">
             <div className="col-md-3">
-              <div className="bg-light rounded-3 p-3 text-center">
-                <i className="bi bi-people-fill text-primary me-2"></i>
+              <div className="bg-light rounded-3 p-3 text-center d-flex align-items-center justify-content-center gap-2">
+                <Users size={18} className="text-primary" />
                 <span style={{ fontWeight: "600" }}>
                   {department.memberCount} thành viên
                 </span>
               </div>
             </div>
             <div className="col-md-3">
-              <div className="bg-light rounded-3 p-3 text-center">
-                <i className="bi bi-person-plus text-success me-2"></i>
+              <div className="bg-light rounded-3 p-3 text-center d-flex align-items-center justify-content-center gap-2">
+                <Users size={18} className="text-success" />
                 <span style={{ fontWeight: "600" }}>
                   {department.newMembersToday || 0} thành viên mới hôm nay
                 </span>
               </div>
             </div>
             <div className="col-md-3">
-              <div className="bg-light rounded-3 p-3 text-center">
-                <i className="bi bi-clock text-info me-2"></i>
+              <div className="bg-light rounded-3 p-3 text-center d-flex align-items-center justify-content-center gap-2">
+                <Clock size={18} className="text-info" />
                 <span style={{ fontWeight: "600" }}>
                   Ngày tạo ban: {formatDate(department.createdAt)}
                 </span>
               </div>
             </div>
             <div className="col-md-3">
-              <div className="bg-light rounded-3 p-3 text-center">
-                <i className="bi bi-clock text-warning me-2"></i>
+              <div className="bg-light rounded-3 p-3 text-center d-flex align-items-center justify-content-center gap-2">
+                <Clock size={18} className="text-warning" />
                 <span style={{ fontWeight: "600" }}>
                   Thay đổi lần cuối: {formatDate(department.updatedAt)}
                 </span>
@@ -679,9 +624,9 @@ const DepartmentDetail = () => {
                   disabled={loadingMembers}
                 >
                   {loadingMembers ? (
-                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                    <RotateCw size={16} className="me-2 spin-animation" />
                   ) : (
-                    <i className="bi bi-plus-lg me-2"></i>
+                    <Plus size={16} className="me-2" />
                   )}
                   {loadingMembers ? "Đang tải..." : "Thêm thành viên"}
                 </button>
@@ -783,7 +728,7 @@ const DepartmentDetail = () => {
                               data-bs-toggle="dropdown"
                               style={{ color: "#6b7280" }}
                             >
-                              <i className="bi bi-three-dots"></i>
+                              ⋮
                             </button>
                             <ul className="dropdown-menu">
                               <li>
@@ -796,21 +741,6 @@ const DepartmentDetail = () => {
                                   Xoá thành viên khỏi ban
                                 </button>
                               </li>
-                              {/* {member.role !== "HoD" && (
-                                <li>
-                                  <button
-                                    className="dropdown-item"
-                                    onClick={() =>
-                                      handleMemberAction(
-                                        member._id || member.id,
-                                        "change_leader"
-                                      )
-                                    }
-                                  >
-                                    Thay đổi trưởng ban
-                                  </button>
-                                </li>
-                              )} */}
                             </ul>
                           </div>
                         </td>
@@ -841,9 +771,12 @@ const DepartmentDetail = () => {
                       color: "#1f2937",
                       fontWeight: "600",
                       marginBottom: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8
                     }}
                   >
-                    <i className="bi bi-info-circle me-2"></i>
+                    <Info size={18} />
                     Chi tiết ban
                   </h5>
                   {!editing ? (
@@ -854,9 +787,9 @@ const DepartmentDetail = () => {
                       disabled={isEditing}
                     >
                       {isEditing ? (
-                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                        <RotateCw size={16} className="me-2 spin-animation" />
                       ) : (
-                        <i className="bi bi-pencil me-2"></i>
+                        <Pencil size={16} className="me-2" />
                       )}
                       {isEditing ? "Đang chỉnh sửa..." : "Chỉnh sửa"}
                     </button>
@@ -869,9 +802,9 @@ const DepartmentDetail = () => {
                         disabled={isSavingChanges}
                       >
                         {isSavingChanges ? (
-                          <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                          <RotateCw size={16} className="me-2 spin-animation" />
                         ) : (
-                          <i className="bi bi-check-lg me-2"></i>
+                          <Check size={16} className="me-2" />
                         )}
                         {isSavingChanges ? "Đang lưu..." : "Lưu thay đổi"}
                       </button>
@@ -881,7 +814,7 @@ const DepartmentDetail = () => {
                         style={{ borderRadius: "8px", fontWeight: "500" }}
                         disabled={isSavingChanges}
                       >
-                        <i className="bi bi-x-lg me-2"></i>
+                        <X size={14} className="me-2" />
                         Hủy
                       </button>
                     </div>
@@ -929,9 +862,12 @@ const DepartmentDetail = () => {
                       color: "#1f2937",
                       fontWeight: "600",
                       marginBottom: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8
                     }}
                   >
-                    <i className="bi bi-person-circle me-2"></i>
+                    <Users size={18} />
                     Trưởng ban
                   </h5>
                   <div className="d-flex align-items-center mb-3">
@@ -979,9 +915,9 @@ const DepartmentDetail = () => {
                       disabled={changingLeader}
                     >
                       {changingLeader ? (
-                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                        <RotateCw size={16} className="me-2 spin-animation" />
                       ) : (
-                        <i className="bi bi-arrow-repeat me-2"></i>
+                        <RotateCw size={16} className="me-2" />
                       )}
                       {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
                     </button>
@@ -993,9 +929,9 @@ const DepartmentDetail = () => {
                       disabled={assigningLeader}
                     >
                       {assigningLeader ? (
-                        <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                        <RotateCw size={16} className="me-2 spin-animation" />
                       ) : (
-                        <i className="bi bi-person-plus me-2"></i>
+                        <Users size={16} className="me-2" />
                       )}
                       {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
                     </button>
@@ -1009,9 +945,12 @@ const DepartmentDetail = () => {
                       color: "#1f2937",
                       fontWeight: "600",
                       marginBottom: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8
                     }}
                   >
-                    <i className="bi bi-exclamation-triangle me-2"></i>
+                    <AlertTriangle size={18} className="text-danger" />
                     Xoá ban
                   </h5>
                   <button
@@ -1021,9 +960,9 @@ const DepartmentDetail = () => {
                     disabled={isDeleting}
                   >
                     {isDeleting ? (
-                      <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                      <RotateCw size={16} className="me-2 spin-animation" />
                     ) : (
-                      <i className="bi bi-trash me-2"></i>
+                      <Trash size={16} className="me-2" />
                     )}
                     {isDeleting ? "Đang xoá..." : "Xoá ban vĩnh viễn"}
                   </button>
@@ -1040,7 +979,6 @@ const DepartmentDetail = () => {
         )}
       </div>
 
-      {/* All modals remain the same - I'll include them for completeness but they're unchanged */}
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div
@@ -1059,10 +997,11 @@ const DepartmentDetail = () => {
             }}
           >
             <div className="d-flex align-items-center mb-3">
-              <i
-                className="bi bi-exclamation-triangle-fill text-danger me-2"
-                style={{ fontSize: "1.2rem" }}
-              ></i>
+              <AlertTriangle
+                size={20}
+                className="me-2"
+                color="#dc2626"
+              />
               <h5
                 className="mb-0"
                 style={{ color: "#1f2937", fontWeight: "600" }}
@@ -1094,11 +1033,12 @@ const DepartmentDetail = () => {
 
             <div className="d-flex justify-content-end gap-2">
               <button
-                className="btn btn-outline-secondary"
+                className="btn btn-outline-secondary d-inline-flex align-items-center"
                 onClick={handleCancelDelete}
                 style={{ borderRadius: "8px" }}
                 disabled={isDeleting}
               >
+                <X size={14} className="me-1" />
                 Huỷ
               </button>
               <button
@@ -1108,11 +1048,16 @@ const DepartmentDetail = () => {
                 style={{ borderRadius: "8px" }}
               >
                 {isDeleting ? (
-                  <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                  <>
+                    <RotateCw size={16} className="me-2 spin-animation" />
+                    Đang xoá...
+                  </>
                 ) : (
-                  <i className="bi bi-trash me-2"></i>
+                  <>
+                    <Trash size={16} className="me-2" />
+                    Xoá
+                  </>
                 )}
-                {isDeleting ? "Đang xoá..." : "Xoá"}
               </button>
             </div>
           </div>
@@ -1182,12 +1127,9 @@ const DepartmentDetail = () => {
                   </div>
                 </div>
               ) : filteredUnassignedMembers.length === 0 ? (
-                <div className="text-center py-4">
-                  <i
-                    className="bi bi-people text-muted"
-                    style={{ fontSize: "2rem" }}
-                  ></i>
-                  <p className="mt-2 text-muted">
+                <div className="text-center py-4 text-muted">
+                  <Users size={32} className="mb-2" />
+                  <p className="mt-2 mb-0">
                     {memberSearchQuery
                       ? "Không tìm thấy thành viên phù hợp"
                       : "Không có thành viên chưa có ban"}
@@ -1198,56 +1140,56 @@ const DepartmentDetail = () => {
                   {filteredUnassignedMembers.map((member) => {
                     const memberId = member._id || member.id;
                     return (
-                    <div
-                      key={memberId}
-                      className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(memberId)
-                        ? "bg-light border-primary"
-                        : "border-light"
-                        }`}
-                      onClick={() => handleMemberSelect(memberId)}
-                      style={{
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        className="form-check-input me-3"
-                        checked={selectedMembers.includes(memberId)}
-                        onChange={() => handleMemberSelect(memberId)}
-                      />
-                      <div className="flex-grow-1">
-                        <div className="d-flex align-items-center">
-                          <div
-                            className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              backgroundColor: "#f3f4f6",
-                              fontSize: "1.2rem",
-                              fontWeight: "600",
-                              color: "#6b7280",
-                            }}
-                          >
-                            {member.userId?.fullName?.charAt(0) || "?"}
-                          </div>
-                          <div>
-                            <h6
-                              className="mb-1"
-                              style={{ color: "#1f2937", fontWeight: "500" }}
+                      <div
+                        key={memberId}
+                        className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(memberId)
+                          ? "bg-light border-primary"
+                          : "border-light"
+                          }`}
+                        onClick={() => handleMemberSelect(memberId)}
+                        style={{
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          className="form-check-input me-3"
+                          checked={selectedMembers.includes(memberId)}
+                          onChange={() => handleMemberSelect(memberId)}
+                        />
+                        <div className="flex-grow-1">
+                          <div className="d-flex align-items-center">
+                            <div
+                              className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                              style={{
+                                width: "40px",
+                                height: "40px",
+                                backgroundColor: "#f3f4f6",
+                                fontSize: "1.2rem",
+                                fontWeight: "600",
+                                color: "#6b7280",
+                              }}
                             >
-                              {member.userId?.fullName || "Unknown"}
-                            </h6>
-                            <p
-                              className="mb-0"
-                              style={{ color: "#6b7280", fontSize: "0.9rem" }}
-                            >
-                              {member.userId?.email || ""}
-                            </p>
+                              {member.userId?.fullName?.charAt(0) || "?"}
+                            </div>
+                            <div>
+                              <h6
+                                className="mb-1"
+                                style={{ color: "#1f2937", fontWeight: "500" }}
+                              >
+                                {member.userId?.fullName || "Unknown"}
+                              </h6>
+                              <p
+                                className="mb-0"
+                                style={{ color: "#6b7280", fontSize: "0.9rem" }}
+                              >
+                                {member.userId?.email || ""}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })}
                 </div>
@@ -1266,15 +1208,16 @@ const DepartmentDetail = () => {
             <div className="d-flex justify-content-end gap-2">
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="btn btn-outline-secondary d-inline-flex align-items-center"
                 onClick={handleCancelAddMember}
                 style={{ borderRadius: "8px" }}
               >
+                <X size={14} className="me-1" />
                 Huỷ
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
+                className="btn btn-danger d-inline-flex align-items-center"
                 onClick={handleAddSelectedMembers}
                 disabled={isAddingMembers || selectedMembers.length === 0}
                 style={{ borderRadius: "8px" }}
@@ -1285,7 +1228,10 @@ const DepartmentDetail = () => {
                     Đang thêm...
                   </>
                 ) : (
-                  `Thêm ${selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên`
+                  <>
+                    <Plus size={16} className="me-2" />
+                    Thêm {selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên
+                  </>
                 )}
               </button>
             </div>
@@ -1311,10 +1257,7 @@ const DepartmentDetail = () => {
             }}
           >
             <div className="d-flex align-items-center mb-3">
-              <i
-                className="bi bi-exclamation-triangle-fill text-warning me-2"
-                style={{ fontSize: "1.2rem" }}
-              ></i>
+              <AlertTriangle size={20} className="me-2" color="#f59e0b" />
               <h5
                 className="mb-0"
                 style={{ color: "#1f2937", fontWeight: "600" }}
@@ -1330,14 +1273,15 @@ const DepartmentDetail = () => {
 
             <div className="d-flex justify-content-end gap-2">
               <button
-                className="btn btn-outline-secondary"
+                className="btn btn-outline-secondary d-inline-flex align-items-center"
                 onClick={handleCancelRemoveMember}
                 style={{ borderRadius: "8px" }}
               >
+                <X size={14} className="me-1" />
                 Huỷ
               </button>
               <button
-                className="btn btn-danger"
+                className="btn btn-danger d-inline-flex align-items-center"
                 onClick={handleConfirmRemoveMember}
                 style={{ borderRadius: "8px" }}
                 disabled={isRemovingMember}
@@ -1348,7 +1292,10 @@ const DepartmentDetail = () => {
                     Đang xoá...
                   </>
                 ) : (
-                  "Xoá thành viên"
+                  <>
+                    <Trash size={16} className="me-2" />
+                    Xoá thành viên
+                  </>
                 )}
               </button>
             </div>
@@ -1374,10 +1321,7 @@ const DepartmentDetail = () => {
             }}
           >
             <div className="d-flex align-items-center mb-3">
-              <i
-                className="bi bi-arrow-repeat text-primary me-2"
-                style={{ fontSize: "1.2rem" }}
-              ></i>
+              <RotateCw size={20} className="me-2 text-primary" />
               <h5
                 className="mb-0"
                 style={{ color: "#1f2937", fontWeight: "600" }}
@@ -1398,14 +1342,14 @@ const DepartmentDetail = () => {
               <div className="border rounded-3" style={{ maxHeight: "200px", overflowY: "auto" }}>
                 {(() => {
                   const availableMembers = members.filter(member =>
-                    member.role !== 'HoOC' && // Exclude HoOC
-                    member.role !== 'HoD'    // Exclude current HoD
+                    member.role !== 'HoOC' &&
+                    member.role !== 'HoD'
                   );
 
                   if (availableMembers.length === 0) {
                     return (
                       <div className="p-4 text-center text-muted">
-                        <i className="bi bi-people me-2"></i>
+                        <Users size={24} className="me-2" />
                         Không có thành viên nào khác để chọn làm trưởng ban
                       </div>
                     );
@@ -1436,7 +1380,7 @@ const DepartmentDetail = () => {
                         </div>
                       </div>
                       {selectedNewLeader?._id === member._id && (
-                        <i className="bi bi-check-circle-fill text-white"></i>
+                        <CheckCircle size={18} className="text-white" />
                       )}
                     </div>
                   ));
@@ -1446,15 +1390,16 @@ const DepartmentDetail = () => {
 
             <div className="d-flex justify-content-end gap-2">
               <button
-                className="btn btn-outline-secondary"
+                className="btn btn-outline-secondary d-inline-flex align-items-center"
                 onClick={handleCancelChangeLeader}
                 style={{ borderRadius: "8px" }}
                 disabled={changingLeader}
               >
+                <X size={14} className="me-1" />
                 Huỷ
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary d-inline-flex align-items-center"
                 onClick={handleChangeLeader}
                 style={{ borderRadius: "8px" }}
                 disabled={changingLeader || !selectedNewLeader || members.filter(member => member.role !== 'HoOC' && member.role !== 'HoD').length === 0}
@@ -1465,7 +1410,10 @@ const DepartmentDetail = () => {
                     Đang thay đổi...
                   </>
                 ) : (
-                  'Xác nhận thay đổi'
+                  <>
+                    <Check size={16} className="me-2" />
+                    Xác nhận thay đổi
+                  </>
                 )}
               </button>
             </div>
@@ -1484,7 +1432,7 @@ const DepartmentDetail = () => {
             style={{ minWidth: "500px", maxWidth: "700px", border: "1px solid #e5e7eb" }}
           >
             <div className="d-flex align-items-center mb-3">
-              <i className="bi bi-person-plus text-success me-2" style={{ fontSize: "1.2rem" }}></i>
+              <Users size={20} className="me-2 text-success" />
               <h5 className="mb-0" style={{ color: "#1f2937", fontWeight: "600" }}>
                 Gán trưởng ban cho {department.name}
               </h5>
@@ -1500,7 +1448,7 @@ const DepartmentDetail = () => {
                 if (!candidates || candidates.length === 0) {
                   return (
                     <div className="p-4 text-center text-muted">
-                      <i className="bi bi-people me-2"></i>
+                      <Users size={24} className="me-2" />
                       Không có thành viên phù hợp để gán
                     </div>
                   );
@@ -1534,15 +1482,16 @@ const DepartmentDetail = () => {
 
             <div className="d-flex justify-content-end gap-2">
               <button
-                className="btn btn-outline-secondary"
+                className="btn btn-outline-secondary d-inline-flex align-items-center"
                 onClick={handleCancelAssignLeader}
                 style={{ borderRadius: 8 }}
                 disabled={assigningLeader}
               >
+                <X size={14} className="me-1" />
                 Huỷ
               </button>
               <button
-                className="btn btn-success"
+                className="btn btn-success d-inline-flex align-items-center"
                 onClick={handleConfirmAssignLeader}
                 disabled={assigningLeader || !selectedAssignLeader}
                 style={{ borderRadius: 8 }}
@@ -1553,7 +1502,10 @@ const DepartmentDetail = () => {
                     Đang gán...
                   </>
                 ) : (
-                  'Gán trưởng ban'
+                  <>
+                    <Check size={16} className="me-2" />
+                    Gán trưởng ban
+                  </>
                 )}
               </button>
             </div>

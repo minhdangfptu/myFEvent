@@ -291,7 +291,7 @@ export default function CreateEventCalendarPage() {
         navigate(`/events/${eventId}/my-calendar`);
     };
     return (
-        <UserLayout eventId={eventId} sidebarType={eventRole} activePage="calendar">
+        <UserLayout title="Lên lịch họp" eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <div style={{
                 minHeight: "100vh",
                 backgroundColor: "#f8f9fa",

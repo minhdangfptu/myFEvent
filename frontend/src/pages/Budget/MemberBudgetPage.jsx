@@ -141,7 +141,7 @@ const MemberBudgetPage = () => {
     return (
       <UserLayout
         title="Danh sách Ngân sách của Ban"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="member"
         eventId={eventId}
       >
@@ -156,7 +156,7 @@ const MemberBudgetPage = () => {
   return (
     <UserLayout
       title="Danh sách Ngân sách của Ban"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="member"
       eventId={eventId}
     >

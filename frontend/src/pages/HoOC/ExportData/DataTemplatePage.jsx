@@ -3,8 +3,23 @@ import "./DataTemplatePage.css";
 import UserLayout from "~/components/UserLayout";
 import { useNavigate, useParams } from "react-router-dom";
 import DataExportPreviewModal from "~/components/DataExportPreviewModal";
-import { Eye, RotateCw, Search, X } from "lucide-react";
-
+import {
+  Eye,
+  RotateCw,
+  Search,
+  X,
+  Download,
+  Users,
+  User,
+  CalendarDays,
+  ListChecks,
+  MessageCircle,
+  Wallet,
+  ShieldAlert,
+  AlertTriangle,
+  Archive,
+  FileSpreadsheet,
+} from "lucide-react";
 
 export default function DataTemplatePage() {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -19,7 +34,7 @@ export default function DataTemplatePage() {
     {
       id: "team",
       title: "Mẫu Template Danh sách Ban sự kiện",
-      icon: "bi-people-fill",
+      icon: Users,
       color: "#f3f3f3",
       iconColor: "#1976D2",
       fileType: "XLSX",
@@ -31,7 +46,7 @@ export default function DataTemplatePage() {
     {
       id: "members",
       title: "Mẫu Template Danh sách Thành viên",
-      icon: "bi-person-lines-fill",
+      icon: User,
       color: "#f3f3f3",
       iconColor: "#F57C00",
       fileType: "XLSX",
@@ -43,7 +58,7 @@ export default function DataTemplatePage() {
     {
       id: "timeline",
       title: "Mẫu Template Agenda DDAY Sự kiện",
-      icon: "bi-calendar-event",
+      icon: CalendarDays,
       color: "#f3f3f3",
       iconColor: "#FF8F00",
       fileType: "XLSX",
@@ -55,7 +70,7 @@ export default function DataTemplatePage() {
     {
       id: "tasks",
       title: "Mẫu Template Danh sách Công việc",
-      icon: "bi-check2-square",
+      icon: ListChecks,
       color: "#f3f3f3",
       iconColor: "#7B1FA2",
       fileType: "XLSX",
@@ -67,7 +82,7 @@ export default function DataTemplatePage() {
     {
       id: "schedule",
       title: "Mẫu Template Lịch Trình (Schedule)",
-      icon: "bi-calendar3",
+      icon: CalendarDays,
       color: "#f3f3f3",
       iconColor: "#00ACC1",
       fileType: "XLSX",
@@ -79,7 +94,7 @@ export default function DataTemplatePage() {
     {
       id: "feedback",
       title: "Mẫu Template Danh sách Phản hồi",
-      icon: "bi-chat-square-dots",
+      icon: MessageCircle,
       color: "#f3f3f3",
       iconColor: "#388E3C",
       fileType: "XLSX",
@@ -91,7 +106,7 @@ export default function DataTemplatePage() {
     {
       id: "budget",
       title: "Mẫu Template Kinh phí sự kiện",
-      icon: "bi-currency-dollar",
+      icon: Wallet,
       color: "#f3f3f3",
       iconColor: "#F9A825",
       fileType: "XLSX",
@@ -103,7 +118,7 @@ export default function DataTemplatePage() {
     {
       id: "risks",
       title: "Mẫu Template Danh sách Rủi ro",
-      icon: "bi-shield-exclamation",
+      icon: ShieldAlert,
       color: "#f3f3f3",
       iconColor: "#E53935",
       fileType: "XLSX",
@@ -115,7 +130,7 @@ export default function DataTemplatePage() {
     {
       id: "incidents",
       title: "Mẫu Template Danh sách Sự cố đã xảy ra",
-      icon: "bi-exclamation-triangle-fill",
+      icon: AlertTriangle,
       color: "#f3f3f3",
       iconColor: "#FB8C00",
       fileType: "XLSX",
@@ -127,7 +142,7 @@ export default function DataTemplatePage() {
     {
       id: "all-templates-excel",
       title: "Tất cả Templates Excel",
-      icon: "bi-collection",
+      icon: Archive,
       color: "#f3f3f3",
       iconColor: "#8E24AA",
       fileType: "ZIP",
@@ -137,7 +152,6 @@ export default function DataTemplatePage() {
   ];
 
   const handlePreview = (templateId, type = "data") => {
-    console.log(`Preview template: ${templateId}, type: ${type}`);
     const template = templatesExcel.find((t) => t.id === templateId);
 
     if (template) {
@@ -158,7 +172,6 @@ export default function DataTemplatePage() {
     const template = templatesExcel.find((t) => t.id === templateId);
 
     if (template) {
-      // Start loading state
       setDownloadingItems((prev) => new Set(prev).add(templateId));
 
       try {
@@ -170,12 +183,10 @@ export default function DataTemplatePage() {
             window.location.href = exportUrl;
             break;
           }
-
           case "ZIP": {
             window.location.href = `https://drive.google.com/uc?export=download&id=${fileId}`;
             break;
           }
-
           default: {
             window.open(
               `https://drive.google.com/file/d/${fileId}/view?usp=sharing`,
@@ -185,7 +196,6 @@ export default function DataTemplatePage() {
           }
         }
 
-        // Stop loading after 3 seconds (assume download started)
         setTimeout(() => {
           setDownloadingItems((prev) => {
             const newSet = new Set(prev);
@@ -195,7 +205,6 @@ export default function DataTemplatePage() {
         }, 3000);
       } catch (error) {
         console.error("Download failed:", error);
-        // Stop loading on error
         setDownloadingItems((prev) => {
           const newSet = new Set(prev);
           newSet.delete(templateId);
@@ -211,7 +220,8 @@ export default function DataTemplatePage() {
     setPreviewType("data");
   };
 
-  const handleBackClick = () => {
+  const handleBackClick = (e) => {
+    e.preventDefault();
     navigate(-1);
   };
 
@@ -281,7 +291,10 @@ export default function DataTemplatePage() {
                 {/* Search Box */}
                 <div className="data-template-page__search">
                   <div className="data-template-page__search-wrapper">
-                    <i className="bi bi-search data-template-page__search-icon"></i>
+                    <Search
+                      size={18}
+                      className="data-template-page__search-icon"
+                    />
                     <input
                       type="text"
                       className="data-template-page__search-input"
@@ -293,6 +306,7 @@ export default function DataTemplatePage() {
                       <button
                         className="data-template-page__search-clear"
                         onClick={() => setSearchTerm("")}
+                        type="button"
                       >
                         <X size={18} />
                       </button>
@@ -303,77 +317,87 @@ export default function DataTemplatePage() {
             </div>
 
             <div className="data-template-page__grid">
-              {getCurrentTemplates().map((template) => (
-                <div key={template.id} className="data-template-page__card">
+              {getCurrentTemplates().map((template) => {
+                const Icon = template.icon;
+                return (
                   <div
-                    className="data-template-page__card-header"
-                    style={{ backgroundColor: template.color }}
+                    key={template.id}
+                    className="data-template-page__card"
                   >
                     <div
-                      className="data-template-page__card-icon"
-                      style={{ backgroundColor: template.iconColor }}
+                      className="data-template-page__card-header"
+                      style={{ backgroundColor: template.color }}
                     >
-                      <i
-                        className={template.icon}
-                        style={{
-                          fontSize: "1.5rem",
-                          color: "white",
-                        }}
-                      ></i>
+                      <div
+                        className="data-template-page__card-icon"
+                        style={{ backgroundColor: template.iconColor }}
+                      >
+                        <Icon size={22} color="white" />
+                      </div>
+                      <div className="data-template-page__card-title-section">
+                        <h3 className="data-template-page__card-title">
+                          {template.title}
+                        </h3>
+                        <span className="data-template-page__card-filetype">
+                          {template.fileType}
+                        </span>
+                      </div>
                     </div>
-                    <div className="data-template-page__card-title-section">
-                      <h3 className="data-template-page__card-title">
-                        {template.title}
-                      </h3>
-                      <span className="data-template-page__card-filetype">
-                        {template.fileType}
-                      </span>
+
+                    <div className="data-template-page__card-footer">
+                      {template.fileType !== "ZIP" && (
+                        <>
+                          <button
+                            type="button"
+                            className="data-template-page__btn data-template-page__btn--text"
+                            onClick={() =>
+                              handlePreview(template.id, "data")
+                            }
+                          >
+                            <span className="data-template-page__btn-icon">
+                              <Eye size={18} />
+                            </span>
+                            Preview dữ liệu
+                          </button>
+                          <button
+                            type="button"
+                            className="data-template-page__btn data-template-page__btn--text"
+                            onClick={() =>
+                              handlePreview(template.id, "template")
+                            }
+                          >
+                            <span className="data-template-page__btn-icon">
+                              <FileSpreadsheet size={18} />
+                            </span>
+                            Preview mẫu
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        className="data-template-page__btn data-template-page__btn--download"
+                        onClick={() => handleDownload(template.id)}
+                        disabled={downloadingItems.has(template.id)}
+                      >
+                        <span className="data-template-page__btn-icon">
+                          {downloadingItems.has(template.id) ? (
+                            <RotateCw
+                              size={18}
+                              className="spin-animation"
+                            />
+                          ) : (
+                            <Download size={18} />
+                          )}
+                        </span>
+                        {downloadingItems.has(template.id)
+                          ? "Đang xử lý..."
+                          : "Tải Template"}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="data-template-page__card-footer">
-                    {template.fileType !== "ZIP" && (
-                      <>
-                        <button
-                          className="data-template-page__btn data-template-page__btn--text"
-                          onClick={() => handlePreview(template.id, "data")}
-                        >
-                          <span className="data-template-page__btn-icon">
-                            <Eye size={18} />
-                          </span>
-                          Preview dữ liệu
-                        </button>
-                        <button
-                          className="data-template-page__btn data-template-page__btn--text"
-                          onClick={() => handlePreview(template.id, "template")}
-                        >
-                          <span className="data-template-page__btn-icon">
-                            <i className="bi bi-eye-fill"></i>
-                          </span>
-                          Preview mẫu
-                        </button>
-                      </>
-                    )}
-
-                    <button
-                      className="data-template-page__btn data-template-page__btn--download"
-                      onClick={() => handleDownload(template.id)}
-                      disabled={downloadingItems.has(template.id)}
-                    >
-                      <span className="data-template-page__btn-icon">
-                        {downloadingItems.has(template.id) ? (
-                          <i className="bi bi-arrow-clockwise spin-animation"></i>
-                        ) : (
-                          <i className="bi bi-download"></i>
-                        )}
-                      </span>
-                      {downloadingItems.has(template.id)
-                        ? "Đang xử lý..."
-                        : "Tải Template"}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {getCurrentTemplates().length === 0 && (

@@ -128,6 +128,7 @@ export default function HoDSideBar({
       setWorkOpen(false);
       setFinanceOpen(false);
       setOverviewOpen(false);
+      setRisksOpen(false);
       setExportOpen(false);
     }
   }, [sidebarOpen]);
@@ -166,7 +167,7 @@ export default function HoDSideBar({
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/hod-tasks` },
-    { id: "work-list", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
+    { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
     // { id: "work-timeline", label: "Timeline công việc", path: `/events/${selectedEvent || ''}/hooc-manage-milestone` },
     // { id: "work-stats", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hod-statistic` },
   ];
@@ -281,12 +282,12 @@ export default function HoDSideBar({
   };
 
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
+    { id: "finance-budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
     { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || selectedEvent || ''}/budgets/statistics` },
   ];
 
   const exportSubItems = [
-    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId || selectedEvent || ''}/export/data` },
+    // { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId || selectedEvent || ''}/export/data` },
     { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId || selectedEvent || ''}/export/templates` },
   ];
 
@@ -578,7 +579,7 @@ export default function HoDSideBar({
 
             {/* Ban sự kiện */}
             <button
-              className={`btn-nav ${activePage === "event-board" ? "active" : ""
+              className={`btn-nav ${activePage === "department-management" ? "active" : ""
                 }`}
               onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban sự kiện"
@@ -885,7 +886,7 @@ export default function HoDSideBar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{ margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button

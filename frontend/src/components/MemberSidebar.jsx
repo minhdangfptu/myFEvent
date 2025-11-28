@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
-import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu, MessageSquareText } from "lucide-react";
+import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu, MessageSquareText, Home } from "lucide-react";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -490,7 +490,7 @@ export default function MemberSidebar({
             {/* Ban sự kiện */}
             <button
               className={`btn-nav ${
-                activePage === "event-board" ? "active" : ""
+                activePage === "department-management" ? "active" : ""
               }`}
               onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban của bạn"
@@ -798,7 +798,7 @@ export default function MemberSidebar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{ margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button
