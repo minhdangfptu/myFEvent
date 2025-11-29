@@ -278,8 +278,8 @@ export default function HoDSideBar({
   };
 
   const financeSubItems = [
-    { id: "finance-budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
-    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || selectedEvent || ''}/budgets/statistics` },
+    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
+    
   ];
 
   const exportSubItems = [

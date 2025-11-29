@@ -25,6 +25,16 @@ export function EventProvider({ children }) {
     }
   });
 
+  // Store full member info (role + departmentId) for each event
+  const [eventMembers, setEventMembers] = useState(() => {
+    try {
+      const cached = localStorage.getItem('eventMembers');
+      return cached ? JSON.parse(cached) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 8,
@@ -42,7 +52,16 @@ export function EventProvider({ children }) {
     }
   }, [eventRoles]);
 
-  // Clear eventRoles cache when user logs out or changes
+  // Persist eventMembers to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventMembers', JSON.stringify(eventMembers));
+    } catch (err) {
+      console.error('Failed to persist eventMembers:', err);
+    }
+  }, [eventMembers]);
+
+  // Clear eventRoles and eventMembers cache when user logs out or changes
   const userIdRef = useRef(null);
   useEffect(() => {
     const currentUserId = user?._id || user?.id;
@@ -51,19 +70,23 @@ export function EventProvider({ children }) {
       if (!user) {
         // User logged out, clear the cache
         setEventRoles({});
+        setEventMembers({});
         userIdRef.current = null;
         try {
           localStorage.removeItem('eventRoles');
+          localStorage.removeItem('eventMembers');
         } catch (err) {
-          console.error('Failed to clear eventRoles cache:', err);
+          console.error('Failed to clear cache:', err);
         }
       } else if (userIdRef.current && userIdRef.current !== currentUserId) {
         // Different user logged in, clear old cache
         setEventRoles({});
+        setEventMembers({});
         try {
           localStorage.removeItem('eventRoles');
+          localStorage.removeItem('eventMembers');
         } catch (err) {
-          console.error('Failed to clear eventRoles cache:', err);
+          console.error('Failed to clear cache:', err);
         }
       }
 
@@ -156,11 +179,24 @@ export function EventProvider({ children }) {
     try {
       const res = await userApi.getUserRoleByEvent(eventId);
       const role = res?.role || res?.data?.role || "";
+      const departmentId = res?.departmentId || res?.data?.departmentId || null;
+
+      // Cache both role and full member info
       setEventRoles((prev) => ({ ...prev, [eventId]: role }));
+      setEventMembers((prev) => ({
+        ...prev,
+        [eventId]: {
+          role,
+          departmentId,
+          eventMemberId: res?.eventMemberId || res?._id || null
+        }
+      }));
+
       return role;
     } catch (e) {
       // Cache the error as empty string to prevent repeated API calls
       setEventRoles((prev) => ({ ...prev, [eventId]: "" }));
+      setEventMembers((prev) => ({ ...prev, [eventId]: { role: "", departmentId: null } }));
       return "";
     }
   }, [eventRoles]);
@@ -169,6 +205,11 @@ export function EventProvider({ children }) {
   const getEventRole = useCallback((eventId) => {
     return eventRoles[eventId] || "";
   }, [eventRoles]);
+
+  // Utility to get member info synchronously from cache
+  const getEventMember = useCallback((eventId) => {
+    return eventMembers[eventId] || { role: "", departmentId: null };
+  }, [eventMembers]);
 
   // Function to change page with search
   const changePage = useCallback((newPage, search = '') => {
@@ -182,8 +223,10 @@ export function EventProvider({ children }) {
       error,
       refetchEvents: fetchEvents,
       eventRoles,
+      eventMembers,
       fetchEventRole,
       getEventRole,
+      getEventMember,
       pagination,
       changePage
     }}>

@@ -36,18 +36,60 @@ export default function MemberProfilePage() {
   const [selectedRole, setSelectedRole] = useState('Member');
   const [roleSaving, setRoleSaving] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
-  const { fetchEventRole } = useEvents();
+  const [userDepartmentId, setUserDepartmentId] = useState(null);
+  const { fetchEventRole, getEventMember } = useEvents();
 
   // Get member data from navigation state if available
   const memberFromState = location.state?.member;
 
   useEffect(() => {
-    setRoleLoading(true);
-    fetchEventRole(eventId).then(role => {
-      setEventRole(role);
-      setRoleLoading(false);
-    });
-  }, [eventId]);
+    let mounted = true;
+    const loadRole = async () => {
+      if (!eventId) {
+        if (mounted) {
+          setEventRole('');
+          setUserDepartmentId(null);
+          setRoleLoading(false);
+        }
+        return;
+      }
+      try {
+        setRoleLoading(true);
+        const r = await fetchEventRole(eventId);
+
+        // Get member info including departmentId
+        const memberInfo = getEventMember(eventId);
+
+        let normalized = '';
+        let deptId = memberInfo?.departmentId || null;
+
+        if (!r) {
+          normalized = '';
+        } else if (typeof r === 'string') {
+          normalized = r;
+        } else if (typeof r === 'object') {
+          normalized = String(r.role || '');
+          deptId = r.departmentId || memberInfo?.departmentId || null;
+        } else {
+          normalized = String(r);
+        }
+
+        if (mounted) {
+          setEventRole(normalized);
+          setUserDepartmentId(deptId);
+          setRoleLoading(false);
+        }
+      } catch (err) {
+        if (mounted) {
+          setEventRole('');
+          setUserDepartmentId(null);
+          setRoleLoading(false);
+        }
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [eventId, fetchEventRole, getEventMember]);
 
   const getSidebarType = () => {
     if (eventRole === 'HoOC') return 'HoOC';
@@ -288,8 +330,25 @@ export default function MemberProfilePage() {
   const memberVerified = member.userId?.verified || false;
   const memberJoinedAt = member.createdAt || '';
 
+  // Get member's department ID
+  const memberDepartmentId = resolveMemberDepartmentId(member);
+
   // Check if current user can manage this member
-  const canManage = eventRole === 'HoOC' || eventRole === 'HoD';
+  // HoOC can always manage
+  // HoD can manage if:
+  //   - Member has no department yet, OR
+  //   - Member's department matches the HoD's department
+  const canManage = (() => {
+    if (eventRole === 'HoOC') return true;
+    if (eventRole === 'HoD') {
+      // If member has no department, HoD can manage
+      if (!memberDepartmentId) return true;
+      // If member has a department, only the HoD of that department can manage
+      return userDepartmentId === memberDepartmentId;
+    }
+    return false;
+  })();
+
   const canChangeDepartment = canManage && memberRole !== 'HoOC';
   const shouldShowDepartmentInfo = memberRole !== 'HoOC';
   const roleOptions = [

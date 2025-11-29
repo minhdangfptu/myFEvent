@@ -388,7 +388,7 @@ export default function HomePage() {
               aria-label="Mở menu tạo/tham gia sự kiện"
             >
               <Plus size={18} />
-              {t("createEvent")}/{t("joinEvent")}
+              Tạo sự kiện/Tham gia sự kiện
               <ChevronDown size={18} />
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
@@ -399,7 +399,7 @@ export default function HomePage() {
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
                   <CalendarPlus className="me-2" size={18} />
-                  {t("createEvent")}
+                  Tạo sự kiện mới
                 </button>
               </li>
               <li>
@@ -409,7 +409,7 @@ export default function HomePage() {
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
                   <LogIn className="me-2" size={18} />
-                  {t("joinEvent")}
+                  Tham gia sự kiện
                 </button>
               </li>
             </ul>

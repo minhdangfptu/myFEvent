@@ -4,6 +4,55 @@ import ensureEventRole from '../utils/ensureEventRole.js';
 
 // ====== HELPER FUNCTIONS ======
 
+/**
+ * Check if a member has permission to manage a risk
+ * @param {Object} member - Event member object
+ * @param {Object} risk - Risk object (can be null for create operation)
+ * @param {string} riskDepartmentId - Department ID for the risk (used when risk object doesn't exist yet)
+ * @param {string} riskScope - Risk scope ('event' or 'department')
+ * @returns {boolean} - true if member has permission
+ */
+const checkRiskPermission = (member, risk = null, riskDepartmentId = null, riskScope = null) => {
+    // HoOC has full permission
+    if (member.role === 'HoOC') {
+        return true;
+    }
+
+    // For HoD
+    if (member.role === 'HoD') {
+        // Get risk details
+        const scope = risk ? (risk.scope || 'department') : riskScope;
+        let deptId = risk ? risk.departmentId : riskDepartmentId;
+
+        // Allow event-level risks (toàn BTC)
+        if (scope === 'event') {
+            return true;
+        }
+
+        // Extract _id if departmentId is an object (populated)
+        if (deptId && typeof deptId === 'object' && deptId._id) {
+            deptId = deptId._id;
+        }
+
+        // Extract _id from member.departmentId if it's an object
+        let memberDeptId = member.departmentId;
+        if (memberDeptId && typeof memberDeptId === 'object' && memberDeptId._id) {
+            memberDeptId = memberDeptId._id;
+        }
+
+        // Allow if risk belongs to HoD's department
+        if (deptId && memberDeptId) {
+            return deptId.toString() === memberDeptId.toString();
+        }
+
+        // If creating new risk without department (shouldn't happen, but deny by default)
+        return false;
+    }
+
+    // Other roles don't have permission
+    return false;
+};
+
 const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
     try {
         // Get current risk data
@@ -35,7 +84,7 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
 
             // BR: Nếu có bất kỳ occurred nào là pending/resolving → risk status = resolving
             if (resolvingOrPendingCount > 0) {
-                newStatus = 'resolving';;
+                newStatus = 'resolving';
             }
             // BR: Nếu tất cả occurred đều là resolved → risk status = resolved
             else if (resolvedCount === occurredRisks.length && occurredRisks.length > 0) {
@@ -131,6 +180,17 @@ export const createRisk = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 message: 'Chỉ HoOC hoặc HoD được tạo risk'
+            });
+        }
+
+        // Check permission for HoD: can only create risks for their department or event-level
+        const riskScope = req.body.scope || 'department';
+        const riskDepartmentId = req.body.departmentId;
+
+        if (!checkRiskPermission(member, null, riskDepartmentId, riskScope)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được tạo risk cho ban mình hoặc toàn BTC'
             });
         }
 
@@ -350,6 +410,23 @@ export const updateRisk = async (req, res) => {
             });
         }
 
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được sửa risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         const updateData = { ...req.body, updated_personId: member._id };
 
         const result = await RiskService.updateRisk(eventId, riskId, updateData);
@@ -398,6 +475,23 @@ export const deleteRisk = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 message: 'Chỉ HoOC hoặc HoD được xóa risk'
+            });
+        }
+
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được xóa risk của ban mình hoặc toàn BTC'
             });
         }
 
@@ -451,6 +545,23 @@ export const addOccurredRisk = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 message: 'Chỉ HoOC hoặc HoD được thêm occurred risk'
+            });
+        }
+
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được thêm occurred risk cho risk của ban mình hoặc toàn BTC'
             });
         }
 
@@ -509,6 +620,23 @@ export const updateOccurredRisk = async (req, res) => {
             });
         }
 
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được sửa occurred risk cho risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         const updateData = { ...req.body, update_personId: member._id };
 
         const result = await RiskService.updateOccurredRisk(eventId, riskId, occurredRiskId, updateData);
@@ -563,6 +691,24 @@ export const removeOccurredRisk = async (req, res) => {
                 message: 'Chỉ HoOC hoặc HoD được xóa occurred risk'
             });
         }
+
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được xóa occurred risk cho risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         // Update update_personId trước khi xóa occurred risk
         await RiskService.updateOccurredRisk(eventId, riskId, occurredRiskId, { update_personId: member._id });
         const result = await RiskService.removeOccurredRisk(eventId, riskId, occurredRiskId);

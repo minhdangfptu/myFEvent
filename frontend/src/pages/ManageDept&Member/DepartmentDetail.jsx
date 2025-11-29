@@ -61,7 +61,7 @@ const DepartmentDetail = () => {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [isSavingChanges, setIsSavingChanges] = useState(false);
-  const { fetchEventRole } = useEvents();
+  const { fetchEventRole, getEventMember } = useEvents();
 
   const getMemberDisplayName = (member) =>
     (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
@@ -82,6 +82,18 @@ const DepartmentDetail = () => {
     if (eventRole === 'HoD') return 'HoD';
     if (eventRole === 'Member') return 'Member';
     return 'user';
+  };
+
+  // Check if user can manage this specific department
+  // HoOC can manage all departments
+  // HoD can only manage their own department
+  const canManageThisDepartment = () => {
+    if (eventRole === 'HoOC') return true;
+    if (eventRole === 'HoD' && userDepartmentId) {
+      // Check if this department is the one the HoD manages
+      return userDepartmentId === id;
+    }
+    return false;
   };
 
   const fetchMembersAndDepartment = async () => {
@@ -129,7 +141,7 @@ const DepartmentDetail = () => {
     }
   }, [id, eventId]);
 
-  // Fetch role
+  // Fetch role and department info
   useEffect(() => {
     let mounted = true;
     const loadRole = async () => {
@@ -145,8 +157,11 @@ const DepartmentDetail = () => {
         setRoleLoading(true);
         const r = await fetchEventRole(eventId);
 
+        // Get member info including departmentId
+        const memberInfo = getEventMember(eventId);
+
         let normalized = '';
-        let deptId = null;
+        let deptId = memberInfo?.departmentId || null;
 
         if (!r) {
           normalized = '';
@@ -154,7 +169,7 @@ const DepartmentDetail = () => {
           normalized = r;
         } else if (typeof r === 'object') {
           normalized = String(r.role || '');
-          deptId = r.departmentId || null;
+          deptId = r.departmentId || memberInfo?.departmentId || null;
         } else {
           normalized = String(r);
         }
@@ -174,9 +189,7 @@ const DepartmentDetail = () => {
     };
     loadRole();
     return () => { mounted = false; };
-  }, [eventId, fetchEventRole]);
-
-  const canManage = eventRole === 'HoOC' || (eventRole === 'HoD');
+  }, [eventId, fetchEventRole, getEventMember]);
 
   const handleEdit = async () => {
     setIsEditing(true);
@@ -579,7 +592,7 @@ const DepartmentDetail = () => {
               >
                 Thông tin
               </button>
-              {canManage && (
+              {canManageThisDepartment() && (
                 <button
                   className={`nav-link ${activeTab === "settings" ? "active" : ""}`}
                   onClick={() => setActiveTab("settings")}
@@ -610,7 +623,7 @@ const DepartmentDetail = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: "300px", borderRadius: "8px" }}
               />
-              {canManage && (
+              {canManageThisDepartment() && (
                 <button
                   className="btn btn-danger d-flex align-items-center"
                   onClick={handleAddMember}
@@ -679,7 +692,7 @@ const DepartmentDetail = () => {
                     >
                       Email
                     </th>
-                    {canManage && (
+                    {canManageThisDepartment() && (
                       <th
                         style={{
                           border: "none",
@@ -720,7 +733,7 @@ const DepartmentDetail = () => {
                       <td style={{ padding: "15px", color: "#6b7280" }}>
                         {getMemberEmail(member)}
                       </td>
-                      {canManage && (
+                      {canManageThisDepartment() && (
                         <td style={{ padding: "15px" }}>
                           <div className="dropdown">
                             <button
@@ -753,7 +766,7 @@ const DepartmentDetail = () => {
           </div>
         )}
 
-        {activeTab === "settings" && canManage && (
+        {activeTab === "settings" && canManageThisDepartment() && (
           <div className="row">
             {/* Cột trái - Chi tiết ban */}
             <div className="col-md-6">
