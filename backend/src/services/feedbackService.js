@@ -321,6 +321,16 @@ export const feedbackService = {
 
     form.status = 'open';
     await form.save();
+    
+    // Send notification to Members and HoD
+    try {
+      const { notifyFormPublished } = await import('../services/notificationService.js');
+      await notifyFormPublished(eventId, formId);
+    } catch (notifError) {
+      console.error('Error sending form published notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     return { message: 'Xuất bản biểu mẫu thành công', data: form };
   },
 
@@ -561,6 +571,16 @@ export const feedbackService = {
     });
 
     await feedbackResponse.save();
+    
+    // Send notification to HoOC
+    try {
+      const { notifyResponseSubmitted } = await import('../services/notificationService.js');
+      await notifyResponseSubmitted(eventId, formId, member._id);
+    } catch (notifError) {
+      console.error('Error sending response submitted notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     return { message: 'Gửi phản hồi thành công', data: feedbackResponse };
   },
 

@@ -1,6 +1,14 @@
 import { validationResult } from 'express-validator';
 import * as RiskService from '../services/riskService.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import {
+  notifyRiskCreated,
+  notifyRiskUpdated,
+  notifyRiskAssigned,
+  notifyRiskOccurred,
+  notifyOccurredRiskUpdated,
+  notifyRiskStatusChanged,
+} from '../services/notificationService.js';
 
 // ====== HELPER FUNCTIONS ======
 
@@ -103,6 +111,14 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
 
             if (updateResult.success) {
                 // console.log(`✅ Auto-updated risk ${riskId} status: ${risk.risk_status} → ${newStatus}`);
+                
+                // Send notification about status change
+                try {
+                  await notifyRiskStatusChanged(eventId, riskId, risk.risk_status, newStatus, risk.scope || 'department', risk.departmentId);
+                } catch (notifError) {
+                  console.error('Error sending risk status changed notification:', notifError);
+                  // Don't fail the request if notification fails
+                }
             } else {
                 // console.warn(`❌ Failed to auto-update risk ${riskId} status:`, updateResult.message);
             }
@@ -200,6 +216,14 @@ export const createRisk = async (req, res) => {
 
         if (!result.success) {
             return res.status(400).json(result);
+        }
+
+        // Send notification
+        try {
+          await notifyRiskCreated(eventId, result.data._id, riskScope, riskDepartmentId);
+        } catch (notifError) {
+          console.error('Error sending risk created notification:', notifError);
+          // Don't fail the request if notification fails
         }
 
         return res.status(201).json({
@@ -436,6 +460,15 @@ export const updateRisk = async (req, res) => {
             return res.status(statusCode).json(result);
         }
 
+        // Send notification
+        try {
+          const risk = result.data;
+          await notifyRiskUpdated(eventId, riskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending risk updated notification:', notifError);
+          // Don't fail the request if notification fails
+        }
+
         return res.status(200).json({
             success: true,
             data: result.data,
@@ -577,6 +610,19 @@ export const addOccurredRisk = async (req, res) => {
         // Auto-update risk status based on occurred risks
         const statusUpdateResult = await updateRiskStatusBasedOnOccurred(eventId, riskId);
 
+        // Send notification
+        try {
+          const risk = currentRiskResult.data;
+          // Get the newly created occurred risk (last one in the array)
+          const occurredRisks = result.data.occurred_risk || [];
+          const newOccurredRisk = occurredRisks.length > 0 ? occurredRisks[occurredRisks.length - 1] : null;
+          const occurredRiskId = newOccurredRisk?._id || newOccurredRisk?.id;
+          await notifyRiskOccurred(eventId, riskId, occurredRiskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending risk occurred notification:', notifError);
+          // Don't fail the request if notification fails
+        }
+
         return res.status(201).json({
             success: true,
             data: result.data,
@@ -648,6 +694,15 @@ export const updateOccurredRisk = async (req, res) => {
 
         // Auto-update risk status based on occurred risks
         const statusUpdateResult = await updateRiskStatusBasedOnOccurred(eventId, riskId);
+
+        // Send notification
+        try {
+          const risk = currentRiskResult.data;
+          await notifyOccurredRiskUpdated(eventId, riskId, occurredRiskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending occurred risk updated notification:', notifError);
+          // Don't fail the request if notification fails
+        }
 
         return res.status(200).json({
             success: true,

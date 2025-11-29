@@ -78,11 +78,61 @@ export default function MemberSidebar({
   }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
 
   // Sử dụng eventId từ props thay vì lấy từ URL
-  const { events, loading } = useEvents();
-  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
+  const { events, loading, refetchEvents } = useEvents();
+  
+  // Lưu eventId vào sessionStorage để restore khi quay lại từ error page
+  useEffect(() => {
+    if (eventId) {
+      try {
+        sessionStorage.setItem('lastEventId', eventId);
+      } catch (err) {
+        console.error('Failed to save eventId to sessionStorage:', err);
+      }
+    }
+  }, [eventId]);
+
+  // Restore eventId từ sessionStorage nếu không có eventId từ props
+  const effectiveEventId = useMemo(() => {
+    if (eventId) return eventId;
+    try {
+      const savedEventId = sessionStorage.getItem('lastEventId');
+      return savedEventId || null;
+    } catch {
+      return null;
+    }
+  }, [eventId]);
+
+  const event = useMemo(() => {
+    if (!effectiveEventId) return null;
+    return events.find(e => (e._id || e.id) === effectiveEventId);
+  }, [events, effectiveEventId]);
+  
   const hasEvents = !!event;
   const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
+
+  // Track if we've already tried to refetch for this eventId
+  const refetchAttemptedRef = useRef(null);
+  
+  // Fetch lại events nếu có eventId nhưng không tìm thấy event trong events array
+  useEffect(() => {
+    if (!effectiveEventId) {
+      refetchAttemptedRef.current = null;
+      return;
+    }
+    
+    // Chỉ refetch một lần cho mỗi eventId
+    if (refetchAttemptedRef.current === effectiveEventId) {
+      return; // Đã thử refetch cho eventId này rồi
+    }
+    
+    if (!loading && events.length > 0 && !event) {
+      // Có eventId nhưng không tìm thấy event, có thể events chưa được fetch đầy đủ
+      // Thử fetch lại một lần
+      refetchAttemptedRef.current = effectiveEventId;
+      refetchEvents();
+    }
+  }, [effectiveEventId, events, event, loading, refetchEvents]);
 
   // Chỉ show loading khi chưa có events VÀ đang loading
   const showLoading = loading && events.length === 0;
@@ -359,9 +409,9 @@ export default function MemberSidebar({
                   whiteSpace: "normal",
                   lineHeight: "1.2"
                 }}
-                title={event?.name || "(Chưa chọn sự kiện)"}
+                title={event?.name || (effectiveEventId && loading ? "Đang tải..." : "(Chưa chọn sự kiện)")}
               >
-                {event?.name || "(Chưa chọn sự kiện)"}
+                {event?.name || (effectiveEventId && loading ? "Đang tải..." : "(Chưa chọn sự kiện)")}
               </span>
             </div>
           </div>
