@@ -7,7 +7,7 @@ import { eventService } from "../../services/eventService";
 import { getEventImage } from "../../utils/getEventImage";
 import { deriveEventStatus } from "../../utils/getEventStatus";
 import Loading from "~/components/Loading";
-import { CalendarDays, MapPin, User, FileText, AlignLeft, Zap, ExternalLink } from "lucide-react";
+import { CalendarDays, MapPin, User, FileText, AlignLeft, Zap, ExternalLink, Info } from "lucide-react";
 
 export default function EventDetailPage() {
   const { id } = useParams();

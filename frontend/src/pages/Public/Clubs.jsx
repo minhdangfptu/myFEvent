@@ -63,7 +63,7 @@ export default function ClubsPage() {
   }, []);
   const [keyword, setKeyword] = React.useState("");
   const [page, setPage] = React.useState(1);
-  const totalPages = 4;
+  const totalPages = 1;
   const filtered = React.useMemo(() => {
     const k = keyword.trim().toLowerCase();
     if (!k) return clubs;
@@ -120,41 +120,50 @@ export default function ClubsPage() {
             </div>
 
             <div className="row g-3">
-              {filtered.map((c, i) => (
-                <div className="col-12 col-md-6 col-lg-4 col-xl-3" key={i}>
-                  <div
-                    className="card h-100 border-0"
-                    style={{
-                      borderRadius: 16,
-                      boxShadow: "0 8px 24px rgba(0,0,0,.08)",
-                    }}
-                  >
-                    <div className="position-relative">
-                      <div className="ratio ratio-16x9">
-                        <img
-                          src={c.image}
-                          alt={c.name}
-                          className="w-100 h-100 object-fit-cover"
-                          style={{
-                            borderTopLeftRadius: 16,
-                            borderTopRightRadius: 16,
-                          }}
-                        />
-                      </div>
-                      <div
-                        className="position-absolute start-50 translate-middle"
-                        style={{ bottom: -24 }}
-                      >
+              {filtered.length === 0 ? (
+                <div className="col-12">
+                  <div className="text-center py-5">
+                    <i className="bi bi-search" style={{ fontSize: "4rem", color: "#9ca3af" }}></i>
+                    <h4 className="mt-3 mb-2" style={{ color: "#6b7280" }}>
+                      Không tìm thấy câu lạc bộ nào
+                    </h4>
+                    <p className="text-secondary">
+                      Không có CLB nào phù hợp với nội dung tìm kiếm "{keyword}"
+                    </p>
+                    <button
+                      className="btn btn-outline-danger mt-2"
+                      onClick={() => setKeyword("")}
+                    >
+                      <i className="bi bi-x-circle me-2"></i>
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                filtered.map((c, i) => (
+                  <div className="col-12 col-md-6 col-lg-4 col-xl-3" key={i}>
+                    <div
+                      className="card h-100 border-0"
+                      style={{
+                        borderRadius: 16,
+                        boxShadow: "0 8px 24px rgba(0,0,0,.08)",
+                      }}
+                    >
+                      <div className="position-relative">
+                        <div className="ratio ratio-16x9">
+                          <img
+                            src={c.image}
+                            alt={c.name}
+                            className="w-100 h-100 object-fit-cover"
+                            style={{
+                              borderTopLeftRadius: 16,
+                              borderTopRightRadius: 16,
+                            }}
+                          />
+                        </div>
                         <div
-                          className="d-flex align-items-center justify-content-center"
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "50%",
-                            background: "#fff",
-                            boxShadow: "0 8px 20px rgba(0,0,0,.12)",
-                            marginTop: -22,
-                          }}
+                          className="position-absolute start-50 translate-middle"
+                          style={{ bottom: -24 }}
                         >
                           <div
                             className="d-flex align-items-center justify-content-center"
@@ -162,36 +171,48 @@ export default function ClubsPage() {
                               width: 40,
                               height: 40,
                               borderRadius: "50%",
-                              background: "#fee2e2",
-                              color: "#fb923c",
+                              background: "#fff",
+                              boxShadow: "0 8px 20px rgba(0,0,0,.12)",
+                              marginTop: -22,
                             }}
                           >
-                            <i className={`bi ${c.icon || "bi-heart-fill"}`} />
+                            <div
+                              className="d-flex align-items-center justify-content-center"
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: "50%",
+                                background: "#fee2e2",
+                                color: "#fb923c",
+                              }}
+                            >
+                              <i className={`bi ${c.icon || "bi-heart-fill"}`} />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div
-                      className="card-body text-center"
-                      style={{ paddingTop: 40 }}
-                    >
                       <div
-                        className="h5 fw-bold mb-1"
-                        style={{ color: "#111827" }}
+                        className="card-body text-center"
+                        style={{ paddingTop: 40 }}
                       >
-                        {c.name}
-                      </div>
-                      <div className="text-secondary mb-3">{c.email}</div>
-                      <div className="d-flex justify-content-center">
-                        {/* <button className="btn btn-danger d-inline-flex align-items-center gap-2 px-4 py-2 rounded-3">
-                          <i className="bi bi-person-plus" />
-                          Tuyển thành viên
-                        </button> */}
+                        <div
+                          className="h5 fw-bold mb-1"
+                          style={{ color: "#111827" }}
+                        >
+                          {c.name}
+                        </div>
+                        <div className="text-secondary mb-3">{c.email}</div>
+                        <div className="d-flex justify-content-center">
+                          {/* <button className="btn btn-danger d-inline-flex align-items-center gap-2 px-4 py-2 rounded-3">
+                            <i className="bi bi-person-plus" />
+                            Tuyển thành viên
+                          </button> */}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="d-flex justify-content-center mt-4">
@@ -225,8 +246,8 @@ export default function ClubsPage() {
                         height: 44,
                         borderRadius: 12,
                         border:
-                          "1px solid " + (n === page ? "#f97316" : "#e5e7eb"),
-                        background: n === page ? "#f97316" : "#fff",
+                          "1px solid " + (n === page ? "#d42323ff" : "#e5e7eb"),
+                        background: n === page ? "#d42323ff" : "#fff",
                         color: n === page ? "#fff" : "#111827",
                         padding: 0,
                       }}

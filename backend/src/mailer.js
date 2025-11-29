@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-catch */
 import { Resend } from 'resend';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_Y76V3Dp2_PNFk4YqpA8UHVYeMJtdsqKou';
