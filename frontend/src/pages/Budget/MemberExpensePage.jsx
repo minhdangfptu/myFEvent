@@ -28,6 +28,8 @@ const MemberExpensePage = () => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [userMemberId, setUserMemberId] = useState(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkInput, setLinkInput] = useState("");
   
   // Column widths state for resizable columns
   const [columnWidths, setColumnWidths] = useState(null);
@@ -296,16 +298,22 @@ const MemberExpensePage = () => {
   };
 
   const handleAddEvidenceLink = () => {
-    const link = prompt("Nhập link bằng chứng:");
-    if (link && link.trim()) {
+    setLinkInput("");
+    setShowLinkModal(true);
+  };
+
+  const handleConfirmAddLink = () => {
+    if (linkInput && linkInput.trim()) {
       setEditFormData(prev => ({
         ...prev,
         evidence: [...(prev.evidence || []), {
           type: 'link',
-          url: link.trim(),
+          url: linkInput.trim(),
           name: `Link ${(prev.evidence || []).length + 1}`
         }]
       }));
+      setShowLinkModal(false);
+      setLinkInput("");
     }
   };
 
@@ -1345,6 +1353,71 @@ const MemberExpensePage = () => {
           </div>
         )}
       </div>
+
+      {/* Add Link Modal */}
+      {showLinkModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          onClick={() => setShowLinkModal(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title" style={{ fontWeight: '600', color: '#111827' }}>
+                  Thêm link bằng chứng
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowLinkModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Nhập link bằng chứng"
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmAddLink();
+                    } else if (e.key === 'Escape') {
+                      setShowLinkModal(false);
+                    }
+                  }}
+                  autoFocus
+                  style={{ borderRadius: '8px' }}
+                />
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowLinkModal(false)}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmAddLink}
+                  disabled={!linkInput.trim()}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Thêm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </UserLayout>
   );
 };

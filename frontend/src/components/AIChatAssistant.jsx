@@ -86,6 +86,9 @@ export default function AIChatAssistant({ eventId, onWBSGenerated, onClose }) {
   const messagesEndRef = useRef(null);
   const titleCacheRef = useRef(new Map()); // sessionId -> title (cache to avoid repeat fetch)
   const [openMenuId, setOpenMenuId] = useState(null); // kebab menu per session
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
+  const [renameSessionId, setRenameSessionId] = useState(null);
   const eventContextRef = useRef('');
 
   const generateTitleFromText = (text) => {
@@ -489,9 +492,15 @@ export default function AIChatAssistant({ eventId, onWBSGenerated, onClose }) {
     const current = titleCacheRef.current.get(key) ||
       (sessions.find((s) => String(s.sessionId || s.session_id || s.id || s._id) === key)?.title) ||
       '';
-    const next = window.prompt('Nhập tên mới cho cuộc trò chuyện', current || '');
-    if (next == null) return;
-    const trimmed = String(next).trim();
+    setRenameSessionId(id);
+    setRenameInput(current || '');
+    setShowRenameModal(true);
+  };
+
+  const handleConfirmRename = () => {
+    if (!renameSessionId) return;
+    const key = String(renameSessionId);
+    const trimmed = String(renameInput).trim();
     if (trimmed.length === 0) return;
     titleCacheRef.current.set(key, trimmed);
     setSessions((prev) =>
@@ -501,6 +510,13 @@ export default function AIChatAssistant({ eventId, onWBSGenerated, onClose }) {
         return { ...s, title: trimmed };
       })
     );
+    // Update in backend
+    chatService.updateSessionTitle(renameSessionId, trimmed).catch((err) => {
+      console.error('Failed to update session title:', err);
+    });
+    setShowRenameModal(false);
+    setRenameInput("");
+    setRenameSessionId(null);
     setOpenMenuId(null);
   };
 
@@ -854,6 +870,71 @@ export default function AIChatAssistant({ eventId, onWBSGenerated, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Rename Session Modal */}
+      {showRenameModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          onClick={() => setShowRenameModal(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title" style={{ fontWeight: '600', color: '#111827' }}>
+                  Đổi tên cuộc trò chuyện
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowRenameModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Nhập tên mới cho cuộc trò chuyện"
+                  value={renameInput}
+                  onChange={(e) => setRenameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmRename();
+                    } else if (e.key === 'Escape') {
+                      setShowRenameModal(false);
+                    }
+                  }}
+                  autoFocus
+                  style={{ borderRadius: '8px' }}
+                />
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowRenameModal(false)}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmRename}
+                  disabled={!renameInput.trim()}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

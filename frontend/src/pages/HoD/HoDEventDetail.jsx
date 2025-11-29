@@ -764,7 +764,7 @@ export default function HoDEventDetail() {
               <div className="join-code-card">
                 <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem" }}>
                   <Link size={20} />
-                  Mã mời tham gia
+                   Mã mời tham gia
                 </h3>
                 <p style={{ marginBottom: "1.5rem", opacity: 0.9 }}>
                   Chia sẻ nhanh mã/mã QR đến các trưởng bộ phận khác. HoD chỉ có quyền xem nên vui lòng liên hệ HoOC khi cần thay đổi.
