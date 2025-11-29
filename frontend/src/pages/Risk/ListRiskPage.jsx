@@ -8,6 +8,7 @@ import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "../../components/Loading";
+import { UmbrellaOff } from "lucide-react";
 
 export default function ListRiskPage() {
   const { t } = useTranslation();
@@ -21,7 +22,8 @@ export default function ListRiskPage() {
   const [filterCategory, setFilterCategory] = useState("Tất cả");
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
   const [eventRole, setEventRole] = useState("");
-  const { fetchEventRole } = useEvents();
+  const [memberInfo, setMemberInfo] = useState({ role: "", departmentId: null });
+  const { fetchEventRole, getEventMember } = useEvents();
 
   // ====== Pagination States ======
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,7 +56,8 @@ export default function ListRiskPage() {
     name: "",
     scope: "department",
     departmentId: "",
-    risk_category: "others",
+    risk_category: "infrastructure",
+    custom_category: "", // For custom category input when "others" is selected
     impact: "medium",
     likelihood: "medium",
     risk_mitigation_plan: "",
@@ -296,12 +299,18 @@ export default function ListRiskPage() {
         setAllRisks(transformedRisks);
       } else {
         console.error("Failed to fetch risks:", response.error);
-        toast.error("Không thể tải danh sách rủi ro");
+        toast.error("Không thể tải danh sách rủi ro. Vui lòng thử lại.", {
+          position: "top-right",
+          autoClose: 4000,
+        });
         setAllRisks([]);
       }
     } catch (error) {
       console.error("Error fetching risks:", error);
-      toast.error("Lỗi khi tải dữ liệu");
+      toast.error("Lỗi khi tải dữ liệu. Vui lòng kiểm tra kết nối.", {
+        position: "top-right",
+        autoClose: 4000,
+      });
       setAllRisks([]);
     } finally {
       setLoading(false);
@@ -319,7 +328,10 @@ export default function ListRiskPage() {
       // Don't auto-select first department - let user choose manually
     } catch (error) {
       console.error("Error fetching departments:", error);
-      toast.error("Lỗi khi tải dữ liệu ban");
+      toast.error("Lỗi khi tải danh sách ban. Vui lòng thử lại.", {
+        position: "top-right",
+        autoClose: 4000,
+      });
       setDepartments([]);
     } finally {
       setLoadingDepartments(false);
@@ -331,17 +343,30 @@ export default function ListRiskPage() {
     const missingFields = [];
     if (!newRisk.name) missingFields.push("tên rủi ro");
     if (!newRisk.risk_mitigation_plan) missingFields.push("kế hoạch giảm thiểu");
-    if (!newRisk.risk_response_plan) missingFields.push("kế hoạch ứng phó");
+    if (!newRisk.risk_response_plan) missingFields.push("Phương án giải quyết");
 
     // Only require departmentId when scope is "department"
     if (newRisk.scope === "department" && !newRisk.departmentId) {
       missingFields.push("ban phụ trách");
     }
 
+    // Require custom category when "others" is selected
+    if (newRisk.risk_category === "others" && !newRisk.custom_category?.trim()) {
+      missingFields.push("danh mục tùy chỉnh");
+    }
+
     if (missingFields.length > 0) {
-      toast.error(`Vui lòng điền đầy đủ thông tin cho: ${missingFields.join(", ")}`);
+      toast.error(`Vui lòng điền đầy đủ thông tin cho: ${missingFields.join(", ")}`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
+
+    // Show loading toast
+    const loadingToast = toast.loading("Đang tạo rủi ro...", {
+      position: "top-right",
+    });
 
     try {
       setSubmitting(true);
@@ -352,19 +377,32 @@ export default function ListRiskPage() {
         delete payload.departmentId;
       }
 
+      // If "others" is selected, use custom_category as risk_category
+      if (payload.risk_category === "others" && payload.custom_category) {
+        payload.risk_category = payload.custom_category.trim();
+      }
+      // Remove custom_category from payload
+      delete payload.custom_category;
+
       const response = await riskApiWithErrorHandling.createRisk(
         eventId,
         payload
       );
 
       if (response.success) {
-        toast.success("Thêm rủi ro thành công!");
+        toast.update(loadingToast, {
+          render: `Đã thêm rủi ro "${newRisk.name}" thành công!`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
         setShowAddModal(false);
         setNewRisk({
           name: "",
           scope: "department",
           departmentId: "",
-          risk_category: "others",
+          risk_category: "infrastructure",
+          custom_category: "",
           impact: "medium",
           likelihood: "medium",
           risk_mitigation_plan: "",
@@ -372,11 +410,21 @@ export default function ListRiskPage() {
         });
         fetchRisks();
       } else {
-        toast.error(response.error || "Không thể tạo rủi ro");
+        toast.update(loadingToast, {
+          render: response.error || "Không thể tạo rủi ro. Vui lòng thử lại.",
+          type: "error",
+          isLoading: false,
+          autoClose: 4000,
+        });
       }
     } catch (error) {
       console.error("Error creating risk:", error);
-      toast.error("Lỗi khi tạo rủi ro");
+      toast.update(loadingToast, {
+        render: "Lỗi khi tạo rủi ro. Vui lòng kiểm tra kết nối và thử lại.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -390,6 +438,10 @@ export default function ListRiskPage() {
   const deleteRisk = async () => {
     if (!riskToDelete) return;
 
+    const loadingToast = toast.loading(`Đang xóa rủi ro "${riskToDelete.name}"...`, {
+      position: "top-right",
+    });
+
     setIsDeleting(true);
     try {
       const response = await riskApiWithErrorHandling.deleteRisk(
@@ -397,16 +449,31 @@ export default function ListRiskPage() {
         riskToDelete.originalData._id
       );
       if (response.success) {
-        toast.success("Xóa rủi ro thành công!");
+        toast.update(loadingToast, {
+          render: `✅ Đã xóa rủi ro "${riskToDelete.name}" thành công!`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
         setShowDeleteModal(false);
         setRiskToDelete(null);
         fetchRisks();
       } else {
-        toast.error(response.error || "Không thể xóa rủi ro");
+        toast.update(loadingToast, {
+          render: response.error || "Không thể xóa rủi ro. Vui lòng thử lại.",
+          type: "error",
+          isLoading: false,
+          autoClose: 4000,
+        });
       }
     } catch (error) {
       console.error("Error deleting risk:", error);
-      toast.error("Lỗi khi xóa rủi ro");
+      toast.update(loadingToast, {
+        render: "Lỗi khi xóa rủi ro. Vui lòng kiểm tra kết nối và thử lại.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -431,6 +498,15 @@ export default function ListRiskPage() {
     if (departments.length === 0) {
       fetchDepartments();
     }
+
+    // Auto-select department for HoD
+    if (memberInfo.role === "HoD" && memberInfo.departmentId) {
+      setNewRisk((prev) => ({
+        ...prev,
+        departmentId: memberInfo.departmentId,
+      }));
+    }
+
     setShowAddModal(true);
   };
 
@@ -440,7 +516,8 @@ export default function ListRiskPage() {
       name: "",
       scope: "department",
       departmentId: "",
-      risk_category: "others",
+      risk_category: "infrastructure",
+      custom_category: "",
       impact: "medium",
       likelihood: "medium",
       risk_mitigation_plan: "",
@@ -474,8 +551,11 @@ export default function ListRiskPage() {
   useEffect(() => {
     fetchEventRole(eventId).then((role) => {
       setEventRole(role);
+      // Also get full member info including departmentId
+      const member = getEventMember(eventId);
+      setMemberInfo(member);
     });
-  }, [eventId, fetchEventRole]);
+  }, [eventId, fetchEventRole, getEventMember]);
 
   // ====== UI Logic ======
 
@@ -988,7 +1068,7 @@ export default function ListRiskPage() {
                 ) : risks.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="text-center py-5 text-muted">
-                      <div style={{ fontSize: 48 }}>🫙</div>
+                      <div style={{ fontSize: 48 }}><UmbrellaOff size="48px"/></div>
                       <div className="mt-2">
                         {pagination.totalCount === 0
                           ? "Chưa có rủi ro nào"
@@ -1213,14 +1293,24 @@ export default function ListRiskPage() {
                       onChange={(e) =>
                         setNewRisk({ ...newRisk, departmentId: e.target.value })
                       }
-                      disabled={loadingDepartments || newRisk.scope === "event"}
+                      disabled={loadingDepartments || newRisk.scope === "event" || (memberInfo.role === "HoD" && memberInfo.departmentId)}
                     >
                       <option value="">{newRisk.scope === "event" ? "Không áp dụng" : "Chọn ban phụ trách"}</option>
-                      {departments.map((dept) => (
-                        <option key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </option>
-                      ))}
+                      {departments
+                        .filter((dept) => {
+                          // HoOC can see all departments
+                          if (memberInfo.role === "HoOC") return true;
+                          // HoD can only see their department
+                          if (memberInfo.role === "HoD" && memberInfo.departmentId) {
+                            return dept._id === memberInfo.departmentId;
+                          }
+                          return true;
+                        })
+                        .map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
                     </select>
                     {loadingDepartments && (
                       <small className="text-muted">
@@ -1247,6 +1337,7 @@ export default function ListRiskPage() {
                         setNewRisk({
                           ...newRisk,
                           risk_category: e.target.value,
+                          custom_category: e.target.value !== "others" ? "" : newRisk.custom_category,
                         })
                       }
                     >
@@ -1258,6 +1349,26 @@ export default function ListRiskPage() {
                     </select>
                   </div>
                 </div>
+                {newRisk.risk_category === "others" && (
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Danh mục tùy chỉnh *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={newRisk.custom_category}
+                        onChange={(e) =>
+                          setNewRisk({
+                            ...newRisk,
+                            custom_category: e.target.value,
+                          })
+                        }
+                        placeholder="Nhập tên danh mục tùy chỉnh..."
+                      />
+                      <small className="text-muted">Ví dụ: Âm thanh, Ánh sáng, An ninh, ...</small>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="row">
@@ -1314,7 +1425,7 @@ export default function ListRiskPage() {
               </div>
 
               <div className="form-group">
-                <label>Kế hoạch ứng phó *</label>
+                <label>Phương án giải quyết *</label>
                 <textarea
                   className="form-control"
                   rows={4}
@@ -1325,7 +1436,7 @@ export default function ListRiskPage() {
                       risk_response_plan: e.target.value,
                     })
                   }
-                  placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
+                  placeholder="Mô tả phương án giải quyết khi rủi ro xảy ra…"
                 />
               </div>
             </div>
