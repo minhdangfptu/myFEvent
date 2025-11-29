@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import { useEvents } from "../../contexts/EventContext";
 import { formatDate } from "../../utils/formatDate";
-import { AlignLeft, Calendar, CalendarCheck, ClipboardList, Copy, FileText, Grid, Info, Link, MapPin, User, Users } from "lucide-react";
+import { AlignLeft, AlertTriangle, Calendar, CalendarCheck, ClipboardList, Copy, FileText, Grid, Info, Link, LogOut, MapPin, User, Users, Zap } from "lucide-react";
 
 
 export default function HoDEventDetail() {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const { fetchEventRole } = useEvents();
   const [activeTab, setActiveTab] = useState("overview");
   const [event, setEvent] = useState(null);
@@ -18,27 +19,53 @@ export default function HoDEventDetail() {
   const [loading, setLoading] = useState(true);
   const [eventRole, setEventRole] = useState("");
   const [error, setError] = useState("");
+  const [departmentId, setDepartmentId] = useState(null);
+  const [showLeaveEventModal, setShowLeaveEventModal] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
   }, [eventId]);
 
-  // Load role for this event to decide sidebar and permissions
+  // Load role and departmentId for this event
   useEffect(() => {
     let mounted = true;
-    const loadRole = async () => {
+    const loadRoleAndDepartment = async () => {
       if (!eventId) {
-        if (mounted) setEventRole("");
+        if (mounted) {
+          setEventRole("");
+          setDepartmentId(null);
+        }
         return;
       }
       try {
         const role = await fetchEventRole(eventId);
         if (mounted) setEventRole(role);
+        
+        // Load departmentId if user is HoD
+        if (role === "HoD") {
+          try {
+            const { userApi } = await import("../../apis/userApi");
+            const roleResponse = await userApi.getUserRoleByEvent(eventId);
+            const deptId = roleResponse?.departmentId || roleResponse?.eventMember?.departmentId;
+            if (mounted && deptId) {
+              // Handle both object and string formats
+              const finalDeptId = typeof deptId === 'object' ? (deptId._id || deptId) : deptId;
+              setDepartmentId(finalDeptId);
+            }
+          } catch (err) {
+            console.warn("Could not load departmentId:", err);
+          }
+        } else {
+          if (mounted) setDepartmentId(null);
+        }
       } catch (_) {
-        if (mounted) setEventRole("");
+        if (mounted) {
+          setEventRole("");
+          setDepartmentId(null);
+        }
       }
     };
-    loadRole();
+    loadRoleAndDepartment();
     return () => {
       mounted = false;
     };
@@ -373,6 +400,35 @@ export default function HoDEventDetail() {
           align-items: center;
           justify-content: center;
         }
+        .action-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .btn-modern {
+          padding: 0.875rem 1rem;
+          border-radius: 12px;
+          font-weight: 600;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+        .btn-outline {
+          background: white;
+          border: 2px solid #e2e8f0;
+          color: #0f172a;
+        }
+        .btn-outline:hover {
+          border-color: #ef4444;
+          color: #ef4444;
+        }
+        .btn-danger-modern {
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          color: white;
+        }
         @media (max-width: 1024px) {
           .content-grid {
             grid-template-columns: 1fr;
@@ -437,11 +493,16 @@ export default function HoDEventDetail() {
             <Grid size={18} />
             Tổng quan
           </button>
+          <button className={`tab-button ${activeTab === "actions" ? "active" : ""}`} onClick={() => setActiveTab("actions")}>
+            <Zap size={18} />
+            Hành động
+          </button>
           <button className={`tab-button ${activeTab === "invite" ? "active" : ""}`} onClick={() => setActiveTab("invite")}>
             <Link size={18} />
             Mã mời
           </button>
         </div>
+
 
         {error && (
           <div className="alert alert-danger" role="alert">
@@ -595,6 +656,103 @@ export default function HoDEventDetail() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "actions" && (
+          <div className="card-modern">
+            <div className="card-header">
+              <div className="card-title">
+                <div className="card-icon">
+                  <Zap size={18} />
+                </div>
+                Trung tâm hành động
+              </div>
+            </div>
+            <div className="action-buttons">
+              <button 
+                className="btn-modern btn-outline" 
+                onClick={() => navigate(`/events/${eventId}/hod-tasks`)}
+              >
+                <ClipboardList size={18} />
+                Xem công việc
+              </button>
+              <button 
+                className="btn-modern btn-outline" 
+                onClick={() => navigate(`/events/${eventId}/my-calendar`)}
+              >
+                <Calendar size={18} />
+                Lịch cá nhân
+              </button>
+              <button 
+                className="btn-modern btn-outline" 
+                onClick={() => navigate(`/events/${eventId}/risks`)}
+              >
+                <AlertTriangle size={18} />
+                Rủi ro sự kiện
+              </button>
+              {eventRole === "HoD" && (
+                <button 
+                  className="btn-modern btn-danger-modern" 
+                  onClick={() => setShowLeaveEventModal(true)}
+                >
+                  <LogOut size={18} />
+                  Rời sự kiện
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showLeaveEventModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 3000,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '90%',
+              maxWidth: '500px',
+              padding: '2rem',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: '#0f172a',
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                Thông báo
+              </div>
+              <div style={{
+                fontSize: '1rem',
+                color: '#64748b',
+                marginBottom: '1.5rem',
+                textAlign: 'center',
+                lineHeight: 1.6
+              }}>
+                Vui lòng chờ Trưởng ban tổ chức bàn giao vị trí trưởng ban của bạn cho người khác
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button
+                  className="btn-modern btn-danger-modern"
+                  onClick={() => setShowLeaveEventModal(false)}
+                  style={{ minWidth: '120px' }}
+                >
+                  Đóng
+                </button>
               </div>
             </div>
           </div>
