@@ -272,7 +272,7 @@ const ViewDeptBudgetDetailHoOC = () => {
     return (
       <UserLayout
         title="Không có quyền truy cập"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="hooc"
         eventId={eventId}
       >
@@ -299,7 +299,7 @@ const ViewDeptBudgetDetailHoOC = () => {
     return (
       <UserLayout
         title="View Dept Budget Detail (HoOC)"
-        activePage="budget"
+        activePage="finance-budget"
         sidebarType="hooc"
         eventId={eventId}
       >
@@ -318,7 +318,7 @@ const ViewDeptBudgetDetailHoOC = () => {
   return (
     <UserLayout
       title="View Dept Budget Detail (HoOC)"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hooc"
       eventId={eventId}
     >

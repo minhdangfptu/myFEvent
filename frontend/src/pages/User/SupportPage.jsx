@@ -1,10 +1,13 @@
 import { useState } from "react"
 import UserLayout from "../../components/UserLayout"
+import ContactPage from "../Public/Contact"
+import { Coins, SquareCheckBig, SquareMousePointer, User, Users } from "lucide-react"
 
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState("faq")
   const [expandedFaqId, setExpandedFaqId] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState("Tổng quan")
+  const [faqSearchTerm, setFaqSearchTerm] = useState("")
 
   const faqCategories = ["Tổng quan", "Tài khoản", "Sự kiện", "Tính năng"]
 
@@ -20,13 +23,13 @@ export default function SupportPage() {
         id: 2,
         question: "Hệ thống có những vai trò nào?",
         answer:
-          "Hệ thống có 4 vai trò chính: HoOC (Trưởng ban tổ chức) - quản lý toàn bộ sự kiện, tạo và phê duyệt mọi hoạt động. HoD (Trưởng ban) - quản lý một ban cụ thể, tạo ngân sách và phân công công việc cho thành viên trong ban. Member (Thành viên) - thực hiện công việc được giao, cập nhật tiến độ và ghi chi tiêu. Admin - quản trị hệ thống, quản lý người dùng và sự kiện tổng thể.",
+          "Hệ thống có 4 vai trò chính: Trưởng ban Tổ chức - quản lý toàn bộ sự kiện, tạo và phê duyệt mọi hoạt động. Trưởng ban - quản lý một ban cụ thể, tạo ngân sách và phân công công việc cho thành viên trong ban. Thành viên - thực hiện công việc được giao, cập nhật tiến độ và ghi chi tiêu. Admin - quản trị hệ thống, quản lý người dùng và sự kiện tổng thể.",
       },
       {
         id: 3,
         question: "Làm sao để bắt đầu sử dụng hệ thống?",
         answer:
-          "Bước 1: Đăng ký tài khoản với email và mật khẩu hoặc sử dụng Google. Bước 2: Xác thực email qua link được gửi đến hộp thư. Bước 3: Chờ HoOC thêm bạn vào sự kiện với vai trò phù hợp. Bước 4: Truy cập trang chủ để xem danh sách sự kiện của bạn. Bước 5: Chọn sự kiện để xem dashboard và bắt đầu làm việc.",
+          "Bước 1: Đăng ký tài khoản với email và mật khẩu hoặc sử dụng Google. Bước 2: Xác thực email qua link được gửi đến hộp thư. Bước 3: Chờ Trưởng ban Tổ chức thêm bạn vào sự kiện với vai trò phù hợp. Bước 4: Truy cập trang chủ để xem danh sách sự kiện của bạn. Bước 5: Chọn sự kiện để xem dashboard và bắt đầu làm việc.",
       },
       {
         id: 4,
@@ -56,7 +59,7 @@ export default function SupportPage() {
         id: 8,
         question: "Tôi có thể tham gia bao nhiêu sự kiện cùng lúc?",
         answer:
-          "Bạn có thể tham gia không giới hạn số lượng sự kiện. Tuy nhiên, trong mỗi sự kiện, bạn chỉ có một vai trò duy nhất (HoOC, HoD hoặc Member). Bạn có thể có vai trò khác nhau ở các sự kiện khác nhau, ví dụ là HoOC ở sự kiện A và Member ở sự kiện B.",
+          "Bạn có thể tham gia không giới hạn số lượng sự kiện. Tuy nhiên, trong mỗi sự kiện, bạn chỉ có một vai trò duy nhất (Trưởng ban Tổ chức, Trưởng ban hoặc Thành viên). Bạn có thể có vai trò khác nhau ở các sự kiện khác nhau, ví dụ là Trưởng ban Tổ chức ở sự kiện A và Thành viên ở sự kiện B.",
       },
     ],
     "Tài khoản": [
@@ -82,7 +85,7 @@ export default function SupportPage() {
         id: 12,
         question: "Tôi quên email đã đăng ký thì làm sao?",
         answer:
-          "Nếu bạn quên email đã đăng ký, hãy liên hệ với HoOC của sự kiện bạn tham gia hoặc Admin hệ thống qua trang 'Liên hệ'. Cung cấp thông tin cá nhân để xác minh danh tính (tên đầy đủ, số điện thoại, tên sự kiện tham gia). Admin sẽ hỗ trợ khôi phục tài khoản của bạn.",
+          "Nếu bạn quên email đã đăng ký, hãy liên hệ với Trưởng ban Tổ chức của sự kiện bạn tham gia hoặc Admin hệ thống qua trang 'Liên hệ'. Cung cấp thông tin cá nhân để xác minh danh tính (tên đầy đủ, số điện thoại, tên sự kiện tham gia). Admin sẽ hỗ trợ khôi phục tài khoản của bạn.",
       },
       {
         id: 13,
@@ -100,7 +103,7 @@ export default function SupportPage() {
         id: 15,
         question: "Làm sao để xóa tài khoản?",
         answer:
-          "Vào 'Cài đặt' > 'Tài khoản' > 'Xóa tài khoản'. Đọc kỹ cảnh báo về việc xóa tài khoản (toàn bộ dữ liệu sẽ bị xóa vĩnh viễn). Nhập mật khẩu để xác nhận. Nhấn 'Xóa vĩnh viễn'. Lưu ý: Bạn không thể xóa tài khoản nếu đang là HoOC của sự kiện đang diễn ra. Cần chuyển quyền HoOC cho người khác trước.",
+          "Vào 'Cài đặt' > 'Tài khoản' > 'Xóa tài khoản'. Đọc kỹ cảnh báo về việc xóa tài khoản (toàn bộ dữ liệu sẽ bị xóa vĩnh viễn). Nhập mật khẩu để xác nhận. Nhấn 'Xóa vĩnh viễn'. Lưu ý: Bạn không thể xóa tài khoản nếu đang là Trưởng ban Tổ chức của sự kiện đang diễn ra. Cần chuyển quyền Trưởng ban Tổ chức cho người khác trước.",
       },
     ],
     "Sự kiện": [
@@ -108,43 +111,43 @@ export default function SupportPage() {
         id: 16,
         question: "Làm sao để tạo sự kiện mới?",
         answer:
-          "Chỉ người dùng có vai trò User (đã xác thực email) mới có thể tạo sự kiện và trở thành HoOC. Tại trang chủ, nhấn nút 'Tạo sự kiện mới'. Điền thông tin: Tên sự kiện, mô tả, thời gian bắt đầu/kết thúc, địa điểm, loại sự kiện, số lượng người tham gia dự kiến. Upload ảnh bìa (tùy chọn). Nhấn 'Tạo sự kiện'. Sau khi tạo, bạn tự động trở thành HoOC của sự kiện đó.",
+          "Chỉ người dùng có vai trò User (đã xác thực email) mới có thể tạo sự kiện và trở thành Trưởng ban Tổ chức. Tại trang chủ, nhấn nút 'Tạo sự kiện mới'. Điền thông tin: Tên sự kiện, mô tả, thời gian bắt đầu/kết thúc, địa điểm, loại sự kiện, số lượng người tham gia dự kiến. Upload ảnh bìa (tùy chọn). Nhấn 'Tạo sự kiện'. Sau khi tạo, bạn tự động trở thành Trưởng ban Tổ chức của sự kiện đó.",
       },
       {
         id: 17,
         question: "Làm sao để chỉnh sửa thông tin sự kiện?",
         answer:
-          "Chỉ HoOC mới có quyền chỉnh sửa. Vào 'Tổng quan' > 'Chi tiết sự kiện'. Nhấn nút 'Chỉnh sửa' ở góc trên. Cập nhật các thông tin cần thiết. Nhấn 'Lưu thay đổi'. Lưu ý: Không thể thay đổi thời gian bắt đầu nếu sự kiện đã diễn ra.",
+          "Chỉ Trưởng ban Tổ chức mới có quyền chỉnh sửa. Vào 'Tổng quan' > 'Chi tiết sự kiện'. Nhấn nút 'Chỉnh sửa' ở góc trên. Cập nhật các thông tin cần thiết. Nhấn 'Lưu thay đổi'. Lưu ý: Không thể thay đổi thời gian bắt đầu nếu sự kiện đã diễn ra.",
       },
       {
         id: 18,
         question: "Làm sao để theo dõi tiến độ sự kiện?",
         answer:
-          "Vào mục 'Tổng quan' > 'Dashboard tổng'. HoOC và HoD sẽ thấy biểu đồ tổng quan: Tiến độ công việc (phần trăm hoàn thành), ngân sách (dự kiến vs thực tế), số lượng rủi ro theo mức độ nghiêm trọng, timeline các milestone. Member chỉ thấy dashboard của công việc mình tham gia. Dữ liệu được cập nhật real-time.",
+          "Vào mục 'Tổng quan' > 'Dashboard tổng'. Trưởng ban Tổ chức và Trưởng ban sẽ thấy biểu đồ tổng quan: Tiến độ công việc (phần trăm hoàn thành), ngân sách (dự kiến vs thực tế), số lượng rủi ro theo mức độ nghiêm trọng, timeline các milestone. Thành viên chỉ thấy dashboard của công việc mình tham gia. Dữ liệu được cập nhật real-time.",
       },
       {
         id: 19,
         question: "Milestone là gì và cách sử dụng?",
         answer:
-          "Milestone (Cột mốc) là các mốc thời gian quan trọng trong sự kiện, ví dụ: deadline nộp proposal, ngày khai mạc, deadline hoàn thành tài liệu, v.v. HoOC tạo milestone tại 'Tổng quan' > 'Timeline sự kiện'. Nhấn 'Thêm milestone', điền tên, mô tả, ngày đến hạn, mức độ quan trọng. Milestone sẽ hiển thị trên timeline và lịch sự kiện. Hệ thống sẽ gửi thông báo nhắc nhở trước khi đến hạn.",
+          "Milestone (Cột mốc) là các mốc thời gian quan trọng trong sự kiện, ví dụ: deadline nộp proposal, ngày khai mạc, deadline hoàn thành tài liệu, v.v. Trưởng ban Tổ chức tạo milestone tại 'Tổng quan' > 'Timeline sự kiện'. Nhấn 'Thêm milestone', điền tên, mô tả, ngày đến hạn, mức độ quan trọng. Milestone sẽ hiển thị trên timeline và lịch sự kiện. Hệ thống sẽ gửi thông báo nhắc nhở trước khi đến hạn.",
       },
       {
         id: 20,
         question: "Làm sao để quản lý ban sự kiện?",
         answer:
-          "HoOC vào 'Ban sự kiện' để tạo và quản lý các ban. Nhấn 'Tạo ban mới', điền tên ban, mô tả, chọn HoD (Trưởng ban) từ danh sách thành viên. Sau khi tạo, HoD có thể thêm thành viên vào ban của mình. Mỗi ban có thể có nhiều thành viên nhưng chỉ 1 HoD. HoOC có thể xem tất cả các ban và thay đổi HoD nếu cần.",
+          "Trưởng ban Tổ chức vào 'Ban sự kiện' để tạo và quản lý các ban. Nhấn 'Tạo ban mới', điền tên ban, mô tả, chọn Trưởng ban từ danh sách thành viên. Sau khi tạo, Trưởng ban có thể thêm thành viên vào ban của mình. Mỗi ban có thể có nhiều thành viên nhưng chỉ 1 Trưởng ban. Trưởng ban Tổ chức có thể xem tất cả các ban và thay đổi Trưởng ban nếu cần.",
       },
       {
         id: 21,
         question: "Làm sao để thêm thành viên vào sự kiện?",
         answer:
-          "HoOC vào 'Thành viên' > 'Thêm thành viên mới'. Nhập email người muốn mời hoặc chọn từ danh sách người dùng hệ thống. Chọn vai trò (HoOC, HoD, hoặc Member). Nếu email chưa có trong hệ thống, họ sẽ nhận email mời đăng ký. Sau khi chấp nhận, họ sẽ xuất hiện trong danh sách thành viên sự kiện.",
+          "Trưởng ban Tổ chức vào 'Thành viên' > 'Thêm thành viên mới'. Nhập email người muốn mời hoặc chọn từ danh sách người dùng hệ thống. Chọn vai trò (Trưởng ban Tổ chức, Trưởng ban, hoặc Thành viên). Nếu email chưa có trong hệ thống, họ sẽ nhận email mời đăng ký. Sau khi chấp nhận, họ sẽ xuất hiện trong danh sách thành viên sự kiện.",
       },
       {
         id: 22,
         question: "Làm sao để xóa hoặc tạm dừng sự kiện?",
         answer:
-          "Chỉ HoOC mới có quyền. Vào 'Tổng quan' > 'Chi tiết sự kiện' > 'Cài đặt nâng cao'. Để tạm dừng: Chọn 'Đặt trạng thái tạm dừng'. Sự kiện sẽ ẩn khỏi trang chủ của thành viên nhưng dữ liệu vẫn được giữ. Để xóa: Chọn 'Xóa sự kiện', xác nhận bằng mật khẩu. Cảnh báo: Xóa sự kiện sẽ xóa vĩnh viễn toàn bộ dữ liệu liên quan. Nên xuất dữ liệu trước khi xóa.",
+          "Chỉ Trưởng ban Tổ chức mới có quyền. Vào 'Tổng quan' > 'Chi tiết sự kiện' > 'Cài đặt nâng cao'. Để tạm dừng: Chọn 'Đặt trạng thái tạm dừng'. Sự kiện sẽ ẩn khỏi trang chủ của thành viên nhưng dữ liệu vẫn được giữ. Để xóa: Chọn 'Xóa sự kiện', xác nhận bằng mật khẩu. Cảnh báo: Xóa sự kiện sẽ xóa vĩnh viễn toàn bộ dữ liệu liên quan. Nên xuất dữ liệu trước khi xóa.",
       },
       {
         id: 23,
@@ -158,37 +161,37 @@ export default function SupportPage() {
         id: 24,
         question: "Làm sao để tạo và giao công việc?",
         answer:
-          "HoOC và HoD vào 'Công việc' > 'Tạo công việc mới'. Điền: Tên công việc, mô tả chi tiết, thời gian bắt đầu/kết thúc, mức độ ưu tiên (Thấp/Trung bình/Cao), gán cho thành viên (có thể gán nhiều người), đính kèm file nếu cần. Chọn trạng thái ban đầu (thường là To-do). Nhấn 'Tạo'. Người được gán sẽ nhận thông báo ngay lập tức.",
+          "Trưởng ban Tổ chức và Trưởng ban vào 'Công việc' > 'Tạo công việc mới'. Điền: Tên công việc, mô tả chi tiết, thời gian bắt đầu/kết thúc, mức độ ưu tiên (Thấp/Trung bình/Cao), gán cho thành viên (có thể gán nhiều người), đính kèm file nếu cần. Chọn trạng thái ban đầu (thường là To-do). Nhấn 'Tạo'. Người được gán sẽ nhận thông báo ngay lập tức.",
       },
       {
         id: 25,
         question: "Làm sao để theo dõi tiến độ công việc?",
         answer:
-          "Vào 'Công việc' để xem danh sách. Chế độ xem Kanban: Công việc được chia theo cột To-do, In Progress, Done. Kéo thả để đổi trạng thái. Chế độ Gantt: Xem timeline công việc trên biểu đồ, phát hiện xung đột thời gian và phụ thuộc. Chế độ Danh sách: Lọc theo người thực hiện, trạng thái, ưu tiên. HoOC và HoD xem thống kê tiến độ tại 'Công việc' > 'Thống kê tiến độ'.",
+          "Vào 'Công việc' để xem danh sách. Chế độ xem Kanban: Công việc được chia theo cột To-do, In Progress, Done. Kéo thả để đổi trạng thái. Chế độ Gantt: Xem timeline công việc trên biểu đồ, phát hiện xung đột thời gian và phụ thuộc. Chế độ Danh sách: Lọc theo người thực hiện, trạng thái, ưu tiên. Trưởng ban Tổ chức và Trưởng ban xem thống kê tiến độ tại 'Công việc' > 'Thống kê tiến độ'.",
       },
       {
         id: 26,
-        question: "Member cập nhật tiến độ công việc như thế nào?",
+        question: "Thành viên cập nhật tiến độ công việc như thế nào?",
         answer:
-          "Member vào 'Công việc' > chọn công việc của mình. Nhấn 'Cập nhật tiến độ'. Đổi trạng thái (To-do → In Progress → Done). Thêm comment báo cáo tiến độ hoặc vấn đề gặp phải. Upload file kết quả (nếu có). Nhấn 'Lưu'. HoD và HoOC sẽ nhận thông báo về cập nhật này.",
+          "Thành viên vào 'Công việc' > chọn công việc của mình. Nhấn 'Cập nhật tiến độ'. Đổi trạng thái (To-do → In Progress → Done). Thêm comment báo cáo tiến độ hoặc vấn đề gặp phải. Upload file kết quả (nếu có). Nhấn 'Lưu'. Trưởng ban và Trưởng ban Tổ chức sẽ nhận thông báo về cập nhật này.",
       },
       {
         id: 27,
         question: "Làm sao để tạo ngân sách cho ban?",
         answer:
-          "HoD vào 'Tài chính' > 'Ngân sách' > 'Tạo ngân sách mới'. Nhập tổng ngân sách dự kiến cho ban. Thêm các hạng mục chi tiêu: Tên hạng mục (vd: Trang trí, Ăn uống), số tiền dự kiến, mô tả. Đính kèm tài liệu dự toán (nếu có). Nhấn 'Gửi phê duyệt'. HoOC sẽ nhận thông báo và xem xét phê duyệt ngân sách.",
+          "Trưởng ban vào 'Tài chính' > 'Ngân sách' > 'Tạo ngân sách mới'. Nhập tổng ngân sách dự kiến cho ban. Thêm các hạng mục chi tiêu: Tên hạng mục (vd: Trang trí, Ăn uống), số tiền dự kiến, mô tả. Đính kèm tài liệu dự toán (nếu có). Nhấn 'Gửi phê duyệt'. Trưởng ban Tổ chức sẽ nhận thông báo và xem xét phê duyệt ngân sách.",
       },
       {
         id: 28,
         question: "Làm sao để ghi chi tiêu và quản lý hóa đơn?",
         answer:
-          "Member vào 'Tài chính' > 'Chi tiêu' > 'Thêm chi tiêu'. Chọn hạng mục chi, nhập số tiền, ngày chi, mô tả. Upload ảnh hóa đơn/biên lai (bắt buộc nếu >200k). Nhấn 'Lưu'. HoD sẽ xem xét và phê duyệt. Sau khi phê duyệt, số tiền sẽ được trừ vào ngân sách thực tế. Member có thể xem lịch sử chi tiêu của mình tại 'Tài chính' > 'Lịch sử chi tiêu'.",
+          "Thành viên vào 'Tài chính' > 'Chi tiêu' > 'Thêm chi tiêu'. Chọn hạng mục chi, nhập số tiền, ngày chi, mô tả. Upload ảnh hóa đơn/biên lai (bắt buộc nếu >200k). Nhấn 'Lưu'. Trưởng ban sẽ xem xét và phê duyệt. Sau khi phê duyệt, số tiền sẽ được trừ vào ngân sách thực tế. Thành viên có thể xem lịch sử chi tiêu của mình tại 'Tài chính' > 'Lịch sử chi tiêu'.",
       },
       {
         id: 29,
         question: "Làm sao để theo dõi và phân tích ngân sách?",
         answer:
-          "HoOC và HoD vào 'Tài chính' > 'Thống kê thu chi'. Xem biểu đồ so sánh ngân sách dự kiến vs thực tế theo từng ban. Xem chi tiết từng hạng mục đã chi bao nhiêu. Phát hiện các hạng mục vượt ngân sách (màu đỏ cảnh báo). Xuất báo cáo chi tiết dưới dạng Excel để trình sponsor hoặc lãnh đạo.",
+          "Trưởng ban Tổ chức và Trưởng ban vào 'Tài chính' > 'Thống kê thu chi'. Xem biểu đồ so sánh ngân sách dự kiến vs thực tế theo từng ban. Xem chi tiết từng hạng mục đã chi bao nhiêu. Phát hiện các hạng mục vượt ngân sách (màu đỏ cảnh báo). Xuất báo cáo chi tiết dưới dạng Excel để trình sponsor hoặc lãnh đạo.",
       },
       {
         id: 30,
@@ -218,13 +221,13 @@ export default function SupportPage() {
         id: 34,
         question: "Làm sao để tạo và gửi feedback cho thành viên?",
         answer:
-          "Chỉ khả dụng sau khi sự kiện kết thúc. HoOC vào 'Feedback' > 'Tạo form feedback'. Thiết kế form với các câu hỏi: Đánh giá, lựa chọn, văn bản tự do. Chọn đối tượng nhận (toàn bộ hoặc theo ban). Nhấn 'Gửi feedback'. Member nhận thông báo và điền feedback. HoOC xem kết quả tại 'Feedback' > 'Thống kê phản hồi'.",
+          "Chỉ khả dụng sau khi sự kiện kết thúc. Trưởng ban Tổ chức vào 'Feedback' > 'Tạo form feedback'. Thiết kế form với các câu hỏi: Đánh giá, lựa chọn, văn bản tự do. Chọn đối tượng nhận (toàn bộ hoặc theo ban). Nhấn 'Gửi feedback'. Thành viên nhận thông báo và điền feedback. Trưởng ban Tổ chức xem kết quả tại 'Feedback' > 'Thống kê phản hồi'.",
       },
       {
         id: 35,
         question: "Làm sao để xuất dữ liệu sự kiện?",
         answer:
-          "HoOC vào 'Tải xuống' > 'Dữ liệu sự kiện'. Chọn các mục cần xuất: Danh sách thành viên, công việc, ngân sách, rủi ro, timeline, feedback. Chọn định dạng: Excel (tất cả sheet trong 1 file) hoặc PDF (báo cáo tổng hợp). Nhấn 'Xuất'. File sẽ được tạo và tự động tải về. Thời gian xuất phụ thuộc vào lượng dữ liệu (thường 10-30 giây).",
+          "Trưởng ban Tổ chức vào 'Tải xuống' > 'Dữ liệu sự kiện'. Chọn các mục cần xuất: Danh sách thành viên, công việc, ngân sách, rủi ro, timeline, feedback. Chọn định dạng: Excel (tất cả sheet trong 1 file) hoặc PDF (báo cáo tổng hợp). Nhấn 'Xuất'. File sẽ được tạo và tự động tải về. Thời gian xuất phụ thuộc vào lượng dữ liệu (thường 10-30 giây).",
       },
       {
         id: 36,
@@ -249,49 +252,56 @@ export default function SupportPage() {
 
   const documents = [
     {
-      icon: "📘",
+      icon: <SquareMousePointer color="red" />,
       title: "Hướng dẫn sử dụng tổng quan",
       filename: "huong-dan-tong-quan.pdf",
     },
     {
-      icon: "👤",
-      title: "Hướng dẫn cho HoOC",
+      icon: <User color="red" />,
+      title: "Hướng dẫn cho Trưởng ban Tổ chức",
       filename: "huong-dan-hooc.pdf",
     },
     {
-      icon: "👥",
-      title: "Hướng dẫn cho HoD",
+      icon: <User color="red" />,
+      title: "Hướng dẫn cho Trưởng ban",
       filename: "huong-dan-hod.pdf",
     },
     {
-      icon: "🙋",
-      title: "Hướng dẫn cho Member",
+      icon: <User color="red" />,
+      title: "Hướng dẫn cho Thành viên",
       filename: "huong-dan-member.pdf",
     },
     {
-      icon: "⚙️",
+      icon: <SquareCheckBig color="red" />,
       title: "Hướng dẫn quản lý công việc",
       filename: "huong-dan-cong-viec.pdf",
     },
     {
-      icon: "💰",
+      icon: <Coins color="red" />,
       title: "Hướng dẫn quản lý ngân sách",
       filename: "huong-dan-ngan-sach.pdf",
     },
   ]
 
-  const filteredFaqs = faqData[selectedCategory] || []
+  // Lọc theo category + từ khóa (tìm trong cả câu hỏi & câu trả lời)
+  const filteredFaqs = (faqData[selectedCategory] || []).filter((faq) => {
+    if (!faqSearchTerm.trim()) return true
+    const term = faqSearchTerm.toLowerCase()
+    return (
+      faq.question.toLowerCase().includes(term) ||
+      faq.answer.toLowerCase().includes(term)
+    )
+  })
 
   return (
     <UserLayout title="Trung tâm hỗ trợ" activePage="support" sidebarType="user">
       <div className="support-page">
         {/* Header */}
         <div className="support-page__header mb-4">
-
           {/* Tab Navigation */}
           <div className="support-page__tabs d-flex gap-3 border-bottom" style={{ borderColor: '#e5e7eb' }}>
             <button
-              className={`support-page__tab-button btn btn-link text-decoration-none fw-semibold pb-3`}
+              className="support-page__tab-button btn btn-link text-decoration-none fw-semibold pb-3"
               style={{
                 borderRadius: '0',
                 color: activeTab === "faq" ? "#1f2937" : "#6b7280",
@@ -304,8 +314,9 @@ export default function SupportPage() {
             >
               Câu hỏi thường gặp
             </button>
+
             <button
-              className={`support-page__tab-button btn btn-link text-decoration-none fw-semibold pb-3`}
+              className="support-page__tab-button btn btn-link text-decoration-none fw-semibold pb-3"
               style={{
                 color: activeTab === "documents" ? "#1f2937" : "#6b7280",
                 borderBottom: activeTab === "documents" ? "3px solid #dc2626" : "3px solid transparent",
@@ -317,6 +328,21 @@ export default function SupportPage() {
               onClick={() => setActiveTab("documents")}
             >
               Tài liệu
+            </button>
+
+            <button
+              className="support-page__tab-button btn btn-link text-decoration-none fw-semibold pb-3"
+              style={{
+                color: activeTab === "contact" ? "#1f2937" : "#6b7280",
+                borderBottom: activeTab === "contact" ? "3px solid #dc2626" : "3px solid transparent",
+                fontSize: '15px',
+                borderRadius: '0',
+                outline: 'none',
+                boxShadow: 'none'
+              }}
+              onClick={() => setActiveTab("contact")}
+            >
+              Liên hệ
             </button>
           </div>
         </div>
@@ -330,7 +356,7 @@ export default function SupportPage() {
                 {faqCategories.map((category) => (
                   <button
                     key={category}
-                    className={`support-page__category-button btn fw-semibold`}
+                    className="support-page__category-button btn fw-semibold"
                     style={{
                       backgroundColor: selectedCategory === category ? "#dc2626" : "#ffffff",
                       color: selectedCategory === category ? "#ffffff" : "#374151",
@@ -342,17 +368,69 @@ export default function SupportPage() {
                       outline: 'none',
                       boxShadow: 'none'
                     }}
-                    onClick={() => setSelectedCategory(category)}
+                    onClick={() => {
+                      setSelectedCategory(category)
+                      setFaqSearchTerm("")
+                      setExpandedFaqId(null)
+                    }}
                   >
                     {category}
                   </button>
                 ))}
+              </div>
+
+              {/* Thanh tìm kiếm FAQ dưới các category button */}
+              <div className="mt-3">
+                <div className="position-relative">
+                  <i
+                    className="bi bi-search position-absolute"
+                    style={{
+                      left: 12,
+                      top: 10,
+                      color: "#9CA3AF",
+                      pointerEvents: "none"
+                    }}
+                  />
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Tìm theo câu hỏi hoặc nội dung..."
+                    value={faqSearchTerm}
+                    onChange={(e) => {
+                      setFaqSearchTerm(e.target.value)
+                      setExpandedFaqId(null)
+                    }}
+                    style={{
+                      paddingLeft: 36,
+                      borderRadius: 8,
+                      fontSize: 14,
+                      borderColor: "#d1d5db",
+                      height: 40
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* FAQ Items */}
             <div className="col-lg-9">
               <div className="support-page__faq-list">
+                {filteredFaqs.length === 0 && (
+                  <div
+                    className="mb-3"
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 8,
+                      backgroundColor: "#f9fafb",
+                      border: "1px dashed #e5e7eb",
+                      color: "#6b7280",
+                      fontSize: 14,
+                    }}
+                  >
+                    Không tìm thấy câu hỏi nào phù hợp với từ khóa.
+                  </div>
+                )}
+
                 {filteredFaqs.map((faq) => (
                   <div
                     key={faq.id}
@@ -511,6 +589,13 @@ export default function SupportPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Contact Tab */}
+        {activeTab === "contact" && (
+          <div className="support-page__contact-tab">
+            <ContactPage hideLayout />
           </div>
         )}
       </div>

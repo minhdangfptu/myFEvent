@@ -47,7 +47,7 @@ const DepartmentBudgetEmpty = () => {
   return (
     <UserLayout
       title="View Department Budget / Empty"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hod"
       eventId={eventId}
     >

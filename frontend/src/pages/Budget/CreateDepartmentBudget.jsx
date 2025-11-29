@@ -659,7 +659,7 @@ const CreateDepartmentBudget = () => {
   return (
     <UserLayout
       title="Tạo ngân sách"
-      activePage="budget"
+      activePage="finance-budget"
       sidebarType="hod"
       eventId={eventId}
     >

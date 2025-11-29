@@ -591,7 +591,7 @@ export default function GanttChartTaskPage() {
     return (
       <UserLayout
         title={t("taskPage.title") || "Gantt Chart"}
-        activePage="work-board"
+        activePage="work-gantt"
         sidebarType={getSidebarType()}
         eventId={eventId}
       >

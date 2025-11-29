@@ -8,13 +8,15 @@ import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "../../components/Loading";
+import { CircleCheckBig } from "lucide-react";
 
 export default function RiskDetailPage() {
   const { t } = useTranslation();
   const { eventId, riskId } = useParams();
   const navigate = useNavigate();
   const [eventRole, setEventRole] = useState("");
-  const { fetchEventRole } = useEvents();
+  const [memberInfo, setMemberInfo] = useState({ role: "", departmentId: null });
+  const { fetchEventRole, getEventMember } = useEvents();
 
   // ====== API States ======
   const [risk, setRisk] = useState(null);
@@ -236,7 +238,7 @@ export default function RiskDetailPage() {
       errors.risk_mitigation_plan = "Kế hoạch giảm thiểu không được để trống";
     }
     if (!editForm.risk_response_plan?.trim()) {
-      errors.risk_response_plan = "Kế hoạch ứng phó không được để trống";
+      errors.risk_response_plan = "Phương án giải quyết không được để trống";
     }
 
     setEditErrors(errors);
@@ -489,8 +491,13 @@ export default function RiskDetailPage() {
   }, [eventId, riskId, fetchRisk]);
 
   useEffect(() => {
-    fetchEventRole(eventId).then(setEventRole);
-  }, [eventId, fetchEventRole]);
+    fetchEventRole(eventId).then((role) => {
+      setEventRole(role);
+      // Also get full member info including departmentId
+      const member = getEventMember(eventId);
+      setMemberInfo(member);
+    });
+  }, [eventId, fetchEventRole, getEventMember]);
 
   // ====== UI Logic ======
   const getStatusStyle = (status) => {
@@ -509,9 +516,38 @@ export default function RiskDetailPage() {
   };
 
   // ====== Permission Checks ======
-  const canEdit = () => eventRole === "HoOC" || eventRole === "HoD";
-  const canDelete = () => eventRole === "HoOC" || eventRole === "HoD";
-  const canManageOccurred = () => eventRole === "HoOC" || eventRole === "HoD";
+  const canEdit = () => {
+    if (eventRole === "HoOC") return true;
+    if (eventRole === "HoD" && memberInfo.departmentId && risk) {
+      // HoD can edit event-level risks or risks from their department
+      if (risk.scope === "event") return true;
+      if (risk.ownerId === memberInfo.departmentId) return true;
+      return false;
+    }
+    return false;
+  };
+
+  const canDelete = () => {
+    if (eventRole === "HoOC") return true;
+    if (eventRole === "HoD" && memberInfo.departmentId && risk) {
+      // HoD can delete event-level risks or risks from their department
+      if (risk.scope === "event") return true;
+      if (risk.ownerId === memberInfo.departmentId) return true;
+      return false;
+    }
+    return false;
+  };
+
+  const canManageOccurred = () => {
+    if (eventRole === "HoOC") return true;
+    if (eventRole === "HoD" && memberInfo.departmentId && risk) {
+      // HoD can manage occurred risks for event-level risks or risks from their department
+      if (risk.scope === "event") return true;
+      if (risk.ownerId === memberInfo.departmentId) return true;
+      return false;
+    }
+    return false;
+  };
 
   if (loading) {
     return (
@@ -844,7 +880,7 @@ export default function RiskDetailPage() {
                   </div>
                 </div>
 
-                {/* Row 4: Kế hoạch giảm thiểu & Kế hoạch ứng phó */}
+                {/* Row 4: Kế hoạch giảm thiểu & Phương án giải quyết */}
                 <div className="row">
                   <div className="col-md-6">
                     <div className="form-group">
@@ -861,13 +897,13 @@ export default function RiskDetailPage() {
                   </div>
                   <div className="col-md-6">
                     <div className="form-group">
-                      <label>Kế hoạch ứng phó *</label>
+                      <label>Phương án giải quyết *</label>
                       <textarea
                         className={`form-control ${editErrors.risk_response_plan ? 'is-invalid' : ''}`}
                         rows={4}
                         value={editForm.risk_response_plan || ""}
                         onChange={(e) => setEditForm(prev => ({ ...prev, risk_response_plan: e.target.value }))}
-                        placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
+                        placeholder="Mô tả Phương án giải quyết khi rủi ro xảy ra…"
                       />
                       {editErrors.risk_response_plan && <div className="invalid-feedback">{editErrors.risk_response_plan}</div>}
                     </div>
@@ -918,7 +954,7 @@ export default function RiskDetailPage() {
                   </div>
                   <div className="col-md-6">
                     <div className="form-group">
-                      <label>Kế hoạch ứng phó</label>
+                      <label>Phương án giải quyết</label>
                       <div className="info-box">{risk.mitigation || "Chưa có kế hoạch"}</div>
                     </div>
                   </div>
@@ -983,7 +1019,7 @@ export default function RiskDetailPage() {
                         Đang lưu...
                       </>
                     ) : (
-                      "💾 Lưu thay đổi"
+                      "Lưu thay đổi"
                     )}
                   </button>
                 </>
@@ -1207,7 +1243,7 @@ export default function RiskDetailPage() {
         {!risk.hasOccurred && (
           <div className="detail-card">
             <div className="p-4 text-center">
-              <div style={{ fontSize: 48 }}>✅</div>
+              <div style={{ fontSize: 48 }}><CircleCheckBig size="48px" color="#16a34a" /></div>
               <h5 className="mt-3 mb-2">Chưa có sự cố nào xảy ra</h5>
               <p className="text-muted mb-3">Rủi ro này chưa từng xảy ra trong thực tế</p>
               {canManageOccurred() && (

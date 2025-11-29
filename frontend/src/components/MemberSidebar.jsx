@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
 import { APP_VERSION } from "~/config";
-import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu } from "lucide-react";
+import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu, MessageSquareText, Home } from "lucide-react";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -176,7 +176,7 @@ export default function MemberSidebar({
       style={{
         width: sidebarOpen ? "230px" : "70px",
         height: "100vh",
-        transition: "width 0.3s ease",
+        transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         position: "fixed",
         left: 0,
         top: 0,
@@ -189,11 +189,30 @@ export default function MemberSidebar({
     >
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
-        .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
+        .group-title {
+          font-size:.75rem;
+          font-weight:600;
+          letter-spacing:.05em;
+          color:#374151;
+          margin:16px 0 8px;
+          text-transform:uppercase;
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .group-title {
+          opacity: 0;
+        }
         .btn-nav{ border:0;background:transparent;color:#374151;border-radius:8px;padding:10px 12px;text-align:left;
           transition:all .2s ease;width:100%;display:flex;align-items:center;justify-content:space-between;}
         .btn-nav:hover{ background:#e9ecef; }
         .btn-nav.active{ background:#e9ecef;color:#111827; }
+        .btn-nav span {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .btn-nav span {
+          opacity: 0;
+        }
         .menu-item-hover:hover .btn-nav{ background:#e9ecef; }
         .btn-submenu{ border:0;background:transparent;color:#6b7280;border-radius:6px;padding:8px 12px 8px 24px;
           text-align:left;transition:all .2s ease;width:100%;font-size:.9rem;}
@@ -203,6 +222,39 @@ export default function MemberSidebar({
         .theme-option{ flex:1;padding:8px 12px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;
           align-items:center;justify-content:center;gap:6px;font-size:.85rem;color:#6b7280;transition:all .2s;}
         .theme-option.active{ background:#fff;color:#374151;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+        .menu-button {
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #030303;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .menu-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .menu-button:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          transform: scale(0.95);
+        }
+        .menu-button svg {
+          transition: transform 0.2s ease;
+        }
+
+        .fade-content {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .fade-content {
+          opacity: 0;
+          pointer-events: none;
+        }
 
         .hover-submenu{
           position: absolute;
@@ -239,30 +291,44 @@ export default function MemberSidebar({
       {/* Header */}
       <div className="p-3 pb-0" style={{ flexShrink: 0 }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <div
-            className="logo-container"
-            style={{cursor: "pointer"}}
-          >
-            <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img  onClick={() => setSidebarOpen(!sidebarOpen)} className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+          {sidebarOpen ? (
+            <>
+              <div
+                className="logo-container"
+                style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
+              >
+                <img
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
+                <img
+                  className="fade-content"
+                  onClick={() => navigate("/home-page")}
+                  src="/logo-03.png"
+                  alt="myFEvent"
+                  style={{ width: "auto", height: 40 }}
+                />
               </div>
-              {sidebarOpen &&  <img
-              onClick={() => navigate("/home-page")}
-              src="/logo-03.png"
-              alt="myFEvent"
-              style={{ width: "auto", height: 40 }}
-            />}
-            </div>
-          </div>
 
-          {sidebarOpen && (
+              <button
+                className="menu-button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Đóng sidebar"
+              >
+                <Menu size={20} />
+              </button>
+            </>
+          ) : (
             <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setSidebarOpen(false)}
-              style={{ padding: "4px 8px" }}
+              className="menu-button"
+              onClick={() => setSidebarOpen(true)}
+              style={{ width: "100%" }}
+              aria-label="Mở sidebar"
             >
-              <ArrowLeft size={16} />
+              <Menu size={20} />
             </button>
           )}
         </div>
@@ -335,7 +401,7 @@ export default function MemberSidebar({
               title="Trang chủ"
             >
               <div className="d-flex align-items-center">
-                <List size={20} className="me-3" />
+                <Home className="me-3" size={18} style={{ width: 20 }} />
                 {sidebarOpen && <span>Trang chủ</span>}
               </div>
             </button>
@@ -424,7 +490,7 @@ export default function MemberSidebar({
             {/* Ban sự kiện */}
             <button
               className={`btn-nav ${
-                activePage === "event-board" ? "active" : ""
+                activePage === "department-management" ? "active" : ""
               }`}
               onClick={() => navigate(`/events/${eventId || ''}/departments`)}
               title="Ban của bạn"
@@ -470,8 +536,8 @@ export default function MemberSidebar({
                 title="Phản hồi sự kiện"
               >
                 <div className="d-flex align-items-center">
-                  <HelpCircle size={20} className="me-3" />
-                  {sidebarOpen && <span>Feedback</span>}
+                  <MessageSquareText size={20} className="me-3" />
+                  {sidebarOpen && <span>Phản hồi</span>}
                 </div>
               </button>
             )}
@@ -732,7 +798,7 @@ export default function MemberSidebar({
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div style={{ paddingBottom: 10, margin: 0 }}>
+          <div style={{ margin: 0 }}>
             {/* Theme toggle - Commented out
             <div className="theme-toggle">
               <button
@@ -754,6 +820,7 @@ export default function MemberSidebar({
 
             {/* App Version + Dev info + Logo Bộ Công Thương */}
             <div
+              className="fade-content"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -795,15 +862,15 @@ export default function MemberSidebar({
             </div>
           </div>
         ) : (
-          <button
-            className="btn btn-ghost btn-sm w-100"
-            onClick={() => setSidebarOpen(true)}
-            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
-            title="Mở rộng"
-            aria-label="Mở/đóng thanh bên"
-          >
-            <Menu size={18} />
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
+            <img
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover-rotate"
+              src="/website-icon-fix@3x.png"
+              alt="myFEvent"
+              style={{ width: 40, height: 40, cursor: "pointer" }}
+            />
+          </div>
         )}
       </div>
 

@@ -165,6 +165,16 @@ export default function RiskStatisticsPage() {
     fetchEventRole(eventId).then(setEventRole);
   }, [eventId, fetchEventRole]);
 
+  // Permission check - redirect Members to risk list page
+  useEffect(() => {
+    if (!eventRole) return; // Wait for role to load
+
+    if (eventRole === "Member") {
+      toast.error("Bạn không có quyền truy cập trang thống kê");
+      navigate(`/event/${eventId}/risks`);
+    }
+  }, [eventRole, navigate, eventId]);
+
   const getSidebarType = () => {
     if (eventRole === "HoOC") return "HoOC";
     if (eventRole === "HoD") return "HoD";
@@ -379,16 +389,7 @@ export default function RiskStatisticsPage() {
               Tổng quan và phân tích chi tiết rủi ro sau sự kiện
             </p>
           </div>
-          <div className="d-flex gap-2">
-            {/* <button className="btn btn-success d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-excel"></i>
-              Xuất Excel
-            </button> */}
-            <button onClick={()=>navigate(`/events/${eventId}/export/data`)} className="btn btn-danger d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-pdf"></i>
-              Xuất tài liệu
-            </button>
-          </div>
+
         </div>
 
         {/* KPI Cards - KEEP ORIGINAL */}

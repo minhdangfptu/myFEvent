@@ -164,12 +164,7 @@ export const riskApiHelpers = {
 
     // Validate enums
     const validScopes = ['event', 'department'];
-    const validCategories = [
-      'infrastructure', 'mc-guests', 'communication', 'players', 'staffing',
-      'communication_post', 'attendees', 'weather', 'time', 'timeline',
-      'tickets', 'collateral', 'game', 'sponsorship', 'finance',
-      'transportation', 'decor', 'others'
-    ];
+    // Remove validCategories - accept any string for risk_category to allow custom categories
 
     const validImpacts = ['low', 'medium', 'high'];
     const validLikelihoods = ['very_low', 'low', 'medium', 'high', 'very_high'];
@@ -179,9 +174,7 @@ export const riskApiHelpers = {
       throw new Error(`Invalid scope. Must be one of: ${validScopes.join(', ')}`);
     }
 
-    if (!validCategories.includes(riskData.risk_category)) {
-      throw new Error(`Invalid risk_category. Must be one of: ${validCategories.join(', ')}`);
-    }
+    // Remove risk_category validation - allow any string value
 
     if (!validImpacts.includes(riskData.impact)) {
       throw new Error(`Invalid impact. Must be one of: ${validImpacts.join(', ')}`);
