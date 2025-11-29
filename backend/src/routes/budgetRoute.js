@@ -11,13 +11,16 @@ import {
   completeReview,
   updateCategories,
   sendBudgetToMembers,
+  assignItem,
+  getAllBudgetsForDepartment,
+  updateBudgetVisibility,
+} from '../controllers/budgetController.js';
+import {
   reportExpense,
   togglePaidStatus,
-  assignItem,
   submitExpense,
   undoSubmitExpense,
-  getAllBudgetsForDepartment,
-} from '../controllers/budgetController.js';
+} from '../controllers/expenseController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
@@ -61,6 +64,10 @@ router.patch('/:budgetId/categories', authenticateToken, updateCategories);
 // HoD: Send budget to members
 // POST /api/events/:eventId/departments/:departmentId/budget/:budgetId/send-to-members
 router.post('/:budgetId/send-to-members', authenticateToken, sendBudgetToMembers);
+
+// HoOC: Update budget visibility (public/private)
+// PATCH /api/events/:eventId/departments/:departmentId/budget/:budgetId/visibility
+router.patch('/:budgetId/visibility', authenticateToken, updateBudgetVisibility);
 
 // Member: Report expense
 // POST /api/events/:eventId/departments/:departmentId/budget/:budgetId/items/:itemId/report-expense

@@ -97,8 +97,18 @@ export const budgetApi = {
   },
 
   // Lấy thống kê thu chi
-  getBudgetStatistics: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/budgets/statistics`);
+  getBudgetStatistics: async (eventId, departmentId = null) => {
+    const params = departmentId ? { departmentId } : {};
+    const res = await axiosClient.get(`/api/events/${eventId}/budgets/statistics`, { params });
+    return unwrapResponse(res.data);
+  },
+
+  // HoOC: Cập nhật trạng thái công khai của budget
+  updateBudgetVisibility: async (eventId, departmentId, budgetId, isPublic) => {
+    const res = await axiosClient.patch(
+      `/api/events/${eventId}/departments/${departmentId}/budget/${budgetId}/visibility`,
+      { isPublic }
+    );
     return unwrapResponse(res.data);
   },
 

@@ -41,19 +41,6 @@ const PlanItemSchema = new Schema({
   feedback: { type: String, default: '' },
   status:   { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   
-  // Member expense reporting fields
-  evidence: [{ 
-    type: { type: String, enum: ['image', 'pdf', 'doc', 'link'] },
-    url: { type: String },
-    name: { type: String, default: '' }
-  }],
-  actualAmount: { type: Schema.Types.Decimal128, default: 0, min: 0 },
-  isPaid: { type: Boolean, default: false },
-  memberNote: { type: String, default: '' },
-  comparison: { type: String, enum: ['greater', 'less', 'equal'], default: null },
-  reportedBy: { type: Types.ObjectId, ref: 'User' },
-  reportedAt: Date,
-  
   // Assignment fields
   assignedTo: { type: Types.ObjectId, ref: 'EventMember' },
   assignedAt: Date,
@@ -84,10 +71,16 @@ const EventBudgetPlanSchema = new Schema({
 
   items:       { type: [PlanItemSchema], validate: v => Array.isArray(v) && v.length > 0 },
   attachments: [{ name: String, url: String }],
+  
+  // Public/Private visibility
+  isPublic: { type: Boolean, default: false },
+  publicAt: Date,
+  publicBy: { type: Types.ObjectId, ref: 'User' },
+  
   audit: [{
     at: { type: Date, required: true },
     by: { type: Types.ObjectId, ref: 'User', required: true },
-    action: { type: String, enum: ['submitted','changes_requested','approved','locked','comment','sent_to_members'], required: true },
+    action: { type: String, enum: ['submitted','changes_requested','approved','locked','comment','sent_to_members','public','private'], required: true },
     comment: String
   }]
 }, { timestamps: true, versionKey: false });
@@ -120,23 +113,6 @@ EventBudgetPlanSchema.pre('save', function () {
       console.warn('Error in pre-save hook for item:', e.message);
     }
     
-    // Auto calculate comparison
-    try {
-      const estimated = Number(it.total?.toString() || 0);
-      const actual = Number(it.actualAmount?.toString() || 0);
-      if (actual > 0) {
-        if (actual > estimated) {
-          it.comparison = 'greater';
-        } else if (actual < estimated) {
-          it.comparison = 'less';
-        } else {
-          it.comparison = 'equal';
-        }
-      }
-    } catch (e) {
-      // Ignore errors
-      console.warn('Error calculating comparison:', e.message);
-    }
   }
 });
 
