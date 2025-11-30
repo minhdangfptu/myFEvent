@@ -866,6 +866,9 @@ export const getMyCalendarInEvent = async (req, res) => {
 export const getCalendarDetail = async (req, res) => {
     try {
         const { calendarId } = req.params;
+        if (!calendarId) {
+            return res.status(400).json({ message: 'calendarId is required' });
+        }
         const calendar = await getCalendarById(calendarId);
         if (!calendar) {
             return res.status(404).json({ message: 'Calendar not found' });

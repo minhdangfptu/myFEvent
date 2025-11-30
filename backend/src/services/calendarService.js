@@ -9,7 +9,6 @@ export const getCalendarByEventId = async (eventId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                // Skip avatarUrl (base64) to keep payloads small
                 select: 'fullName email'
             }
         })

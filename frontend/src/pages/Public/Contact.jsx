@@ -113,7 +113,7 @@ export default function ContactPage() {
                     />
                   </div>
                   <div>
-                    <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Chủ đề</div>
+                    <div className="form-label mb-1" style={{ fontSize: 14, fontWeight: 500, color: '#333' }}>Chủ đề *</div>
                     <input
                       className="form-control form-control-sm"
                       placeholder="Nhập chủ đề tin nhắn"
