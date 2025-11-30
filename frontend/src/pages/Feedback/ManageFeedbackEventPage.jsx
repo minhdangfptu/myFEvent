@@ -165,25 +165,27 @@ export default function ManageFeedbackEventPage() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => navigate(`/events/${eventId}/feedback/create`)}
-              style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <i className="bi bi-plus-lg"></i>
-              Tạo biểu mẫu mới
-            </button>
+            {forms.length > 0 && (
+              <button
+                onClick={() => navigate(`/events/${eventId}/feedback/create`)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <i className="bi bi-plus-lg"></i>
+                Tạo biểu mẫu mới
+              </button>
+            )}
           </div>
 
           {forms.length === 0 ? (

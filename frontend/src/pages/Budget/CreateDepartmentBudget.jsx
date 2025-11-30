@@ -24,7 +24,7 @@ const CreateDepartmentBudget = () => {
       category: "",
       unit: "",
       unitPrice: "",
-      quantity: "",
+      quantity: "1",
       total: 0,
       note: "",
       evidence: [],
@@ -48,8 +48,31 @@ const CreateDepartmentBudget = () => {
     fetchDepartment();
     if (isEditMode) {
       fetchBudget();
+    } else {
+      // Reset form when not in edit mode
+      setBudget(null);
+      setRequestName("");
+      setRequestNameTouched(false);
+      setBudgetItems([
+        {
+          id: Date.now(),
+          name: "",
+          category: "",
+          unit: "",
+          unitPrice: "",
+          quantity: "1",
+          total: 0,
+          note: "",
+          evidence: [],
+          feedback: "",
+          status: "pending",
+          itemId: null,
+          assignedTo: null,
+        },
+      ]);
+      setCategories([]);
     }
-  }, [eventId, departmentId, isEditMode]);
+  }, [eventId, departmentId, isEditMode, budgetIdFromParams]);
 
   useEffect(() => {
     if (!isEditMode) {
@@ -63,6 +86,24 @@ const CreateDepartmentBudget = () => {
       fetchMembers();
     }
   }, [eventId, departmentId]);
+
+  // Helper function to parse Decimal128 values (MongoDB)
+  const parseDecimal = (value) => {
+    if (value === null || value === undefined) return 0;
+    // If it's a MongoDB Decimal128 object with $numberDecimal
+    if (typeof value === 'object' && value !== null && value.$numberDecimal !== undefined) {
+      return parseFloat(value.$numberDecimal) || 0;
+    }
+    // If it's already a number
+    if (typeof value === 'number') {
+      return isNaN(value) ? 0 : value;
+    }
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    return 0;
+  };
 
   // Format số với dấu phẩy phân cách hàng nghìn
   const formatNumber = (value) => {
@@ -127,6 +168,12 @@ const CreateDepartmentBudget = () => {
 
     try {
       setInitialLoading(true);
+      // Reset state trước khi fetch để tránh hiển thị dữ liệu cũ trong lúc đang load
+      setBudget(null);
+      setRequestName("");
+      setBudgetItems([]);
+      setCategories([]);
+      
       // Nếu có budgetId từ URL params, dùng getDepartmentBudgetById để lấy đúng budget
       // Nếu không, dùng getDepartmentBudget (sẽ ưu tiên lấy approved budget)
       const budgetData = budgetIdFromParams 
@@ -151,8 +198,11 @@ const CreateDepartmentBudget = () => {
         
         setBudgetItems(
           budgetData.items.map((item) => {
-            const unitCost = parseFloat(item.unitCost) || 0;
-            const qty = parseFloat(item.qty) || 0;
+            // Sử dụng parseDecimal để xử lý cả MongoDB Decimal128
+            const unitCost = parseDecimal(item.unitCost);
+            const qty = parseDecimal(item.qty);
+            const total = parseDecimal(item.total);
+            
             // Nếu budget chưa approved, item status phải là pending (trừ khi đã được approved trước đó và budget đã approved)
             let itemStatus = item.status || "pending";
             if (!isBudgetApproved && itemStatus === "approved") {
@@ -164,8 +214,8 @@ const CreateDepartmentBudget = () => {
               category: item.category || "",
               unit: item.unit || "",
               unitPrice: unitCost > 0 ? formatNumber(unitCost.toString()) : "",
-              quantity: qty > 0 ? formatNumber(qty.toString()) : "",
-              total: parseFloat(item.total) || 0,
+              quantity: qty > 0 ? formatNumber(qty.toString()) : qty === 0 ? "1" : "1", // Default to "1" if 0
+              total: total || 0,
               note: item.note || "",
               evidence: Array.isArray(item.evidence) ? item.evidence : [],
               feedback: item.feedback || "",
@@ -232,8 +282,13 @@ const CreateDepartmentBudget = () => {
             // Tính tổng với giá trị đã parse
             updated.total = calculateTotal(updated.unitPrice, updated.quantity);
           } else if (field === "quantity") {
-            // Format số với dấu phẩy khi hiển thị
-            updated.quantity = formatNumber(value);
+            // Format số với dấu phẩy khi hiển thị (nhưng giữ nguyên nếu là số nhỏ)
+            const numValue = parseNumber(value);
+            if (numValue > 0) {
+              updated.quantity = formatNumber(value);
+            } else {
+              updated.quantity = value; // Giữ nguyên giá trị nhập vào
+            }
             // Tính tổng với giá trị đã parse
             updated.total = calculateTotal(updated.unitPrice, updated.quantity);
           } else if (field === "name") {
@@ -274,15 +329,39 @@ const CreateDepartmentBudget = () => {
 
   const handleConfirmAddLink = () => {
     if (!linkInput || !linkInput.trim() || !linkItemId) return;
+    
+    // Validate URL format
+    const trimmedLink = linkInput.trim();
+    let finalUrl = trimmedLink;
+    
+    // Basic URL validation - check if it looks like a URL
+    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+    const hasProtocol = trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://');
+    const looksLikeUrl = urlPattern.test(trimmedLink) || trimmedLink.includes('.') || trimmedLink.includes('/');
+    
+    if (!looksLikeUrl && !hasProtocol) {
+      toast.error("Vui lòng nhập URL hợp lệ (ví dụ: https://example.com hoặc example.com)");
+      return;
+    }
+    
+    // Add https:// if no protocol is provided
+    if (!hasProtocol) {
+      finalUrl = `https://${trimmedLink}`;
+    }
+    
     setBudgetItems((prev) =>
       prev.map((item) => {
         if (item.id === linkItemId) {
+          // Count total links across all items to get unique numbering
+          const allLinks = prev.reduce((count, it) => {
+            return count + (it.evidence || []).filter(ev => ev.type === 'link').length;
+          }, 0);
           const nextEvidence = [
             ...(item.evidence || []),
             {
               type: "link",
-              url: linkInput.trim(),
-              name: `Link ${(item.evidence || []).length + 1}`,
+              url: finalUrl,
+              name: `Link ${allLinks + 1}`,
             },
           ];
           return { ...item, evidence: nextEvidence };
@@ -298,6 +377,23 @@ const CreateDepartmentBudget = () => {
   const handleAddEvidenceFile = (itemId, event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.some(type => file.type.includes(type.split('/')[1]) || file.type === type)) {
+      toast.error("Chỉ chấp nhận file ảnh (JPG, PNG, GIF, WEBP), PDF hoặc Word (DOC, DOCX)");
+      event.target.value = "";
+      return;
+    }
+    
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error("Kích thước file không được vượt quá 10MB");
+      event.target.value = "";
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       const fileType = file.type.startsWith("image/")
@@ -321,6 +417,10 @@ const CreateDepartmentBudget = () => {
           return item;
         })
       );
+    };
+    reader.onerror = () => {
+      toast.error("Lỗi khi đọc file. Vui lòng thử lại.");
+      event.target.value = "";
     };
     reader.readAsDataURL(file);
     event.target.value = "";
@@ -369,7 +469,7 @@ const CreateDepartmentBudget = () => {
         category: "",
         unit: "",
         unitPrice: "",
-        quantity: "",
+        quantity: "1",
         total: 0,
         note: "",
         evidence: [],
@@ -458,7 +558,7 @@ const CreateDepartmentBudget = () => {
           firstErrorField = 'unitPrice';
         }
       }
-      if (!quantityNum) {
+      if (!quantityNum || quantityNum < 1) {
         itemErrors.quantity = true;
         if (!firstErrorElement) {
           firstErrorElement = document.querySelector(`input[data-item-id="${item.id}"][data-field="quantity"]`);
@@ -575,16 +675,35 @@ const CreateDepartmentBudget = () => {
       }
       toast.success("Đã lưu nháp thành công!");
       // Navigate với budgetId cụ thể để đảm bảo hiển thị đúng budget vừa lưu
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      try {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      } catch (navError) {
+        console.error("Navigation error:", navError);
+        // If navigation fails, try to reload the page or navigate to budget list
+        window.location.href = `/events/${eventId}/departments/${departmentId}/budget/${budgetId}`;
+      }
     } catch (error) {
+      console.error("Error saving draft:", error);
       const errorMessage = error?.response?.data?.message || "Lưu nháp thất bại!";
-      toast.error(errorMessage);
       
-      // Nếu lỗi do status không cho phép update, redirect về trang view
-      if (error?.response?.status === 400 && errorMessage.includes("Cannot update budget")) {
-        setTimeout(() => {
-          navigate(`/events/${eventId}/departments/${departmentId}/budget`);
-        }, 2000);
+      // Check if the error is actually a success (budget was saved but response had issues)
+      // If budgetId exists, it means save was successful
+      if (budgetId) {
+        toast.success("Đã lưu nháp thành công!");
+        try {
+          navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+        } catch (navError) {
+          console.error("Navigation error:", navError);
+          window.location.href = `/events/${eventId}/departments/${departmentId}/budget/${budgetId}`;
+        }
+      } else {
+        toast.error(errorMessage);
+        // Nếu lỗi do status không cho phép update, redirect về trang view
+        if (error?.response?.status === 400 && errorMessage.includes("Cannot update budget")) {
+          setTimeout(() => {
+            navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+          }, 2000);
+        }
       }
     } finally {
       setIsSavingDraft(false);
@@ -1018,8 +1137,8 @@ const CreateDepartmentBudget = () => {
                           className="form-control form-control-sm"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)}
-                          placeholder="0"
-                          min="0"
+                          placeholder="1"
+                          min="1"
                           disabled={!isEditable}
                           style={{ 
                             borderRadius: "8px", 

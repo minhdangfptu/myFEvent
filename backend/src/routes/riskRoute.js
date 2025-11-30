@@ -46,11 +46,6 @@ router.get('/occurred-risks',
     RiskController.getAllOccurredRisksByEventController
 );
 
-// ====== UTILITY ROUTES ======
-
-// PATCH /api/events/:eventId/risks/bulk-status - Bulk update risk statuses
-router.patch('/bulk-status', authenticateToken, RiskController.bulkUpdateRiskStatus);
-
 router.get('/full-members', authenticateToken, getMemberRawForRisk);
 
 
@@ -58,9 +53,6 @@ router.get('/full-members', authenticateToken, getMemberRawForRisk);
 
 // POST /api/events/:eventId/risks/:riskId/update-status - Manual status update
 router.post('/:riskId/update-status', authenticateToken, RiskController.updateRiskStatusManually);
-
-// POST /api/events/:eventId/risks/batch-update-status - Batch auto-update statuses
-router.post('/batch-update-status', authenticateToken, RiskController.batchUpdateRiskStatuses);
 
 /**
  * @route   GET /api/events/:eventId/risks/category-statistics

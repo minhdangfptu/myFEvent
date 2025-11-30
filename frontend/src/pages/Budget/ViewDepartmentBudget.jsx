@@ -39,10 +39,8 @@ const ViewDepartmentBudget = () => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   
-  // Column widths state for resizable columns
   const [columnWidths, setColumnWidths] = useState(null);
   
-  // Default column widths
   const defaultWidths = {
     category: 120,
     name: 200,
@@ -55,7 +53,6 @@ const ViewDepartmentBudget = () => {
     memberNote: 200,
     total: 130,
     actualAmount: 150,
-    // Columns for HoOC table
     hoocCategory: 120,
     hoocName: 200,
     hoocUnitCost: 130,
@@ -67,7 +64,6 @@ const ViewDepartmentBudget = () => {
     hoocFeedback: 250
   };
 
-  // Minimum widths to prevent text wrapping in headers and ensure full text visibility
   const minWidths = {
     category: 110,
     name: 180,
@@ -93,7 +89,6 @@ const ViewDepartmentBudget = () => {
   
   const widths = columnWidths || defaultWidths;
   
-  // Save column widths to localStorage
   const saveColumnWidths = (newWidths) => {
     if (departmentId) {
       setColumnWidths(newWidths);
@@ -101,7 +96,6 @@ const ViewDepartmentBudget = () => {
     }
   };
   
-  // Resize handler
   const [resizing, setResizing] = useState({ column: null, startX: 0, startWidth: 0 });
   
   const handleMouseDown = (e, column) => {
@@ -127,7 +121,6 @@ const ViewDepartmentBudget = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       setResizing({ column: null, startX: 0, startWidth: 0 });
-      // Save to localStorage with final width
       const finalWidths = { ...(columnWidths || defaultWidths), [column]: currentWidth };
       saveColumnWidths(finalWidths);
     };
@@ -136,7 +129,6 @@ const ViewDepartmentBudget = () => {
     document.addEventListener('mouseup', handleMouseUp);
   };
   
-  // Check if current user is HoD (Head of Department)
   const isHoD = useMemo(() => {
     if (!user || !department) return false;
     const userId = user._id || user.id;
@@ -161,7 +153,6 @@ const ViewDepartmentBudget = () => {
   const currentMemberId =
     currentMember?._id || currentMember?.id || currentMember?.userId;
 
-  // Load column widths from localStorage when departmentId is available
   useEffect(() => {
     if (departmentId) {
       const saved = localStorage.getItem(`budget-table-columns-${departmentId}`);
@@ -169,7 +160,6 @@ const ViewDepartmentBudget = () => {
         try {
           setColumnWidths(JSON.parse(saved));
         } catch (e) {
-          // Ignore parse errors
         }
       }
     }
@@ -189,7 +179,6 @@ const ViewDepartmentBudget = () => {
     try {
       setLoading(true);
       
-      // Nếu có budgetId, sử dụng API getDepartmentBudgetById, ngược lại dùng getDepartmentBudget
       const budgetPromise = budgetId 
         ? budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetId)
         : budgetApi.getDepartmentBudget(eventId, departmentId);
@@ -205,7 +194,6 @@ const ViewDepartmentBudget = () => {
         return;
       }
       
-      // Kiểm tra nếu user là member thì chỉ được xem budget của ban mình
       if (user) {
         const role = await fetchEventRole(eventId);
         if (role === 'Member') {
@@ -222,7 +210,6 @@ const ViewDepartmentBudget = () => {
             return;
           }
           
-          // Nếu budget chưa được duyệt, member không được xem
           if (budgetData.status !== 'approved') {
             toast.error("Budget này chưa được duyệt, bạn chỉ được xem các budget đã được duyệt");
             navigate(`/events/${eventId}/budgets/member`);
@@ -251,22 +238,17 @@ const ViewDepartmentBudget = () => {
     }
   };
 
-  // Helper function to convert MongoDB Decimal128 to number
   const parseDecimal = (value) => {
     if (value === null || value === undefined) return 0;
-    // If it's a MongoDB Decimal128 object with $numberDecimal
     if (typeof value === 'object' && value !== null && value.$numberDecimal !== undefined) {
       return parseFloat(value.$numberDecimal) || 0;
     }
-    // If it's already a number
     if (typeof value === 'number') {
       return isNaN(value) ? 0 : value;
     }
-    // If it's a string, try to parse it
     if (typeof value === 'string') {
       return parseFloat(value) || 0;
     }
-    // For any other type, return 0
     return 0;
   };
 

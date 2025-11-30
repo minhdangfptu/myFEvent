@@ -108,9 +108,22 @@ const ViewDeptBudgetDetailHoOC = () => {
       setItemFeedbacks(initialFeedbacks);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Không thể tải dữ liệu budget");
-      if (error?.response?.status === 404 || error?.response?.status === 500) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Không thể tải dữ liệu budget";
+      toast.error(errorMessage);
+      
+      // Handle different error cases
+      if (error?.response?.status === 404) {
+        toast.error("Budget không tồn tại hoặc đã bị xóa");
         navigate(`/events/${eventId}/budgets`);
+      } else if (error?.response?.status === 403) {
+        toast.error("Bạn không có quyền xem budget này");
+        navigate(`/events/${eventId}/budgets`);
+      } else if (error?.response?.status === 500) {
+        toast.error("Lỗi server. Vui lòng thử lại sau.");
+        navigate(`/events/${eventId}/budgets`);
+      } else {
+        // For other errors, try to stay on page but show error
+        console.error("Unexpected error:", error);
       }
     } finally {
       setLoading(false);

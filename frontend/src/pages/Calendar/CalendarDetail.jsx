@@ -20,7 +20,6 @@ export default function CalendarDetail() {
 
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState(null);
-    // States cho modal thay đổi trạng thái
     const [isChangeStatusModalOpen, setIsChangeStatusModalOpen] = useState(false);
     const [newStatus, setNewStatus] = useState("");
     const [absentReason, setAbsentReason] = useState("");
@@ -32,9 +31,8 @@ export default function CalendarDetail() {
     const [isDeletingCalendar, setIsDeletingCalendar] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-    // States cho modal xem tất cả
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
-    const [viewAllType, setViewAllType] = useState(""); // "confirmed", "absent", "unconfirmed"
+    const [viewAllType, setViewAllType] = useState(""); 
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
@@ -113,7 +111,6 @@ export default function CalendarDetail() {
         return null;
     }
 
-    // Format date and time
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('vi-VN');
@@ -124,7 +121,6 @@ export default function CalendarDetail() {
         return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     };
 
-    // Calculate duration
     const calculateDuration = (start, end) => {
         const startDate = new Date(start);
         const endDate = new Date(end);
@@ -134,7 +130,6 @@ export default function CalendarDetail() {
         return `${hours} giờ ${minutes > 0 ? minutes + ' phút' : ''}`;
     };
 
-    // Categorize participants by status
     const attendees = calendar.participants
         .filter(p => p.participateStatus === 'confirmed')
         .map(p => ({
@@ -163,20 +158,17 @@ export default function CalendarDetail() {
             email: p.member.userId.email
         }));
 
-    // Handle view reason modal
     const handleViewReason = (person) => {
         setSelectedPerson(person);
         setIsReasonModalOpen(true);
     };
 
-    // Handle view all modal
     const handleViewAll = (type) => {
         setViewAllType(type);
         setSearchQuery("");
         setIsViewAllModalOpen(true);
     };
 
-    // Get filtered list for view all modal
     const getFilteredList = () => {
         let list = [];
         if (viewAllType === 'confirmed') list = attendees;
@@ -193,7 +185,6 @@ export default function CalendarDetail() {
         return list;
     };
 
-    // Get modal title based on type
     const getModalTitle = () => {
         if (viewAllType === 'confirmed') return 'Danh sách người tham gia';
         if (viewAllType === 'absent') return 'Danh sách người không tham gia';
@@ -201,14 +192,12 @@ export default function CalendarDetail() {
         return '';
     };
 
-    // Get current user's participation status
     const getCurrentUserParticipateStatus = () => {
         if (!user || !calendar) return null;
         const userIdCandidates = [user?._id, user?.id].filter(Boolean).map(v => v?.toString());
         const userEmail = user?.email?.toLowerCase?.();
 
         const currentUserParticipant = calendar.participants.find(p => {
-            // p.member.userId may be populated object or just an id/string depending on API
             const populatedUser = p.member?.userId;
             const participantUserId = (typeof populatedUser === 'object' && populatedUser !== null)
                 ? (populatedUser?._id || populatedUser?.id || populatedUser)?.toString()
@@ -227,7 +216,6 @@ export default function CalendarDetail() {
 
     const currentUserStatus = getCurrentUserParticipateStatus();
 
-    // Handle participate actions
     const handleParticipate = async (status, reason = "") => {
         setIsParticipating(true);
         try {
@@ -251,7 +239,6 @@ export default function CalendarDetail() {
         }
     };
 
-    // delete calendar functionality reverted
 
     const handleOpenChangeStatus = (initialStatus = "") => {
         setNewStatus(initialStatus || "");
