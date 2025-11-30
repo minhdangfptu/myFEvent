@@ -4,9 +4,10 @@ import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import { toast } from "react-toastify";
 import Loading from "./Loading";
-import { APP_VERSION } from "~/config";
+import { APP_VERSION } from "~/config/index";
 import { Bell, Bug, Calendar, Coins, Grid, HelpCircle, Menu, Moon, Settings, Sun, User, Users, Home, FileText, MessageSquareText, Database, ChevronUp, ChevronDown } from "lucide-react";
 import authStorage from "~/utils/authStorage";
+import { currentEventStorage } from "~/utils/currentEventStorage";
 
 
 export default function HoDSideBar({
@@ -99,10 +100,20 @@ export default function HoDSideBar({
 
   // Process events from context
   const myEvents = useMemo(() => {
-    if (!ctxEvents || ctxEvents.length === 0) return [];
-    
+    let eventsToProcess = [...(ctxEvents || [])];
+
+    // If no events in context but we have eventId, try to get cached event
+    if (eventsToProcess.length === 0 && eventId) {
+      const cachedEvent = currentEventStorage.get();
+      if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+        eventsToProcess = [cachedEvent];
+      }
+    }
+
+    if (eventsToProcess.length === 0) return [];
+
     // If there's an eventId in props/URL, prefer that event first
-    let sortedList = [...ctxEvents];
+    let sortedList = [...eventsToProcess];
     if (eventId) {
       const idx = sortedList.findIndex((e) => (e._id || e.id) === eventId);
       if (idx !== -1) {

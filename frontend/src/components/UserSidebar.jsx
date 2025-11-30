@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
-import { APP_VERSION } from "../config";
+import { APP_VERSION } from "~/config/index";
 import { ArrowLeft, Bell, HelpCircle, Menu, Moon, Settings, Sun, Home, User as UserIcon } from "lucide-react";
 
 

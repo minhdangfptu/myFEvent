@@ -8,7 +8,7 @@ import { userApi } from "../../apis/userApi";
 import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
-import { formatDate, formatDateForInput } from "../../utils/formatDate";
+import { formatDate, formatDateForInput, formatDateTime } from "../../utils/formatDate";
 import { AlertTriangle, AlignLeft, Calendar, CalendarCheck, Check, CheckCircle, Copy, Edit, Eye, FileText, Grid, Hash, Image, Info, Link, Lock, MapPin, Pencil, PlayCircle, ShieldCheck, Sliders, Trash, Upload, User, Users, X, XCircle, XOctagon, Zap } from "lucide-react";
 
 
@@ -1388,7 +1388,7 @@ const handleImageUpload = async () => {
                       disabled={!editing} 
                     />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {editing ? (editForm.eventStartDate ? new Date(editForm.eventStartDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventStartDate ? new Date(event.eventStartDate).toLocaleString("vi-VN") : "Chưa có")}
+                      Hiển thị: {editing ? (editForm.eventStartDate ? formatDateTime(editForm.eventStartDate) : "Chưa có") : (event.eventStartDate ? formatDateTime(event.eventStartDate) : "Chưa có")}
                     </small>
                   </div>
 
@@ -1406,7 +1406,7 @@ const handleImageUpload = async () => {
                       disabled={!editing} 
                     />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {editing ? (editForm.eventEndDate ? new Date(editForm.eventEndDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventEndDate ? new Date(event.eventEndDate).toLocaleString("vi-VN") : "Chưa có")}
+                      Hiển thị: {editing ? (editForm.eventEndDate ? formatDateTime(editForm.eventEndDate) : "Chưa có") : (event.eventEndDate ? formatDateTime(event.eventEndDate) : "Chưa có")}
                     </small>
                   </div>
                 </div>

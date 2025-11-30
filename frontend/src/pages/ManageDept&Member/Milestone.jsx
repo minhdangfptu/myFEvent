@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
 import { useEvents } from "../../contexts/EventContext"
+import { CalendarX2 } from "lucide-react"
 
 const styles = {
   container: {
@@ -26,7 +27,7 @@ const styles = {
     margin: 0,
   },
   btnCreate: {
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     border: "none",
     padding: "0.75rem 1.5rem",
@@ -179,7 +180,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s ease",
     fontSize: "0.95rem",
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
   },
@@ -202,6 +203,32 @@ const styles = {
     height: "300px",
     color: "#9ca3af",
     fontSize: "1rem",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "3rem 2rem",
+    textAlign: "center",
+    color: "#9ca3af",
+  },
+  emptyStateIcon: {
+    width: "80px",
+    height: "80px",
+    color: "#d1d5db",
+    marginBottom: "1.5rem",
+  },
+  emptyStateTitle: {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    marginBottom: "0.5rem",
+  },
+  emptyStateText: {
+    fontSize: "0.95rem",
+    color: "#9ca3af",
+    maxWidth: "300px",
   },
   modalOverlay: {
     position: "fixed",
@@ -496,42 +523,56 @@ const Milestone = () => {
 
         <div style={styles.content} className="milestone-content-responsive">
           <div style={styles.timelineSection}>
-            <div style={styles.timelineLine}></div>
-            <div style={styles.milestonesList}>
-              {milestones.map((milestone, index) => (
-                <div
-                  key={milestone.id}
-                  style={{
-                    ...styles.milestoneItem,
-                    ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
-                  }}
-                  onClick={() => handleMilestoneClick(milestone)}
-                  onMouseEnter={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "#f3f4f6"
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "transparent"
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      ...styles.milestoneDot,
-                      background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
-                    }}
-                  >
-                    <div style={styles.dotInner}></div>
-                  </div>
-                  <div style={styles.milestoneInfo}>
-                    <div style={styles.milestoneDate}>{milestone.date}</div>
-                    <div style={styles.milestoneName}>{milestone.name}</div>
-                  </div>
+            {milestones.length > 0 ? (
+              <>
+                <div style={styles.timelineLine}></div>
+                <div style={styles.milestonesList}>
+                  {milestones.map((milestone, index) => (
+                    <div
+                      key={milestone.id}
+                      style={{
+                        ...styles.milestoneItem,
+                        ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
+                      }}
+                      onClick={() => handleMilestoneClick(milestone)}
+                      onMouseEnter={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "#f3f4f6"
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "transparent"
+                        }
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...styles.milestoneDot,
+                          background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
+                        }}
+                      >
+                        <div style={styles.dotInner}></div>
+                      </div>
+                      <div style={styles.milestoneInfo}>
+                        <div style={styles.milestoneDate}>{milestone.date}</div>
+                        <div style={styles.milestoneName}>{milestone.name}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div style={styles.emptyState}>
+                <CalendarX2 style={styles.emptyStateIcon} strokeWidth={1.5} />
+                <h3 style={styles.emptyStateTitle}>Chưa có cột mốc nào</h3>
+                <p style={styles.emptyStateText}>
+                  {eventRole === "HoOC"
+                    ? "Hãy tạo cột mốc đầu tiên để bắt đầu quản lý tiến độ sự kiện của bạn"
+                    : "Chưa có cột mốc nào được tạo cho sự kiện này"}
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={styles.detailsSection} className="details-section-responsive">
@@ -594,7 +635,7 @@ const Milestone = () => {
               </div>
             ) : (
               <div style={styles.noSelection}>
-                <p>Chọn một cột mốc để xem chi tiết</p>
+                {/* <p>Chọn một cột mốc để xem chi tiết</p> */}
               </div>
             )}
           </div>
@@ -606,7 +647,7 @@ const Milestone = () => {
               <h2 style={styles.modalTitle}>Tạo Cột Mốc Mới</h2>
               <form onSubmit={handleCreateSubmit}>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Tên cột mốc:</label>
+                  <label style={styles.formLabel}>Tên cột mốc* :</label>
                   <input
                     type="text"
                     style={styles.formInput}
@@ -640,7 +681,7 @@ const Milestone = () => {
                   />
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Ngày dự kiến:</label>
+                  <label style={styles.formLabel}>Ngày dự kiến* :</label>
                   <input
                     type="date"
                     style={styles.formInput}

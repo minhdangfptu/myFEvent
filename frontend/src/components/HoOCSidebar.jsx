@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
-import { APP_VERSION } from "~/config";
+import { APP_VERSION } from "~/config/index";
 import { Calendar, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Database, Menu, Home, MessageSquareText } from "lucide-react";
+import { currentEventStorage } from "../utils/currentEventStorage";
 
 export default function HoOCSidebar({
   sidebarOpen,
@@ -84,7 +85,20 @@ export default function HoOCSidebar({
 
   // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
   const { events, loading } = useEvents();
-  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
+  const event = useMemo(() => {
+    // Tìm event từ context
+    const foundEvent = events.find(e => (e._id || e.id) === eventId);
+
+    // Nếu không tìm thấy, lấy từ cache
+    if (!foundEvent && eventId) {
+      const cachedEvent = currentEventStorage.get();
+      if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+        return cachedEvent;
+      }
+    }
+
+    return foundEvent;
+  }, [events, eventId]);
   const hasEvent = !!event;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
 

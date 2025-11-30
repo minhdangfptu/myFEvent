@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
-import { APP_VERSION } from "~/config";
+import { APP_VERSION } from "~/config/index";
 import { ArrowLeft, Calendar, List, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Sun, Moon, Menu, MessageSquareText, Home } from "lucide-react";
+import { currentEventStorage } from "../utils/currentEventStorage";
 
 export default function MemberSidebar({
   sidebarOpen,
@@ -79,7 +80,20 @@ export default function MemberSidebar({
 
   // Sử dụng eventId từ props thay vì lấy từ URL
   const { events, loading } = useEvents();
-  const event = useMemo(() => events.find(e => (e._id || e.id) === eventId), [events, eventId]);
+  const event = useMemo(() => {
+    // Tìm event từ context
+    const foundEvent = events.find(e => (e._id || e.id) === eventId);
+
+    // Nếu không tìm thấy, lấy từ cache
+    if (!foundEvent && eventId) {
+      const cachedEvent = currentEventStorage.get();
+      if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+        return cachedEvent;
+      }
+    }
+
+    return foundEvent;
+  }, [events, eventId]);
   const hasEvents = !!event;
   const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();

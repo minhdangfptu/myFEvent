@@ -159,14 +159,10 @@ export default function UserProfilePage() {
       // Nếu không có avatarFile mới, không gửi avatarUrl để giữ nguyên avatar hiện tại
 
       const response = await authApi.updateProfile(payload);
-      
-      // Sử dụng dữ liệu từ response hoặc reload từ server
-      let newProfile = response?.data || null;
-      if (!newProfile) {
-        const res = await authApi.getProfile();
-        newProfile = res?.data || res || null;
-      }
-      
+
+      // Backend trả về data đầy đủ trong response
+      const newProfile = response?.data || null;
+
       if (newProfile) {
         setProfile(newProfile);
         // Cập nhật form state với dữ liệu mới từ server
@@ -178,7 +174,7 @@ export default function UserProfilePage() {
           tags: Array.isArray(newProfile.tags) ? newProfile.tags : []
         });
         setAvatarPreview(newProfile.avatarUrl || null);
-        
+
         try {
           window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
         } catch (e) { /* noop */ }
@@ -212,10 +208,18 @@ export default function UserProfilePage() {
     setPerformingAvatarSave(true);
     try {
       const b64 = await fileToBase64(avatarFile);
-      await authApi.updateProfile({ avatarUrl: b64 });
+      const response = await authApi.updateProfile({ avatarUrl: b64 });
 
-      const res = await authApi.getProfile();
-      setProfile(res?.data || res || null);
+      // Backend trả về data đầy đủ trong response
+      const newProfile = response?.data || null;
+      if (newProfile) {
+        setProfile(newProfile);
+
+        // Dispatch event to update other components
+        try {
+          window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
+        } catch (e) { /* noop */ }
+      }
 
       setShowAvatarConfirm(false);
       setUnsavedAvatar(false);
@@ -223,7 +227,9 @@ export default function UserProfilePage() {
       cleanupObjectUrl();
       notify('success', 'Ảnh đại diện đã được lưu.');
     } catch (e) {
-      notify('error', 'Lưu ảnh đại diện thất bại. Vui lòng thử lại.');
+      console.error('Save avatar error:', e);
+      const errorMessage = e?.response?.data?.message || e?.message || 'Lưu ảnh đại diện thất bại. Vui lòng thử lại.';
+      notify('error', errorMessage);
     } finally {
       setPerformingAvatarSave(false);
     }

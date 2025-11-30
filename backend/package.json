@@ -17,6 +17,7 @@
     "production": "npm run build && npm run start",
     "dev": "nodemon --no-warnings ./server.js",
     "test": "vitest run",
+    "test:agenda": "vitest src/controllers/__tests__",
     "test:watch": "vitest",
     "test:db": "node --no-warnings ./src/scripts/testMongoConnection.js",
     "build:indexes": "node --no-warnings ./src/scripts/buildIndexes.js",

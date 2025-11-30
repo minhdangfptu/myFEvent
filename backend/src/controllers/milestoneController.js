@@ -169,15 +169,15 @@ export const deleteMilestone = async (req, res) => {
     // Only HooC can delete milestone
     const membership = await getEventMembership(eventId, req.user?.id);
     if (!membership || membership.role !== 'HoOC') {
-      return res.status(403).json({ message: 'Only HoOC can delete milestone' });
+      return res.status(403).json({ message: 'Chỉ HoOC mới có quyền xóa cột mốc' });
     }
     const result = await softDeleteMilestoneIfNoTasks(eventId, milestoneId);
-    if (result.code === 'NOT_FOUND') return res.status(404).json({ message: 'Milestone not found' });
-    if (result.code === 'HAS_TASKS') return res.status(400).json({ message: 'Milestone has tasks' });
-    return res.status(200).json({ message: 'Milestone deleted' });
+    if (result.code === 'NOT_FOUND') return res.status(404).json({ message: 'Không tìm thấy cột mốc' });
+    if (result.code === 'HAS_TASKS') return res.status(400).json({ message: 'Không thể xóa cột mốc vì còn công việc liên quan' });
+    return res.status(200).json({ message: 'Xóa cột mốc thành công' });
   } catch (error) {
     console.error('deleteMilestone error:', error);
-    return res.status(500).json({ message: 'Failed to delete milestone' });
+    return res.status(500).json({ message: 'Lỗi khi xóa cột mốc' });
   }
 };
 
