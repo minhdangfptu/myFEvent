@@ -1,5 +1,5 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, replaceEventImages, addEventImages, removeEventImages, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
+import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, updateEventImage, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 import milestoneRoute from './milestoneRoute.js';
 import departmentRoute from './departmentRoute.js';
@@ -54,9 +54,7 @@ router.patch('/:id', authenticateToken, updateEvent);
 router.delete('/:id', authenticateToken, deleteEvent);
 
 // Image management
-router.patch('/:id/images', authenticateToken, replaceEventImages);
-router.post('/:id/images', authenticateToken, addEventImages);
-router.delete('/:id/images', authenticateToken, removeEventImages);
+router.patch('/:id/image', authenticateToken, updateEventImage);
 
 
 export default router;

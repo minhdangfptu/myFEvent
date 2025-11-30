@@ -17,13 +17,17 @@
     "production": "npm run build && npm run start",
     "dev": "nodemon --no-warnings ./server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "node --no-warnings ./src/scripts/testMongoConnection.js",
+    "build:indexes": "node --no-warnings ./src/scripts/buildIndexes.js",
+    "test:members": "node --no-warnings ./src/scripts/testMembersQuery.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.22.10",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",

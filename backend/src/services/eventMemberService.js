@@ -1,5 +1,7 @@
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
+import User from '../models/user.js';
+import Department from '../models/department.js';
 
 
 export const ensureEventExists = async (eventId) => {
@@ -8,15 +10,46 @@ export const ensureEventExists = async (eventId) => {
 };
 
 export const getMembersByEventRaw = async (eventId) => {
-  return await EventMember.find({ 
-      eventId, status: { $ne: 'deactive' }, 
+  console.time('[getMembersByEventRaw] Total time');
+
+  // WORKAROUND: populate userId bị chậm cực kỳ (54s!) → Query riêng và map
+  console.time('[getMembersByEventRaw] Find EventMembers');
+  const members = await EventMember.find({
+      eventId, status: { $ne: 'deactive' },
     })
-    .populate([
-      { path: 'userId', select: 'fullName email avatarUrl' },
-      { path: 'departmentId', select: 'name' }
-    ])
     .sort({ createdAt: -1 })
     .lean();
+  console.timeEnd('[getMembersByEventRaw] Find EventMembers');
+  console.log(`[getMembersByEventRaw] Found ${members.length} members`);
+
+  // Get unique userIds and departmentIds
+  const userIds = [...new Set(members.map(m => m.userId).filter(Boolean))];
+  const deptIds = [...new Set(members.map(m => m.departmentId).filter(Boolean))];
+
+  console.time('[getMembersByEventRaw] Query Users & Departments');
+  const [users, departments] = await Promise.all([
+    // KHÔNG select avatarUrl vì chứa base64 images (rất lớn, gây timeout!)
+    User.find({ _id: { $in: userIds } }).select('fullName email').lean(),
+    Department.find({ _id: { $in: deptIds } }).select('name').lean()
+  ]);
+  console.timeEnd('[getMembersByEventRaw] Query Users & Departments');
+
+  // Create maps for fast lookup
+  const userMap = new Map(users.map(u => [u._id.toString(), u]));
+  const deptMap = new Map(departments.map(d => [d._id.toString(), d]));
+
+  // Map data manually
+  console.time('[getMembersByEventRaw] Map data');
+  const result = members.map(member => ({
+    ...member,
+    userId: member.userId ? userMap.get(member.userId.toString()) || null : null,
+    departmentId: member.departmentId ? deptMap.get(member.departmentId.toString()) || null : null
+  }));
+  console.timeEnd('[getMembersByEventRaw] Map data');
+
+  console.timeEnd('[getMembersByEventRaw] Total time');
+
+  return result;
 };
 
 
@@ -35,8 +68,8 @@ export const groupMembersByDepartment = (members) => {
       userId: member.userId?._id,
       name: member.userId?.fullName || 'Unknown',
       email: member.userId?.email || '',
-      avatar: member.userId?.avatarUrl ||
-        `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
+      // Không dùng avatarUrl (base64 quá lớn) → dùng UI Avatars API
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
       role: member.role,
       department: deptName
     });
@@ -47,20 +80,20 @@ export const groupMembersByDepartment = (members) => {
 
 
 export const getUnassignedMembersRaw = async (eventId) => {
-  return await EventMember.find({ 
-    eventId, 
-    departmentId: null, 
+  return await EventMember.find({
+    eventId,
+    departmentId: null,
     role: { $ne: 'HoOC' }, // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
     status: { $ne: 'deactive' }
   })
-    .populate('userId', 'fullName email avatarUrl')
+    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
     .lean();
 };
 
 
 export const getMembersByDepartmentRaw = async (departmentId) => {
   const members = await EventMember.find({ departmentId, status: { $ne: 'deactive' } })
-    .populate('userId', 'fullName email avatarUrl')
+    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
     .lean();
 
   return members.map(member => ({
@@ -69,8 +102,8 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     userId: member.userId?._id,
     name: member.userId?.fullName || 'Unknown',
     email: member.userId?.email || '',
-    avatar: member.userId?.avatarUrl ||
-      `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
+    // Use UI Avatars API instead of base64 from DB
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
     role: member.role,
     departmentId: member.departmentId
   }));
@@ -114,7 +147,7 @@ export const getEventMemberProfileById = async (memberId) => {
 export const inactiveEventMember = async (memberId) => {
   return EventMember.findByIdAndUpdate(
     memberId,
-    { status: "Deactive" },
+    { status: "deactive" },
     { new: true }
   );
 };
@@ -123,15 +156,15 @@ export const createEventMember = async (userId, eventId) => {
     userId,
     eventId,
     role: 'Member',
-    status: 'Active'
+    status: 'active'
   });
 };
 export const getActiveEventMembers = async (eventId) => {
-  return await EventMember.find({ 
+  return await EventMember.find({
     eventId: eventId,
-    status: 'Active'
+    status: 'active'
   })
-    .populate('userId', 'fullName email avatarUrl')
+    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
     .lean();
 };
 

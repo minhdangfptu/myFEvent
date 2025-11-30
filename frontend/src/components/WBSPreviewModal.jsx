@@ -204,7 +204,7 @@ export default function WBSPreviewModal({ eventId, wbsData, sessionId, onClose, 
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Mô tả</div>
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Ban</div>
                   <div style={{ padding: '10px 12px', borderRight: '1px solid #E5E7EB' }}>Ngày bắt đầu</div>
-                  <div style={{ padding: '10px 12px' }}>Ngày kết thúc</div>
+                  <div style={{ padding: '10px 12px' }}>Ngày kết thúc </div>
                 </div>
                 
                 {/* Table Rows */}

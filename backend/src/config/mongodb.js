@@ -1,47 +1,76 @@
 import mongoose from 'mongoose';
 import { config } from './environment.js';
 
+let listenersRegistered = false;
+
 const connectDB = async () => {
-  try {
-    const options = {
-      // Tăng timeout cho production environment
-      serverSelectionTimeoutMS: 30000, // Tăng từ 5s lên 30s
-      connectTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      
-      // Giảm pool size cho Atlas free tier
-      maxPoolSize: 5, // Giảm từ 10 xuống 5
-      minPoolSize: 1, // Giảm từ 2 xuống 1
-      maxIdleTimeMS: 30000, // Thêm max idle time
-      
-      // Connection retry settings
-      retryWrites: true,
-      retryReads: true,
-      
-      family: 4,
-    };
+  const options = {
+    serverSelectionTimeoutMS: 30000, // Tăng lên 30s để xử lý network chậm
+    connectTimeoutMS: 30000, // Tăng lên 30s
+    socketTimeoutMS: 75000, // Tăng lên 75s cho các query phức tạp
+    maxPoolSize: 10, // Tăng pool size cho production
+    minPoolSize: 2,
+    maxIdleTimeMS: 60000, // Tăng idle time lên 60s
+    retryWrites: true,
+    retryReads: true,
+    family: 4,
+    // Thêm các options quan trọng khác
+    heartbeatFrequencyMS: 10000, // Kiểm tra kết nối mỗi 10s
+    serverMonitoringMode: 'auto',
+  };
 
-    const conn = await mongoose.connect(config.MONGODB_URI, options);
-    console.log('MongoDB Connected!');
-    console.log(`Database: ${conn.connection.name}`);
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
 
-    // Enhanced error handling
+  // Retry logic
+  let retries = 3;
+  let lastError;
+
+  while (retries > 0) {
+    try {
+      const conn = await mongoose.connect(config.MONGODB_URI, options);
+      console.log('✅ MongoDB Connected!');
+      console.log(`📦 Database: ${conn.connection.name}`);
+      lastError = null;
+      break; // Kết nối thành công, thoát loop
+    } catch (error) {
+      lastError = error;
+      retries--;
+      console.error(`❌ MongoDB connection attempt failed. Retries left: ${retries}`);
+      console.error('Error:', error.message);
+
+      if (retries > 0) {
+        // Đợi trước khi retry (exponential backoff)
+        const waitTime = (4 - retries) * 3000; // 3s, 6s, 9s
+        console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  // Nếu sau khi retry hết vẫn lỗi
+  if (lastError) {
+    console.error('\n❌ MongoDB connection failed after all retries!');
+    console.error('📋 Chi tiết lỗi:', lastError.message);
+    throw lastError;
+  }
+
+  // Đăng ký listener CHỈ 1 LẦN (chỉ chạy khi connect thành công)
+  if (!listenersRegistered) {
+    listenersRegistered = true;
+
     mongoose.connection.on('error', (err) => {
       console.error('MongoDB connection error:', err);
-      // Không exit process, để app tiếp tục chạy
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
-      // Auto reconnect sau 5s
-      setTimeout(() => {
-        console.log('Attempting to reconnect to MongoDB...');
-        connectDB();
-      }, 5000);
+      console.warn('⚠️ MongoDB disconnected');
+      // KHÔNG tự connectDB() nữa, tránh vòng lặp vô hạn & spam
     });
 
-    mongoose.connection.on('reconnected', () => {
-      console.log('MongoDB reconnected successfully');
+    mongoose.connection.on('connected', () => {
+      console.log('MongoDB connected/reconnected');
     });
 
     const graceful = async (signal) => {
@@ -52,38 +81,10 @@ const connectDB = async () => {
         process.exit(0);
       }
     };
-    
+
     process.on('SIGINT', () => graceful('SIGINT'));
     process.on('SIGTERM', () => graceful('SIGTERM'));
-    
-  } catch (error) {
-    console.error('\n❌ MongoDB connection failed!');
-    console.error('\n📋 Chi tiết lỗi:', error.message);
-    
-    // Retry connection sau 5s thay vì exit
-    console.log('Retrying connection in 5 seconds...');
-    setTimeout(() => {
-      connectDB();
-    }, 5000);
   }
 };
 
-// Wrapper function với retry logic
-const connectWithRetry = async (maxRetries = 3) => {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      await connectDB();
-      return; // Thành công, thoát loop
-    } catch (error) {
-      console.log(`Connection attempt ${i + 1} failed. Retrying...`);
-      if (i === maxRetries - 1) {
-        console.error('Max retries reached. Exiting...');
-        process.exit(1);
-      }
-      // Đợi 5s trước khi retry
-      await new Promise(resolve => setTimeout(resolve, 5000));
-    }
-  }
-};
-
-export default connectWithRetry;
+export default connectDB;

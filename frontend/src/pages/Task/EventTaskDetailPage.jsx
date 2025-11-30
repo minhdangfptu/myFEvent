@@ -14,6 +14,36 @@ import ConfirmModal from "~/components/ConfirmModal";
 import { useNotifications } from "~/contexts/NotificationsContext";
 import { useAuth } from "~/contexts/AuthContext";
 
+const STATUS = {
+  NOT_STARTED: "chua_bat_dau",
+  IN_PROGRESS: "da_bat_dau",
+  DONE: "hoan_thanh",
+  CANCELLED: "huy",
+};
+
+const STATUS_LABELS = {
+  [STATUS.NOT_STARTED]: "Chưa bắt đầu",
+  [STATUS.IN_PROGRESS]: "Đang làm",
+  [STATUS.DONE]: "Hoàn thành",
+  [STATUS.CANCELLED]: "Đã hủy",
+};
+
+const STATUS_STYLE_MAP = {
+  [STATUS.NOT_STARTED]: { bg: "#F3F4F6", color: "#374151" },
+  [STATUS.IN_PROGRESS]: { bg: "#FEF3C7", color: "#92400E" },
+  [STATUS.DONE]: { bg: "#DCFCE7", color: "#166534" },
+  [STATUS.CANCELLED]: { bg: "#FEE2E2", color: "#991B1B" },
+};
+
+const STATUS_TRANSITIONS = {
+  [STATUS.NOT_STARTED]: [STATUS.IN_PROGRESS, STATUS.CANCELLED],
+  [STATUS.IN_PROGRESS]: [STATUS.DONE, STATUS.CANCELLED],
+  [STATUS.DONE]: [],
+  [STATUS.CANCELLED]: [],
+};
+
+const statusToLabel = (code) => STATUS_LABELS[code] || "Không xác định";
+
 export default function EventTaskDetailPage() {
   const { t } = useTranslation();
   const { eventId, taskId } = useParams();
@@ -57,14 +87,18 @@ export default function EventTaskDetailPage() {
   const [tasksAll, setTasksAll] = useState([]);
   const [claimingTask, setClaimingTask] = useState(false);
   const [releasingSelf, setReleasingSelf] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
 
+  const normalizedRole = (eventRole || "").toLowerCase();
   const getSidebarType = () => {
-    if (eventRole === "HoOC") return "hooc";
-    if (eventRole === "HoD") return "HoD";
-    if (eventRole === "Member") return "member";
+    if (normalizedRole === "hooc") return "hooc";
+    if (normalizedRole === "hod") return "HoD";
+    if (normalizedRole === "member") return "member";
     return "user";
   };
 
@@ -136,16 +170,7 @@ export default function EventTaskDetailPage() {
           dueDate: task?.dueDate
             ? new Date(task.dueDate).toISOString().slice(0, 16)
             : "",
-          status:
-            task?.status === "done"
-              ? "Đã xong"
-              : task?.status === "in_progress"
-              ? "Đang làm"
-              : task?.status === "blocked"
-              ? "Tạm hoãn"
-              : task?.status === "cancelled"
-              ? "Đã huỷ"
-              : "Chưa bắt đầu",
+          status: task?.status || STATUS.NOT_STARTED,
           progressPct:
             typeof task?.progressPct === "number" ? task.progressPct : 0,
           estimate: task?.estimate ?? "",
@@ -222,27 +247,9 @@ export default function EventTaskDetailPage() {
     taskApi.getTaskByEvent(eventId).then(res => setTasksAll(res?.data || []));
   }, [eventId, isEditing]);
 
-  const statusMapToBackend = (s) =>
-    s === "Đã xong"
-      ? "done"
-      : s === "Đang làm"
-      ? "in_progress"
-      : s === "Tạm hoãn"
-      ? "blocked"
-      : s === "Đã huỷ"
-      ? "cancelled"
-      : "todo";
-
-  const statusMapToLabel = (s) =>
-    s === "done"
-      ? "Đã xong"
-      : s === "in_progress"
-      ? "Đang làm"
-      : s === "blocked"
-      ? "Tạm hoãn"
-      : s === "cancelled"
-      ? "Đã huỷ"
-      : "Chưa bắt đầu";
+  useEffect(() => {
+    setPendingStatus(form.status || STATUS.NOT_STARTED);
+  }, [form.status]);
 
   const handleChange = (field, value) =>
     setForm((f) => ({
@@ -250,22 +257,31 @@ export default function EventTaskDetailPage() {
       [field]: value,
     }));
 
-  const handleStatusChange = async (value) => {
-    const backendStatus = statusMapToBackend(value);
+  const handleStatusChange = async (newStatusCode) => {
+    const targetStatus = newStatusCode || STATUS.NOT_STARTED;
+    setUpdatingStatus(true);
     try {
       await taskApi.updateTaskProgress(eventId, taskId, {
-        status: backendStatus,
+        status: targetStatus,
       });
-      setForm((f) => ({ ...f, status: value }));
+      setForm((f) => ({ ...f, status: targetStatus }));
       setIsEditing(false);
+      setShowStatusModal(false);
+      toast.success("Cập nhật trạng thái thành công");
       // Backend sẽ tự động tạo notification khi task hoàn thành
     } catch (err) {
       const msg = err?.response?.data?.message;
       toast.error(msg || "Cập nhật trạng thái thất bại");
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
   const handleAssigneeChange = async (newAssigneeId) => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền cập nhật người thực hiện.");
+      return;
+    }
     try {
       if (!newAssigneeId) {
         await taskApi.unassignTask(eventId, taskId);
@@ -292,6 +308,10 @@ export default function EventTaskDetailPage() {
   };
 
   const handleRemoveAssignee = async () => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền cập nhật người thực hiện.");
+      return;
+    }
     try {
       await taskApi.unassignTask(eventId, taskId);
       setForm((f) => ({ ...f, assigneeId: "" }));
@@ -303,10 +323,13 @@ export default function EventTaskDetailPage() {
   };
 
   const handleSave = async () => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền chỉnh sửa công việc này.");
+      setIsEditing(false);
+      return;
+    }
     // Kiểm tra xem có thể edit không
-    const canEditCurrent =
-      form.status === "Chưa bắt đầu" ||
-      statusMapToBackend(form.status) === "todo";
+    const canEditCurrent = form.status === STATUS.NOT_STARTED;
     if (!canEditCurrent) {
       toast.error(
         "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
@@ -362,6 +385,10 @@ export default function EventTaskDetailPage() {
   };
 
   const handleDelete = () => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền xóa công việc này.");
+      return;
+    }
     setShowDeleteModal(true);
   };
 
@@ -600,20 +627,50 @@ export default function EventTaskDetailPage() {
     form.assigneeId &&
     String(form.assigneeId) === String(currentMembershipId);
   const canHoDClaim =
-    eventRole === "HoD" &&
+    normalizedRole === "hod" &&
     !!currentMembershipId &&
     (!!form.departmentId
       ? String(form.departmentId) === String(currentMembershipDeptId || form.departmentId)
       : true);
 
+  const isManagerRole =
+    normalizedRole === "hooc" || normalizedRole === "hod";
+
+  const canUpdateStatus = isSelfAssigned || isManagerRole;
+
   // Kiểm tra xem có thể edit không (chỉ khi status = "todo"/"Chưa bắt đầu")
-  const canEdit =
-    form.status === "Chưa bắt đầu" ||
-    statusMapToBackend(form.status) === "todo";
+  const canEdit = form.status === STATUS.NOT_STARTED && isManagerRole;
+
+  const isMemberRole = normalizedRole === "member";
+  const canModifyTask = isManagerRole;
+  useEffect(() => {
+    if (!canModifyTask && isEditing) {
+      setIsEditing(false);
+    }
+  }, [canModifyTask, isEditing]);
+  const canEditFields = canEdit;
+  const statusOptions = useMemo(() => {
+    const current = form.status || STATUS.NOT_STARTED;
+    const candidates = [current, ...(STATUS_TRANSITIONS[current] || [])];
+    return Array.from(new Set(candidates));
+  }, [form.status]);
+
+  const handleQuickStatusAdvance = () => {
+    if (!canUpdateStatus) return;
+    const current = form.status || STATUS.NOT_STARTED;
+    const next = STATUS_TRANSITIONS[current]?.[0];
+    if (!next) {
+      toast.info("Không thể chuyển trạng thái từ trạng thái hiện tại.");
+      return;
+    }
+    handleStatusChange(next);
+  };
 
   // Hiển thị thông báo khi không thể edit
-  const editDisabledMessage = !canEdit
-    ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'. Chỉ có thể cập nhật trạng thái."
+  const editDisabledMessage = !canEditFields
+    ? !canModifyTask
+      ? "Chỉ HoOC hoặc HoD mới có quyền chỉnh sửa."
+      : "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'. Chỉ có thể cập nhật trạng thái."
     : null;
 
   const leftBlock = (
@@ -626,7 +683,7 @@ export default function EventTaskDetailPage() {
           value={form.title}
           onChange={(e) => handleChange("title", e.target.value)}
           placeholder="Nhập tên công việc"
-          disabled={!canEdit}
+          disabled={!canEditFields}
         />
       </div>
       <div className="mb-3">
@@ -637,7 +694,7 @@ export default function EventTaskDetailPage() {
           onChange={(e) => handleChange("description", e.target.value)}
           rows={4}
           placeholder="Mô tả ngắn..."
-          disabled={!canEdit}
+          disabled={!canEditFields}
         />
       </div>
       <div className="row">
@@ -646,27 +703,15 @@ export default function EventTaskDetailPage() {
           <div className="input-group">
             <select
               className="form-select"
-              value={form.status}
+              value={form.status || STATUS.NOT_STARTED}
               onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={!canUpdateStatus}
             >
-              {(() => {
-                const current = statusMapToBackend(form.status);
-                // Chỉ assignee mới được update status, chỉ hiển thị các trạng thái có thể chuyển
-                const NEXT = {
-                  todo: ["in_progress"],
-                  in_progress: ["blocked", "done"],
-                  blocked: ["in_progress"],
-                  done: [],
-                  cancelled: [],
-                };
-                const candidates = [current, ...(NEXT[current] || [])];
-                const unique = Array.from(new Set(candidates));
-                return unique.map((s) => (
-                  <option key={s} value={s}>
-                    {statusMapToLabel(s)}
-                  </option>
-                ));
-              })()}
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {statusToLabel(s)}
+                </option>
+              ))}
             </select>
             <span className="input-group-text">▼</span>
           </div>
@@ -684,14 +729,14 @@ export default function EventTaskDetailPage() {
               value={form.estimate}
               onChange={(e) => handleChange("estimate", e.target.value)}
               placeholder="Số lượng"
-              disabled={!canEdit}
+              disabled={!canEditFields}
             />
             <select
               className="form-select"
               value={form.estimateUnit}
               onChange={(e) => handleChange("estimateUnit", e.target.value)}
               style={{ maxWidth: 120 }}
-              disabled={!canEdit}
+              disabled={!canEditFields}
             >
               <option value="h">giờ</option>
               <option value="d">ngày</option>
@@ -706,7 +751,7 @@ export default function EventTaskDetailPage() {
               className="form-select"
               value={form.parentId}
               onChange={e => handleChange('parentId', e.target.value)}
-              disabled={!canEdit}
+              disabled={!canEditFields}
             >
               <option value="">Không có</option>
               {tasksAll.filter(
@@ -724,35 +769,6 @@ export default function EventTaskDetailPage() {
             />
           )}
         </div>
-      </div>
-      <div className="mb-3">
-        <label className="form-label">
-          Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})
-        </label>
-        {isEditing ? (
-          <select
-            multiple
-            className="form-select"
-            value={form.dependenciesText.split(',').filter(Boolean)}
-            onChange={e => handleChange('dependenciesText', Array.from(e.target.selectedOptions, o => o.value).join(','))}
-            disabled={!canEdit}
-            size={6}
-            style={{ minHeight: 160 }}
-          >
-            {tasksAll.filter(
-              t => t.assigneeId && String(t._id) !== String(taskId)
-            ).map(t => (
-              <option key={t._id} value={t._id}>{t.title}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            className="form-control"
-            value={form.dependenciesText}
-            disabled
-          />
-        )}
       </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
@@ -787,7 +803,7 @@ export default function EventTaskDetailPage() {
             className="form-select"
             value={form.departmentId}
             onChange={(e) => handleChange("departmentId", e.target.value)}
-            disabled={!canEdit}
+            disabled={!canEditFields}
           >
             <option value="">Chọn ban</option>
             {departments.map((d) => (
@@ -806,7 +822,7 @@ export default function EventTaskDetailPage() {
             className="form-select"
             value={form.assigneeId}
             onChange={(e) => handleAssigneeChange(e.target.value)}
-            disabled={!form.departmentId || !canEdit}
+            disabled={!form.departmentId || !canEditFields}
           >
             <option value="">Chọn người thực hiện</option>
             {displayedAssignees.map((m) => (
@@ -855,7 +871,7 @@ export default function EventTaskDetailPage() {
             <button
               className="btn btn-sm btn-outline-danger"
               onClick={handleRemoveAssignee}
-              disabled={!canEdit}
+              disabled={!canModifyTask}
             >
               🗑
             </button>
@@ -896,7 +912,7 @@ export default function EventTaskDetailPage() {
             className="form-select"
             value={form.milestoneId}
             onChange={(e) => handleChange("milestoneId", e.target.value)}
-            disabled={!canEdit}
+            disabled={!canEditFields}
           >
             <option value="">Chọn cột mốc</option>
             {milestones.map((m) => (
@@ -915,7 +931,7 @@ export default function EventTaskDetailPage() {
           className="form-control"
           value={form.startDate}
           onChange={(e) => handleChange("startDate", e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEditFields}
           min={(() => {
             const now = new Date();
             now.setMinutes(now.getMinutes() + 1);
@@ -954,7 +970,7 @@ export default function EventTaskDetailPage() {
           className="form-control"
           value={form.dueDate}
           onChange={(e) => handleChange("dueDate", e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEditFields}
           min={(() => {
             if (form.startDate) {
               const startDate = new Date(form.startDate);
@@ -1009,7 +1025,36 @@ export default function EventTaskDetailPage() {
         <div className="row">
           <div className="col-md-6 mb-2">
             <div className="text-muted small">Trạng thái</div>
-            <div className="fw-medium">{form.status || "—"}</div>
+            <div className="fw-medium">
+              <span
+                className="status-badge"
+                style={{
+                  display: "inline-flex",
+                  padding: "6px 16px",
+                  borderRadius: 999,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: canUpdateStatus ? "pointer" : "default",
+                  transition: "opacity .2s",
+                  backgroundColor:
+                    STATUS_STYLE_MAP[form.status]?.bg || "#E5E7EB",
+                  color: STATUS_STYLE_MAP[form.status]?.color || "#111827",
+                }}
+                onClick={handleQuickStatusAdvance}
+                title={
+                  canUpdateStatus
+                    ? "Click để chuyển sang trạng thái tiếp theo"
+                    : ""
+                }
+              >
+                {statusToLabel(form.status)}
+              </span>
+            </div>
+            {canUpdateStatus && (
+              <div className="text-muted small mt-1">
+                Nhấn để chuyển sang trạng thái tiếp theo.
+              </div>
+            )}
           </div>
           <div className="col-md-6 mb-2">
             <div className="text-muted small">Ước lượng</div>
@@ -1087,37 +1132,7 @@ export default function EventTaskDetailPage() {
           )}
         </div>
         <div>
-          <div className="text-muted small mb-1">Công việc trước (các công việc này phải xong trước khi bắt đầu công việc {form.title})</div>
-          {relatedTasks.dependencies.length > 0 ? (
-            <div className="fw-medium">
-              {relatedTasks.dependencies.map((dep, idx) => (
-                <div key={dep.id} className="mb-1">
-                  <a
-                    href={`/events/${eventId}/tasks/${dep.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(`/events/${eventId}/tasks/${dep.id}`);
-                    }}
-                    style={{
-                      color: "#3B82F6",
-                      textDecoration: "none",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.textDecoration = "none";
-                    }}
-                  >
-                    {dep.title}
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="fw-medium">—</div>
-          )}
+        
         </div>
       </div>
     </div>
@@ -1218,13 +1233,12 @@ export default function EventTaskDetailPage() {
               <h4 className="mb-0">
                 {isEditing ? "Chỉnh sửa công việc" : "Chi tiết công việc"}
               </h4>
-              {!canEdit && (
+              {editDisabledMessage && (
                 <div
                   className="text-muted small mt-1"
                   style={{ color: "#dc3545" }}
                 >
-                  ⚠️ Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'.
-                  Chỉ có thể cập nhật trạng thái.
+                  ⚠️ {editDisabledMessage}
                 </div>
               )}
             </div>
@@ -1234,34 +1248,47 @@ export default function EventTaskDetailPage() {
               </button>
               {!isEditing ? (
                 <>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => setIsEditing(true)}
-                    disabled={form.status !== "Chưa bắt đầu"}
-                    title={
-                      form.status !== "Chưa bắt đầu"
-                        ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'"
-                        : ""
-                    }
-                  >
-                    Chỉnh sửa
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={handleDelete}
-                    disabled={
-                      form.status === "Đang làm" ||
-                      statusMapToBackend(form.status) === "in_progress"
-                    }
-                    title={
-                      form.status === "Đang làm" ||
-                      statusMapToBackend(form.status) === "in_progress"
-                        ? "Không thể xóa task khi đang ở trạng thái 'Đang làm'"
-                        : ""
-                    }
-                  >
-                    Xóa
-                  </button>
+                  {isManagerRole && (
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => {
+                        setIsEditing(true);
+                      }}
+                      disabled={form.status !== STATUS.NOT_STARTED}
+                      title={
+                        form.status !== STATUS.NOT_STARTED
+                          ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'"
+                          : ""
+                      }
+                    >
+                      Chỉnh sửa
+                    </button>
+                  )}
+                  {isManagerRole && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleDelete}
+                      disabled={form.status === STATUS.IN_PROGRESS}
+                      title={
+                        form.status === STATUS.IN_PROGRESS
+                          ? "Không thể xóa task khi đang ở trạng thái 'Đang làm'"
+                          : ""
+                      }
+                    >
+                      Xóa
+                    </button>
+                  )}
+                  {canUpdateStatus && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setPendingStatus(form.status || STATUS.NOT_STARTED);
+                        setShowStatusModal(true);
+                      }}
+                    >
+                      Cập nhật trạng thái
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -1276,11 +1303,13 @@ export default function EventTaskDetailPage() {
                   </button>
                   <button
                     className="btn btn-danger"
-                    disabled={saving || !canEdit}
+                    disabled={saving || !canEditFields}
                     onClick={handleSave}
                     title={
-                      !canEdit
-                        ? "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
+                      !canEditFields
+                        ? isMemberRole
+                          ? "Thành viên không có quyền chỉnh sửa task"
+                          : "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
                         : ""
                     }
                   >
@@ -1308,8 +1337,8 @@ export default function EventTaskDetailPage() {
             </div>
           ) : (
             <div className="row g-4">
-              {isEditing ? leftBlock : viewLeftBlock}
-              {isEditing ? rightBlock : viewRightBlock}
+              {(canModifyTask && isEditing) ? leftBlock : viewLeftBlock}
+              {(canModifyTask && isEditing) ? rightBlock : viewRightBlock}
             </div>
           )}
         </div>
@@ -1320,6 +1349,61 @@ export default function EventTaskDetailPage() {
         onConfirm={confirmDelete}
         message="Bạn có chắc muốn xóa công việc này?"
       />
+      {showStatusModal && (
+        <div
+          className="modal fade show"
+          style={{
+            display: "block",
+            background: "rgba(0,0,0,0.45)",
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Cập nhật trạng thái</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowStatusModal(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <label className="form-label">Chọn trạng thái mới</label>
+                <select
+                  className="form-select"
+                  value={pendingStatus}
+                  onChange={(e) => setPendingStatus(e.target.value)}
+                >
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {statusToLabel(s)}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-text mt-2">
+                  Chỉ hiển thị các trạng thái mà bạn được phép chuyển.
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowStatusModal(false)}
+                  disabled={updatingStatus}
+                >
+                  Huỷ
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleStatusChange(pendingStatus)}
+                  disabled={updatingStatus}
+                >
+                  {updatingStatus ? "Đang cập nhật..." : "Cập nhật"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

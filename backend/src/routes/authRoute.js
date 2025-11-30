@@ -32,6 +32,7 @@ import {
   sendDeleteOtpValidation,
   verifyDeleteOtpValidation
 } from '../validations/authValidation.js';
+import { uploadImageIfNeeded } from '../services/cloudinaryService.js';
 
 const router = express.Router();
 
@@ -123,7 +124,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
       update.tags = Array.isArray(tags) ? [...new Set(tags.filter(t => t && t.trim()))] : [];
     }
     if (avatarUrl !== undefined) {
-      update.avatarUrl = avatarUrl || null;
+      update.avatarUrl = avatarUrl
+        ? await uploadImageIfNeeded(avatarUrl, 'avatars')
+        : null;
     }
     
     const user = await User.findByIdAndUpdate(

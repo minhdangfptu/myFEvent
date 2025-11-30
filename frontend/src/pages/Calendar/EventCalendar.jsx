@@ -6,6 +6,7 @@ import UserLayout from "../../components/UserLayout"
 import { ToastContainer, toast } from "react-toastify";
 import calendarService from "../../services/calendarService";
 import { departmentService } from "../../services/departmentService";
+import { milestoneApi } from "../../apis/milestoneApi";
 
 export default function EventCalendar() {
   const navigate = useNavigate();
@@ -33,13 +34,22 @@ export default function EventCalendar() {
     setLoading(true);
     try {
       console.log("Fetching calendars for:", { eventId, month: currentMonth + 1, year: currentYear });
-      const response = await calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear);
-      console.log("API Response:", response);
+
+      // Fetch both calendars and milestones in parallel
+      const [calendarResponse, milestoneResponse] = await Promise.all([
+        calendarService.getMyCalendarInEvent(eventId, currentMonth + 1, currentYear),
+        milestoneApi.listMilestonesByEvent(eventId)
+      ]);
+
+      console.log("Calendar Response:", calendarResponse);
+      console.log("Milestone Response:", milestoneResponse);
 
       // Group calendars by date
       const grouped = {};
-      const calendarArray = response.data || [];
+      const calendarArray = calendarResponse.data || [];
+      const milestoneArray = milestoneResponse.data || [];
 
+      // Process calendar events
       calendarArray.forEach(calendar => {
         const startDate = new Date(calendar.startAt);
 
@@ -84,12 +94,44 @@ export default function EventCalendar() {
           timeRange: `${startHour}:${startMinute} - ${endHour}:${endMinute}`,
           location: calendar.location,
           type: calendar.type,
+          itemType: 'calendar',
           participants: calendar.participants,
           participantCount: calendar.participants.length,
           startAt: calendar.startAt,
           endAt: calendar.endAt,
           userParticipateStatus: userParticipateStatus,
           originalData: calendar
+        });
+      });
+
+      // Process milestones
+      milestoneArray.forEach(milestone => {
+        if (!milestone.targetDate) return;
+
+        const targetDate = new Date(milestone.targetDate);
+        const year = targetDate.getFullYear();
+        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const day = String(targetDate.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`;
+
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+
+        grouped[dateKey].push({
+          _id: milestone._id || milestone.id,
+          title: milestone.name,
+          time: 'All day',
+          timeRange: 'Cột mốc sự kiện',
+          location: milestone.description || 'Không có mô tả',
+          type: 'milestone',
+          itemType: 'milestone',
+          participants: [],
+          participantCount: 0,
+          startAt: milestone.targetDate,
+          endAt: milestone.targetDate,
+          userParticipateStatus: null,
+          originalData: milestone
         });
       });
 
@@ -219,7 +261,7 @@ export default function EventCalendar() {
   };
 
   const days = generateCalendarDays();
-  const weekDays = ["MON", "TUE", "WED", "THUR", "FRI", "SAT", "SUN"];
+  const weekDays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
   const handleCalendarClick = (calendar) => {
     setSelectedCalendar(calendar);
@@ -254,6 +296,12 @@ export default function EventCalendar() {
   return (
     <UserLayout title="Lịch sự kiện" sidebarType={eventRole} activePage="calendar" eventId={eventId}>
       <ToastContainer position="top-right" autoClose={3000} />
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <div style={{ padding: "20px", backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
         <div style={{
           backgroundColor: "white",
@@ -336,24 +384,26 @@ export default function EventCalendar() {
             >
               ⟳
             </button>
-            <button
-              onClick={handleCreateCalendar}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: "#ea4335",
-                color: "white",
-                cursor: "pointer",
-                fontSize: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
-              +
-            </button>
+            {eventRole !== "Member" && (
+              <button
+                onClick={handleCreateCalendar}
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "#ea4335",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                +
+              </button>
+            )}
           </div>
         </div>
 
@@ -362,8 +412,47 @@ export default function EventCalendar() {
           borderRadius: "8px",
           overflow: "hidden",
           boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-          border: "1px solid #e5e7eb"
+          border: "1px solid #e5e7eb",
+          position: "relative"
         }}>
+          {loading && (
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(255, 255, 255, 0.85)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 10,
+              backdropFilter: "blur(2px)"
+            }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "12px"
+              }}>
+                <div style={{
+                  width: "40px",
+                  height: "40px",
+                  border: "4px solid #e5e7eb",
+                  borderTop: "4px solid #4285f4",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite"
+                }}></div>
+                <div style={{
+                  fontSize: "14px",
+                  color: "#6b7280",
+                  fontWeight: "500"
+                }}>
+                  Đang tải lịch...
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
@@ -387,6 +476,13 @@ export default function EventCalendar() {
             {days.map((dayObj, index) => {
               const dayCalendars = getCalendarsForDay(dayObj.day, dayObj.month, dayObj.year);
               const isToday = dayObj.isCurrentMonth && dayObj.day === todayDay && dayObj.month === todayMonth && dayObj.year === todayYear;
+              const hasEvents = dayCalendars.length > 0;
+
+              // Determine background color - đơn giản hóa, chỉ có màu cho today
+              let backgroundColor = dayObj.isCurrentMonth ? "white" : "#fafafa";
+              if (isToday) {
+                backgroundColor = "#ffeded"; // Light pink/red cho today
+              }
 
               return (
                 <div
@@ -396,52 +492,132 @@ export default function EventCalendar() {
                     borderBottom: index < 28 ? "1px solid #e5e7eb" : "none",
                     padding: "8px",
                     minHeight: "160px",
-                    backgroundColor: dayObj.isCurrentMonth ? "white" : "#fafafa",
+                    backgroundColor: backgroundColor,
                     position: "relative",
                   }}
                 >
                   <div style={{
                     fontSize: "13px",
-                    fontWeight: dayObj.isCurrentMonth ? "500" : "normal",
+                    fontWeight: isToday ? "700" : (dayObj.isCurrentMonth ? "500" : "normal"),
                     marginBottom: "8px",
-                    color: isToday ? "#4285f4" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
-                    display: "inline-block",
+                    color: isToday ? "#dc2626" : (dayObj.isCurrentMonth ? "#1a1a1a" : "#9ca3af"),
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    flexWrap: "wrap",
                   }}>
-                    {dayObj.day}
+                    <span style={{ 
+                      fontSize: "14px",
+                      textDecoration: isToday ? "underline" : "none",
+                      textUnderlineOffset: isToday ? "3px" : undefined,
+                      textDecorationThickness: isToday ? "2px" : undefined,
+                    }}>{dayObj.day}</span>
+                    {hasEvents && (() => {
+                      const milestones = dayCalendars.filter(item => item.itemType === 'milestone');
+                      const calendars = dayCalendars.filter(item => item.itemType === 'calendar');
+                      const hasBoth = milestones.length > 0 && calendars.length > 0;
+
+                      // Nếu có cả 2, chỉ hiển thị 1 icon ⭐
+                      if (hasBoth) {
+                        return (
+                          <span style={{ fontSize: "11px", marginLeft: 3 }}>⭐</span>
+                        );
+                      }
+                      // Nếu chỉ có milestone
+                      if (milestones.length > 0) {
+                        return <span style={{ fontSize: "11px", marginLeft: 3 }}>🎯</span>;
+                      }
+                      // Nếu chỉ có calendar
+                      if (calendars.length > 0) {
+                        return <span style={{ fontSize: "11px", marginLeft: 3 }}>📅</span>;
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {dayCalendars.slice(0, 3).map((calendar) => {
-                      const statusIcon = calendar.userParticipateStatus === 'confirmed' ? '✓' : 
-                                        calendar.userParticipateStatus === 'absent' ? '✖' : '';
-                      const statusColor = calendar.userParticipateStatus === 'confirmed' ? '#10b981' : 
-                                        calendar.userParticipateStatus === 'absent' ? '#dc2626' : '';
+                    {dayCalendars.slice(0, 3).map((item) => {
+                      const statusIcon = item.userParticipateStatus === 'confirmed' ? '✓' :
+                                        item.userParticipateStatus === 'absent' ? '✖' : '';
+                      const statusColor = item.userParticipateStatus === 'confirmed' ? '#10b981' :
+                                        item.userParticipateStatus === 'absent' ? '#dc2626' : '';
+
+                      const isMilestone = item.itemType === 'milestone';
                       
+                      // Chip config - đồng bộ với dashboard
+                      const chipConfig = isMilestone ? {
+                        icon: "🎯",
+                        label: "Cột mốc",
+                        chipBg: "#fee2e2",
+                        chipText: "#991b1b",
+                        borderColor: "#dc2626",
+                        bgColor: "#fef2f2"
+                      } : item.type === "event" ? {
+                        icon: "📅",
+                        label: "Lịch họp",
+                        chipBg: "#dbeafe",
+                        chipText: "#1e40af",
+                        borderColor: "#3b82f6",
+                        bgColor: "#eff6ff"
+                      } : {
+                        icon: "🏢",
+                        label: "Họp ban",
+                        chipBg: "#fed7aa",
+                        chipText: "#9a3412",
+                        borderColor: "#f57c00",
+                        bgColor: "#fef3e8"
+                      };
+
                       return (
                         <div
-                          key={calendar._id}
-                          onClick={() => handleCalendarClick(calendar)}
+                          key={item._id}
+                          onClick={() => handleCalendarClick(item)}
                           style={{
                             fontSize: "11px",
-                            padding: "3px 6px",
-                            borderRadius: "3px",
+                            padding: "6px 8px",
+                            borderRadius: "6px",
                             cursor: "pointer",
-                            backgroundColor: calendar.type === "event" ? "#e8f0fe" : "#fef3e8",
-                            color: calendar.type === "event" ? "#1967d2" : "#f57c00",
+                            backgroundColor: chipConfig.bgColor,
                             lineHeight: "1.4",
-                            transition: "all 0.2s",
-                            borderLeft: statusColor ? `3px solid ${statusColor}` : 'none',
+                            borderLeft: `3px solid ${chipConfig.borderColor}`,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = "0.8";
+                            e.currentTarget.style.opacity = "0.85";
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.opacity = "1";
                           }}
                         >
-                          <div style={{ fontWeight: "500", display: "flex", alignItems: "center", gap: "4px" }}>
-                            {statusIcon && <span style={{ color: statusColor, fontSize: "12px" }}>{statusIcon}</span>}
-                            <span>{calendar.title} - {calendar.time}</span>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <span style={{
+                              fontSize: "9px",
+                              backgroundColor: chipConfig.chipBg,
+                              color: chipConfig.chipText,
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              fontWeight: "600",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              lineHeight: 1
+                            }}>
+                              <span style={{ fontSize: "10px" }}>{chipConfig.icon}</span>
+                              <span>{chipConfig.label}</span>
+                            </span>
+                            {!isMilestone && statusIcon && (
+                              <span style={{ color: statusColor, fontSize: "11px", fontWeight: "700" }}>{statusIcon}</span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between" }}>
+                            <div style={{ fontWeight: "500", fontSize: "10.5px", color: chipConfig.chipText, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {item.title}
+                            </div>
+                            {!isMilestone && (
+                              <div style={{ fontSize: "9px", color: "#6b7280", display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                                <span>⏰</span>
+                                <span>{item.time}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -485,44 +661,122 @@ export default function EventCalendar() {
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
-              <h3 style={{
+              <div style={{
                 margin: "0 0 20px 0",
-                fontSize: "18px",
-                fontWeight: "600",
-                color: "#1a1a1a",
                 borderBottom: "1px solid #e5e7eb",
                 paddingBottom: "12px"
               }}>
-                {selectedCalendar.title}
-              </h3>
+                {(() => {
+                  const isMilestone = selectedCalendar.itemType === 'milestone';
+                  const chipConfig = isMilestone ? {
+                    icon: "🎯",
+                    label: "Cột mốc",
+                    bgColor: "#fee2e2",
+                    textColor: "#991b1b"
+                  } : selectedCalendar.type === "event" ? {
+                    icon: "📅",
+                    label: "Lịch họp",
+                    bgColor: "#dbeafe",
+                    textColor: "#1e40af"
+                  } : {
+                    icon: "🏢",
+                    label: "Họp ban",
+                    bgColor: "#fed7aa",
+                    textColor: "#9a3412"
+                  };
+
+                  return (
+                    <>
+                      <div style={{ marginBottom: "10px" }}>
+                        <span style={{
+                          fontSize: "11px",
+                          backgroundColor: chipConfig.bgColor,
+                          color: chipConfig.textColor,
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          fontWeight: "600",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}>
+                          <span style={{ fontSize: "14px" }}>{chipConfig.icon}</span>
+                          {chipConfig.label}
+                        </span>
+                      </div>
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: "18px",
+                        fontWeight: "600",
+                        color: "#1a1a1a"
+                      }}>
+                        {selectedCalendar.title}
+                      </h3>
+                    </>
+                  );
+                })()}
+              </div>
               <div style={{ marginBottom: "20px", fontSize: "14px", color: "#4b5563" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "16px" }}>📍</span>
-                  <div>
-                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
-                      Địa điểm
+                {selectedCalendar.itemType === 'milestone' ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>📋</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Loại
+                        </div>
+                        <div>Cột mốc sự kiện</div>
+                      </div>
                     </div>
-                    <div>{selectedCalendar.location}</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "16px" }}>⏰</span>
-                  <div>
-                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
-                      Thời gian
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>📅</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Ngày
+                        </div>
+                        <div>{new Date(selectedCalendar.startAt).toLocaleDateString('vi-VN')}</div>
+                      </div>
                     </div>
-                    <div>{selectedCalendar.timeRange}</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                  <span style={{ fontSize: "16px" }}>👥</span>
-                  <div>
-                    <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
-                      Người tham gia
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>📝</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Mô tả
+                        </div>
+                        <div>{selectedCalendar.location}</div>
+                      </div>
                     </div>
-                    <div>{selectedCalendar.participantCount} người</div>
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>📍</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Địa điểm
+                        </div>
+                        <div>{selectedCalendar.location}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>⏰</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Thời gian
+                        </div>
+                        <div>{selectedCalendar.timeRange}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                      <span style={{ fontSize: "16px" }}>👥</span>
+                      <div>
+                        <div style={{ fontWeight: "500", color: "#6b7280", fontSize: "12px", marginBottom: "2px" }}>
+                          Người tham gia
+                        </div>
+                        <div>{selectedCalendar.participantCount} người</div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button
@@ -541,12 +795,18 @@ export default function EventCalendar() {
                 >
                   Đóng
                 </button>
-                <button 
-                  onClick={() => navigate(`/events/${eventId}/my-calendar/${selectedCalendar._id}`)}
+                <button
+                  onClick={() => {
+                    if (selectedCalendar.itemType === 'milestone') {
+                      navigate(`/events/${eventId}/milestone-detail/${selectedCalendar._id}`);
+                    } else {
+                      navigate(`/events/${eventId}/my-calendar/${selectedCalendar._id}`);
+                    }
+                  }}
                   style={{
                     flex: 1,
                     padding: "10px",
-                    backgroundColor: "#4285f4",
+                    backgroundColor: selectedCalendar.itemType === 'milestone' ? "#dc2626" : "#4285f4",
                     color: "white",
                     border: "none",
                     borderRadius: "6px",

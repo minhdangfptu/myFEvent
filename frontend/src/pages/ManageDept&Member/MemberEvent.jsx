@@ -216,7 +216,7 @@ export default function MemberPage() {
 
               return hocMembers.length > 0 ? (
                 <Accordion
-                  title="Đội Core (Core Team)"
+                  title="Trưởng ban Tổ chức"
                   count={hocMembers.length}
                 >
                   <div className="row g-3 pt-2">

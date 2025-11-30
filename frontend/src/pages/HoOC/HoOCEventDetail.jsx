@@ -57,8 +57,7 @@ export default function HoOCEventDetail() {
   });
 
   // Image upload state
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imagePreview, setImagePreview] = useState("");
   const [imageInputType, setImageInputType] = useState("file");
   const [imageUrl, setImageUrl] = useState("");
 
@@ -210,10 +209,13 @@ export default function HoOCEventDetail() {
     if (!eventData.name || !eventData.name.trim()) missingFields.push("Tên sự kiện");
     if (!eventData.description || !eventData.description.trim()) missingFields.push("Mô tả");
     if (!eventData.organizerName || !eventData.organizerName.trim()) missingFields.push("Người tổ chức");
-    if (!eventData.eventStartDate) missingFields.push("Ngày bắt đầu");
-    if (!eventData.eventEndDate) missingFields.push("Ngày kết thúc");
+    if (!eventData.eventStartDate) missingFields.push("Ngày bắt đầu DDAY");
+    if (!eventData.eventEndDate) missingFields.push("Ngày kết thúc DDAY");
     if (!eventData.location || !eventData.location.trim()) missingFields.push("Địa điểm");
-    if (!eventData.image || !Array.isArray(eventData.image) || eventData.image.length === 0) {
+    const imageValue = Array.isArray(eventData.image)
+      ? eventData.image.find((img) => typeof img === "string" && img.trim())
+      : eventData.image;
+    if (!imageValue || (typeof imageValue === "string" && !imageValue.trim())) {
       missingFields.push("Hình ảnh sự kiện");
     }
     return { isValid: missingFields.length === 0, missingFields };
@@ -300,16 +302,10 @@ export default function HoOCEventDetail() {
   // ========== IMAGE HANDLERS ==========
   const getImageSrc = (image) => {
     if (!image) return "/default-events.jpg";
-    if (Array.isArray(image) && image.length > 0) {
-      const firstImage = image[0];
-      if (typeof firstImage === "string" && firstImage.startsWith("data:")) return firstImage;
-      return `data:image/jpeg;base64,${firstImage}`;
-    }
-    if (typeof image === "string") {
-      if (image.startsWith("data:") || image.startsWith("http")) return image;
-      return `data:image/jpeg;base64,${image}`;
-    }
-    return "/default-events.jpg";
+    const source = Array.isArray(image) && image.length > 0 ? image[0] : image;
+    if (typeof source !== "string") return "/default-events.jpg";
+    if (source.startsWith("data:") || source.startsWith("http")) return source;
+    return `data:image/jpeg;base64,${source}`;
   };
 
   const handleFileUpload = (event) => {
@@ -325,8 +321,8 @@ export default function HoOCEventDetail() {
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImageFiles((prev) => [...prev, file]);
-      setImagePreviews((prev) => [...prev, e.target.result]);
+      setImagePreview(e.target.result);
+      setError("");
     };
     reader.readAsDataURL(file);
   };
@@ -342,23 +338,21 @@ export default function HoOCEventDetail() {
       setError("URL không hợp lệ");
       return;
     }
-    setImagePreviews((prev) => [...prev, imageUrl.trim()]);
+    setImagePreview(imageUrl.trim());
     setImageUrl("");
     setError("");
   };
 
-  const removeImage = (index) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  const removeImagePreview = () => {
+    setImagePreview("");
   };
 
-  const removeExistingImage = async (index) => {
+  const removeExistingImage = async () => {
     handleOpenConfirm(
       async () => {
         try {
           setSubmitting(true);
-          const updatedImages = event.image.filter((_, i) => i !== index);
-          await eventApi.replaceEventImages(eventId, updatedImages);
+          await eventApi.updateEventImage(eventId, null);
           await fetchEventDetails();
           toast.success("Xóa ảnh thành công!");
         } catch (error) {
@@ -371,39 +365,22 @@ export default function HoOCEventDetail() {
     );
   };
 
-  const convertToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const handleImageUpload = async () => {
-    if (imagePreviews.length === 0) return;
-    try {
-      setSubmitting(true);
-      setError("");
-      const base64Images = [];
-      for (let i = 0; i < imageFiles.length; i++) {
-        const base64 = await convertToBase64(imageFiles[i]);
-        base64Images.push(base64);
-      }
-      const urlImages = imagePreviews.filter((_, i) => i >= imageFiles.length);
-      const allImages = [...base64Images, ...urlImages];
-      await eventApi.replaceEventImages(eventId, allImages);
-      setImageFiles([]);
-      setImagePreviews([]);
-      setImageUrl("");
-      await fetchEventDetails();
-      toast.success("Cập nhật hình ảnh thành công!");
-    } catch (error) {
-      toast.error("Cập nhật hình ảnh thất bại");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+const handleImageUpload = async () => {
+  if (!imagePreview) return;
+  try {
+    setSubmitting(true);
+    setError("");
+    await eventApi.updateEventImage(eventId, imagePreview);
+    setImagePreview("");
+    setImageUrl("");
+    await fetchEventDetails();
+    toast.success("Cập nhật hình ảnh thành công!");
+  } catch (error) {
+    toast.error("Cập nhật hình ảnh thất bại");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   // ========== OTP HANDLERS ==========
   const sendOtp = async () => {
@@ -1138,7 +1115,17 @@ export default function HoOCEventDetail() {
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-calendar-event"></i>
-                <span>{formatDate(event.eventStartDate) || "Chưa có"} - {formatDate(event.eventEndDate) || "Chưa có"}</span>
+                <span>
+                  {(() => {
+                    if (!event?.eventStartDate || !event?.eventEndDate) return "Chưa có thông tin";
+                    const startDate = new Date(event.eventStartDate);
+                    const endDate = new Date(event.eventEndDate);
+                    const isSameDay = startDate.toDateString() === endDate.toDateString();
+                    return isSameDay
+                      ? formatDate(event.eventStartDate)
+                      : `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`;
+                  })()}
+                </span>
               </div>
               <div className="hero-meta-item">
                 <i className="bi bi-geo-alt-fill"></i>
@@ -1370,7 +1357,7 @@ export default function HoOCEventDetail() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div className="form-group">
-                    <label className="form-label-modern">Ngày bắt đầu</label>
+                    <label className="form-label-modern">Ngày bắt đầu DDAY</label>
                     <input 
                       type="datetime-local" 
                       className="form-control-modern" 
@@ -1388,7 +1375,7 @@ export default function HoOCEventDetail() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label-modern">Ngày kết thúc</label>
+                    <label className="form-label-modern">Ngày kết thúc DDAY</label>
                     <input 
                       type="datetime-local" 
                       className="form-control-modern" 
@@ -1452,15 +1439,9 @@ export default function HoOCEventDetail() {
 
                 <div style={{ position: "relative", borderRadius: "16px", overflow: "hidden", marginBottom: "1rem" }}>
                   <img src={getImageSrc(event.image)} alt={event.name} style={{ width: "100%", height: "200px", objectFit: "cover" }} onError={(e) => e.target.src = "/default-events.jpg"} />
-                  {event.image && Array.isArray(event.image) && event.image.length > 1 && (
-                    <div style={{ position: "absolute", top: "1rem", right: "1rem", background: "rgba(0,0,0,0.7)", color: "white", padding: "0.5rem 1rem", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600" }}>
-                      <i className="bi bi-images" style={{ marginRight: "0.5rem" }}></i>
-                      {event.image.length} ảnh
-                    </div>
-                  )}
-                  {canEditImages && (
+                  {canEditImages && event?.image && (
                     <button
-                      onClick={() => removeExistingImage(0)}
+                      onClick={removeExistingImage}
                       disabled={submitting}
                       style={{
                         position: "absolute",
@@ -1515,25 +1496,22 @@ export default function HoOCEventDetail() {
                       </div>
                     )}
 
-                    {imagePreviews.length > 0 && (
+                    {imagePreview && (
                       <>
                         <div className="image-preview-grid">
-                          {imagePreviews.map((img, index) => (
-                            <div key={index} className="image-preview-item">
-                              <img src={img} alt={`Preview ${index + 1}`} onError={(e) => e.target.src = "/default-events.jpg"} />
-                              <button className="image-preview-remove" onClick={() => removeImage(index)} disabled={submitting}>
-                                <i className="bi bi-x"></i>
-                              </button>
-                            </div>
-                          ))}
+                          <div className="image-preview-item">
+                            <img src={imagePreview} alt="Preview" onError={(e) => e.target.src = "/default-events.jpg"} />
+                            <button className="image-preview-remove" onClick={removeImagePreview} disabled={submitting}>
+                              <i className="bi bi-x"></i>
+                            </button>
+                          </div>
                         </div>
                         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
                           <button className="btn-modern btn-primary-modern" onClick={handleImageUpload} disabled={submitting} style={{ flex: 1 }}>
                             {submitting ? "Đang tải..." : "Tải lên"}
                           </button>
                           <button className="btn-modern btn-secondary-modern" onClick={() => {
-                            setImageFiles([]);
-                            setImagePreviews([]);
+                            setImagePreview("");
                             setImageUrl("");
                             setError("");
                           }} disabled={submitting} style={{ flex: 1 }}>

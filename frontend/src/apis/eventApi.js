@@ -22,9 +22,8 @@ export const eventApi = {
       throw error;
     }
   },
-  create: async ({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images }) => {
-    // console.log({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
-    const res = await axiosClient.post('/api/events', { name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
+  create: async ({ name, description, eventStartDate, eventEndDate, location, type, organizerName, image }) => {
+    const res = await axiosClient.post('/api/events', { name, description, eventStartDate, eventEndDate, location, type, organizerName, image });
     // console.log(res);
     // Trả về cả status, message và data nếu có
     return {
@@ -33,12 +32,8 @@ export const eventApi = {
       data: res.data?.data || res.data
     };
   },
-  replaceImages: async (eventId, images) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
-    return res.data;
-  },
-  addImages: async (eventId, images) => {
-    const res = await axiosClient.post(`/api/events/${eventId}/images`, { images });
+  updateEventImage: async (eventId, image) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/image`, { image });
     return res.data;
   },
   getEventSummary: async (eventId) => {
@@ -60,10 +55,6 @@ export const eventApi = {
   },
   getById: async (id) => {
     const res = await axiosClient.get(`/api/events/private/${id}`);
-    return res.data;
-  },
-  replaceEventImages: async (eventId, images) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
     return res.data;
   },
   listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
@@ -113,11 +104,7 @@ export const eventApi = {
   getCoreTeamList: async (eventId) => {
     const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
     return res.data;
-  },
-  removeMemberFromEvent: async (eventId, memberId) => {
-    const res = await axiosClient.delete(`/api/events/${eventId}/members/${memberId}`);
-    return res.data;
-  },
+  }
   
 }
 

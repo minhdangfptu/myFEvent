@@ -20,22 +20,62 @@ import { CSS } from '@dnd-kit/utilities';
 import { taskApi } from '~/apis/taskApi';
 import { toast } from 'react-toastify';
 
-export default function KanbanBoardTask({ listTask, eventId, onTaskMove, currentUserId }) {
+const normalizeAssigneeId = (assignee) => {
+  if (!assignee) return null;
+  if (typeof assignee === 'string') return assignee;
+  if (typeof assignee === 'object') {
+    return (
+      assignee.id ||
+      assignee._id ||
+      (typeof assignee.toString === 'function' ? assignee.toString() : null)
+    );
+  }
+  return String(assignee);
+};
+
+export default function KanbanBoardTask({
+  listTask,
+  eventId,
+  onTaskMove,
+  currentEventMemberId,
+}) {
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
+  // Ensure every task has a stable string `id` property for dnd-kit
+  const normalizeTask = (task) => {
+    if (!task) return task;
+    const idVal = task.id ?? task._id ?? task._id ?? task?._id;
+    return { ...task, id: idVal != null ? String(idVal) : String(Math.random()) };
+  };
+
+  const normalizeList = (arr) => Array.isArray(arr) ? arr.map(normalizeTask) : [];
+
   const [items, setItems] = useState({
-    notStarted: listTask.notStarted || [],
-    inProgress: listTask.inProgress || [],
-    done: listTask.done || [],
+    notStarted: normalizeList(listTask.notStarted),
+    inProgress: normalizeList(listTask.inProgress),
+    done: normalizeList(listTask.done),
   });
 
   // Sync items khi listTask thay đổi
   React.useEffect(() => {
     setItems({
-      notStarted: listTask.notStarted || [],
-      inProgress: listTask.inProgress || [],
-      done: listTask.done || [],
+      notStarted: normalizeList(listTask.notStarted),
+      inProgress: normalizeList(listTask.inProgress),
+      done: normalizeList(listTask.done),
     });
+    // Debug: show incoming data to help trace rendering issues
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[KanbanBoardTask] listTask:', listTask);
+      // eslint-disable-next-line no-console
+      console.debug('[KanbanBoardTask] items after normalize:', {
+        notStarted: normalizeList(listTask.notStarted).length,
+        inProgress: normalizeList(listTask.inProgress).length,
+        done: normalizeList(listTask.done).length,
+      });
+    } catch (e) {
+      // ignore
+    }
   }, [listTask]);
 
   const sensors = useSensors(
@@ -59,6 +99,17 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     setActiveId(event.active.id);
   };
 
+  const normalizedCurrentMemberId = currentEventMemberId
+    ? String(currentEventMemberId)
+    : null;
+
+  const canCurrentMemberUpdate = (task) => {
+    if (!normalizedCurrentMemberId) return true;
+    const taskAssigneeId = normalizeAssigneeId(task?.assigneeId);
+    if (!taskAssigneeId) return false;
+    return String(taskAssigneeId) === normalizedCurrentMemberId;
+  };
+
   const handleDragEnd = async (event) => {
     const { active, over } = event;
     setActiveId(null);
@@ -72,7 +123,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     let activeTask = null;
     let activeColumnId = null;
     for (const [columnId, tasks] of Object.entries(items)) {
-      const task = tasks.find((t) => t.id === activeId);
+      const task = tasks.find((t) => String(t.id) === String(activeId));
       if (task) {
         activeTask = task;
         activeColumnId = columnId;
@@ -83,7 +134,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     if (!activeTask) return;
 
     // Kiểm tra quyền trước khi đổi trạng thái
-    if (activeTask.assigneeId && String(activeTask.assigneeId) !== String(currentUserId)) {
+    if (!canCurrentMemberUpdate(activeTask)) {
       setItems(items); // rollback
       toast.error('Chỉ người được giao task này mới có quyền đổi trạng thái!');
       return;
@@ -98,8 +149,8 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
 
       // Cập nhật UI ngay lập tức (optimistic update)
       const newItems = { ...items };
-      newItems[activeColumnId] = newItems[activeColumnId].filter((t) => t.id !== activeId);
-      newItems[newColumnId] = [...newItems[newColumnId], activeTask];
+      newItems[activeColumnId] = newItems[activeColumnId].filter((t) => String(t.id) !== String(activeId));
+      newItems[newColumnId] = [...newItems[newColumnId], normalizeTask(activeTask)];
       setItems(newItems);
 
       // Gọi API để cập nhật status
@@ -128,14 +179,14 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
     // Nếu kéo vào một task khác (overId là task ID)
     const overTask = Object.values(items)
       .flat()
-      .find((t) => t.id === overId);
+      .find((t) => String(t.id) === String(overId));
     
     if (!overTask) return;
 
     // Tìm column của over task
     let overColumnId = null;
     for (const [columnId, tasks] of Object.entries(items)) {
-      if (tasks.find((t) => t.id === overId)) {
+      if (tasks.find((t) => String(t.id) === String(overId))) {
         overColumnId = columnId;
         break;
       }
@@ -145,8 +196,8 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
 
     // Cập nhật UI
     const newItems = { ...items };
-    newItems[activeColumnId] = newItems[activeColumnId].filter((t) => t.id !== activeId);
-    newItems[overColumnId] = [...newItems[overColumnId], activeTask];
+    newItems[activeColumnId] = newItems[activeColumnId].filter((t) => String(t.id) !== String(activeId));
+    newItems[overColumnId] = [...newItems[overColumnId], normalizeTask(activeTask)];
     setItems(newItems);
 
     // Gọi API
@@ -205,7 +256,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: task.id });
+    } = useSortable({ id: String(task.id) });
 
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -221,7 +272,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
   };
 
   const Column = ({ title, count, color, tasks, columnId }) => {
-    const taskIds = tasks.map((task) => task.id);
+    const taskIds = tasks.map((task) => String(task.id));
     const { setNodeRef, isOver } = useDroppable({
       id: columnId,
     });
@@ -269,7 +320,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
             strategy={verticalListSortingStrategy}
           >
             {tasks.map((task) => (
-              <SortableTaskCard key={task.id} task={task} />
+              <SortableTaskCard key={String(task.id)} task={task} />
             ))}
           </SortableContext>
         </div>
@@ -280,7 +331,7 @@ export default function KanbanBoardTask({ listTask, eventId, onTaskMove, current
   const activeTask = activeId
     ? Object.values(items)
         .flat()
-        .find((task) => task.id === activeId)
+        .find((task) => String(task.id) === String(activeId))
     : null;
 
   return (

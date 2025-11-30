@@ -1,9 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
+import { departmentApi } from "../../apis/departmentApi";
 import { useLocation } from "react-router-dom";
 import { useEvents } from "../../contexts/EventContext";
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl";
+import ConfirmModal from "../../components/ConfirmModal";
+import { toast, ToastContainer } from "react-toastify";
 
 function AddMemberModal({ open, onClose, onConfirm }) {
   const [emails, setEmails] = useState(["", ""]);
@@ -114,6 +117,10 @@ export default function ManageMemberPage() {
     totalPages: 0,
   });
   const [eventRole, setEventRole] = useState("");
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [userDepartmentId, setUserDepartmentId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ show: false, type: null, member: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const location = useLocation();
   const { events: myEvents, fetchEventRole, getEventRole } = useEvents();
@@ -180,6 +187,7 @@ export default function ManageMemberPage() {
                 "https://i.pravatar.cc/100?u=" + (m.email || m._id || idx),
               name: m.name || m.fullName || m.displayName || m.email || "Không rõ",
               dept: deptName || m.department || m.departmentName || "—",
+              departmentId: m.departmentId || m.department?._id || m.department?.id || null,
               role: m.role || m.membership || "Member",
             }))
         );
@@ -221,6 +229,7 @@ export default function ManageMemberPage() {
             "https://i.pravatar.cc/100?u=" + (m.email || m._id || idx),
           name: m.fullName || m.name || m.displayName || m.email || "Không rõ",
           dept: m.department?.name || m.departmentName || m.dept || "—",
+          departmentId: m.departmentId || m.department?._id || m.department?.id || null,
           role: m.role || m.membership || "Member",
         }));
         setMembers(normalized);
@@ -255,6 +264,99 @@ export default function ManageMemberPage() {
     return role; // Giữ nguyên nếu không khớp
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    if (openDropdown !== null) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdown]);
+
+  // Handler hiển thị confirm modal
+  const showConfirmRemoveFromEvent = (member) => {
+    setConfirmModal({
+      show: true,
+      type: 'removeFromEvent',
+      member: member
+    });
+  };
+
+  const showConfirmRemoveFromDepartment = (member) => {
+    setConfirmModal({
+      show: true,
+      type: 'removeFromDepartment',
+      member: member
+    });
+  };
+
+  // Handler xóa sau khi confirm
+  const handleConfirmDelete = async () => {
+    const { type, member } = confirmModal;
+    if (!member) return;
+
+    const eventId = currentEvent?._id || currentEvent?.id || currentEventId;
+    if (!eventId) {
+      toast.error('Không tìm thấy ID sự kiện');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      if (type === 'removeFromEvent') {
+        await eventApi.removeMemberFromEvent(eventId, member.id);
+        setMembers(prev => prev.filter(m => m.id !== member.id));
+        toast.success('Đã xóa thành viên khỏi ban tổ chức thành công');
+      } else if (type === 'removeFromDepartment') {
+        if (!member.departmentId) {
+          toast.error('Không tìm thấy ID ban');
+          return;
+        }
+        await departmentApi.removeMemberFromDepartment(eventId, member.departmentId, member.id);
+        setMembers(prev => prev.map(m =>
+          m.id === member.id ? { ...m, dept: '—', departmentId: null, role: 'Member' } : m
+        ));
+        toast.success(`Đã xóa thành viên khỏi ban "${member.dept}" thành công`);
+      }
+
+      setConfirmModal({ show: false, type: null, member: null });
+      setOpenDropdown(null);
+    } catch (error) {
+      console.error('Error removing member:', error);
+      const errorMsg = error?.response?.data?.message || error?.message || 'Không thể xóa thành viên';
+      toast.error(errorMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Check if user can perform actions on this member
+  const canManageMember = (member) => {
+    // Không cho phép quản lý HoOC
+    if (member.role === 'HoOC') return false;
+
+    if (eventRole === 'HoOC') return true;
+    if (eventRole === 'HoD' && member.dept !== '—' && userDepartmentId) {
+      // HoD can only manage members in their department
+      // TODO: Need to check if member.dept matches userDepartmentId
+      return true;
+    }
+    return false;
+  };
+
+  // Get confirm modal message
+  const getConfirmMessage = () => {
+    const { type, member } = confirmModal;
+    if (!member) return '';
+
+    if (type === 'removeFromEvent') {
+      return `Bạn có chắc muốn xóa "${member.name}" khỏi ban tổ chức?`;
+    } else if (type === 'removeFromDepartment') {
+      return `Bạn có chắc muốn xóa "${member.name}" khỏi ban "${member.dept}"?`;
+    }
+    return '';
+  };
+
   return (
     <UserLayout
       title="Quản lý thành viên sự kiện"
@@ -263,9 +365,13 @@ export default function ManageMemberPage() {
       showSearch={false}
       eventId={currentEventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <style>{`
 				.cell-action{cursor:pointer}
 				.table thead th{font-size:12px;color:#6b7280;font-weight:600;border-bottom-color:#e5e7eb}
+				.dropdown-item{transition:background-color 0.15s ease-in-out}
+				.dropdown-item:hover{background-color:#f3f4f6}
+				.dropdown-item:active{background-color:#e5e7eb}
 			`}</style>
       <div className="container-fluid" style={{ maxWidth: 1150 }}>
         <div className="d-flex align-items-center justify-content-between mb-3">
@@ -320,7 +426,7 @@ export default function ManageMemberPage() {
         </div>
 
         <div className="card border-0 shadow-sm">
-          <div className="table-responsive">
+          <div className="table-responsive" style={{ overflow: 'visible' }}>
             <table className="table align-middle mb-0">
               <thead>
                 <tr>
@@ -335,26 +441,101 @@ export default function ManageMemberPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 10).map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <input  className="form-check-input" type="checkbox" />
-                    </td>
-                    <td>
-                      <img
-                        src={r.avatar}
-                        className="rounded-circle"
-                        style={{ width: 28, height: 28 }}
-                      />
-                    </td>
-                    <td style={{ padding: "10px", fontWeight: "500", color: "#374151" }}>{r.name}</td>
-                    <td>{r.dept}</td>
-                    <td>{getRoleDisplayName(r.role)}</td>
-                    <td className="cell-action text-end">
-                      <i className="bi bi-three-dots" />
-                    </td>
-                  </tr>
-                ))}
+                {filtered.slice(0, 10).map((r) => {
+                  const isDropdownOpen = openDropdown === r.id;
+                  const hasDepartment = r.dept && r.dept !== '—';
+                  const canManage = canManageMember(r);
+
+                  return (
+                    <tr key={r.id}>
+                      <td>
+                        <input  className="form-check-input" type="checkbox" />
+                      </td>
+                      <td>
+                        <img
+                          src={r.avatar}
+                          className="rounded-circle"
+                          style={{ width: 28, height: 28 }}
+                        />
+                      </td>
+                      <td style={{ padding: "10px", fontWeight: "500", color: "#374151" }}>{r.name}</td>
+                      <td>{r.dept}</td>
+                      <td>{getRoleDisplayName(r.role)}</td>
+                      <td className="cell-action text-end position-relative">
+                        {canManage && (
+                          <>
+                            <i
+                              className="bi bi-three-dots"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdown(isDropdownOpen ? null : r.id);
+                              }}
+                              style={{ cursor: 'pointer', fontSize: '18px' }}
+                            />
+                            {isDropdownOpen && (
+                              <div
+                                className="position-absolute bg-white shadow-sm border rounded"
+                                style={{
+                                  right: 0,
+                                  top: '100%',
+                                  minWidth: '220px',
+                                  zIndex: 1050,
+                                  marginTop: '4px'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {eventRole === 'HoOC' && (
+                                  <>
+                                    <button
+                                      className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                      style={{ fontSize: '14px' }}
+                                      onClick={() => {
+                                        setOpenDropdown(null);
+                                        showConfirmRemoveFromEvent(r);
+                                      }}
+                                    >
+                                      <i className="bi bi-person-x text-danger"></i>
+                                      <span>Xóa khỏi ban tổ chức</span>
+                                    </button>
+                                    {hasDepartment && r.departmentId && (
+                                      <>
+                                        <hr className="my-1" />
+                                        <button
+                                          className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                          style={{ fontSize: '14px' }}
+                                          onClick={() => {
+                                            setOpenDropdown(null);
+                                            showConfirmRemoveFromDepartment(r);
+                                          }}
+                                        >
+                                          <i className="bi bi-box-arrow-right text-warning"></i>
+                                          <span>Xóa khỏi ban "{r.dept}"</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                                {eventRole === 'HoD' && hasDepartment && r.departmentId && (
+                                  <button
+                                    className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                    style={{ fontSize: '14px' }}
+                                    onClick={() => {
+                                      setOpenDropdown(null);
+                                      showConfirmRemoveFromDepartment(r);
+                                    }}
+                                  >
+                                    <i className="bi bi-box-arrow-right text-warning"></i>
+                                    <span>Xóa khỏi ban "{r.dept}"</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -410,6 +591,14 @@ export default function ManageMemberPage() {
             onConfirm={() => setShowModal(false)}
           />
         )}
+
+        <ConfirmModal
+          show={confirmModal.show}
+          onClose={() => setConfirmModal({ show: false, type: null, member: null })}
+          onConfirm={handleConfirmDelete}
+          message={getConfirmMessage()}
+          isLoading={isDeleting}
+        />
       </div>
     </UserLayout>
   );

@@ -5,6 +5,7 @@ import { milestoneService } from "../../services/milestoneService";
 import { formatDate } from "~/utils/formatDate";
 import { toast } from "react-toastify";
 import { useEvents } from "../../contexts/EventContext";
+import Loading from "../../components/Loading";
 
 const MilestoneDetail = () => {
   const navigate = useNavigate();
@@ -17,14 +18,31 @@ const MilestoneDetail = () => {
   const [eventRole, setEventRole] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchMilestoneDetail() {
-      const response = await milestoneService.getMilestoneDetail(eventId, id);
-      setMilestone(response);
+      try {
+        setLoading(true);
+        setError("");
+        const response = await milestoneService.getMilestoneDetail(eventId, id);
+        setMilestone(response);
+      } catch (err) {
+        console.error("Error fetching milestone:", err);
+        if (err.response?.status === 403) {
+          setError("Bạn không có quyền truy cập cột mốc này");
+        } else if (err.response?.status === 404) {
+          setError("Không tìm thấy cột mốc");
+        } else {
+          setError("Không thể tải thông tin cột mốc");
+        }
+      } finally {
+        setLoading(false);
+      }
     }
     fetchMilestoneDetail();
-  }, [id]);
+  }, [id, eventId]);
 
   // Load event role to decide sidebar and actions visibility
   useEffect(() => {
@@ -118,12 +136,41 @@ const MilestoneDetail = () => {
     setDeleteConfirmName(milestone.name);
   };
 
-  if (!milestone) {
-    return <div>Loading...</div>;
-  }
-
   const sidebarType =
     eventRole === "Member" ? "member" : eventRole === "HoD" ? "hod" : "hooc";
+
+  if (loading) {
+    return (
+      <UserLayout
+        title="Thông tin cột mốc"
+        sidebarType={sidebarType}
+        activePage="overview-timeline"
+        eventId={eventId}
+      >
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+          <Loading />
+          <p className="text-muted mt-3">Đang tải thông tin cột mốc...</p>
+        </div>
+      </UserLayout>
+    );
+  }
+
+  if (error || !milestone) {
+    return (
+      <UserLayout
+        title="Thông tin cột mốc"
+        sidebarType={sidebarType}
+        activePage="overview-timeline"
+        eventId={eventId}
+      >
+        <div className="alert alert-danger" role="alert">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
+          {error || "Không tìm thấy cột mốc"}
+        </div>
+      </UserLayout>
+    );
+  }
+
   const isMember = eventRole === "Member";
 
   return (

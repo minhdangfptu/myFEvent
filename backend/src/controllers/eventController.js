@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
 // controllers/eventController.js
 import { getUserById } from '../services/userService.js';
-import { eventService } from '../services/eventService.js';
+import { eventService, findEventById } from '../services/eventService.js';
+import eventMember from '../models/eventMember.js';
+import { createEventMember } from '../services/eventMemberService.js';
 
 const ok = (res, status, body) => res.status(status).json(body);
 const handle = async (res, fn) => {
@@ -95,33 +97,13 @@ export const deleteEvent = (req, res) =>
     return ok(res, 200, result);
   });
 
-// PUT /api/events/:id/images  (replace)
-export const replaceEventImages = (req, res) =>
+// PATCH /api/events/:id/image
+export const updateEventImage = (req, res) =>
   handle(res, async () => {
     const userId = req.user?.id;
     const { id } = req.params;
-    const { images } = req.body;
-    const result = await eventService.replaceEventImages({ userId, id, images });
-    return ok(res, 200, result);
-  });
-
-// POST /api/events/:id/images  (add)
-export const addEventImages = (req, res) =>
-  handle(res, async () => {
-    const userId = req.user?.id;
-    const { id } = req.params;
-    const { images } = req.body;
-    const result = await eventService.addEventImages({ userId, id, images });
-    return ok(res, 200, result);
-  });
-
-// DELETE /api/events/:id/images
-export const removeEventImages = (req, res) =>
-  handle(res, async () => {
-    const userId = req.user?.id;
-    const { id } = req.params;
-    const { indexes } = req.body;
-    const result = await eventService.removeEventImages({ userId, id, indexes });
+    const { image } = req.body;
+    const result = await eventService.updateEventImage({ userId, id, image });
     return ok(res, 200, result);
   });
 
@@ -145,7 +127,7 @@ export const inviteMemberToEvent = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     // Check if the user is already a member of the event
-    const existingMember = await EventMember.findOne({ eventId, userId });
+    const existingMember = await eventMember.findOne({ eventId, userId });
     if (existingMember) {
       return res.status(400).json({ message: 'User is already a member of the event' });
     }

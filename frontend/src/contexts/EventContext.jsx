@@ -14,7 +14,17 @@ export function EventProvider({ children }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [eventRoles, setEventRoles] = useState({});
+
+  // Initialize eventRoles from localStorage
+  const [eventRoles, setEventRoles] = useState(() => {
+    try {
+      const cached = localStorage.getItem('eventRoles');
+      return cached ? JSON.parse(cached) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 8,
@@ -22,6 +32,47 @@ export function EventProvider({ children }) {
     totalPages: 0
   });
   const fetchingRef = useRef(false); // Track if we're currently fetching
+
+  // Persist eventRoles to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventRoles', JSON.stringify(eventRoles));
+    } catch (err) {
+      console.error('Failed to persist eventRoles:', err);
+    }
+  }, [eventRoles]);
+
+  // Clear eventRoles cache when user logs out or changes
+  const userIdRef = useRef(null);
+  useEffect(() => {
+    const currentUserId = user?._id || user?.id;
+
+    if (!authLoading) {
+      if (!user) {
+        // User logged out, clear the cache
+        setEventRoles({});
+        userIdRef.current = null;
+        try {
+          localStorage.removeItem('eventRoles');
+        } catch (err) {
+          console.error('Failed to clear eventRoles cache:', err);
+        }
+      } else if (userIdRef.current && userIdRef.current !== currentUserId) {
+        // Different user logged in, clear old cache
+        setEventRoles({});
+        try {
+          localStorage.removeItem('eventRoles');
+        } catch (err) {
+          console.error('Failed to clear eventRoles cache:', err);
+        }
+      }
+
+      // Update current user ID
+      if (currentUserId) {
+        userIdRef.current = currentUserId;
+      }
+    }
+  }, [user, authLoading]);
 
   const extractEventArray = useCallback((payload) => {
     if (!payload) return [];
@@ -39,11 +90,13 @@ export function EventProvider({ children }) {
   }, []);
 
   const fetchEvents = useCallback(async (page = 1, limit = 8, search = '') => {
+    // Skip if auth is still loading
     if (authLoading) {
       setLoading(true);
       return;
     }
 
+    // Skip if no user
     if (!user) {
       setEvents([]);
       setLoading(false);
@@ -76,21 +129,38 @@ export function EventProvider({ children }) {
     }
   }, [user, authLoading, extractEventArray]);
 
+  // Fetch events when auth completes or user changes
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]); // fetchEvents is memoized with user and authLoading dependencies
+    // Wait for auth to complete before fetching
+    if (authLoading) {
+      return; // Still loading auth, don't do anything yet
+    }
+
+    // Auth is done loading
+    if (user) {
+      // User is authenticated, fetch their events
+      fetchEvents();
+    } else {
+      // No user after auth loads, clear events
+      setEvents([]);
+      setLoading(false);
+      fetchingRef.current = false;
+    }
+  }, [authLoading, user, fetchEvents]); // Re-fetch when authLoading or user changes
 
   // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {
     if (!eventId) return "";
-    // Return cached role if available
-    if (eventRoles[eventId]) return eventRoles[eventId];
+    // Return cached role if available (check with 'in' to handle empty string)
+    if (eventId in eventRoles) return eventRoles[eventId];
     try {
       const res = await userApi.getUserRoleByEvent(eventId);
       const role = res?.role || res?.data?.role || "";
       setEventRoles((prev) => ({ ...prev, [eventId]: role }));
       return role;
     } catch (e) {
+      // Cache the error as empty string to prevent repeated API calls
+      setEventRoles((prev) => ({ ...prev, [eventId]: "" }));
       return "";
     }
   }, [eventRoles]);

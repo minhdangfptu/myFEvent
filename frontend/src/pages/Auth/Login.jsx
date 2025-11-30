@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -25,6 +26,9 @@ export default function LoginPage() {
   }, [location.search]);
 
   useEffect(() => {
+    // Skip if user is in the process of logging in (handled by handleSubmit/handleGoogleSuccess)
+    if (isLoggingIn) return;
+
     if (!authLoading && isAuthenticated) {
       const from = location.state?.from?.pathname || "/home-page";
       if (user?.role === "admin") {
@@ -33,12 +37,13 @@ export default function LoginPage() {
         navigate(from, { replace: true });
       }
     }
-  }, [isAuthenticated, authLoading, navigate, location.state, user]);
+  }, [isAuthenticated, authLoading, navigate, location.state, user, isLoggingIn]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    setIsLoggingIn(true);
     try {
       const { user: loggedInUser } = await login(email, password);
       if (loggedInUser?.role === "admin") {
@@ -48,6 +53,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login error:", error);
+      setIsLoggingIn(false);
       const errorCode = error?.response?.data?.code;
       if (error?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
@@ -65,6 +71,7 @@ export default function LoginPage() {
   const handleGoogleSuccess = async (credentialResponse) => {
     setError("");
     setLoading(true);
+    setIsLoggingIn(true);
     try {
       // Decode the JWT token to get user info
       const decoded = jwtDecode(credentialResponse.credential);
@@ -104,6 +111,7 @@ export default function LoginPage() {
       navigate("/home-page", { replace: true, state: { loginSuccess: true } });
     } catch (err) {
       console.error("Google login error:", err);
+      setIsLoggingIn(false);
       const errorCode = err?.response?.data?.code;
       if (err?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });

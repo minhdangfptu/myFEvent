@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
+import { useNotifications } from "~/contexts/NotificationsContext";
 import calendarService from "~/services/calendarService";
 import { departmentService } from "~/services/departmentService";
 
@@ -54,6 +55,7 @@ export default function CreateDepartmentCalendarPage() {
 	const navigate = useNavigate();
 	const { eventId, departmentId } = useParams();
 	const { fetchEventRole } = useEvents();
+	const { refreshNotifications } = useNotifications();
 	const [eventRole, setEventRole] = useState("");
 	const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -205,6 +207,7 @@ export default function CreateDepartmentCalendarPage() {
 			const response = await calendarService.createCalendarForDepartment(eventId, departmentId, submitData);
 			if (response.data) {
 			 toast.success('Tạo lịch ban thành công');
+			 refreshNotifications?.();
 			 navigate(`/events/${eventId}/my-calendar`);
 			} else {
 				throw new Error('Không nhận được dữ liệu từ server');

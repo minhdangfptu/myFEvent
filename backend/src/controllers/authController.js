@@ -132,6 +132,17 @@ export const login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Tài khoản không tồn tại' });
 
+    // Check if user registered with Google OAuth (no password)
+    if (!user.passwordHash) {
+      if (user.authProvider === 'google') {
+        return res.status(400).json({
+          message: 'Tài khoản này đã được đăng ký bằng Google. Vui lòng đăng nhập bằng Google.',
+          code: 'USE_GOOGLE_LOGIN'
+        });
+      }
+      return res.status(400).json({ message: 'Lỗi xác thực. Vui lòng liên hệ admin.' });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng' });
 
@@ -426,7 +437,11 @@ export const forgotPassword = async (req, res) => {
 
     const resetLink = `${config.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${resetJwt}`;
 
-    await sendMail({
+    // Send response immediately, then send email in background (non-blocking)
+    res.status(200).json({ message: 'Reset email sent' });
+
+    // Send email asynchronously without blocking the response
+    sendMail({
       to: email,
       subject: 'Đặt lại mật khẩu myFEvent',
       html: `
@@ -438,9 +453,10 @@ export const forgotPassword = async (req, res) => {
           <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
         </div>
       `,
+    }).catch((error) => {
+      // Log error but don't block the response
+      console.error('Failed to send password reset email:', error);
     });
-
-    return res.status(200).json({ message: 'Reset email sent' });
   } catch (error) {
     console.error('Forgot password error:', error);
     return res.status(500).json({ message: 'Failed to send reset email' });
@@ -483,6 +499,14 @@ export const changePassword = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Check if user registered with Google (no password to change)
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        message: 'Tài khoản Google không có mật khẩu. Không thể đổi mật khẩu.',
+        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
+      });
+    }
+
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
 
@@ -502,6 +526,15 @@ export const checkPassWord = async (req, res) => {
     const { password } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Check if user registered with Google (no password)
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        message: 'Tài khoản Google không có mật khẩu.',
+        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: 'Incorrect information' });
     return res.status(200).json({ message: 'Correct information' });

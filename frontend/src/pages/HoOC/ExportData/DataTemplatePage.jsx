@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./DataTemplatePage.css";
 import UserLayout from "~/components/UserLayout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import DataExportPreviewModal from "~/components/DataExportPreviewModal";
 
 export default function DataTemplatePage() {
@@ -11,6 +11,7 @@ export default function DataTemplatePage() {
   const [previewType, setPreviewType] = useState("data");
   const [downloadingItems, setDownloadingItems] = useState(new Set());
   const navigate = useNavigate();
+  const { eventId } = useParams();
 
   const templatesExcel = [
     {
