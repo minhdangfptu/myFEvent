@@ -6,7 +6,8 @@ import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
-import { CheckCircle, Clock, FileText } from "lucide-react";
+import { CheckCircle, Clock } from "lucide-react";
+import { timeAgo } from '../../utils/timeAgo';
 
 
 export default function FeedbackSummary() {
@@ -66,9 +67,6 @@ export default function FeedbackSummary() {
   };
 
 
-  const exportPDF = () => {
-    toast.info('Tính năng xuất PDF đang được phát triển');
-  };
 
   const exportExcel = async () => {
     try {
@@ -150,44 +148,6 @@ export default function FeedbackSummary() {
               <p style={{ fontSize: '14px', color: '#6b7280' }}>
                 Kết quả thống kê phản hồi cho biểu mẫu này
               </p>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={exportExcel}
-                style={{
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <i className="bi bi-file-earmark-excel"></i>
-                Xuất Excel
-              </button>
-              <button
-                onClick={exportPDF}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <FileText size={18} />
-                Xuất PDF
-              </button>
             </div>
           </div>
 
@@ -314,179 +274,190 @@ export default function FeedbackSummary() {
                 </div>
               )}
 
-              {stat.questionType === 'multiple-choice' && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#dc2626' }}></div>
-                    <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>
-                      Tỷ lệ sử dụng
-                    </h4>
-                  </div>
-                  <div style={{ position: 'relative', height: '300px', padding: '20px 0 40px 60px' }}>
-                    {/* Y-axis labels */}
-                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: '40px', width: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      {Object.keys(stat.statistics.distribution).reverse().map((option, idx) => (
-                        <span key={idx} style={{ fontSize: '12px', color: '#374151', textAlign: 'right', paddingRight: '8px' }}>
-                          {option}
-                        </span>
-                      ))}
-                    </div>
-                    {/* Chart area */}
-                    <div style={{ height: '100%', position: 'relative', paddingLeft: '20px' }}>
-                      {/* Grid lines */}
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between' }}>
-                        {[0, 20, 40, 60, 80, 100].map((val, idx) => (
-                          <div key={idx} style={{ position: 'relative', width: '1px' }}>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '1px', backgroundColor: '#e5e7eb' }}></div>
-                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
-                              {val}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Line chart */}
-                      <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: '20px', right: 0, bottom: 0, overflow: 'visible' }}>
-                        <defs>
-                          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="#dc2626" stopOpacity="0.3" />
-                            <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Area under line */}
-                        <polygon
-                          points={(() => {
-                            const options = Object.keys(stat.statistics.distribution);
-                            const width = 100;
-                            const height = 100;
-                            const stepX = options.length > 1 ? width / (options.length - 1) : 0;
-                            const points = options.map((option, idx) => {
-                              const percentage = parseFloat(stat.statistics.percentages[option] || '0');
-                              const x = idx * stepX;
-                              const y = height - (percentage / 100) * height;
-                              return `${x},${y}`;
-                            });
-                            // Add bottom points for area
-                            const lastX = (options.length - 1) * stepX;
-                            return `${points.join(' ')} ${lastX},${height} 0,${height}`;
-                          })()}
-                          fill="url(#lineGradient)"
-                        />
-                        {/* Line */}
-                        <polyline
-                          points={(() => {
-                            const options = Object.keys(stat.statistics.distribution);
-                            const width = 100;
-                            const height = 100;
-                            const stepX = options.length > 1 ? width / (options.length - 1) : 0;
-                            return options.map((option, idx) => {
-                              const percentage = parseFloat(stat.statistics.percentages[option] || '0');
-                              const x = idx * stepX;
-                              const y = height - (percentage / 100) * height;
-                              return `${x},${y}`;
-                            }).join(' ');
-                          })()}
-                          fill="none"
-                          stroke="#dc2626"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        {/* Data points */}
-                        {Object.keys(stat.statistics.distribution).map((option, idx) => {
-                          const options = Object.keys(stat.statistics.distribution);
-                          const width = 100;
-                          const height = 100;
-                          const stepX = options.length > 1 ? width / (options.length - 1) : 0;
-                          const percentage = parseFloat(stat.statistics.percentages[option] || '0');
-                          const x = idx * stepX;
-                          const y = height - (percentage / 100) * height;
-                          return (
-                            <circle
-                              key={idx}
-                              cx={x}
-                              cy={y}
-                              r="5"
-                              fill="#dc2626"
-                              stroke="white"
-                              strokeWidth="2"
-                            />
-                          );
-                        })}
-                      </svg>
-                      {/* X-axis labels */}
-                      <div style={{ position: 'absolute', bottom: '-30px', left: '20px', right: 0, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
-                        {Object.keys(stat.statistics.distribution).map((option, idx) => {
-                          const percentage = stat.statistics.percentages[option] || '0';
-                          return (
-                            <span key={idx} style={{ textAlign: 'center' }}>
-                              {percentage}%
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {stat.questionType === 'multiple-choice' && (() => {
+                // Sắp xếp các lựa chọn theo phần trăm giảm dần để dễ so sánh
+                const sortedOptions = Object.keys(stat.statistics.distribution).sort((a, b) => {
+                  const percentageA = parseFloat(stat.statistics.percentages[a] || '0');
+                  const percentageB = parseFloat(stat.statistics.percentages[b] || '0');
+                  return percentageB - percentageA;
+                });
 
-              {stat.questionType === 'yes-no' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                  {/* Pie Chart */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="200" height="200" viewBox="0 0 200 200" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill="none"
-                        stroke="#e5e7eb"
-                        strokeWidth="40"
-                      />
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill="none"
-                        stroke="#dc2626"
-                        strokeWidth="40"
-                        strokeDasharray={`${(stat.statistics.yes / (stat.statistics.yes + stat.statistics.no)) * 251.2} 251.2`}
-                        strokeDashoffset="0"
-                      />
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill="none"
-                        stroke="#f59e0b"
-                        strokeWidth="40"
-                        strokeDasharray={`${(stat.statistics.no / (stat.statistics.yes + stat.statistics.no)) * 251.2} 251.2`}
-                        strokeDashoffset={`-${(stat.statistics.yes / (stat.statistics.yes + stat.statistics.no)) * 251.2}`}
-                      />
-                    </svg>
+                return (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#dc2626' }}></div>
+                      <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>
+                        Tỷ lệ sử dụng
+                      </h4>
+                    </div>
+                    
+                    {/* Horizontal Bar Chart */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {sortedOptions.map((option, idx) => {
+                        const percentage = parseFloat(stat.statistics.percentages[option] || '0');
+                        const count = stat.statistics.distribution[option] || 0;
+                        const maxPercentage = Math.max(...sortedOptions.map(opt => parseFloat(stat.statistics.percentages[opt] || '0')));
+                        
+                        return (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {/* Option label */}
+                              <div style={{ 
+                                minWidth: '120px', 
+                                fontSize: '14px', 
+                                color: '#374151', 
+                                fontWeight: '500',
+                                textAlign: 'left',
+                                wordBreak: 'break-word'
+                              }}>
+                                {option}
+                              </div>
+                              
+                              {/* Bar container */}
+                              <div style={{ flex: 1, position: 'relative', height: '32px', backgroundColor: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' }}>
+                                {/* Bar */}
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    height: '100%',
+                                    width: `${maxPercentage > 0 ? (percentage / maxPercentage) * 100 : 0}%`,
+                                    backgroundColor: '#dc2626',
+                                    borderRadius: '6px',
+                                    transition: 'width 0.3s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-end',
+                                    paddingRight: '8px'
+                                  }}
+                                >
+                                  {/* Percentage inside bar if bar is wide enough */}
+                                  {percentage > 15 && (
+                                    <span style={{ fontSize: '12px', color: 'white', fontWeight: '600' }}>
+                                      {percentage}%
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Percentage outside bar if bar is too narrow */}
+                                {percentage <= 15 && (
+                                  <div style={{ 
+                                    position: 'absolute', 
+                                    left: `${maxPercentage > 0 ? (percentage / maxPercentage) * 100 : 0}%`, 
+                                    top: '50%', 
+                                    transform: 'translateY(-50%)',
+                                    marginLeft: '8px',
+                                    fontSize: '12px',
+                                    color: '#374151',
+                                    fontWeight: '600',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {percentage}%
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Count and percentage info */}
+                              <div style={{ 
+                                minWidth: '80px', 
+                                fontSize: '12px', 
+                                color: '#6b7280',
+                                textAlign: 'right',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-end'
+                              }}>
+                                <span style={{ fontWeight: '600', color: '#374151' }}>
+                                  {percentage}%
+                                </span>
+                                <span style={{ fontSize: '11px' }}>
+                                  ({count} {count === 1 ? 'lần' : 'lần'})
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  {/* Legend */}
-                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#dc2626', borderRadius: '4px' }}></div>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>Có</span>
-                        <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                          {stat.statistics.yesPercentage}% ({stat.statistics.yes})
+                );
+              })()}
+
+              {stat.questionType === 'yes-no' && (() => {
+                const total = stat.statistics.yes + stat.statistics.no;
+                const circumference = 2 * Math.PI * 80; // 2πr với r=80
+                const yesPercentage = total > 0 ? (stat.statistics.yes / total) : 0;
+                const noPercentage = total > 0 ? (stat.statistics.no / total) : 0;
+                const yesDashLength = yesPercentage * circumference;
+                const noDashLength = noPercentage * circumference;
+                
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    {/* Pie Chart */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="200" height="200" viewBox="0 0 200 200" style={{ transform: 'rotate(-90deg)' }}>
+                        {/* Background circle */}
+                        <circle
+                          cx="100"
+                          cy="100"
+                          r="80"
+                          fill="none"
+                          stroke="#e5e7eb"
+                          strokeWidth="40"
+                        />
+                        {/* Yes segment - chỉ hiển thị nếu yes > 0 */}
+                        {stat.statistics.yes > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="#dc2626"
+                            strokeWidth="40"
+                            strokeDasharray={`${yesDashLength} ${circumference}`}
+                            strokeDashoffset="0"
+                          />
+                        )}
+                        {/* No segment - chỉ hiển thị nếu no > 0 */}
+                        {stat.statistics.no > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="#f59e0b"
+                            strokeWidth="40"
+                            strokeDasharray={`${noDashLength} ${circumference}`}
+                            strokeDashoffset={stat.statistics.yes > 0 ? `-${yesDashLength}` : '0'}
+                          />
+                        )}
+                      </svg>
+                      </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '16px', height: '16px', backgroundColor: '#dc2626', borderRadius: '4px' }}></div>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>Có</span>
+                          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                            {stat.statistics.yesPercentage}% ({stat.statistics.yes})
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '16px', height: '16px', backgroundColor: '#f59e0b', borderRadius: '4px' }}></div>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>Không</span>
+                          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                            {stat.statistics.noPercentage}% ({stat.statistics.no})
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#f59e0b', borderRadius: '4px' }}></div>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>Không</span>
-                        <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                          {stat.statistics.noPercentage}% ({stat.statistics.no})
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {stat.questionType === 'text' && (() => {
                 const allAnswers = stat.statistics.sampleAnswers || [];
@@ -506,8 +477,11 @@ export default function FeedbackSummary() {
                       }}
                     >
                       {displayedAnswers.map((answer, ai) => {
-                        // Calculate time ago (mock for now, should come from backend)
-                        const timeAgo = ai === 0 ? '2 giờ trước' : ai === 1 ? '5 giờ trước' : ai === 2 ? '1 ngày trước' : ai === 3 ? '2 ngày trước' : `${ai + 1} ngày trước`;
+                        // Lấy thời gian thực từ backend
+                        const answerText = typeof answer === 'string' ? answer : answer.text || answer;
+                        const submittedAt = typeof answer === 'object' && answer.submittedAt ? answer.submittedAt : null;
+                        const timeAgoText = submittedAt ? timeAgo(submittedAt) : 'Không xác định';
+                        
                         return (
                           <div key={ai} style={{ 
                             padding: '16px', 
@@ -518,11 +492,11 @@ export default function FeedbackSummary() {
                             border: '1px solid #e5e7eb'
                           }}>
                             <div style={{ marginBottom: '8px', lineHeight: '1.5' }}>
-                              "{typeof answer === 'string' ? answer : answer.text || answer}"
+                              "{answerText}"
                             </div>
                             <div style={{ fontSize: '12px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Clock size={18} />
-                              {timeAgo}
+                              {timeAgoText}
                             </div>
                           </div>
                         );
