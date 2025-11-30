@@ -57,6 +57,17 @@ const sanitizeMeetingTimes = (
   };
 };
 
+// Validate URL format
+const isValidUrl = (string) => {
+  if (!string || !string.trim()) return false;
+  try {
+    const url = new URL(string);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+};
+
 export default function CreateDepartmentCalendarPage() {
   const navigate = useNavigate();
   const { eventId, departmentId } = useParams();
@@ -183,12 +194,23 @@ export default function CreateDepartmentCalendarPage() {
       setError("Vui lòng nhập địa điểm");
       return;
     }
+    // Validate URL for online meetings
+    if (formData.locationType === "online" && !isValidUrl(formData.location.trim())) {
+      setError("Vui lòng nhập link hợp lệ (bắt đầu bằng http:// hoặc https://)");
+      return;
+    }
     if (!formData.meetingDate) {
       setError("Vui lòng chọn ngày họp");
       return;
     }
     if (!formData.startTime || !formData.endTime) {
       setError("Vui lòng nhập đầy đủ thời gian");
+      return;
+    }
+    // Validate attachment links
+    const invalidAttachments = formData.attachments.filter(link => link.trim() !== "" && !isValidUrl(link.trim()));
+    if (invalidAttachments.length > 0) {
+      setError("Các link tài liệu phải là URL hợp lệ (bắt đầu bằng http:// hoặc https://)");
       return;
     }
     if (
@@ -216,7 +238,7 @@ export default function CreateDepartmentCalendarPage() {
         endTime: formData.endTime,
         participantType: formData.participantType === "all" ? "all" : undefined,
         notes: formData.notes,
-        attachments: formData.attachments.filter((link) => link.trim() !== ""),
+        attachments: formData.attachments.filter((link) => link.trim() !== "" && isValidUrl(link.trim())),
       };
       if (formData.participantType === "members") {
         submitData.members = formData.selectedMembers;

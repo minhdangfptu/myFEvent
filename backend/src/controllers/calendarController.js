@@ -794,14 +794,33 @@ export const getMyCalendarInEvent = async (req, res) => {
             }
         }
         const membershipId = membership._id.toString();
+        const userDepartmentId = membership.departmentId?.toString();
+        
         const myCalendars = calendars.filter(calendar => {
-            return Array.isArray(calendar.participants) && calendar.participants.some(participant => {
+            // Check if user is in participants list
+            const isParticipant = Array.isArray(calendar.participants) && calendar.participants.some(participant => {
                 const memberField = participant?.member;
                 const participantMemberId = (memberField && typeof memberField === 'object')
                     ? (memberField._id || memberField)?.toString()
                     : (memberField)?.toString();
                 return participantMemberId === membershipId;
             });
+            
+            // If user is a participant, include the calendar
+            if (isParticipant) return true;
+            
+            // For department calendars: if user belongs to that department, show the meeting
+            // This fixes the issue where members joining later can see department meetings
+            if (calendar.departmentId && userDepartmentId) {
+                const calendarDepartmentId = (typeof calendar.departmentId === 'object' && calendar.departmentId._id)
+                    ? calendar.departmentId._id.toString()
+                    : calendar.departmentId.toString();
+                if (calendarDepartmentId === userDepartmentId) {
+                    return true;
+                }
+            }
+            
+            return false;
         });
         return res.status(200).json({ data: myCalendars });
     } catch (error) {
@@ -1007,6 +1026,52 @@ export const removeParticipant = async (req, res) => {
       message: 'Lỗi server khi xóa người tham gia'
     });
   }
+};
+
+export const deleteCalendar = async (req, res) => {
+    try {
+        const { calendarId } = req.params;
+        const calendar = await getCalendarById(calendarId);
+        if (!calendar) {
+            return res.status(404).json({ message: 'Calendar not found' });
+        }
+
+        // Permission checks - same as update
+        let ownerMemberid = null;
+        if (calendar.eventId) {
+            const requesterMembership = await getRequesterMembership(calendar.eventId?.toString(), req.user?.id);
+            const isHoOC = requesterMembership?.role === 'HoOC';
+            ownerMemberid = requesterMembership?._id;
+            if (!isHoOC) {
+                return res.status(403).json({ message: 'Only HoOC can delete calendar for event!' });
+            }
+        } else if (calendar.departmentId) {
+            const department = await findDepartmentById(calendar.departmentId?.toString());
+            if (!department) {
+                return res.status(404).json({ message: 'Department not found' });
+            }
+            const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
+            const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
+            ownerMemberid = requesterMembership?._id;
+            if (!isHoDOfDepartment) {
+                return res.status(403).json({ message: 'Only HoD of this department can delete calendar for this department!' });
+            }
+        }
+
+        // Delete the calendar
+        const Calendar = (await import('../models/calendar.js')).default;
+        await Calendar.findByIdAndDelete(calendarId);
+
+        return res.status(200).json({
+            message: 'Calendar deleted successfully',
+            data: { calendarId }
+        });
+    } catch (error) {
+        console.error('Error in deleteCalendar:', error);
+        return res.status(500).json({
+            message: 'Failed to delete calendar'
+        });
+    }
 };
 
 export const sendReminder = async (req, res) => {
