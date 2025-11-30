@@ -469,18 +469,17 @@ export default function HoOCSidebar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvent && (
               <>
-                {isEventCompleted && (
-                  <button
-                    className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
-                    onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
-                    title="Phản hồi sự kiện"
-                  >
-                    <div className="d-flex align-items-center">
-                      <MessageSquareText size={20} className="me-3" />
-                      {sidebarOpen && <span>Phản hồi</span>}
-                    </div>
-                  </button>
-                )}
+                {/* Phản hồi - Hiển thị luôn khi có sự kiện */}
+                <button
+                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                  onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                  title="Phản hồi sự kiện"
+                >
+                  <div className="d-flex align-items-center">
+                    <MessageSquareText size={20} className="me-3" />
+                    {sidebarOpen && <span>Phản hồi</span>}
+                  </div>
+                </button>
 
                 <div
                   className="menu-item-hover"

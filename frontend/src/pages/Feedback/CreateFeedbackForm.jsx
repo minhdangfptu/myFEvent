@@ -9,13 +9,13 @@ import { useEvents } from '../../contexts/EventContext';
 import { ArrowDown, ArrowUp, Eye, Menu, RotateCw, Trash, X } from "lucide-react";
 
 
-const formatDateTimeLocal = (value) => {
+const formatDateLocal = (value) => {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const offset = date.getTimezoneOffset();
   const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 16);
+  return local.toISOString().slice(0, 10); // Only date, no time
 };
 
 export default function CreateFeedbackForm() {
@@ -38,33 +38,37 @@ export default function CreateFeedbackForm() {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [formStatus, setFormStatus] = useState('draft');
-  const MINUTE_BUFFER_MS = 60 * 1000;
-  const ONE_MINUTE = 60 * 1000;
-  const [currentMinTime, setCurrentMinTime] = useState(formatDateTimeLocal(new Date()));
+  const [currentMinDate, setCurrentMinDate] = useState(formatDateLocal(new Date()));
 
   const getDefaultCloseTime = () => {
     const now = new Date();
     const plusOneDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    return formatDateTimeLocal(plusOneDay);
+    return formatDateLocal(plusOneDay);
   };
 
-  const applyMinuteBuffer = (dateObj) => new Date(dateObj.getTime() + MINUTE_BUFFER_MS);
   const clampToFuture = (value) => {
-    if (!value) return currentMinTime;
-    const timestamp = new Date(value);
-    if (timestamp < new Date(currentMinTime)) {
-      toast.info('Thời gian mở không được trước hiện tại, đã tự động điều chỉnh.');
-      return currentMinTime;
+    if (!value) return currentMinDate;
+    const date = new Date(value);
+    const minDate = new Date(currentMinDate);
+    minDate.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    if (date < minDate) {
+      toast.info('Ngày mở không được trước hiện tại, đã tự động điều chỉnh.');
+      return currentMinDate;
     }
     return value;
   };
   const clampCloseTime = (value) => {
     if (!value) return getDefaultCloseTime();
     const closeDate = new Date(value);
-    const minCloseDate = formData.openTime ? applyMinuteBuffer(new Date(formData.openTime)) : new Date(currentMinTime);
-    if (closeDate < minCloseDate) {
-      toast.info('Thời gian đóng phải sau thời gian mở ít nhất 1 phút, đã tự động điều chỉnh.');
-      return formatDateTimeLocal(minCloseDate);
+    closeDate.setHours(0, 0, 0, 0);
+    const openDate = formData.openTime ? new Date(formData.openTime) : new Date(currentMinDate);
+    openDate.setHours(0, 0, 0, 0);
+    if (closeDate <= openDate) {
+      const nextDay = new Date(openDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      toast.info('Ngày đóng phải sau ngày mở, đã tự động điều chỉnh.');
+      return formatDateLocal(nextDay);
     }
     return value;
   };
@@ -84,15 +88,12 @@ export default function CreateFeedbackForm() {
   };
 
   const closeTimeMinimum = formData.openTime
-    ? formatDateTimeLocal(applyMinuteBuffer(new Date(formData.openTime)))
-    : formatDateTimeLocal(applyMinuteBuffer(new Date()));
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentMinTime(formatDateTimeLocal(new Date()));
-    }, ONE_MINUTE);
-    return () => clearInterval(interval);
-  }, []);
+    ? (() => {
+        const openDate = new Date(formData.openTime);
+        openDate.setDate(openDate.getDate() + 1);
+        return formatDateLocal(openDate);
+      })()
+    : getDefaultCloseTime();
 
   useEffect(() => {
     if (eventId) {
@@ -103,7 +104,7 @@ export default function CreateFeedbackForm() {
           if (isEdit && formId) {
             await loadForm();
           } else {
-            const nowLocal = formatDateTimeLocal(new Date());
+            const nowLocal = formatDateLocal(new Date());
             const defaultClose = getDefaultCloseTime();
             setFormData(prev => ({
               ...prev,
@@ -162,8 +163,8 @@ export default function CreateFeedbackForm() {
       setFormData({
         name: form.name || '',
         description: form.description || '',
-        openTime: formatDateTimeLocal(form.openTime),
-        closeTime: formatDateTimeLocal(form.closeTime),
+        openTime: formatDateLocal(form.openTime),
+        closeTime: formatDateLocal(form.closeTime),
         targetAudience: ['Member', 'HoD'], // Luôn set cho Member và HoD
         questions: form.questions || []
       });
@@ -383,10 +384,18 @@ export default function CreateFeedbackForm() {
 
 
   const isReadOnly = isEdit && formStatus !== 'draft';
+  const canEditCloseTime = isEdit && (formStatus === 'open' || formStatus === 'closed');
 
   const handleSubmit = async (publish = false) => {
-    if (isReadOnly) {
+    // Allow updating closeTime for published forms
+    if (isReadOnly && !canEditCloseTime) {
       toast.error('Biểu mẫu đã xuất bản, không thể chỉnh sửa');
+      return;
+    }
+    
+    // If only updating closeTime for published form
+    if (canEditCloseTime && publish) {
+      toast.error('Biểu mẫu đã xuất bản, chỉ có thể cập nhật thời gian đóng');
       return;
     }
     // Validation
@@ -396,28 +405,33 @@ export default function CreateFeedbackForm() {
     }
 
     if (!formData.openTime || !formData.closeTime) {
-      toast.error('Vui lòng chọn thời gian mở và đóng');
+      toast.error('Vui lòng chọn ngày mở và đóng');
       return;
     }
 
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const openTimeDate = new Date(formData.openTime);
+    openTimeDate.setHours(0, 0, 0, 0);
     const closeTimeDate = new Date(formData.closeTime);
-    const openTimeBuffered = applyMinuteBuffer(openTimeDate);
-    const closeTimeBuffered = applyMinuteBuffer(closeTimeDate);
+    closeTimeDate.setHours(23, 59, 59, 999); // Set to end of day
 
     if (openTimeDate >= closeTimeDate) {
-      toast.error('Thời gian đóng phải sau thời gian mở');
+      toast.error('Ngày đóng phải sau ngày mở');
       return;
     }
 
-    if (openTimeBuffered < now) {
-      toast.error('Thời gian mở phải ở hiện tại hoặc tương lai');
+    // Cho phép chọn ngày hôm nay (so sánh chỉ theo ngày, không theo giờ phút)
+    if (openTimeDate < now) {
+      toast.error('Ngày mở phải ở hiện tại hoặc tương lai');
       return;
     }
 
-    if (closeTimeBuffered <= now) {
-      toast.error('Thời gian đóng phải ở tương lai');
+    // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+    if (closeTimeDate <= todayEnd) {
+      toast.error('Ngày đóng phải ở tương lai');
       return;
     }
 
@@ -456,6 +470,18 @@ export default function CreateFeedbackForm() {
 
     try {
       setSubmitting(true);
+      
+      // If updating only closeTime for published form
+      if (canEditCloseTime) {
+        const submitData = {
+          closeTime: closeTimeDate.toISOString()
+        };
+        await feedbackApi.updateForm(eventId, formId, submitData);
+        toast.success('Cập nhật thời gian đóng thành công');
+        navigate(`/events/${eventId}/feedback`);
+        return;
+      }
+      
       const normalizedQuestions = formData.questions.map((q) => {
         if (q.questionType !== 'multiple-choice') return q;
         return {
@@ -463,11 +489,18 @@ export default function CreateFeedbackForm() {
           options: q.options.map(opt => opt.trim()).filter(opt => opt !== '')
         };
       });
+      
+      // Set openTime to start of day, closeTime to end of day
+      const openTimeStart = new Date(openTimeDate);
+      openTimeStart.setHours(0, 0, 0, 0);
+      const closeTimeEnd = new Date(closeTimeDate);
+      closeTimeEnd.setHours(23, 59, 59, 999);
+      
       const submitData = {
         ...formData,
         targetAudience: ['Member', 'HoD'], // Luôn set cho Member và HoD
-        openTime: openTimeBuffered.toISOString(),
-        closeTime: closeTimeBuffered.toISOString(),
+        openTime: openTimeStart.toISOString(),
+        closeTime: closeTimeEnd.toISOString(),
         questions: normalizedQuestions
       };
 
@@ -565,7 +598,9 @@ export default function CreateFeedbackForm() {
 
           {isReadOnly && (
             <div style={{ padding: '12px 16px', backgroundColor: '#fff7ed', borderRadius: '8px', color: '#c2410c', marginBottom: '16px' }}>
-              Biểu mẫu đã được xuất bản hoặc đóng. Bạn chỉ có thể xem nội dung mà không thể chỉnh sửa.
+              {canEditCloseTime 
+                ? 'Biểu mẫu đã được xuất bản. Bạn chỉ có thể thay đổi thời gian đóng.'
+                : 'Biểu mẫu đã được xuất bản hoặc đóng. Bạn chỉ có thể xem nội dung mà không thể chỉnh sửa.'}
             </div>
           )}
 
@@ -623,37 +658,43 @@ export default function CreateFeedbackForm() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                        Thời gian mở
+                        Ngày mở
                       </label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       value={formData.openTime}
                       onChange={(e) => handleOpenTimeChange(e.target.value)}
-                      min={currentMinTime}
+                      min={currentMinDate}
+                      disabled={isReadOnly}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '8px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isReadOnly ? 0.6 : 1,
+                          cursor: isReadOnly ? 'not-allowed' : 'text'
                         }}
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                        Thời gian đóng
+                        Ngày đóng
                       </label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       value={formData.closeTime}
                       onChange={(e) => handleCloseTimeChange(e.target.value)}
                       min={closeTimeMinimum}
+                      disabled={isReadOnly && !canEditCloseTime}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '8px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: (isReadOnly && !canEditCloseTime) ? 0.6 : 1,
+                          cursor: (isReadOnly && !canEditCloseTime) ? 'not-allowed' : 'text'
                         }}
                       />
                     </div>
@@ -845,13 +886,13 @@ export default function CreateFeedbackForm() {
                 </div>
               </div>
 
-              {!isReadOnly && (
+              {(!isReadOnly || canEditCloseTime) && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
                   <button
                     onClick={() => handleSubmit(false)}
                     disabled={submitting}
                     style={{
-                      backgroundColor: '#6b7280',
+                      backgroundColor: canEditCloseTime ? '#2563eb' : '#6b7280',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
@@ -865,7 +906,7 @@ export default function CreateFeedbackForm() {
                     }}
                   >
                     {submitting && <i className="bi bi-arrow-clockwise spin-animation"></i>}
-                    {submitting ? 'Đang lưu...' : 'Lưu nháp'}
+                    {submitting ? 'Đang lưu...' : canEditCloseTime ? 'Cập nhật thời gian đóng' : 'Lưu nháp'}
                   </button>
                 </div>
               )}

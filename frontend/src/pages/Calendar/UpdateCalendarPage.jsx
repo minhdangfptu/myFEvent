@@ -74,7 +74,7 @@ export default function UpdateEventCalendarPage() {
     const [loadingCalendar, setLoadingCalendar] = useState(true);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [isManageParticipantsOpen, setIsManageParticipantsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState("list"); // "list", "add", "remind"
+    const [activeTab, setActiveTab] = useState("list"); 
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState("all");
 
@@ -163,11 +163,9 @@ export default function UpdateEventCalendarPage() {
             setSelectedMembers([]);
             setActiveTab("list");
 
-            // Refresh calendar data
             const updatedCalendar = await calendarService.getCalendarEventDetail(eventId, calendarId);
             setCurrentParticipants(updatedCalendar.data.participants || []);
 
-            // Refresh available members
             fetchAvailableMembers();
         } catch (error) {
             console.error('Error adding participants:', error);
@@ -184,11 +182,9 @@ export default function UpdateEventCalendarPage() {
             const response = await calendarService.removeParticipant(eventId, calendarId, memberId);
             toast.success(response.message || `Đã xóa ${memberName} khỏi cuộc họp`);
 
-            // Refresh calendar data
             const updatedCalendar = await calendarService.getCalendarEventDetail(eventId, calendarId);
             setCurrentParticipants(updatedCalendar.data.participants || []);
             
-            // Refresh available members list
             await fetchAvailableMembers();
         } catch (error) {
             console.error('Error removing participant:', error);
@@ -197,7 +193,6 @@ export default function UpdateEventCalendarPage() {
     };
 
     const handleSendReminder = async () => {
-        // Prevent spam clicking
         if (isSendingReminder) {
             return;
         }
@@ -207,7 +202,6 @@ export default function UpdateEventCalendarPage() {
             const response = await calendarService.sendReminder(eventId, calendarId, remindTarget);
             toast.success(response.message || 'Đã gửi nhắc nhở thành công');
             setIsManageParticipantsOpen(false);
-            // Disable button for 3 seconds to prevent spam
             setTimeout(() => {
                 setIsSendingReminder(false);
             }, 3000);
@@ -221,12 +215,10 @@ export default function UpdateEventCalendarPage() {
     const getFilteredParticipants = () => {
         let filtered = currentParticipants;
 
-        // Filter by status
         if (filterStatus !== 'all') {
             filtered = filtered.filter(p => p.participateStatus === filterStatus);
         }
 
-        // Filter by search query
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(p =>
@@ -238,7 +230,6 @@ export default function UpdateEventCalendarPage() {
         return filtered;
     };
 
-    // Categorize participants by status
     const attendees = currentParticipants.filter(p => p.participateStatus === 'confirmed');
     const notAttending = currentParticipants.filter(p => p.participateStatus === 'absent');
     const pending = currentParticipants.filter(p => p.participateStatus === 'unconfirmed');
@@ -254,7 +245,6 @@ export default function UpdateEventCalendarPage() {
     const [calendarDepartmentId, setCalendarDepartmentId] = useState(null);
     const [calendarCreatorId, setCalendarCreatorId] = useState(null);
 
-    // Load calendar data để populate form
     useEffect(() => {
         const loadCalendarData = async () => {
             if (!eventId || !calendarId) return;
@@ -266,7 +256,6 @@ export default function UpdateEventCalendarPage() {
 
                 setCurrentParticipants(calendar.participants || []);
 
-                // Parse date and time
                 const startDate = new Date(calendar.startAt);
                 const endDate = new Date(calendar.endAt);
 
@@ -274,24 +263,21 @@ export default function UpdateEventCalendarPage() {
                 const startTime = startDate.toTimeString().slice(0, 5);
                 const endTime = endDate.toTimeString().slice(0, 5);
 
-                // Determine calendar scope
                 const depId = calendar.departmentId || null;
                 setIsDepartmentCalendar(!!depId);
                 setCalendarDepartmentId(depId);
 
-                // Default participant UI state (we will let user re-select on update)
                 let participantType = depId ? "all" : "all";
                 let selectedDepartments = [];
                 let selectedCoreTeam = [];
 
-                // Don't sanitize times when editing - preserve original values
                 setFormData({
                     name: calendar.name || "",
                     locationType: calendar.locationType || "online",
                     location: calendar.location || "",
                     meetingDate,
-                    startTime: startTime, // Use original start time
-                    endTime: endTime, // Use original end time
+                    startTime: startTime, 
+                    endTime: endTime, 
                     participantType,
                     selectedDepartments,
                     selectedCoreTeam,
@@ -390,10 +376,9 @@ export default function UpdateEventCalendarPage() {
             let startMinutes = startH * 60 + startM;
             let endMinutes = endH * 60 + endM;
 
-            // Nếu endTime < startTime, nghĩa là sang ngày hôm sau
             const isOvernight = endH < startH || (endH === startH && endM < startM);
             if (isOvernight) {
-                endMinutes += 24 * 60; // Cộng thêm 24 giờ
+                endMinutes += 24 * 60; 
             }
 
             const duration = endMinutes - startMinutes;
@@ -411,7 +396,6 @@ export default function UpdateEventCalendarPage() {
         e.preventDefault();
         setError("");
 
-        // Validation
         if (!formData.name.trim()) {
             setError("Vui lòng nhập tên cuộc họp");
             return;
@@ -420,7 +404,6 @@ export default function UpdateEventCalendarPage() {
             setError("Vui lòng nhập địa điểm");
             return;
         }
-        // Validate URL for online meetings
         if (formData.locationType === "online" && !isValidUrl(formData.location.trim())) {
             setError("Vui lòng nhập link hợp lệ (bắt đầu bằng http:// hoặc https://)");
             return;
@@ -433,14 +416,12 @@ export default function UpdateEventCalendarPage() {
             setError("Vui lòng nhập đầy đủ thời gian");
             return;
         }
-        // Validate attachment links
         const invalidAttachments = formData.attachments.filter(link => link.trim() !== "" && !isValidUrl(link.trim()));
         if (invalidAttachments.length > 0) {
             setError("Các link tài liệu phải là URL hợp lệ (bắt đầu bằng http:// hoặc https://)");
             return;
         }
 
-        // Validate participants
         if (!isDepartmentCalendar) {
             if (formData.participantType === "departments" && formData.selectedDepartments.length === 0) {
                 setError("Vui lòng chọn ít nhất một ban");
@@ -465,12 +446,10 @@ export default function UpdateEventCalendarPage() {
         const selectedStartDateTime = new Date(formData.meetingDate + 'T' + formData.startTime + ':00');
         const selectedEndDateTime = new Date(formData.meetingDate + 'T' + formData.endTime + ':00');
 
-        // Nếu giờ kết thúc < giờ bắt đầu, nghĩa là sang ngày hôm sau
         if (endH < startH || (endH === startH && endM < startM)) {
             selectedEndDateTime.setDate(selectedEndDateTime.getDate() + 1);
         }
 
-        // Kiểm tra thời gian bắt đầu có trong quá khứ không
         if (selectedStartDateTime < now) {
             setError("Không thể tạo cuộc họp với thời gian trong quá khứ");
             return;
@@ -479,7 +458,6 @@ export default function UpdateEventCalendarPage() {
         setLoading(true);
 
         try {
-            // TẠO updateData OBJECT
             const updateData = {
                 name: formData.name,
                 locationType: formData.locationType,
@@ -504,7 +482,6 @@ export default function UpdateEventCalendarPage() {
                 }
             }
 
-            // WRAP updateData TRONG OBJECT
             const submitData = {
                 updateData: updateData
             };

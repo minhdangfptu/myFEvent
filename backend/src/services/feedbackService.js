@@ -168,12 +168,21 @@ export const feedbackService = {
     }
 
     const now = new Date();
-    if (new Date(openTime) < now) {
+    // So sánh chỉ theo ngày (không theo giờ phút) để cho phép chọn ngày hôm nay
+    const nowDateOnly = new Date(now);
+    nowDateOnly.setHours(0, 0, 0, 0);
+    const openTimeDateOnly = new Date(openTime);
+    openTimeDateOnly.setHours(0, 0, 0, 0);
+    const closeTimeDateOnly = new Date(closeTime);
+    closeTimeDateOnly.setHours(0, 0, 0, 0);
+    
+    if (openTimeDateOnly < nowDateOnly) {
       const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
       err.status = 400;
       throw err;
     }
-    if (new Date(closeTime) <= now) {
+    // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
+    if (closeTimeDateOnly <= nowDateOnly) {
       const err = new Error('Thời gian đóng phải ở tương lai');
       err.status = 400;
       throw err;
@@ -242,19 +251,30 @@ export const feedbackService = {
       throw err;
     }
 
-    // Can't update if form is published and has responses
-    if (form.status === 'open' || form.status === 'closed') {
-      const responseCount = await FeedbackResponse.countDocuments({ formId });
-      if (responseCount > 0) {
-        const err = new Error('Không thể chỉnh sửa biểu mẫu đã có phản hồi');
+    const { name, description, openTime, closeTime, questions } = body;
+    
+    // Check if trying to update fields other than closeTime for published forms with responses
+    const responseCount = await FeedbackResponse.countDocuments({ formId });
+    const hasResponses = responseCount > 0;
+    const isPublished = form.status === 'open' || form.status === 'closed';
+    
+    // Allow updating closeTime even for published forms with responses
+    // But block other field updates if form is published and has responses
+    if (isPublished && hasResponses) {
+      const updatingOtherFields = name !== undefined || description !== undefined || 
+                                  openTime !== undefined || questions !== undefined;
+      if (updatingOtherFields) {
+        const err = new Error('Không thể chỉnh sửa biểu mẫu đã có phản hồi. Chỉ có thể thay đổi thời gian đóng.');
         err.status = 400;
         throw err;
       }
     }
 
-    const { name, description, openTime, closeTime, questions } = body;
-
     const now = new Date();
+    // So sánh chỉ theo ngày (không theo giờ phút) để cho phép chọn ngày hôm nay
+    const nowDateOnly = new Date(now);
+    nowDateOnly.setHours(0, 0, 0, 0);
+    
     const nextOpenTime = openTime !== undefined ? new Date(openTime) : form.openTime;
     const nextCloseTime = closeTime !== undefined ? new Date(closeTime) : form.closeTime;
 
@@ -264,16 +284,25 @@ export const feedbackService = {
       throw err;
     }
 
-    if (openTime !== undefined && nextOpenTime < now) {
-      const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
-      err.status = 400;
-      throw err;
+    if (openTime !== undefined) {
+      const nextOpenTimeDateOnly = new Date(nextOpenTime);
+      nextOpenTimeDateOnly.setHours(0, 0, 0, 0);
+      if (nextOpenTimeDateOnly < nowDateOnly) {
+        const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
+        err.status = 400;
+        throw err;
+      }
     }
 
-    if (closeTime !== undefined && nextCloseTime <= now) {
-      const err = new Error('Thời gian đóng phải ở tương lai');
-      err.status = 400;
-      throw err;
+    if (closeTime !== undefined) {
+      const nextCloseTimeDateOnly = new Date(nextCloseTime);
+      nextCloseTimeDateOnly.setHours(0, 0, 0, 0);
+      // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
+      if (nextCloseTimeDateOnly <= nowDateOnly) {
+        const err = new Error('Thời gian đóng phải ở tương lai');
+        err.status = 400;
+        throw err;
+      }
     }
 
     if (name !== undefined) form.name = name.trim();
@@ -676,10 +705,25 @@ export const feedbackService = {
           noPercentage: total > 0 ? ((noCount / total) * 100).toFixed(1) : 0
         };
       } else if (question.questionType === 'text') {
-        const textAnswers = questionResponses.map(r => r.answer).filter(Boolean);
+        // Map responses với cả answer và submittedAt từ parent response
+        const textAnswersWithTime = responses
+          .map(response => {
+            const questionResp = response.responses.find(resp => resp.questionId === index.toString());
+            if (questionResp && questionResp.answer) {
+              return {
+                text: questionResp.answer,
+                submittedAt: response.submittedAt
+              };
+            }
+            return null;
+          })
+          .filter(Boolean)
+          .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)) // Sắp xếp mới nhất trước
+          .slice(0, 10); // First 10 for preview
+        
         stats.statistics = {
-          totalTextResponses: textAnswers.length,
-          sampleAnswers: textAnswers.slice(0, 10) // First 10 for preview
+          totalTextResponses: textAnswersWithTime.length,
+          sampleAnswers: textAnswersWithTime
         };
       }
 
