@@ -370,6 +370,33 @@ const getRoleLabel = (role) => {
       toast.error("Vui lòng điền đủ các trường bắt buộc");
       return;
     }
+    
+    // Validate deadline và startDate của sub task không được vượt quá deadline của epic task
+    if (form.parentId) {
+      const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+      if (parentTask && parentTask.dueDate) {
+        const parentDeadline = new Date(parentTask.dueDate);
+        
+        // Validate deadline
+        const subTaskDeadline = new Date(form.dueDate);
+        if (subTaskDeadline > parentDeadline) {
+          toast.error(`Deadline của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+          setSaving(false);
+          return;
+        }
+        
+        // Validate startDate
+        if (form.startDate) {
+          const subTaskStartDate = new Date(form.startDate);
+          if (subTaskStartDate > parentDeadline) {
+            toast.error(`Thời gian bắt đầu của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+            setSaving(false);
+            return;
+          }
+        }
+      }
+    }
+    
     setSaving(true);
     try {
       const dependencies = (form.dependenciesText || "")
@@ -817,6 +844,25 @@ const getRoleLabel = (role) => {
           )}
         </div>
       </div>
+      <div className="row">
+        <div className="col-md-6 mb-3">
+          <label className="form-label">Tiến độ (%)</label>
+          <input
+            type="number"
+            className="form-control"
+            min={0}
+            max={100}
+            step={1}
+            value={form.progressPct}
+            onChange={(e) => handleChange("progressPct", e.target.value)}
+            placeholder="0-100"
+            disabled={!canEditFields}
+          />
+          <div className="form-text small text-muted">
+            Nhập phần trăm hoàn thành (0-100)
+          </div>
+        </div>
+      </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
         <div className="d-flex flex-wrap gap-5">
@@ -991,11 +1037,25 @@ const getRoleLabel = (role) => {
             }
             return minDateTime;
           })()}
-          max={
-            eventInfo?.eventEndDate
+          max={(() => {
+            // Nếu có parent task, giới hạn startDate không vượt quá deadline của epic task
+            if (form.parentId) {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                const parentDeadline = new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                // Nếu có eventEndDate, lấy giá trị nhỏ hơn giữa parent deadline và event end date
+                if (eventInfo?.eventEndDate) {
+                  const eventEnd = new Date(eventInfo.eventEndDate).toISOString().slice(0, 16);
+                  return parentDeadline < eventEnd ? parentDeadline : eventEnd;
+                }
+                return parentDeadline;
+              }
+            }
+            // Nếu không có parent, dùng event end date
+            return eventInfo?.eventEndDate
               ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined
-          }
+              : undefined;
+          })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
@@ -1008,6 +1068,13 @@ const getRoleLabel = (role) => {
               `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
                 "vi-VN"
               )}`}
+            {form.parentId && (() => {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+              }
+              return "";
+            })()}
           </div>
         )}
       </div>
@@ -1035,11 +1102,25 @@ const getRoleLabel = (role) => {
             }
             return minDateTime;
           })()}
-          max={
-            eventInfo?.eventEndDate
+          max={(() => {
+            // Nếu có parent task, giới hạn deadline không vượt quá deadline của epic task
+            if (form.parentId) {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                const parentDeadline = new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                // Nếu có eventEndDate, lấy giá trị nhỏ hơn giữa parent deadline và event end date
+                if (eventInfo?.eventEndDate) {
+                  const eventEnd = new Date(eventInfo.eventEndDate).toISOString().slice(0, 16);
+                  return parentDeadline < eventEnd ? parentDeadline : eventEnd;
+                }
+                return parentDeadline;
+              }
+            }
+            // Nếu không có parent, dùng event end date
+            return eventInfo?.eventEndDate
               ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined
-          }
+              : undefined;
+          })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
@@ -1053,6 +1134,13 @@ const getRoleLabel = (role) => {
               `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
                 "vi-VN"
               )}`}
+            {form.parentId && (() => {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+              }
+              return "";
+            })()}
           </div>
         )}
       </div>

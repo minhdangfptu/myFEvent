@@ -8,7 +8,7 @@ import { userApi } from "../../apis/userApi";
 import Loading from "~/components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
-import { formatDate, formatDateForInput } from "../../utils/formatDate";
+import { formatDate, formatDateForInput, formatDateTime } from "../../utils/formatDate";
 import { AlertTriangle, AlignLeft, Calendar, CalendarCheck, Check, CheckCircle, Copy, Edit, Eye, FileText, Grid, Hash, Image, Info, Link, Lock, MapPin, Pencil, PlayCircle, ShieldCheck, Sliders, Trash, Upload, User, Users, X, XCircle, XOctagon, Zap } from "lucide-react";
 
 
@@ -22,12 +22,18 @@ function formatDateTimeForInput(value) {
   if (!value) return "";
   let d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  // Format: yyyy-MM-ddTHH:mm for datetime-local input
+  
+  // Fix timezone issue: Get local date/time components to avoid timezone conversion
+  // This ensures the displayed time matches what user sees, not UTC conversion
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
+  
+  // Use getHours() and getMinutes() which return local time, not UTC
+  // This prevents the 18:11 default time issue
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
+  
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
@@ -1382,13 +1388,20 @@ const handleImageUpload = async () => {
                       value={editing ? formatDateTimeForInput(editForm.eventStartDate) : formatDateTimeForInput(event.eventStartDate)} 
                       onChange={(e) => {
                         // Convert datetime-local value to ISO string
-                        const dateValue = e.target.value ? new Date(e.target.value).toISOString() : "";
-                        setEditForm({ ...editForm, eventStartDate: dateValue });
+                        // datetime-local input gives local time, convert to ISO string for backend
+                        if (e.target.value) {
+                          // Parse as local time and convert to ISO (UTC) for storage
+                          const localDate = new Date(e.target.value);
+                          const dateValue = localDate.toISOString();
+                          setEditForm({ ...editForm, eventStartDate: dateValue });
+                        } else {
+                          setEditForm({ ...editForm, eventStartDate: "" });
+                        }
                       }} 
                       disabled={!editing} 
                     />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {editing ? (editForm.eventStartDate ? new Date(editForm.eventStartDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventStartDate ? new Date(event.eventStartDate).toLocaleString("vi-VN") : "Chưa có")}
+                      Hiển thị: {editing ? (editForm.eventStartDate ? formatDateTime(editForm.eventStartDate) : "Chưa có") : (event.eventStartDate ? formatDateTime(event.eventStartDate) : "Chưa có")}
                     </small>
                   </div>
 
@@ -1400,13 +1413,20 @@ const handleImageUpload = async () => {
                       value={editing ? formatDateTimeForInput(editForm.eventEndDate) : formatDateTimeForInput(event.eventEndDate)} 
                       onChange={(e) => {
                         // Convert datetime-local value to ISO string
-                        const dateValue = e.target.value ? new Date(e.target.value).toISOString() : "";
-                        setEditForm({ ...editForm, eventEndDate: dateValue });
+                        // datetime-local input gives local time, convert to ISO string for backend
+                        if (e.target.value) {
+                          // Parse as local time and convert to ISO (UTC) for storage
+                          const localDate = new Date(e.target.value);
+                          const dateValue = localDate.toISOString();
+                          setEditForm({ ...editForm, eventEndDate: dateValue });
+                        } else {
+                          setEditForm({ ...editForm, eventEndDate: "" });
+                        }
                       }} 
                       disabled={!editing} 
                     />
                     <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.25rem", display: "block" }}>
-                      Hiển thị: {editing ? (editForm.eventEndDate ? new Date(editForm.eventEndDate).toLocaleString("vi-VN") : "Chưa có") : (event.eventEndDate ? new Date(event.eventEndDate).toLocaleString("vi-VN") : "Chưa có")}
+                      Hiển thị: {editing ? (editForm.eventEndDate ? formatDateTime(editForm.eventEndDate) : "Chưa có") : (event.eventEndDate ? formatDateTime(event.eventEndDate) : "Chưa có")}
                     </small>
                   </div>
                 </div>

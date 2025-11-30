@@ -87,6 +87,14 @@ const calendarService = {
     } catch (error) {
         throw error;
     }
+  },
+  deleteCalendarEvent: async (eventId, calendarId) => {
+    try {
+        const response = await calendarApi.deleteCalendarEvent(eventId, calendarId);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
   }
 };
 export default calendarService;

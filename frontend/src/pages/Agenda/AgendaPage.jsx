@@ -13,12 +13,9 @@ import {
   addDateToAgenda,
   updateDateById,
   removeDateById,
-  findDateById,
   addItemToDateById,
-  batchCreateItemsForDateById,
   updateDayItem,
   removeDayItem,
-  createDateWithItems,
 } from "~/apis/agendaApi";
 import ConfirmModal from "~/components/ConfirmModal";
 import { AlertTriangle, CheckCircle, Pencil, Plus, RotateCw, Trash, XCircle } from "lucide-react";
@@ -214,8 +211,10 @@ const [newDateInput, setNewDateInput] = useState("");
         setFlattenedItems([]);
       }
     } catch (err) {
-      setError(err.message || "Failed to fetch agenda data");
+      const errorMessage = err.response?.data?.message || err.message || "Không thể tải dữ liệu agenda";
+      setError(errorMessage);
       console.error("❌ Error fetching agenda:", err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -313,9 +312,10 @@ const validateDate = (dateString) => {
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
     } catch (err) {
-      setError(err.message || "Failed to delete schedule");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa lịch trình";
+      setError(errorMessage);
       console.error("❌ Error deleting schedule:", err);
-      toast.error(err.message || "Lỗi khi xóa lịch trình");
+      toast.error(errorMessage);
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
     } finally {
@@ -392,10 +392,11 @@ const validateDate = (dateString) => {
       await fetchAgendaData(); // Refresh data
       toast.success("Thêm lịch trình thành công!");
     } catch (err) {
-      setError(err.message || "Failed to add schedule");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm lịch trình";
+      setError(errorMessage);
       console.error("❌ Error adding schedule:", err);
       debugLog("Error when adding schedule", { err, newSchedule, selectedDateId });
-      toast.error(err.message || "Lỗi khi thêm lịch trình");
+      toast.error(errorMessage);
     } finally {
       setIsAddingSchedule(false);
     }
@@ -439,10 +440,11 @@ const validateDate = (dateString) => {
       await fetchAgendaData(); // Refresh data
       toast.success("Thêm ngày thành công!");
     } catch (err) {
-      setError(err.message || "Failed to add new date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm ngày";
+      setError(errorMessage);
       console.error("❌ Error adding date:", err);
       debugLog("Error when adding date", err);
-      toast.error(err.message || "Lỗi khi thêm ngày");
+      toast.error(errorMessage);
     }
   };
 
@@ -476,9 +478,10 @@ const validateDate = (dateString) => {
       setShowDeleteDateModal(false);
       setDateToDelete(null);
     } catch (err) {
-      setError(err.message || "Failed to delete date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa ngày";
+      setError(errorMessage);
       console.error("❌ Error deleting date:", err);
-      toast.error(err.message || "Lỗi khi xóa ngày");
+      toast.error(errorMessage);
       setShowDeleteDateModal(false);
       setDateToDelete(null);
     } finally {
@@ -529,10 +532,11 @@ const validateDate = (dateString) => {
       await fetchAgendaData();
       toast.success("Cập nhật ngày thành công!");
     } catch (err) {
-      setError(err.message || "Failed to update date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật ngày";
+      setError(errorMessage);
       console.error("❌ Error updating date:", err);
       debugLog("Error when updating date", err);
-      toast.error(err.message || "Lỗi khi cập nhật ngày");
+      toast.error(errorMessage);
     }
   };
 
@@ -668,10 +672,11 @@ const validateDate = (dateString) => {
       await fetchAgendaData(); // Fetch fresh data to get correct indices after server-side sorting
       toast.success("Cập nhật lịch trình thành công!");
     } catch (err) {
-      setError(err.message || "Failed to save edit");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật lịch trình";
+      setError(errorMessage);
       console.error("❌ Error saving edit:", err);
       debugLog("Error saving edit", { err, editingSchedule });
-      toast.error(err.message || "Lỗi khi cập nhật");
+      toast.error(errorMessage);
     }
   };
 
@@ -715,25 +720,6 @@ const validateDate = (dateString) => {
               <span className="visually-hidden">Đang tải...</span>
             </div>
             <p className="mt-2">Đang tải dữ liệu agenda...</p>
-          </div>
-        </div>
-      </UserLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()} eventId={eventId}>
-        <div className="agenda-page__container">
-          <div className="alert alert-danger">
-            <h4>Lỗi tải dữ liệu</h4>
-            <p>{error}</p>
-            <button
-              className="btn btn-outline-danger"
-              onClick={fetchAgendaData}
-            >
-              Thử lại
-            </button>
           </div>
         </div>
       </UserLayout>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
+import { AlertCircle, Trash2, Plus, X, Check } from "lucide-react";
 import CancelConfirmModal from "~/components/CancelConfirmModal";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
@@ -55,6 +56,33 @@ const sanitizeMeetingTimes = (meetingDate, startTime, endTime, safeInfo = getSaf
     };
 };
 
+// Validate URL format
+const isValidUrl = (string) => {
+    if (!string || typeof string !== 'string') return false;
+    const trimmed = string.trim();
+    if (!trimmed) return false;
+    
+    // Check if it starts with http:// or https:// (case insensitive)
+    const lowerTrimmed = trimmed.toLowerCase();
+    const isValidProtocol = lowerTrimmed.startsWith('http://') || lowerTrimmed.startsWith('https://');
+    
+    if (!isValidProtocol) {
+        return false;
+    }
+    
+    // Try to create URL object to validate format
+    try {
+        const url = new URL(trimmed);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (error) {
+        // If URL constructor fails but starts with http:// or https://, still accept it
+        // (some URLs might have special characters that URL constructor doesn't like)
+        // But ensure it has at least some content after the protocol
+        const afterProtocol = trimmed.substring(trimmed.indexOf('://') + 3);
+        return afterProtocol.length > 0;
+    }
+};
+
 export default function CreateEventCalendarPage() {
     const navigate = useNavigate();
     const { eventId } = useParams();
@@ -102,6 +130,7 @@ export default function CreateEventCalendarPage() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [timeError, setTimeError] = useState("");
 
     const [departmentsList, setDepartmentsList] = useState([]);
     const [coreTeamList, setCoreTeamList] = useState([]);
@@ -132,6 +161,12 @@ export default function CreateEventCalendarPage() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         const safeInfo = getSafeNowInfo();
+        
+        // Clear time error when user starts typing
+        if (["meetingDate", "startTime", "endTime"].includes(name)) {
+            setTimeError("");
+        }
+        
         setFormData(prev => {
             const updated = { ...prev, [name]: value };
             if (["meetingDate", "startTime", "endTime"].includes(name)) {
@@ -143,6 +178,25 @@ export default function CreateEventCalendarPage() {
                 );
                 updated.startTime = sanitized.startTime;
                 updated.endTime = sanitized.endTime;
+                
+                // Validate: endTime must be after startTime (on the same day)
+                // Only validate when both times are filled
+                if (updated.startTime && updated.endTime && updated.meetingDate) {
+                    const startMinutes = toMinutes(updated.startTime);
+                    const endMinutes = toMinutes(updated.endTime);
+                    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+                        // Set error message only when endTime is being changed and it's wrong
+                        if (name === "endTime") {
+                            setTimeError("Thời gian kết thúc phải sau thời gian bắt đầu");
+                        }
+                    } else {
+                        // Clear error if valid
+                        setTimeError("");
+                    }
+                } else {
+                    // Clear error if either time is empty
+                    setTimeError("");
+                }
             }
             return updated;
         });
@@ -208,6 +262,18 @@ export default function CreateEventCalendarPage() {
             setError("Vui lòng nhập địa điểm");
             return;
         }
+        // Validate URL for online meetings
+        if (formData.locationType === "online") {
+            const locationTrimmed = formData.location ? formData.location.trim() : "";
+            if (!locationTrimmed) {
+                setError("Vui lòng nhập địa điểm");
+                return;
+            }
+            if (!isValidUrl(locationTrimmed)) {
+                setError("Vui lòng nhập link hợp lệ (bắt đầu bằng http:// hoặc https://)");
+                return;
+            }
+        }
         if (!formData.meetingDate) {
             setError("Vui lòng chọn ngày họp");
             return;
@@ -215,6 +281,19 @@ export default function CreateEventCalendarPage() {
         if (!formData.startTime || !formData.endTime) {
             setError("Vui lòng nhập đầy đủ thời gian");
             return;
+        }
+        
+        // Validate attachment links - only validate non-empty links
+        const nonEmptyAttachments = formData.attachments.filter(link => link && link.trim() !== "");
+        if (nonEmptyAttachments.length > 0) {
+            const invalidAttachments = nonEmptyAttachments.filter(link => {
+                const trimmed = link.trim();
+                return !isValidUrl(trimmed);
+            });
+            if (invalidAttachments.length > 0) {
+                setError("Các link tài liệu phải là URL hợp lệ (bắt đầu bằng http:// hoặc https://)");
+                return;
+            }
         }
 
         // Validate participants
@@ -230,19 +309,29 @@ export default function CreateEventCalendarPage() {
         const [startH, startM] = formData.startTime.split(':').map(Number);
         const [endH, endM] = formData.endTime.split(':').map(Number);
 
+        // Validate: endTime must be after startTime (same day)
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        if (endMinutes <= startMinutes) {
+            setTimeError("Thời gian kết thúc phải sau thời gian bắt đầu trong cùng một ngày");
+            setError("Thời gian kết thúc phải sau thời gian bắt đầu trong cùng một ngày");
+            return;
+        }
+
         // KIỂM TRA THỜI GIAN
         const now = new Date();
         const selectedStartDateTime = new Date(formData.meetingDate + 'T' + formData.startTime + ':00');
         const selectedEndDateTime = new Date(formData.meetingDate + 'T' + formData.endTime + ':00');
 
-        // Nếu giờ kết thúc < giờ bắt đầu, nghĩa là sang ngày hôm sau
-        if (endH < startH || (endH === startH && endM < startM)) {
-            selectedEndDateTime.setDate(selectedEndDateTime.getDate() + 1);
-        }
-
         // Kiểm tra thời gian bắt đầu có trong quá khứ không
         if (selectedStartDateTime < now) {
             setError("Không thể tạo cuộc họp với thời gian trong quá khứ");
+            return;
+        }
+        
+        // Validate endTime is after startTime
+        if (selectedEndDateTime <= selectedStartDateTime) {
+            setError("Thời gian kết thúc phải sau thời gian bắt đầu");
             return;
         }
 
@@ -258,7 +347,10 @@ export default function CreateEventCalendarPage() {
                 endAt: selectedEndDateTime.toISOString(),
                 participantType: formData.participantType,
                 notes: formData.notes,
-                attachments: formData.attachments.filter(link => link.trim() !== "")
+                attachments: formData.attachments.filter(link => {
+                    const trimmed = link && link.trim();
+                    return trimmed !== "" && isValidUrl(trimmed);
+                })
             };
 
             if (formData.participantType === "departments") {
@@ -327,7 +419,7 @@ export default function CreateEventCalendarPage() {
                             alignItems: "center",
                             gap: "8px"
                         }}>
-                            <span>⚠️</span>
+                            <AlertCircle size={18} color="#991b1b" />
                             {error}
                         </div>
                     )}
@@ -378,7 +470,7 @@ export default function CreateEventCalendarPage() {
                                     color: "#1a1a1a",
                                     paddingTop: "20px"
                                 }}>
-                                    Địa điểm
+                                    Địa điểm <span style={{ color: "#ef4444" }}>*</span>
                                 </label>
 
                                 <div style={{ marginBottom: "12px", display: "flex", gap: "20px" }}>
@@ -440,7 +532,7 @@ export default function CreateEventCalendarPage() {
                                     fontWeight: "600",
                                     color: "#1a1a1a"
                                 }}>
-                                    Thời gian
+                                    Thời gian <span style={{ color: "#ef4444" }}>*</span>
                                 </label>
 
                                 <div style={{ marginBottom: "12px" }}>
@@ -493,22 +585,55 @@ export default function CreateEventCalendarPage() {
                                             name="endTime"
                                             value={formData.endTime}
                                             onChange={handleChange}
+                                            min={formData.startTime && formData.meetingDate === todayISODate ? formData.startTime : undefined}
                                             style={{
                                                 width: "100%",
                                                 padding: "10px 12px",
                                                 fontSize: "14px",
-                                                border: "1px solid #d1d5db",
+                                                border: timeError ? "1px solid #dc2626" : "1px solid #d1d5db",
                                                 borderRadius: "6px",
                                                 outline: "none",
                                                 backgroundColor: "white"
                                             }}
                                             onFocus={(e) => e.target.style.borderColor = "#4285f4"}
-                                            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+                                            onBlur={(e) => {
+                                                e.target.style.borderColor = timeError ? "#dc2626" : "#d1d5db";
+                                                // Validate on blur - only show error if actually wrong
+                                                if (formData.startTime && formData.endTime) {
+                                                    const startMinutes = toMinutes(formData.startTime);
+                                                    const endMinutes = toMinutes(formData.endTime);
+                                                    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+                                                        setTimeError("Thời gian kết thúc phải sau thời gian bắt đầu");
+                                                    } else {
+                                                        setTimeError("");
+                                                    }
+                                                } else {
+                                                    setTimeError("");
+                                                }
+                                            }}
                                         />
+                                        {/* Error message only shown when there's an actual error */}
+                                        {timeError && (
+                                            <div style={{
+                                                fontSize: "12px",
+                                                color: "#dc2626",
+                                                marginTop: "6px",
+                                                padding: "6px 8px",
+                                                backgroundColor: "#fee2e2",
+                                                borderRadius: "4px",
+                                                border: "1px solid #fecaca",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "6px"
+                                            }}>
+                                                <AlertCircle size={16} color="#dc2626" />
+                                                <span>{timeError}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                {calculateDuration() && (
+                                {!timeError && calculateDuration() && (
                                     <div style={{
                                         fontSize: "12px",
                                         color: "#6b7280",
@@ -534,7 +659,7 @@ export default function CreateEventCalendarPage() {
                                         fontWeight: "600",
                                         color: "#1a1a1a"
                                     }}>
-                                        Đối tượng tham gia
+                                        Đối tượng tham gia <span style={{ color: "#ef4444" }}>*</span>
                                     </label>
 
                                     {/* Radio buttons cho 3 options */}
@@ -762,11 +887,13 @@ export default function CreateEventCalendarPage() {
                                                 border: "none",
                                                 color: "#ef4444",
                                                 cursor: "pointer",
-                                                fontSize: "18px",
-                                                padding: "4px 8px"
+                                                padding: "4px 8px",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center"
                                             }}
                                         >
-                                            🗑
+                                            <Trash2 size={18} color="#ef4444" />
                                         </button>
                                     </div>
                                 ))}
@@ -786,10 +913,14 @@ export default function CreateEventCalendarPage() {
                                         cursor: "pointer",
                                         fontSize: "14px",
                                         color: "#374151",
-                                        fontWeight: "500"
+                                        fontWeight: "500",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px"
                                     }}
                                 >
-                                    ➕ Thêm link
+                                    <Plus size={16} color="#374151" />
+                                    Thêm link
                                 </button>
                             </div>
                         </div>
@@ -816,10 +947,14 @@ export default function CreateEventCalendarPage() {
                                     fontSize: "15px",
                                     fontWeight: "500",
                                     opacity: loading ? 0.5 : 1,
-                                    transition: "opacity 0.2s"
+                                    transition: "opacity 0.2s",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px"
                                 }}
                             >
-                                × Hủy
+                                <X size={18} color="white" />
+                                Hủy
                             </button>
                             <button
                                 type="submit"
@@ -833,10 +968,19 @@ export default function CreateEventCalendarPage() {
                                     cursor: loading ? "not-allowed" : "pointer",
                                     fontSize: "15px",
                                     fontWeight: "500",
-                                    minWidth: "150px"
+                                    minWidth: "150px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "6px"
                                 }}
                             >
-                                {loading ? "Đang tạo..." : "✓ Tạo cuộc họp"}
+                                {loading ? "Đang tạo..." : (
+                                    <>
+                                        <Check size={18} color="white" />
+                                        Tạo cuộc họp
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>

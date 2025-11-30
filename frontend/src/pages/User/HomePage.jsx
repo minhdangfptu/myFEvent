@@ -13,6 +13,7 @@ import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
 import { Calendar, CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Copy, Flag, LogIn, MapPin, Plus, Search, Ticket, Upload, UserCheck, X, Zap } from "lucide-react";
+import { currentEventStorage } from "../../utils/currentEventStorage";
 
 
 const unwrapApiData = (payload) => {
@@ -209,6 +210,12 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchBlogs(1, '', '');
+  }, []);
+
+  // Clear current event cache when user is on HomePage
+  useEffect(() => {
+    // Clear cache when component mounts (user navigates to homepage)
+    currentEventStorage.clear();
   }, []);
 
   // Show login success toast once
@@ -772,6 +779,9 @@ export default function HomePage() {
                           fontWeight: 500,
                         }}
                         onClick={() => {
+                          // Save current event to cache
+                          currentEventStorage.set(event);
+
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
@@ -1207,10 +1217,14 @@ export default function HomePage() {
 
                     try {
                       setCreateSubmitting(true);
-                      const res = await eventApi.create({
+                      // Convert datetime-local values to ISO string (UTC) to avoid timezone issues
+                      const eventData = {
                         ...createForm,
                         type: "private",
-                      });
+                        eventStartDate: createForm.eventStartDate ? new Date(createForm.eventStartDate).toISOString() : "",
+                        eventEndDate: createForm.eventEndDate ? new Date(createForm.eventEndDate).toISOString() : "",
+                      };
+                      const res = await eventApi.create(eventData);
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",

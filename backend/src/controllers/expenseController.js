@@ -4,6 +4,10 @@ import EventBudgetPlan from '../models/budgetPlanDep.js';
 import { ensureEventExists, ensureDepartmentInEvent } from '../services/departmentService.js';
 import { getRequesterMembership } from '../services/eventMemberService.js';
 import {
+  notifyExpenseReported,
+  notifyExpenseSubmitted,
+} from '../services/notificationService.js';
+import {
   normalizeEvidenceArray,
   toDecimal128,
   decimalToNumber,
@@ -143,6 +147,17 @@ export const reportExpense = async (req, res) => {
     expense.estimatedTotal = toDecimal128(estimatedTotal, '0');
 
     await expense.save();
+
+    // Send notification to HoD
+    try {
+      const userMember = await getRequesterMembership(eventId, userIdObj);
+      if (userMember) {
+        await notifyExpenseReported(eventId, departmentId, budgetId, itemId, userMember._id);
+      }
+    } catch (notifError) {
+      console.error('Error sending expense reported notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     return res.status(200).json({ data: expense });
   } catch (error) {
@@ -291,6 +306,14 @@ export const submitExpense = async (req, res) => {
     // Update submittedStatus
     expense.submittedStatus = 'submitted';
     await expense.save();
+
+    // Send notification to HoD
+    try {
+      await notifyExpenseSubmitted(eventId, departmentId, budgetId, itemId, userMember._id);
+    } catch (notifError) {
+      console.error('Error sending expense submitted notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     // Kiểm tra xem tất cả items đã được submitted chưa
     const allExpenses = await EventExpense.find({ planId: planIdObj });

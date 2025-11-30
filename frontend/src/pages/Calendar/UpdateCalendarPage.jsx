@@ -52,6 +52,17 @@ const sanitizeMeetingTimes = (meetingDate, startTime, endTime, safeInfo = getSaf
         endTime: sanitizedEnd
     };
 };
+
+// Validate URL format
+const isValidUrl = (string) => {
+    if (!string || !string.trim()) return false;
+    try {
+        const url = new URL(string);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (_) {
+        return false;
+    }
+};
 import { Users, UserPlus, Bell, Search, X } from "lucide-react";
 
 export default function UpdateEventCalendarPage() {
@@ -73,6 +84,7 @@ export default function UpdateEventCalendarPage() {
 
     const [remindTarget, setRemindTarget] = useState("unconfirmed");
     const [currentParticipants, setCurrentParticipants] = useState([]);
+    const [isSendingReminder, setIsSendingReminder] = useState(false);
 
     const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -185,13 +197,24 @@ export default function UpdateEventCalendarPage() {
     };
 
     const handleSendReminder = async () => {
+        // Prevent spam clicking
+        if (isSendingReminder) {
+            return;
+        }
+        
+        setIsSendingReminder(true);
         try {
             const response = await calendarService.sendReminder(eventId, calendarId, remindTarget);
             toast.success(response.message || 'Đã gửi nhắc nhở thành công');
             setIsManageParticipantsOpen(false);
+            // Disable button for 3 seconds to prevent spam
+            setTimeout(() => {
+                setIsSendingReminder(false);
+            }, 3000);
         } catch (error) {
             console.error('Error sending reminder:', error);
             toast.error(error.response?.data?.message || 'Không thể gửi nhắc nhở');
+            setIsSendingReminder(false);
         }
     };
 
@@ -261,15 +284,14 @@ export default function UpdateEventCalendarPage() {
                 let selectedDepartments = [];
                 let selectedCoreTeam = [];
 
-                const safeInfo = getSafeNowInfo();
-                const sanitizedTimes = sanitizeMeetingTimes(meetingDate, startTime, endTime, safeInfo);
+                // Don't sanitize times when editing - preserve original values
                 setFormData({
                     name: calendar.name || "",
                     locationType: calendar.locationType || "online",
                     location: calendar.location || "",
                     meetingDate,
-                    startTime: sanitizedTimes.startTime,
-                    endTime: sanitizedTimes.endTime,
+                    startTime: startTime, // Use original start time
+                    endTime: endTime, // Use original end time
                     participantType,
                     selectedDepartments,
                     selectedCoreTeam,
@@ -398,12 +420,23 @@ export default function UpdateEventCalendarPage() {
             setError("Vui lòng nhập địa điểm");
             return;
         }
+        // Validate URL for online meetings
+        if (formData.locationType === "online" && !isValidUrl(formData.location.trim())) {
+            setError("Vui lòng nhập link hợp lệ (bắt đầu bằng http:// hoặc https://)");
+            return;
+        }
         if (!formData.meetingDate) {
             setError("Vui lòng chọn ngày họp");
             return;
         }
         if (!formData.startTime || !formData.endTime) {
             setError("Vui lòng nhập đầy đủ thời gian");
+            return;
+        }
+        // Validate attachment links
+        const invalidAttachments = formData.attachments.filter(link => link.trim() !== "" && !isValidUrl(link.trim()));
+        if (invalidAttachments.length > 0) {
+            setError("Các link tài liệu phải là URL hợp lệ (bắt đầu bằng http:// hoặc https://)");
             return;
         }
 
@@ -455,7 +488,7 @@ export default function UpdateEventCalendarPage() {
                 endAt: selectedEndDateTime.toISOString(),
                 participantType: formData.participantType,
                 notes: formData.notes,
-                attachments: formData.attachments.filter(link => link.trim() !== "")
+                attachments: formData.attachments.filter(link => link.trim() !== "" && isValidUrl(link.trim()))
             };
 
             if (!isDepartmentCalendar) {
@@ -1709,22 +1742,24 @@ export default function UpdateEventCalendarPage() {
                                         </button>
                                         <button
                                             onClick={handleSendReminder}
+                                            disabled={isSendingReminder}
                                             style={{
-                                                backgroundColor: '#2563eb',
+                                                backgroundColor: isSendingReminder ? '#9ca3af' : '#2563eb',
                                                 color: 'white',
                                                 border: 'none',
                                                 padding: '10px 24px',
                                                 borderRadius: '8px',
-                                                cursor: 'pointer',
+                                                cursor: isSendingReminder ? 'not-allowed' : 'pointer',
                                                 fontSize: '15px',
                                                 fontWeight: 600,
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '8px'
+                                                gap: '8px',
+                                                opacity: isSendingReminder ? 0.6 : 1
                                             }}
                                         >
                                             <Bell size={18} />
-                                            Gửi nhắc nhở
+                                            {isSendingReminder ? 'Đang gửi...' : 'Gửi nhắc nhở'}
                                         </button>
                                     </div>
                                 </div>

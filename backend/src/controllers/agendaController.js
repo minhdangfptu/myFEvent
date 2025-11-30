@@ -156,8 +156,7 @@ export const createAgenda = async (req, res) => {
         const statusCode = error.message.includes('already exists') ? 409 : 400;
         return res.status(statusCode).json({
             success: false,
-            message: 'Failed to create agenda',
-            error: error.message
+            message: error.message || 'Failed to create agenda'
         });
     }
 };
@@ -183,8 +182,7 @@ export const addDateToAgenda = async (req, res) => {
     } catch (error) {
         res.status(400).json({
             success: false,
-            message: 'Failed to add date',
-            error: error.message
+            message: error.message || 'Failed to add date'
         });
     }
 };
@@ -215,8 +213,7 @@ export const updateDateById = async (req, res) => {
     } catch (error) {
         res.status(400).json({
             success: false,
-            message: 'Failed to update date',
-            error: error.message
+            message: error.message || 'Failed to update date'
         });
     }
 };
@@ -247,8 +244,7 @@ export const removeDateById = async (req, res) => {
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             success: false,
-            message: 'Failed to remove date',
-            error: error.message
+            message: error.message || 'Failed to remove date'
         });
     }
 };
@@ -274,8 +270,7 @@ export const addItemToDateById = async (req, res) => {
     } catch (error) {
         res.status(400).json({
             success: false,
-            message: 'Failed to add item',
-            error: error.message
+            message: error.message || 'Failed to add item'
         });
     }
 };
@@ -314,8 +309,7 @@ export const updateDayItem = async (req, res) => {
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             success: false,
-            message: 'Failed to update item',
-            error: error.message
+            message: error.message || 'Failed to update item'
         });
     }
 };
@@ -351,111 +345,7 @@ export const removeDayItem = async (req, res) => {
         const statusCode = error.message.includes('not found') ? 404 : 400;
         res.status(statusCode).json({
             success: false,
-            message: 'Failed to remove item',
-            error: error.message
-        });
-    }
-};
-
-// === BATCH OPERATIONS ===
-
-// Batch tạo items cho một date (by dateId)
-export const batchCreateItemsForDateById = async (req, res) => {
-    try {
-        const validationError = handleValidationErrors(req, res);
-        if (validationError) return validationError;
-
-        const { milestoneId, dateId } = req.params;
-        const { items } = req.body;
-        
-        if (!Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'items must be a non-empty array'
-            });
-        }
-        
-        const agenda = await agendaService.batchCreateItemsForDateById(
-            milestoneId,
-            dateId,
-            items
-        );
-        
-        res.status(200).json({
-            success: true,
-            data: agenda,
-            message: `${items.length} items created successfully`
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to batch create items',
-            error: error.message
-        });
-    }
-};
-
-// Batch update items (by index)
-export const batchUpdateItems = async (req, res) => {
-    try {
-        const validationError = handleValidationErrors(req, res);
-        if (validationError) return validationError;
-
-        const { milestoneId } = req.params;
-        const { itemUpdates } = req.body;
-        
-        if (!Array.isArray(itemUpdates) || itemUpdates.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'itemUpdates must be a non-empty array'
-            });
-        }
-        
-        const agenda = await agendaService.batchUpdateItems(milestoneId, itemUpdates);
-        
-        res.status(200).json({
-            success: true,
-            data: agenda,
-            message: `${itemUpdates.length} items updated successfully`
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to batch update items',
-            error: error.message
-        });
-    }
-};
-
-// Batch xóa items (by index)
-export const batchRemoveItems = async (req, res) => {
-    try {
-        const validationError = handleValidationErrors(req, res);
-        if (validationError) return validationError;
-
-        const { milestoneId } = req.params;
-        const { itemsToRemove } = req.body;
-        
-        if (!Array.isArray(itemsToRemove) || itemsToRemove.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'itemsToRemove must be a non-empty array'
-            });
-        }
-        
-        const agenda = await agendaService.batchRemoveItems(milestoneId, itemsToRemove);
-        
-        res.status(200).json({
-            success: true,
-            data: agenda,
-            message: `${itemsToRemove.length} items removed successfully`
-        });
-    } catch (error) {
-        const statusCode = error.message.includes('not found') ? 404 : 400;
-        res.status(statusCode).json({
-            success: false,
-            message: 'Failed to batch remove items',
-            error: error.message
+            message: error.message || 'Failed to remove item'
         });
     }
 };

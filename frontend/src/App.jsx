@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
@@ -109,6 +109,12 @@ import AxiosInterceptor from "./components/AxiosInterceptor";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SupportPage from "./pages/User/SupportPage";
 import SupportButton from "./components/SupportButton";
+
+// Component để redirect URL cũ có budgetId trong path review
+const BudgetReviewRedirect = () => {
+  const { eventId, departmentId } = useParams();
+  return <Navigate to={`/events/${eventId}/departments/${departmentId}/budget/review`} replace />;
+};
 
 // Network Warning Overlay Component
 function NetworkWarningOverlay({ isVisible, onClose }) {
@@ -729,6 +735,15 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          {/* Route redirect cho URL cũ có budgetId trong path (HoOC) - phải đặt trước route review */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetReviewRedirect />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/review" 
             element={
@@ -743,7 +758,7 @@ export default function App() {
               <ProtectedRoute requiredEventRoles={['HoOC']}>
                 <BudgetStatistics />
               </ProtectedRoute>
-            }
+            } 
           />
           {/* Budget Routes - Member */}
           <Route
@@ -846,6 +861,15 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          {/* Route redirect cho URL cũ có budgetId trong path (HoOC) - phải đặt trước route review */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetReviewRedirect />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/review" 
             element={
@@ -860,7 +884,7 @@ export default function App() {
               <ProtectedRoute requiredEventRoles={['HoOC']}>
                 <BudgetStatistics />
               </ProtectedRoute>
-            }
+            } 
           />
           {/* Budget Routes - Member */}
           <Route

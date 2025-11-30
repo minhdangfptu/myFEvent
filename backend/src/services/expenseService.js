@@ -88,28 +88,53 @@ export const getItemKey = (itemId) => {
 export const fetchExpensesForBudgets = async (budgetIds) => {
   if (!budgetIds || budgetIds.length === 0) return new Map();
   
-  const expenses = await EventExpense.find({
-    planId: { $in: budgetIds }
-  }).lean();
-  
-  const expensesByBudget = new Map();
-  const expensesByItem = new Map();
-  
-  for (const expense of expenses) {
-    const planId = expense.planId?.toString() || expense.planId;
-    const itemId = getItemKey(expense.itemId);
+  try {
+    // Convert budgetIds to ObjectIds for query
+    const objectIds = budgetIds
+      .map(id => {
+        try {
+          if (id instanceof mongoose.Types.ObjectId) return id;
+          if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+            return new mongoose.Types.ObjectId(id);
+          }
+          return null;
+        } catch (err) {
+          return null;
+        }
+      })
+      .filter(Boolean);
     
-    if (!planId || !itemId) continue;
+    if (objectIds.length === 0) return new Map();
     
-    if (!expensesByBudget.has(planId)) {
-      expensesByBudget.set(planId, new Map());
+    const expenses = await EventExpense.find({
+      planId: { $in: objectIds }
+    }).lean();
+    
+    const expensesByBudget = new Map();
+    
+    for (const expense of expenses) {
+      try {
+        const planId = expense.planId?.toString() || expense.planId;
+        const itemId = getItemKey(expense.itemId);
+        
+        if (!planId || !itemId) continue;
+        
+        if (!expensesByBudget.has(planId)) {
+          expensesByBudget.set(planId, new Map());
+        }
+        
+        const budgetExpenses = expensesByBudget.get(planId);
+        budgetExpenses.set(itemId, expense);
+      } catch (expenseError) {
+        continue; // Skip this expense if processing fails
+      }
     }
     
-    const budgetExpenses = expensesByBudget.get(planId);
-    budgetExpenses.set(itemId, expense);
+    return expensesByBudget;
+  } catch (error) {
+    // Return empty Map if fetch fails
+    return new Map();
   }
-  
-  return expensesByBudget;
 };
 
 // Helper: Merge item with expense data
@@ -145,62 +170,94 @@ export const mergeItemWithExpense = (item, expense) => {
 export const populateAssignedInfoForItems = async (items) => {
   if (!items || items.length === 0) return items;
   
-  const assignedToIds = items
-    .map(item => item.assignedTo)
-    .filter(Boolean)
-    .map(id => toObjectId(id))
-    .filter(Boolean);
-  
-  if (assignedToIds.length === 0) return items;
-  
-  const members = await EventMember.find({
-    _id: { $in: assignedToIds }
-  })
-    .populate('userId', 'fullName email')
-    .lean();
-  
-  const memberMap = new Map();
-  for (const member of members) {
-    memberMap.set(member._id.toString(), member);
-  }
-  
-  return items.map(item => {
-    if (!item.assignedTo) return item;
-    const memberId = getItemKey(item.assignedTo);
-    const member = memberId ? memberMap.get(memberId) : null;
+  try {
+    const assignedToIds = items
+      .map(item => item.assignedTo)
+      .filter(Boolean)
+      .map(id => {
+        try {
+          return toObjectId(id);
+        } catch (err) {
+          return null;
+        }
+      })
+      .filter(Boolean);
     
-    return {
-      ...item,
-      assignedToInfo: member ? {
-        _id: member._id,
-        userId: member.userId?._id || member.userId,
-        fullName: member.userId?.fullName || '',
-        email: member.userId?.email || ''
-      } : null
-    };
-  });
+    if (assignedToIds.length === 0) return items;
+    
+    const members = await EventMember.find({
+      _id: { $in: assignedToIds }
+    })
+      .populate('userId', 'fullName email')
+      .lean();
+    
+    const memberMap = new Map();
+    for (const member of members) {
+      if (member && member._id) {
+        memberMap.set(member._id.toString(), member);
+      }
+    }
+    
+    return items.map(item => {
+      if (!item.assignedTo) return item;
+      try {
+        const memberId = getItemKey(item.assignedTo);
+        const member = memberId ? memberMap.get(memberId) : null;
+        
+        return {
+          ...item,
+          assignedToInfo: member ? {
+            _id: member._id,
+            userId: member.userId?._id || member.userId,
+            fullName: member.userId?.fullName || '',
+            email: member.userId?.email || ''
+          } : null
+        };
+      } catch (itemError) {
+        return item; // Return item as-is if processing fails
+      }
+    });
+  } catch (error) {
+    // Return items as-is if population fails
+    return items;
+  }
 };
 
 // Helper: Build budget with expenses
 export const buildBudgetWithExpenses = async (budget) => {
   if (!budget) return null;
   
-  const budgetObj = budget.toObject ? budget.toObject() : budget;
-  const expensesByBudget = await fetchExpensesForBudgets([budgetObj._id]);
-  const planExpenses = expensesByBudget.get(budgetObj._id.toString()) || new Map();
-  
-  const itemsWithExpenses = (budgetObj.items || []).map(item => {
-    const key = getItemKey(item.itemId) || getItemKey(item._id);
-    const expense = key ? planExpenses.get(key) : null;
-    return mergeItemWithExpense(item, expense);
-  });
-  
-  const itemsWithAssigned = await populateAssignedInfoForItems(itemsWithExpenses);
-  
-  return {
-    ...budgetObj,
-    items: itemsWithAssigned
-  };
+  try {
+    const budgetObj = budget.toObject ? budget.toObject() : budget;
+    
+    // Validate budget has _id
+    if (!budgetObj._id) {
+      return budgetObj; // Return as-is if no _id
+    }
+    
+    const expensesByBudget = await fetchExpensesForBudgets([budgetObj._id]);
+    const planExpenses = expensesByBudget.get(budgetObj._id.toString()) || new Map();
+    
+    const itemsWithExpenses = (budgetObj.items || []).map(item => {
+      try {
+        const key = getItemKey(item.itemId) || getItemKey(item._id);
+        const expense = key ? planExpenses.get(key) : null;
+        return mergeItemWithExpense(item, expense);
+      } catch (itemError) {
+        return item; // Return item as-is if merge fails
+      }
+    });
+    
+    const itemsWithAssigned = await populateAssignedInfoForItems(itemsWithExpenses);
+    
+    return {
+      ...budgetObj,
+      items: itemsWithAssigned
+    };
+  } catch (error) {
+    // Return budget as-is if building fails
+    return budget.toObject ? budget.toObject() : budget;
+  }
 };
 
 // Helper: Load membership

@@ -30,7 +30,16 @@ const AxiosInterceptor = ({ children }) => {
               navigate("/login");
               break;
             case 403:
-              navigate("/unauthorized");
+              // Log để debug
+              console.log('403 Error:', error.config.url, error.response.data);
+              // Không redirect nếu đang ở các trang user để tránh loop
+              const currentPath = window.location.pathname;
+              if (!currentPath.includes('/user/')) {
+                toast.error("Bạn không có quyền truy cập.");
+                navigate("/unauthorized");
+              } else {
+                console.warn('403 error on user page, not redirecting to avoid loop');
+              }
               break;
             case 404:
               navigate("/404");

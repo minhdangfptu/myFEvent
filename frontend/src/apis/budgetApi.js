@@ -16,8 +16,9 @@ const unwrapResponse = (payload) => {
 
 export const budgetApi = {
   // Lấy budget của department
-  getDepartmentBudget: async (eventId, departmentId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/budget`);
+  getDepartmentBudget: async (eventId, departmentId, forReview = false) => {
+    const url = `/api/events/${eventId}/departments/${departmentId}/budget${forReview ? '?forReview=true' : ''}`;
+    const res = await axiosClient.get(url);
     return unwrapResponse(res.data);
   },
 
