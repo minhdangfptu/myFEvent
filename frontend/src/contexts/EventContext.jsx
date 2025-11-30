@@ -42,6 +42,7 @@ export function EventProvider({ children }) {
     totalPages: 0
   });
   const fetchingRef = useRef(false); // Track if we're currently fetching
+  const hasFetchedRef = useRef(false); // Track if we've fetched at least once
 
   // Persist eventRoles to localStorage when it changes
   useEffect(() => {
@@ -128,11 +129,11 @@ export function EventProvider({ children }) {
     }
 
     // Skip if already fetching to prevent duplicate requests
-    if (fetchingRef.current) {
+    if (fetchingRef.current?.fetching) {
       return;
     }
 
-    fetchingRef.current = true;
+    fetchingRef.current = { fetching: true, lastUserId: user?._id || user?.id };
     setLoading(true);
     setError("");
     try {
@@ -148,7 +149,7 @@ export function EventProvider({ children }) {
       setError("Lỗi lấy dữ liệu sự kiện");
     } finally {
       setLoading(false);
-      fetchingRef.current = false;
+      fetchingRef.current = { fetching: false, lastUserId: user?._id || user?.id };
     }
   }, [user, authLoading, extractEventArray]);
 
@@ -162,14 +163,23 @@ export function EventProvider({ children }) {
     // Auth is done loading
     if (user) {
       // User is authenticated, fetch their events
-      fetchEvents();
+      // Only fetch if we haven't fetched yet, or if user changed
+      const currentUserId = user._id || user.id;
+      const lastUserId = fetchingRef.current?.lastUserId;
+      
+      if (!hasFetchedRef.current || lastUserId !== currentUserId) {
+        hasFetchedRef.current = true;
+        fetchEvents();
+      }
     } else {
       // No user after auth loads, clear events
       setEvents([]);
       setLoading(false);
-      fetchingRef.current = false;
+      fetchingRef.current = { fetching: false, lastUserId: null };
+      hasFetchedRef.current = false;
     }
-  }, [authLoading, user, fetchEvents]); // Re-fetch when authLoading or user changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?._id || user?.id]); // Only depend on authLoading and user ID, not fetchEvents
 
   // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {

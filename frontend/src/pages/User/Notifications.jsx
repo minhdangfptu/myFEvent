@@ -9,21 +9,86 @@ export default function NotificationsPage() {
   const navigate = useNavigate()
 
   const getNotificationTargetUrl = (n) => {
-    if (n.targetUrl) return n.targetUrl
-
-    if (n.eventId && n.relatedTaskId) {
-      return `/events/${n.eventId}/tasks/${n.relatedTaskId}`
+    // Backend can optionally send a direct URL (ưu tiên cao nhất)
+    if (n.targetUrl) {
+      // Validate targetUrl - nếu không bắt đầu bằng / thì có thể là relative path
+      let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
+      
+      // Fix URL cũ có budgetId trong path review: /budget/{budgetId}/review -> /budget/review
+      // Pattern: /events/.../departments/.../budget/{budgetId}/review
+      url = url.replace(
+        /\/events\/([^/]+)\/departments\/([^/]+)\/budget\/([^/]+)\/review$/,
+        '/events/$1/departments/$2/budget/review'
+      );
+      
+      console.log('Notification targetUrl:', url, 'Original:', n.targetUrl, 'Full notification:', n);
+      return url;
     }
 
+    // TÀI CHÍNH notifications
+    if (n.eventId && n.category === 'TÀI CHÍNH') {
+      // Budget notifications - backend đã set targetUrl, nếu không có thì fallback về trang home
+      if (n.relatedBudgetId) {
+        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
+        // Nếu không có targetUrl, fallback về trang home của event để tránh 404
+        return `/home-page/events/${n.eventId}`;
+      }
+      // Expense notifications
+      if (n.relatedExpenseId) {
+        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
+        // Nếu không có targetUrl, fallback về trang home của event
+        return `/home-page/events/${n.eventId}`;
+      }
+    }
+
+    // PHẢN HỒI notifications
+    if (n.eventId && n.category === 'PHẢN HỒI') {
+      if (n.relatedFeedbackId) {
+        return `/events/${n.eventId}/feedback/member`;
+      }
+    }
+
+    // RỦI RO notifications
+    if (n.eventId && n.category === 'RỦI RO') {
+      if (n.relatedRiskId) {
+        return `/events/${n.eventId}/risks/detail/${n.relatedRiskId}`;
+      }
+      return `/events/${n.eventId}/risks`;
+    }
+
+    // LỊCH HỌP notifications
+    if (n.eventId && n.category === 'LỊCH HỌP') {
+      if (n.relatedCalendarId) {
+        return `/events/${n.eventId}/my-calendar`;
+      }
+      if (n.relatedAgendaId && n.relatedMilestoneId) {
+        return `/events/${n.eventId}/milestones/${n.relatedMilestoneId}/agenda/${n.relatedAgendaId}`;
+      }
+      return `/events/${n.eventId}/my-calendar`;
+    }
+
+    // CÔNG VIỆC notifications - điều hướng đến trang task
+    if (n.eventId && n.category === 'CÔNG VIỆC') {
+      // Nếu có relatedTaskId thì đi đến task detail
+      if (n.relatedTaskId) {
+        return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;
+      }
+      // Nếu không có relatedTaskId thì đi đến trang danh sách tasks
+      return `/events/${n.eventId}/tasks`;
+    }
+
+    // THÀNH VIÊN notifications - điều hướng đến trang thành viên
     if (n.eventId && n.category === 'THÀNH VIÊN') {
-      return `/home-page/events/${n.eventId}`
+      return `/events/${n.eventId}/members`;
     }
 
+    // Mặc định nếu có eventId thì đưa về trang chi tiết sự kiện
     if (n.eventId) {
-      return `/home-page/events/${n.eventId}`
+      return `/home-page/events/${n.eventId}`;
     }
 
-    return '/notifications'
+    // Fallback: về trang danh sách thông báo
+    return '/notifications';
   }
 
   const ICON_BY_CATEGORY = {
@@ -31,6 +96,9 @@ export default function NotificationsPage() {
     'CÔNG VIỆC': ClipboardCheck,
     'NHẮC NHỞ': CalendarClock,
     'HỆ THỐNG': Info,
+    'TÀI CHÍNH': ClipboardList,
+    'PHẢN HỒI': ClipboardCheck,
+    'RỦI RO': Info,
   }
 
   const getIconComponent = (n) => {

@@ -93,10 +93,32 @@ export default function HoDSideBar({
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
   // get context events (if needed) and loading flag
-  const { events: ctxEvents, loading: ctxLoading } = useEvents();
+  const { events: ctxEvents, loading: ctxLoading, refetchEvents } = useEvents();
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Lưu eventId vào sessionStorage để restore khi quay lại từ error page
+  useEffect(() => {
+    if (eventId) {
+      try {
+        sessionStorage.setItem('lastEventId', eventId);
+      } catch (err) {
+        console.error('Failed to save eventId to sessionStorage:', err);
+      }
+    }
+  }, [eventId]);
+
+  // Restore eventId từ sessionStorage nếu không có eventId từ props
+  const effectiveEventId = useMemo(() => {
+    if (eventId) return eventId;
+    try {
+      const savedEventId = sessionStorage.getItem('lastEventId');
+      return savedEventId || null;
+    } catch {
+      return null;
+    }
+  }, [eventId]);
 
   // Process events from context
   const myEvents = useMemo(() => {
@@ -129,9 +151,35 @@ export default function HoDSideBar({
       icon: "bi-calendar-event",
       membership: e.membership,
     }));
-  }, [ctxEvents, eventId]);
+  }, [ctxEvents, effectiveEventId]);
 
-  const selectedEvent = eventId || (myEvents.length > 0 ? myEvents[0].id : "");
+  const selectedEvent = effectiveEventId || (myEvents.length > 0 ? myEvents[0].id : "");
+
+  // Track if we've already tried to refetch for this eventId
+  const refetchAttemptedRef = useRef(null);
+  
+  // Fetch lại events nếu có eventId nhưng không tìm thấy event trong events array
+  useEffect(() => {
+    if (!effectiveEventId) {
+      refetchAttemptedRef.current = null;
+      return;
+    }
+    
+    // Chỉ refetch một lần cho mỗi eventId
+    if (refetchAttemptedRef.current === effectiveEventId) {
+      return; // Đã thử refetch cho eventId này rồi
+    }
+    
+    if (!ctxLoading && ctxEvents.length > 0) {
+      const foundEvent = ctxEvents.find(e => (e._id || e.id) === effectiveEventId);
+      if (!foundEvent) {
+        // Có eventId nhưng không tìm thấy event, có thể events chưa được fetch đầy đủ
+        // Thử fetch lại một lần
+        refetchAttemptedRef.current = effectiveEventId;
+        refetchEvents();
+      }
+    }
+  }, [effectiveEventId, ctxEvents, ctxLoading, refetchEvents]);
   const currentEventMembership = myEvents.find(e => e.id === selectedEvent)?.membership || null;
   const hasEvents = myEvents && myEvents.length > 0;
 
@@ -480,9 +528,9 @@ export default function HoDSideBar({
                   whiteSpace: "normal",
                   lineHeight: "1.2"
                 }}
-                title={myEvents.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                title={myEvents.find(e => e.id === selectedEvent)?.name || (effectiveEventId && ctxLoading ? "Đang tải..." : "(Chưa chọn sự kiện)")}
               >
-                {myEvents.find(e => e.id === selectedEvent)?.name || "(Chưa chọn sự kiện)"}
+                {myEvents.find(e => e.id === selectedEvent)?.name || (effectiveEventId && ctxLoading ? "Đang tải..." : "(Chưa chọn sự kiện)")}
               </span>
             </div>
           </div>

@@ -29,6 +29,8 @@ export default function CalendarDetail() {
     const [isPastMeeting, setIsPastMeeting] = useState(false);
     const [isParticipating, setIsParticipating] = useState(false);
     const [isConfirmingStatus, setIsConfirmingStatus] = useState(false);
+    const [isDeletingCalendar, setIsDeletingCalendar] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // States cho modal xem tất cả
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
@@ -280,6 +282,25 @@ export default function CalendarDetail() {
         }
     };
 
+    const handleDeleteCalendar = () => {
+        setShowDeleteModal(true);
+    };
+
+    const confirmDeleteCalendar = async () => {
+        setIsDeletingCalendar(true);
+        try {
+            await calendarService.deleteCalendarEvent(eventId, calendarId);
+            toast.success('Đã xóa cuộc họp thành công');
+            navigate(`/events/${eventId}/my-calendar`);
+        } catch (error) {
+            console.error('Error deleting calendar:', error);
+            toast.error(error.response?.data?.message || 'Không thể xóa cuộc họp');
+        } finally {
+            setIsDeletingCalendar(false);
+            setShowDeleteModal(false);
+        }
+    };
+
     return (
         <UserLayout title="Cuộc họp của bạn" eventId={eventId} sidebarType={eventRole} activePage="calendar">
             <ToastContainer position="top-right" autoClose={3000} />
@@ -302,7 +323,10 @@ export default function CalendarDetail() {
                                         </div>
                                     </button>
                                 </Link>
-                                <button style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button 
+                                    onClick={handleDeleteCalendar}
+                                    style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                                         <Trash size={18} color="#ffff" />
                                         <h4 style={{ margin: -1, fontSize: '14px', fontWeight: 600, color: '#ffff' }}>Xóa</h4>
@@ -1325,6 +1349,81 @@ export default function CalendarDetail() {
                             >
                                 {isConfirmingStatus && <i className="bi bi-arrow-clockwise spin-animation"></i>}
                                 {isConfirmingStatus ? 'Đang xử lý...' : 'Xác nhận'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '20px'
+                    }}
+                    onClick={() => setShowDeleteModal(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            maxWidth: '500px',
+                            width: '100%',
+                            padding: '24px',
+                            position: 'relative',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: 600, color: '#1f2937' }}>
+                            Xác nhận xóa cuộc họp
+                        </h2>
+                        <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#6b7280' }}>
+                            Bạn có chắc chắn muốn xóa cuộc họp "{calendar?.name}"? Hành động này không thể hoàn tác.
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={isDeletingCalendar}
+                                style={{
+                                    backgroundColor: 'white',
+                                    color: '#1f2937',
+                                    border: '1px solid #d1d5db',
+                                    padding: '10px 24px',
+                                    borderRadius: '8px',
+                                    cursor: isDeletingCalendar ? 'not-allowed' : 'pointer',
+                                    fontSize: '15px',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={confirmDeleteCalendar}
+                                disabled={isDeletingCalendar}
+                                style={{
+                                    backgroundColor: '#dc2626',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 24px',
+                                    borderRadius: '8px',
+                                    cursor: isDeletingCalendar ? 'not-allowed' : 'pointer',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    opacity: isDeletingCalendar ? 0.6 : 1
+                                }}
+                            >
+                                {isDeletingCalendar ? 'Đang xóa...' : 'Xóa'}
                             </button>
                         </div>
                     </div>

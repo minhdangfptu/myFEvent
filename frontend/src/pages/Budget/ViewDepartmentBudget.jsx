@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import * as XLSX from 'xlsx';
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
@@ -30,11 +29,15 @@ const ViewDepartmentBudget = () => {
   const [members, setMembers] = useState([]);
   const [assigningItem, setAssigningItem] = useState(null);
   const [renaming, setRenaming] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
   const [showEvidenceModal, setShowEvidenceModal] = useState(false);
   const [editingEvidenceItem, setEditingEvidenceItem] = useState(null);
   const [evidenceFormData, setEvidenceFormData] = useState({
     evidence: []
   });
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkInput, setLinkInput] = useState("");
   
   // Column widths state for resizable columns
   const [columnWidths, setColumnWidths] = useState(null);
@@ -248,8 +251,28 @@ const ViewDepartmentBudget = () => {
     }
   };
 
+  // Helper function to convert MongoDB Decimal128 to number
+  const parseDecimal = (value) => {
+    if (value === null || value === undefined) return 0;
+    // If it's a MongoDB Decimal128 object with $numberDecimal
+    if (typeof value === 'object' && value !== null && value.$numberDecimal !== undefined) {
+      return parseFloat(value.$numberDecimal) || 0;
+    }
+    // If it's already a number
+    if (typeof value === 'number') {
+      return isNaN(value) ? 0 : value;
+    }
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    // For any other type, return 0
+    return 0;
+  };
+
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("vi-VN").format(amount || 0);
+    const numAmount = parseDecimal(amount);
+    return new Intl.NumberFormat("vi-VN").format(numAmount);
   };
 
   const formatDate = (dateString) => {
@@ -297,7 +320,7 @@ const ViewDepartmentBudget = () => {
   ) || [];
 
   const totalCost = budget?.items?.reduce(
-    (sum, item) => sum + (parseFloat(item.total) || 0),
+    (sum, item) => sum + parseDecimal(item.total),
     0
   ) || 0;
 
@@ -363,125 +386,34 @@ const ViewDepartmentBudget = () => {
     }
   };
 
-  const handleRenameBudget = async () => {
+  const handleRenameBudget = () => {
     if (!budget?._id) return;
     const currentName = budget.name || "Budget Ban";
-    const newName = prompt("Nhập tên đơn ngân sách mới", currentName);
-    if (newName === null) return;
-    const trimmed = newName.trim();
+    setRenameInput(currentName);
+    setShowRenameModal(true);
+  };
+
+  const handleConfirmRename = async () => {
+    if (!budget?._id) return;
+    const trimmed = renameInput.trim();
     if (!trimmed) {
       toast.error("Tên đơn không được để trống.");
       return;
     }
-    if (trimmed === currentName) return;
+    if (trimmed === budget.name) {
+      setShowRenameModal(false);
+      return;
+    }
     try {
       setRenaming(true);
       await budgetApi.updateBudget(eventId, departmentId, budget._id, { name: trimmed });
       toast.success("Đã cập nhật tên đơn ngân sách.");
+      setShowRenameModal(false);
       await fetchData();
     } catch (error) {
       toast.error(error?.response?.data?.message || "Đổi tên thất bại!");
     } finally {
       setRenaming(false);
-    }
-  };
-
-  const handleExportExcel = () => {
-    if (!budget || !filteredItems.length) {
-      toast.warning("Không có dữ liệu để xuất");
-      return;
-    }
-
-    try {
-      const wb = XLSX.utils.book_new();
-      
-      if (activeTable === "hooc") {
-        // Bảng gửi HoOC
-        const hoocData = filteredItems.map((item) => ({
-          "Hạng Mục": item.category || "",
-          "Nội dung": item.name || "",
-          "Đơn Giá (VNĐ)": parseFloat(item.unitCost) || 0,
-          "Số Lượng": item.qty || 0,
-          "Đơn Vị Tính": item.unit || "",
-          "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
-          "Ghi Chú": item.note || "",
-          "Phản hồi từ TBTC": item.feedback || ""
-        }));
-
-        const wsHooc = XLSX.utils.json_to_sheet(hoocData);
-        wsHooc['!cols'] = [
-          { wch: 15 }, // Hạng Mục
-          { wch: 30 }, // Nội dung
-          { wch: 15 }, // Đơn Giá
-          { wch: 12 }, // Số Lượng
-          { wch: 12 }, // Đơn Vị Tính
-          { wch: 18 }, // Tổng Tiền
-          { wch: 30 }, // Ghi Chú
-          { wch: 40 }  // Phản hồi từ HoOC
-        ];
-        XLSX.utils.book_append_sheet(wb, wsHooc, "Bảng gửi HoOC");
-      } else {
-        // Bảng kiểm soát Member
-        const memberData = filteredItems.map((item) => {
-          const baseRow = {
-            "Hạng Mục": item.category || "",
-            "Nội dung": item.name || "",
-            "Đơn Giá (VNĐ)": parseFloat(item.unitCost) || 0,
-            "Số Lượng": item.qty || 0,
-            "Đơn Vị Tính": item.unit || "",
-            "Ghi Chú": item.note || "",
-            "Bằng chứng": item.evidence && item.evidence.length > 0 
-              ? item.evidence.map(ev => ev.type === 'link' ? ev.url : ev.name).join(", ")
-              : "",
-            "Chú thích của member": item.memberNote || "",
-            "Tổng Tiền (VNĐ)": parseFloat(item.total) || 0,
-            "Tổng tiền thực tế": parseFloat(item.actualAmount) || 0
-          };
-
-          if (isApproved && isHoD) {
-            const assignedToName = item.assignedToInfo?.fullName || item.assignedToInfo?.name || "Chưa phân công";
-            baseRow["Giao việc"] = assignedToName;
-          }
-
-          return baseRow;
-        });
-
-        const wsMember = XLSX.utils.json_to_sheet(memberData);
-        const colWidths = [
-          { wch: 15 }, // Hạng Mục
-          { wch: 30 }, // Nội dung
-          { wch: 15 }, // Đơn Giá
-          { wch: 12 }, // Số Lượng
-          { wch: 12 }, // Đơn Vị Tính
-          { wch: 30 }, // Ghi Chú
-        ];
-        
-        if (isApproved && isHoD) {
-          colWidths.push({ wch: 25 }); // Giao việc
-        }
-        
-        colWidths.push(
-          { wch: 30 }, // Bằng chứng
-          { wch: 30 }, // Chú thích
-          { wch: 18 }, // Tổng Tiền
-          { wch: 20 }  // Tổng tiền thực tế
-        );
-        
-        wsMember['!cols'] = colWidths;
-        XLSX.utils.book_append_sheet(wb, wsMember, "Bảng kiểm soát Member");
-      }
-
-      // Generate filename
-      const dateStr = new Date().toISOString().split('T')[0];
-      const deptName = (department?.name || 'budget').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-      const tableName = activeTable === "hooc" ? "HoOC" : "Member";
-      const filename = `Ngansach_${deptName}_${tableName}_${dateStr}.xlsx`;
-
-      XLSX.writeFile(wb, filename);
-      toast.success("Xuất Excel thành công!");
-    } catch (error) {
-      console.error("Error exporting Excel:", error);
-      toast.error("Không thể xuất file Excel");
     }
   };
 
@@ -565,16 +497,22 @@ const ViewDepartmentBudget = () => {
   };
 
   const handleAddEvidenceLink = () => {
-    const link = prompt("Nhập link bằng chứng:");
-    if (link && link.trim()) {
+    setLinkInput("");
+    setShowLinkModal(true);
+  };
+
+  const handleConfirmAddLink = () => {
+    if (linkInput && linkInput.trim()) {
       setEvidenceFormData(prev => ({
         ...prev,
         evidence: [...(prev.evidence || []), {
           type: 'link',
-          url: link.trim(),
+          url: linkInput.trim(),
           name: `Link ${(prev.evidence || []).length + 1}`
         }]
       }));
+      setShowLinkModal(false);
+      setLinkInput("");
     }
   };
 
@@ -621,8 +559,8 @@ const ViewDepartmentBudget = () => {
 
   // Hàm so sánh mới: so sánh Tổng Tiền (VNĐ) và Tổng tiền thực tế
   const getComparisonDisplay = (estimatedTotal, actualAmount) => {
-    const estimated = parseFloat(estimatedTotal?.toString() || 0);
-    const actual = parseFloat(actualAmount?.toString() || 0);
+    const estimated = parseDecimal(estimatedTotal);
+    const actual = parseDecimal(actualAmount);
     
     if (actual === 0) {
       return <span className="text-muted">—</span>;
@@ -1244,10 +1182,10 @@ const ViewDepartmentBudget = () => {
                             </span>
                           </td>
                           <td style={{ padding: "12px", color: shouldHighlight ? "#DC2626" : "#111827", backgroundColor: cellBgColor }}>
-                            {formatCurrency(parseFloat(item.unitCost) || 0)}
+                            {formatCurrency(item.unitCost)}
                           </td>
                           <td style={{ padding: "12px", color: shouldHighlight ? "#DC2626" : "#111827", backgroundColor: cellBgColor }}>
-                            {item.qty || 0}
+                            {parseDecimal(item.qty)}
                           </td>
                           <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
                             <span style={{ color: shouldHighlight ? "#DC2626" : "#6B7280" }}>
@@ -1259,7 +1197,7 @@ const ViewDepartmentBudget = () => {
                               className="fw-semibold"
                               style={{ color: shouldHighlight ? "#DC2626" : "#111827" }}
                             >
-                              {formatCurrency(parseFloat(item.total) || 0)}
+                              {formatCurrency(item.total)}
                             </span>
                           </td>
                           <td style={{ 
@@ -1761,8 +1699,8 @@ const ViewDepartmentBudget = () => {
                     </tr>
                   ) : (
                     filteredItems.map((item, index) => {
-                      const estimatedTotal = parseFloat(item.total?.toString() || 0);
-                      const actualAmount = parseFloat(item.actualAmount?.toString() || 0);
+                      const estimatedTotal = parseDecimal(item.total);
+                      const actualAmount = parseDecimal(item.actualAmount);
                       const isPaid = item.isPaid || false;
                       const rowBgColor = isPaid ? "#D1FAE5" : "transparent";
                       const itemIdToUse =
@@ -1805,10 +1743,10 @@ const ViewDepartmentBudget = () => {
                             </span>
                           </td>
                           <td style={{ padding: "12px" }}>
-                            {formatCurrency(parseFloat(item.unitCost) || 0)}
+                            {formatCurrency(item.unitCost)}
                           </td>
                           <td style={{ padding: "12px" }}>
-                            {item.qty || 0}
+                            {parseDecimal(item.qty)}
                           </td>
                           <td style={{ padding: "12px" }}>
                             <span style={{ color: "#6B7280" }}>
@@ -2100,15 +2038,6 @@ const ViewDepartmentBudget = () => {
               </button>
             </>
           )}
-
-          <button
-            className="btn btn-success"
-            onClick={handleExportExcel}
-            style={{ borderRadius: "8px" }}
-          >
-            <i className="bi bi-file-earmark-excel me-2"></i>
-            Xuất Excel
-          </button>
         </div>
       </div>
 
@@ -2295,6 +2224,136 @@ const ViewDepartmentBudget = () => {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Budget Modal */}
+      {showRenameModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          onClick={() => setShowRenameModal(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title" style={{ fontWeight: '600', color: '#111827' }}>
+                  Đổi tên đơn ngân sách
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowRenameModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Nhập tên đơn ngân sách mới"
+                  value={renameInput}
+                  onChange={(e) => setRenameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmRename();
+                    } else if (e.key === 'Escape') {
+                      setShowRenameModal(false);
+                    }
+                  }}
+                  autoFocus
+                  style={{ borderRadius: '8px' }}
+                />
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowRenameModal(false)}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmRename}
+                  disabled={!renameInput.trim() || renaming}
+                  style={{ borderRadius: '8px' }}
+                >
+                  {renaming ? 'Đang lưu...' : 'Xác nhận'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Link Modal */}
+      {showLinkModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          onClick={() => setShowLinkModal(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title" style={{ fontWeight: '600', color: '#111827' }}>
+                  Thêm link bằng chứng
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowLinkModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Nhập link bằng chứng"
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmAddLink();
+                    } else if (e.key === 'Escape') {
+                      setShowLinkModal(false);
+                    }
+                  }}
+                  autoFocus
+                  style={{ borderRadius: '8px' }}
+                />
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowLinkModal(false)}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmAddLink}
+                  disabled={!linkInput.trim()}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Thêm
                 </button>
               </div>
             </div>

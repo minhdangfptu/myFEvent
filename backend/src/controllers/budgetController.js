@@ -5,6 +5,13 @@ import Department from '../models/department.js';
 import User from '../models/user.js';
 import mongoose from 'mongoose';
 import {
+  notifyBudgetSubmitted,
+  notifyBudgetApproved,
+  notifyBudgetRejected,
+  notifyBudgetSentToMembers,
+  notifyItemAssigned,
+} from '../services/notificationService.js';
+import {
   normalizeEvidenceArray,
   decimalToNumber,
   toDecimal128,
@@ -91,6 +98,7 @@ export const getDepartmentBudget = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
+    const { forReview } = req.query; // Check if this is for review page
 
     // Ensure event exists
     await ensureEventExists(eventId);
@@ -101,30 +109,60 @@ export const getDepartmentBudget = async (req, res) => {
       return res.status(404).json({ message: 'Department not found' });
     }
 
-    // Find budget plan - prioritize approved/sent_to_members, then latest
-    // First try to get approved or sent_to_members budget
-    let budget = await EventBudgetPlan.findOne({
-      eventId: new mongoose.Types.ObjectId(eventId),
-      departmentId: new mongoose.Types.ObjectId(departmentId),
-      status: { $in: ['approved', 'sent_to_members', 'locked'] }
-    })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: 'createdBy',
-        select: 'fullName email',
-        options: { strictPopulate: false }
+    let budget = null;
+
+    // If forReview=true, prioritize submitted/changes_requested budgets for review
+    if (forReview === 'true') {
+      budget = await EventBudgetPlan.findOne({
+        eventId: new mongoose.Types.ObjectId(eventId),
+        departmentId: new mongoose.Types.ObjectId(departmentId),
+        status: { $in: ['submitted', 'changes_requested'] }
       })
-      .populate({
-        path: 'reviewedBy',
-        select: 'fullName email',
-        options: { strictPopulate: false }
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'createdBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'reviewedBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'sentToMembersBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .lean();
+    }
+
+    // If not for review or no submitted budget found, prioritize approved/sent_to_members, then latest
+    if (!budget) {
+      // First try to get approved or sent_to_members budget
+      budget = await EventBudgetPlan.findOne({
+        eventId: new mongoose.Types.ObjectId(eventId),
+        departmentId: new mongoose.Types.ObjectId(departmentId),
+        status: { $in: ['approved', 'sent_to_members', 'locked'] }
       })
-      .populate({
-        path: 'sentToMembersBy',
-        select: 'fullName email',
-        options: { strictPopulate: false }
-      })
-      .lean();
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'createdBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'reviewedBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'sentToMembersBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .lean();
+    }
     
     // If no approved/sent_to_members budget, get the latest one (any status)
     if (!budget) {
@@ -165,9 +203,28 @@ export const getDepartmentBudget = async (req, res) => {
       return res.status(403).json({ message: 'Budget is private' });
     }
 
-    const formattedBudget = await buildBudgetWithExpenses(budget);
+    try {
+      // Validate budget has _id before building
+      if (!budget._id) {
+        return res.status(500).json({ message: 'Invalid budget data: missing _id' });
+      }
 
-    return res.status(200).json({ data: formattedBudget });
+      const formattedBudget = await buildBudgetWithExpenses(budget);
+      
+      if (!formattedBudget) {
+        return res.status(200).json({ data: budget });
+      }
+      
+      return res.status(200).json({ data: formattedBudget });
+    } catch (buildError) {
+      // Return budget without expenses if buildBudgetWithExpenses fails
+      // This allows the page to still load even if expense data fails
+      return res.status(200).json({ 
+        data: budget,
+        warning: 'Could not load expense data, showing budget only',
+        error: process.env.NODE_ENV === 'development' ? buildError.message : undefined
+      });
+    }
   } catch (error) {
     console.error('getDepartmentBudget error:', error);
     console.error('Error stack:', error.stack);
@@ -661,6 +718,14 @@ export const submitBudget = async (req, res) => {
       .populate('departmentId', 'name')
       .lean();
     
+    // Send notification to HoOC
+    try {
+      await notifyBudgetSubmitted(eventId, departmentId, budgetId);
+    } catch (notifError) {
+      console.error('Error sending budget submitted notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     return res.status(200).json({ 
       data: savedBudget,
       message: 'Budget submitted successfully'
@@ -981,6 +1046,18 @@ export const completeReview = async (req, res) => {
       allApproved,
       hasPending
     });
+
+    // Send notification based on review result
+    try {
+      if (newStatus === 'approved') {
+        await notifyBudgetApproved(eventId, departmentId, budgetId);
+      } else if (newStatus === 'changes_requested') {
+        await notifyBudgetRejected(eventId, departmentId, budgetId);
+      }
+    } catch (notifError) {
+      console.error('Error sending budget review notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     return res.status(200).json({ data: budget });
   } catch (error) {
@@ -1516,6 +1593,14 @@ export const sendBudgetToMembers = async (req, res) => {
 
     await budget.save();
 
+    // Send notification to members
+    try {
+      await notifyBudgetSentToMembers(eventId, departmentId, budgetId);
+    } catch (notifError) {
+      console.error('Error sending budget sent to members notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
     return res.status(200).json({ data: budget });
   } catch (error) {
     console.error('sendBudgetToMembers error:', error);
@@ -1802,6 +1887,16 @@ export const assignItem = async (req, res) => {
       // Save the budget
       const savedBudget = await budget.save();
       console.log('Assignment saved successfully');
+
+      // Send notification to assigned member if memberIdObj is provided
+      if (memberIdObj) {
+        try {
+          await notifyItemAssigned(eventId, departmentId, budgetId, searchItemId, memberIdObj);
+        } catch (notifError) {
+          console.error('Error sending item assigned notification:', notifError);
+          // Don't fail the request if notification fails
+        }
+      }
       
       return res.status(200).json({ data: savedBudget });
     } catch (saveError) {

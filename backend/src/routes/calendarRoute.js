@@ -10,7 +10,8 @@ import {
     getAvailableMembers,
     addParticipants,
     removeParticipant,
-    sendReminder
+    sendReminder,
+    deleteCalendar
 } from '../controllers/calendarController.js';
 
 import { authenticateToken } from '../middlewares/authMiddleware.js';
@@ -34,5 +35,6 @@ router.patch('/:calendarId/participate-status', authenticateToken, updatePartici
 router.post('/:calendarId/reminders', authenticateToken, sendReminder);
 
 router.put('/:calendarId', authenticateToken, updateCalendarForEvent);
+router.delete('/:calendarId', authenticateToken, deleteCalendar);
 
 export default router;

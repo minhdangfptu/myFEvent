@@ -14,7 +14,7 @@ import KanbanBoardTask from "~/components/KanbanBoardTask";
 import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
-import { Trash } from "lucide-react";
+import { Trash, AlertTriangle, X } from "lucide-react";
 import authStorage from "~/utils/authStorage";
 
 
@@ -116,8 +116,19 @@ export default function HoDTaskPage() {
   const [membersForAssignment, setMembersForAssignment] = useState([]);
   const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
   const [showEditAssigneeModal, setShowEditAssigneeModal] = useState(false);
+  const [expiredEpicModal, setExpiredEpicModal] = useState({ show: false, epicName: "", epicDeadline: "", onConfirm: null, pendingParentId: null });
   const [editingTask, setEditingTask] = useState(null);
   const [newAssigneeId, setNewAssigneeId] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const handleToggleSidebar = () => {
+      setSidebarOpen(prev => !prev);
+    };
+
+    window.addEventListener('toggleSidebar', handleToggleSidebar);
+    return () => window.removeEventListener('toggleSidebar', handleToggleSidebar);
+  }, []);
 
   // Load department info
   useEffect(() => {
@@ -556,6 +567,56 @@ export default function HoDTaskPage() {
   const [epicContext, setEpicContext] = useState(null);
 
   const openAddTaskModal = (mode = "epic", epic = null) => {
+    // Kiểm tra nếu là thêm công việc vào epic task và epic task đã quá hạn
+    if (mode === "normal" && epic) {
+      // Tìm epic task từ tasks list để lấy đầy đủ thông tin
+      const epicId = epic.id || epic._id;
+      const fullEpicTask = tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
+      const epicToCheck = fullEpicTask || epic;
+      
+      // Epic object có thể có dueDateRaw, dueDate, hoặc due (đã format)
+      // Nếu có due (string đã format), cần parse lại
+      let epicDueDate = epicToCheck.dueDateRaw || epicToCheck.dueDate;
+      
+      // Nếu không có dueDateRaw/dueDate nhưng có due (string format), thử parse
+      if (!epicDueDate && epicToCheck.due && epicToCheck.due !== "Chưa thiết lập" && epicToCheck.due !== "") {
+        // Parse từ format "DD/MM/YYYY"
+        const parts = epicToCheck.due.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+            epicDueDate = new Date(year, month, day);
+          }
+        }
+      }
+      
+      // Nếu vẫn không có dueDate, bỏ qua kiểm tra
+      if (epicDueDate) {
+        const epicDeadline = new Date(epicDueDate);
+        // Kiểm tra nếu epicDeadline là invalid date
+        if (!isNaN(epicDeadline.getTime())) {
+          const now = new Date();
+          // So sánh chỉ ngày, không so sánh giờ để tránh lỗi do timezone
+          epicDeadline.setHours(23, 59, 59, 999); // Set về cuối ngày để so sánh chính xác
+          now.setHours(0, 0, 0, 0); // Set về đầu ngày
+          if (epicDeadline < now) {
+          // Epic task đã quá hạn, hiển thị modal cảnh báo và không cho phép tạo công việc
+          setExpiredEpicModal({
+            show: true,
+            epicName: epic.name || epic.title || "Công việc lớn",
+            epicDeadline: new Date(epicDueDate).toLocaleString('vi-VN'),
+            onConfirm: null,
+            pendingParentId: null
+          });
+          return;
+          }
+        }
+      }
+    }
+    
+    // Nếu không quá hạn hoặc là thêm epic task, mở modal bình thường
     setAddTaskMode(mode);
     setEpicContext(epic);
     setAddTaskError("");
@@ -644,6 +705,28 @@ export default function HoDTaskPage() {
         next.assigneeId = "";
         next.parentId = "";
       }
+      
+      // Kiểm tra nếu chọn parentId (epic task) và epic task đó đã quá hạn
+      if (field === "parentId" && value && addTaskMode === "normal") {
+        const parentTask = parents.find((p) => String(p._id || p.id) === String(value));
+        if (parentTask && parentTask.dueDate) {
+          const parentDeadline = new Date(parentTask.dueDate);
+          const now = new Date();
+          if (parentDeadline < now) {
+            // Epic task đã quá hạn, hiển thị modal cảnh báo
+            setExpiredEpicModal({
+              show: true,
+              epicName: parentTask.title || parentTask.name || "Công việc lớn",
+              epicDeadline: new Date(parentTask.dueDate).toLocaleString('vi-VN'),
+              onConfirm: null,
+              pendingParentId: value
+            });
+            // Không set parentId ngay, đợi user xác nhận
+            return prev;
+          }
+        }
+      }
+      
       return next;
     });
   };
@@ -660,6 +743,30 @@ export default function HoDTaskPage() {
     if (taskType === "normal" && !addTaskForm.parentId) {
       setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
+    }
+
+    // Validate deadline và startDate của sub task không được vượt quá deadline của epic task
+    if (taskType === "normal" && addTaskForm.parentId) {
+      const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+      if (parentTask && parentTask.dueDate) {
+        const parentDeadline = new Date(parentTask.dueDate);
+        
+        // Validate deadline
+        const subTaskDeadline = new Date(addTaskForm.dueDate);
+        if (subTaskDeadline > parentDeadline) {
+          setAddTaskError(`Deadline của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+          return;
+        }
+        
+        // Validate startDate
+        if (addTaskForm.startDate) {
+          const subTaskStartDate = new Date(addTaskForm.startDate);
+          if (subTaskStartDate > parentDeadline) {
+            setAddTaskError(`Thời gian bắt đầu của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+            return;
+          }
+        }
+      }
     }
   
     const toISO = (d) => new Date(d).toISOString();
@@ -732,6 +839,46 @@ export default function HoDTaskPage() {
           if (confirmModal.onConfirm) confirmModal.onConfirm();
         }}
       />
+      {expiredEpicModal.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 3000,
+          background: 'rgba(0,0,0,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 10,
+            width: 500,
+            padding: 24,
+            boxShadow: '0 2px 16px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ marginBottom: 16 }}>
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <AlertTriangle size={20} style={{ color: '#DC2626' }} />
+                <strong style={{ color: '#DC2626' }}>Cảnh báo:</strong> Công việc lớn "<strong>{expiredEpicModal.epicName}</strong>" đã quá hạn.
+              </div>
+              <p className="mb-0">
+                Deadline: <strong>{expiredEpicModal.epicDeadline}</strong>
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button 
+                className="btn btn-secondary d-flex align-items-center gap-2" 
+                onClick={() => {
+                  setExpiredEpicModal({ show: false, epicName: "", epicDeadline: "", onConfirm: null, pendingParentId: null });
+                }}
+              >
+                <X size={16} />
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
         title={t("taskPage.title")}
@@ -1525,11 +1672,28 @@ export default function HoDTaskPage() {
                             }
                             return minDateTime;
                           })()}
+                          max={(() => {
+                            // Nếu là sub task (normal task) và có parent, giới hạn startDate không vượt quá deadline của epic task
+                            if (addTaskMode === "normal" && addTaskForm.parentId) {
+                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+                              if (parentTask && parentTask.dueDate) {
+                                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                              }
+                            }
+                            return undefined;
+                          })()}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
                             Lưu ý: Thời gian bắt đầu phải sau thời điểm
                             {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                            {addTaskMode === "normal" && addTaskForm.parentId && (() => {
+                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+                              if (parentTask && parentTask.dueDate) {
+                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                              }
+                              return "";
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1566,11 +1730,28 @@ export default function HoDTaskPage() {
                             
                             return minDateTime;
                           })()}
+                          max={(() => {
+                            // Nếu là sub task (normal task) và có parent, giới hạn deadline không vượt quá deadline của epic task
+                            if (addTaskMode === "normal" && addTaskForm.parentId) {
+                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+                              if (parentTask && parentTask.dueDate) {
+                                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                              }
+                            }
+                            return undefined;
+                          })()}
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
                             Lưu ý: Deadline phải sau thời điểm {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
                             {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
+                            {addTaskMode === "normal" && addTaskForm.parentId && (() => {
+                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+                              if (parentTask && parentTask.dueDate) {
+                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                              }
+                              return "";
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1749,7 +1930,7 @@ export default function HoDTaskPage() {
             style={{
               position: "fixed",
               bottom: 0,
-              left: 0,
+              left: sidebarOpen ? "230px" : "70px",
               right: 0,
               backgroundColor: "white",
               borderTop: "1px solid #E5E7EB",
@@ -1758,48 +1939,60 @@ export default function HoDTaskPage() {
               zIndex: 1000,
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: 16,
+              transition: "left 0.3s ease",
             }}
           >
             <div
               style={{
-                backgroundColor: "#F3F4F6",
-                padding: "4px 12px",
-                borderRadius: "6px",
-                fontSize: "14px",
-                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                maxWidth: "1200px",
+                width: "100%",
+                justifyContent: "center",
               }}
             >
-              {selectedTaskIds.length + selectedEpicIds.length} selected
+              <div
+                style={{
+                  backgroundColor: "#F3F4F6",
+                  padding: "4px 12px",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                {selectedTaskIds.length + selectedEpicIds.length} selected
+              </div>
+              <div style={{ width: 1, height: 24, backgroundColor: "#E5E7EB" }} />
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handleSelectAll()}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <i className="bi bi-cursor"></i>
+                Select all
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={handleDeleteSelected}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Trash size={18} />
+                Delete
+              </button>
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => {
+                  setSelectedTaskIds([]);
+                  setSelectedEpicIds([]);
+                }}
+                style={{ padding: "4px 8px", minWidth: 32 }}
+              >
+                ×
+              </button>
             </div>
-            <div style={{ width: 1, height: 24, backgroundColor: "#E5E7EB" }} />
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => handleSelectAll()}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <i className="bi bi-cursor"></i>
-              Select all
-            </button>
-            <div style={{ flex: 1 }} />
-            <button
-              className="btn btn-sm btn-danger"
-              onClick={handleDeleteSelected}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <Trash size={18} />
-              Delete
-            </button>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => {
-                setSelectedTaskIds([]);
-                setSelectedEpicIds([]);
-              }}
-              style={{ padding: "4px 8px", minWidth: 32 }}
-            >
-              ×
-            </button>
           </div>
         )}
       </UserLayout>

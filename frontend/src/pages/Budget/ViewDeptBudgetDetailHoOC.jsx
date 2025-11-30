@@ -70,7 +70,7 @@ const ViewDeptBudgetDetailHoOC = () => {
     try {
       setLoading(true);
       const [budgetData, deptData] = await Promise.all([
-        budgetApi.getDepartmentBudget(eventId, departmentId),
+        budgetApi.getDepartmentBudget(eventId, departmentId, true), // Pass forReview=true
         departmentService.getDepartmentDetail(eventId, departmentId),
       ]);
 
@@ -117,8 +117,25 @@ const ViewDeptBudgetDetailHoOC = () => {
     }
   };
 
+  // Helper function to parse Decimal128 values
+  const parseDecimal = (value) => {
+    if (value === null || value === undefined) return 0;
+    // If it's a MongoDB Decimal128 object with $numberDecimal
+    if (typeof value === 'object' && value !== null && value.$numberDecimal !== undefined) {
+      return parseFloat(value.$numberDecimal) || 0;
+    }
+    // If it's already a number
+    if (typeof value === 'number') return value;
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    return 0;
+  };
+
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("vi-VN").format(amount || 0);
+    const numAmount = parseDecimal(amount);
+    return new Intl.NumberFormat("vi-VN").format(numAmount);
   };
 
   const formatDate = (dateString) => {
@@ -259,7 +276,7 @@ const ViewDeptBudgetDetailHoOC = () => {
   ) || [];
 
   const totalCost = budget?.items?.reduce(
-    (sum, item) => sum + (parseFloat(item.total) || 0),
+    (sum, item) => sum + parseDecimal(item.total),
     0
   ) || 0;
 
@@ -512,17 +529,17 @@ const ViewDeptBudgetDetailHoOC = () => {
                           {item.name}
                         </td>
                         <td style={{ padding: "12px", color: "#111827", backgroundColor: cellBgColor }}>
-                          {formatCurrency(parseFloat(item.unitCost) || 0)}
+                          {formatCurrency(item.unitCost)}
                         </td>
                         <td style={{ padding: "12px", color: "#111827", backgroundColor: cellBgColor }}>
-                          {item.qty || 0}
+                          {parseDecimal(item.qty)}
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
                           <span
                             className="fw-semibold"
                             style={{ color: "#111827" }}
                           >
-                            {formatCurrency(parseFloat(item.total) || 0)}
+                            {formatCurrency(item.total)}
                           </span>
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
