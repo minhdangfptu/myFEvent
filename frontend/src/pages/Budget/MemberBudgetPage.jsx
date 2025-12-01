@@ -85,6 +85,7 @@ const MemberBudgetPage = () => {
           budgetId: budget._id || budget.id,
           departmentId: budget.departmentId || deptId,
           departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
+          requestName: (budget.name && budget.name.trim()) || "Budget Ban",
           budgetStatus: budget.status || null,
           totalItems: budget.totalItems || 0,
           totalCost: budget.totalCost || 0,
@@ -206,6 +207,9 @@ const MemberBudgetPage = () => {
                   <thead>
                     <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                       <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
+                        Tên đơn
+                      </th>
+                      <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                         Tên Ban
                       </th>
                       <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
@@ -228,8 +232,13 @@ const MemberBudgetPage = () => {
                   <tbody>
                     {budgets.map((budget) => (
                       <tr key={budget.budgetId}>
+                        <td style={{ padding: "12px", maxWidth: 240 }}>
+                          <span className="fw-semibold" style={{ fontSize: "16px", color: "#3B82F6" }}>
+                            {budget.requestName || "Budget Ban"}
+                          </span>
+                        </td>
                         <td style={{ padding: "12px" }}>
-                          <span className="fw-semibold" style={{ fontSize: "16px" }}>
+                          <span className="text-muted">
                             {budget.departmentName}
                           </span>
                         </td>
