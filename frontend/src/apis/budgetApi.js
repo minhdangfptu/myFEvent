@@ -63,6 +63,7 @@ export const budgetApi = {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
+    if (params.includeItems === false) queryParams.append('includeItems', 'false');
     
     const res = await axiosClient.get(`/api/events/${eventId}/departments/${departmentId}/budget/budgets?${queryParams.toString()}`);
     return unwrapResponse(res.data);
@@ -74,6 +75,7 @@ export const budgetApi = {
     if (params.status) queryParams.append('status', params.status);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
+    if (params.includeItems === false) queryParams.append('includeItems', 'false');
     
     const res = await axiosClient.get(`/api/events/${eventId}/budgets?${queryParams.toString()}`);
     return unwrapResponse(res.data);
