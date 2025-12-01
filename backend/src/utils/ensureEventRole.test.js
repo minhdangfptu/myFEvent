@@ -27,6 +27,7 @@ describe('utils - ensureEventRole', () => {
       userId: 'u1',
       eventId: 'e1',
       role: { $in: ['HoOC', 'HoD'] },
+      status: { $ne: 'deactive' }
     })
     expect(result).toEqual({ _id: 'm1', role: 'HoOC' })
   })
@@ -62,6 +63,7 @@ describe('utils - ensureEventRole', () => {
       userId: 'u2',
       eventId: 'e2',
       role: { $in: ['HoOC', 'HoD', 'member'] },
+      status: { $ne: 'deactive' }
     })
     expect(result).toEqual({ _id: 'm2', role: 'member' })
   })
