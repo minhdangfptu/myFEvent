@@ -112,13 +112,20 @@ const MemberExpensePage = () => {
       }
 
       const departments = await departmentService.getDepartments(eventId);
+      // Đảm bảo departments là array
+      const departmentsList = Array.isArray(departments) 
+        ? departments 
+        : (departments?.items || departments?.data || []);
+      
       let userDept = null;
       let currentUserMemberId = null;
 
-      for (const dept of departments) {
+      for (const dept of departmentsList) {
         try {
           const members = await departmentService.getMembersByDepartment(eventId, dept._id || dept.id);
-          const userMember = members.find(m => {
+          // Đảm bảo members là array
+          const membersArray = Array.isArray(members) ? members : [];
+          const userMember = membersArray.find(m => {
             const memberUserId = m.userId?._id || m.userId?.id || m.userId;
             return String(memberUserId) === String(userId);
           });
@@ -140,64 +147,216 @@ const MemberExpensePage = () => {
 
       setUserMemberId(currentUserMemberId);
 
-      const budget = await budgetApi.getDepartmentBudget(eventId, userDept._id || userDept.id);
+      // Load tất cả budgets của department (không chỉ budget hiện tại)
+      // Vì có thể có nhiều budgets đã được approved và gửi xuống member
+      const deptId = userDept._id || userDept.id;
+      let budgetsList = [];
       
-      if (budget && (budget.status === 'approved' || budget.status === 'sent_to_members')) {
+      try {
+        const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, deptId, {
+          page: 1,
+          limit: 100
+        });
+        
+        budgetsList = Array.isArray(budgetsResponse) 
+          ? budgetsResponse 
+          : (budgetsResponse?.data || budgetsResponse?.budgets || []);
+      } catch (error) {
+        console.warn("Failed to load all budgets, trying single budget:", error);
+        // Fallback: thử load budget hiện tại
+        try {
+          const singleBudget = await budgetApi.getDepartmentBudget(eventId, deptId);
+          if (singleBudget) {
+            budgetsList = [singleBudget];
+          }
+        } catch (err) {
+          console.error("Error loading budget:", err);
+        }
+      }
+      
+      // Lọc chỉ lấy budgets đã được approved hoặc sent_to_members
+      const approvedBudgets = budgetsList.filter(budget => 
+        budget.status === 'approved' || budget.status === 'sent_to_members'
+      );
+      
+      if (approvedBudgets.length === 0) {
+        setBudgets([]);
+        return;
+      }
+      
+      // Lọc items được assign cho member này từ tất cả budgets
+      const budgetsWithAssignedItems = approvedBudgets.map(budget => {
         const filteredItems = (budget.items || []).filter(item => {
-          if (budget.status === 'approved') {
-            if (!item.assignedTo) {
-              return false;
-            }
-          } else if (budget.status === 'sent_to_members') {
-            if (!item.assignedTo) {
+          const userMemberIdStr = String(currentUserMemberId);
+          
+          // Nếu budget status là 'sent_to_members', hiển thị tất cả items (kể cả chưa assign)
+          if (budget.status === 'sent_to_members') {
+            // Nếu item chưa được assign, vẫn hiển thị (member có thể xem tất cả)
+            if (!item.assignedTo && !item.assignedToInfo) {
               return true;
+            }
+          } else if (budget.status === 'approved') {
+            // Nếu budget chỉ approved nhưng chưa gửi xuống, chỉ hiển thị items đã được assign
+            if (!item.assignedTo && !item.assignedToInfo) {
+              return false;
             }
           }
           
+          // Kiểm tra xem item có được assign cho member này không
+          // Xử lý nhiều trường hợp khác nhau của assignedTo
           let assignedId = null;
           if (item.assignedTo) {
             if (typeof item.assignedTo === 'string') {
               assignedId = item.assignedTo;
             } else if (item.assignedTo._id) {
-              assignedId = item.assignedTo._id.toString();
-            } else if (item.assignedTo.toString) {
-              assignedId = item.assignedTo.toString();
+              assignedId = String(item.assignedTo._id);
+            } else if (item.assignedTo.id) {
+              assignedId = String(item.assignedTo.id);
+            } else if (typeof item.assignedTo === 'object' && item.assignedTo !== null) {
+              // Thử lấy bất kỳ giá trị nào có thể là ID
+              assignedId = String(Object.values(item.assignedTo)[0] || '');
+            } else {
+              assignedId = String(item.assignedTo);
             }
           }
           
+          // Xử lý assignedToInfo (có thể là member object)
           let assignedToInfoId = null;
           if (item.assignedToInfo) {
-            if (item.assignedToInfo._id) {
-              assignedToInfoId = item.assignedToInfo._id.toString();
-            } else if (typeof item.assignedToInfo._id === 'string') {
-              assignedToInfoId = item.assignedToInfo._id;
+            if (typeof item.assignedToInfo === 'string') {
+              assignedToInfoId = item.assignedToInfo;
+            } else if (item.assignedToInfo._id) {
+              assignedToInfoId = String(item.assignedToInfo._id);
+            } else if (item.assignedToInfo.id) {
+              assignedToInfoId = String(item.assignedToInfo.id);
+            } else if (typeof item.assignedToInfo === 'object' && item.assignedToInfo !== null) {
+              // Thử lấy _id hoặc id từ object
+              assignedToInfoId = String(item.assignedToInfo._id || item.assignedToInfo.id || Object.values(item.assignedToInfo)[0] || '');
             }
           }
           
-          const userMemberIdStr = String(currentUserMemberId);
-          const match = (assignedId && String(assignedId) === userMemberIdStr) ||
-                       (assignedToInfoId && String(assignedToInfoId) === userMemberIdStr);
+          // So sánh với nhiều cách khác nhau để đảm bảo match
+          const normalizedUserMemberId = userMemberIdStr.trim();
+          const normalizedAssignedId = assignedId ? assignedId.trim() : '';
+          const normalizedAssignedToInfoId = assignedToInfoId ? assignedToInfoId.trim() : '';
+          
+          // Kiểm tra match với assignedId
+          const matchAssignedId = normalizedAssignedId && 
+            (normalizedAssignedId === normalizedUserMemberId);
+          
+          // Kiểm tra match với assignedToInfoId
+          const matchAssignedToInfo = normalizedAssignedToInfoId && 
+            (normalizedAssignedToInfoId === normalizedUserMemberId);
+          
+          // Kiểm tra trực tiếp với item.assignedTo (fallback)
+          let matchDirectAssignedTo = false;
+          if (item.assignedTo) {
+            const directAssignedToStr = String(item.assignedTo).trim();
+            matchDirectAssignedTo = directAssignedToStr === normalizedUserMemberId;
+          }
+          
+          // Kiểm tra với assignedToInfo object (fallback)
+          let matchAssignedToInfoObject = false;
+          if (item.assignedToInfo && typeof item.assignedToInfo === 'object') {
+            const infoId = item.assignedToInfo._id || item.assignedToInfo.id;
+            if (infoId) {
+              matchAssignedToInfoObject = String(infoId).trim() === normalizedUserMemberId;
+            }
+          }
+          
+          const match = matchAssignedId || matchAssignedToInfo || matchDirectAssignedTo || matchAssignedToInfoObject;
+          
+          // Debug log để kiểm tra (chỉ log items có assignedTo hoặc assignedToInfo)
+          if (item.assignedTo || item.assignedToInfo) {
+            console.log('MemberExpensePage - Checking item:', {
+              itemName: item.name,
+              budgetStatus: budget.status,
+              assignedId: normalizedAssignedId || 'null',
+              assignedToInfoId: normalizedAssignedToInfoId || 'null',
+              userMemberIdStr: normalizedUserMemberId,
+              assignedTo: item.assignedTo,
+              assignedToInfo: item.assignedToInfo,
+              match,
+              matchAssignedId,
+              matchAssignedToInfo,
+              matchDirectAssignedTo,
+              matchAssignedToInfoObject
+            });
+          }
+          
+          // Nếu budget status là 'sent_to_members' và item chưa được assign, vẫn hiển thị
+          if (budget.status === 'sent_to_members' && !item.assignedTo && !item.assignedToInfo) {
+            return true;
+          }
           
           return match;
         });
 
-        if (filteredItems.length > 0) {
-          setBudgets([{ 
-            ...budget, 
-            items: filteredItems,
-            departmentId: userDept._id || userDept.id,
-            departmentName: userDept.name || budget.departmentName || "Chưa có"
-          }]);
-        } else {
-          if (budget.status === 'approved') {
-            setBudgets([]);
-            toast.info("Chưa có mục ngân sách nào được phân công cho bạn. Vui lòng đợi Trưởng ban phân công.");
-          } else {
-            setBudgets([]);
-          }
-        }
+        return {
+          ...budget,
+          items: filteredItems,
+          departmentId: deptId,
+          departmentName: userDept.name || budget.departmentName || "Chưa có"
+        };
+      }).filter(budget => budget.items && budget.items.length > 0); // Chỉ giữ budgets có items được assign
+
+      // Debug log chi tiết
+      console.log('MemberExpensePage - Final result:', {
+        totalBudgets: budgetsList.length,
+        approvedBudgets: approvedBudgets.length,
+        budgetsWithAssignedItems: budgetsWithAssignedItems.length,
+        currentUserMemberId: String(currentUserMemberId),
+        userDept: userDept.name,
+        approvedBudgetsStatus: approvedBudgets.map(b => ({ 
+          id: b._id || b.id, 
+          status: b.status, 
+          itemsCount: b.items?.length || 0,
+          itemsWithAssigned: b.items?.filter(item => item.assignedTo || item.assignedToInfo).length || 0,
+          items: b.items?.map(item => {
+            let assignedId = null;
+            if (item.assignedTo) {
+              if (typeof item.assignedTo === 'string') {
+                assignedId = item.assignedTo;
+              } else if (item.assignedTo._id) {
+                assignedId = String(item.assignedTo._id);
+              } else if (item.assignedTo.id) {
+                assignedId = String(item.assignedTo.id);
+              } else {
+                assignedId = String(item.assignedTo);
+              }
+            }
+            let assignedToInfoId = null;
+            if (item.assignedToInfo) {
+              if (typeof item.assignedToInfo === 'string') {
+                assignedToInfoId = item.assignedToInfo;
+              } else if (item.assignedToInfo._id) {
+                assignedToInfoId = String(item.assignedToInfo._id);
+              } else if (item.assignedToInfo.id) {
+                assignedToInfoId = String(item.assignedToInfo.id);
+              }
+            }
+            return {
+              name: item.name,
+              itemId: item.itemId || item._id,
+              assignedTo: item.assignedTo,
+              assignedToInfo: item.assignedToInfo,
+              assignedId: assignedId,
+              assignedToInfoId: assignedToInfoId,
+              matchesUser: assignedId && String(assignedId) === String(currentUserMemberId) ||
+                           assignedToInfoId && String(assignedToInfoId) === String(currentUserMemberId)
+            };
+          }) || []
+        }))
+      });
+      
+      if (budgetsWithAssignedItems.length > 0) {
+        setBudgets(budgetsWithAssignedItems);
       } else {
         setBudgets([]);
+        // Chỉ hiển thị toast nếu có budgets approved nhưng không có items được assign
+        if (approvedBudgets.length > 0) {
+          toast.info("Chưa có mục ngân sách nào được phân công cho bạn. Vui lòng đợi Trưởng ban phân công.");
+        }
       }
     } catch (error) {
       console.error("Error fetching budgets:", error);
@@ -417,11 +576,19 @@ const MemberExpensePage = () => {
                 <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
                   Báo cáo chi tiêu
                 </h2>
-                <div className="d-flex align-items-center gap-2 text-muted">
-                          <Users size={18} />
-                          <span>Ban: {budget.departmentName || "Đang tải..."}</span>
+                <div className="d-flex flex-column gap-2">
+                  {budget.name && (
+                    <div className="d-flex align-items-center gap-2" style={{ color: "#3B82F6" }}>
+                      <FileText size={18} />
+                      <span className="fw-semibold">Đơn: {budget.name}</span>
                     </div>
+                  )}
+                  <div className="d-flex align-items-center gap-2 text-muted">
+                    <Users size={18} />
+                    <span>Ban: {budget.departmentName || "Đang tải..."}</span>
                   </div>
+                </div>
+              </div>
 
               {/* Summary Cards */}
               <div className="d-flex flex-wrap gap-3 mb-4">

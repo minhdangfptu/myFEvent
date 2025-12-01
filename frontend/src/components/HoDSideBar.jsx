@@ -327,7 +327,7 @@ export default function HoDSideBar({
 
   const financeSubItems = [
     { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
-    
+    { id: "finance-statistics", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/departments/statistics` },
   ];
 
   const exportSubItems = [

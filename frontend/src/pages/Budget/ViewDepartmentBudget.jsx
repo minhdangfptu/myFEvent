@@ -19,6 +19,8 @@ const ViewDepartmentBudget = () => {
   const [loading, setLoading] = useState(true);
   const [budget, setBudget] = useState(null);
   const [department, setDepartment] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [sidebarType, setSidebarType] = useState('user');
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRecallModal, setShowRecallModal] = useState(false);
@@ -38,6 +40,18 @@ const ViewDepartmentBudget = () => {
   });
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState("");
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpenseItem, setEditingExpenseItem] = useState(null);
+  const [expenseFormData, setExpenseFormData] = useState({
+    actualAmount: "",
+    memberNote: "",
+    evidence: []
+  });
+  const [editingInlineItem, setEditingInlineItem] = useState(null);
+  const [inlineFormData, setInlineFormData] = useState({
+    actualAmount: "",
+    memberNote: ""
+  });
   
   const [columnWidths, setColumnWidths] = useState(null);
   
@@ -183,11 +197,22 @@ const ViewDepartmentBudget = () => {
         ? budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetId)
         : budgetApi.getDepartmentBudget(eventId, departmentId);
       
-      const [budgetData, deptData, membersData] = await Promise.all([
+      // Load budget và department trước (cần thiết ngay)
+      const [budgetData, deptData] = await Promise.all([
         budgetPromise,
         departmentService.getDepartmentDetail(eventId, departmentId),
-        departmentService.getMembersByDepartment(eventId, departmentId).catch(() => []),
       ]);
+      
+      // Lazy load members chỉ khi cần (khi budget đã approved và là HoD)
+      let membersData = [];
+      if (budgetData && (budgetData.status === 'approved' || budgetData.status === 'sent_to_members')) {
+        try {
+          membersData = await departmentService.getMembersByDepartment(eventId, departmentId);
+        } catch (error) {
+          console.warn("Failed to load members, will load when needed:", error);
+          membersData = [];
+        }
+      }
       
       if (!budgetData) {
         navigate(`/events/${eventId}/departments/${departmentId}/budget/empty`);
@@ -196,6 +221,19 @@ const ViewDepartmentBudget = () => {
       
       if (user) {
         const role = await fetchEventRole(eventId);
+        setUserRole(role);
+        
+        // Xác định sidebarType dựa trên role
+        if (role === 'HoD') {
+          setSidebarType('hod');
+        } else if (role === 'Member') {
+          setSidebarType('member');
+        } else if (role === 'HoOC') {
+          setSidebarType('hooc');
+        } else {
+          setSidebarType('user');
+        }
+        
         if (role === 'Member') {
           const userId = user._id || user.id;
           const membersArray = Array.isArray(membersData) ? membersData : [];
@@ -485,14 +523,26 @@ const ViewDepartmentBudget = () => {
 
   const handleConfirmAddLink = () => {
     if (linkInput && linkInput.trim()) {
-      setEvidenceFormData(prev => ({
-        ...prev,
-        evidence: [...(prev.evidence || []), {
-          type: 'link',
-          url: linkInput.trim(),
-          name: `Link ${(prev.evidence || []).length + 1}`
-        }]
-      }));
+      // Kiểm tra xem đang ở trong Expense Modal hay Evidence Modal
+      if (showExpenseModal && editingExpenseItem) {
+        setExpenseFormData(prev => ({
+          ...prev,
+          evidence: [...(prev.evidence || []), {
+            type: 'link',
+            url: linkInput.trim(),
+            name: `Link ${(prev.evidence || []).length + 1}`
+          }]
+        }));
+      } else {
+        setEvidenceFormData(prev => ({
+          ...prev,
+          evidence: [...(prev.evidence || []), {
+            type: 'link',
+            url: linkInput.trim(),
+            name: `Link ${(prev.evidence || []).length + 1}`
+          }]
+        }));
+      }
       setShowLinkModal(false);
       setLinkInput("");
     }
@@ -523,6 +573,180 @@ const ViewDepartmentBudget = () => {
       ...prev,
       evidence: (prev.evidence || []).filter((_, i) => i !== idx)
     }));
+  };
+
+  const handleOpenExpenseModal = (item) => {
+    setEditingExpenseItem(item);
+    setExpenseFormData({
+      actualAmount: item.actualAmount || "",
+      memberNote: item.memberNote || "",
+      evidence: item.evidence || []
+    });
+    setShowExpenseModal(true);
+  };
+
+  const handleCloseExpenseModal = () => {
+    setShowExpenseModal(false);
+    setEditingExpenseItem(null);
+    setExpenseFormData({
+      actualAmount: "",
+      memberNote: "",
+      evidence: []
+    });
+  };
+
+  const handleSaveExpense = async () => {
+    if (!editingExpenseItem || !budget) return;
+    
+    try {
+      setIsSubmitting(true);
+      const itemIdToUse = editingExpenseItem.itemId?.toString() || 
+                         editingExpenseItem.itemId?._id?.toString() || 
+                         editingExpenseItem.itemId ||
+                         editingExpenseItem._id?.toString() ||
+                         editingExpenseItem._id;
+      
+      await budgetApi.reportExpense(
+        eventId,
+        departmentId,
+        budget._id,
+        itemIdToUse,
+        {
+          actualAmount: parseFloat(expenseFormData.actualAmount) || 0,
+          memberNote: expenseFormData.memberNote || "",
+          evidence: expenseFormData.evidence || []
+        }
+      );
+      toast.success("Đã lưu chi tiêu thành công!");
+      handleCloseExpenseModal();
+      await fetchData();
+    } catch (error) {
+      console.error("Error saving expense:", error);
+      toast.error(error?.response?.data?.message || "Lưu chi tiêu thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveInlineExpense = async (item) => {
+    if (!item || !budget) return;
+    
+    try {
+      const itemIdToUse = item.itemId?.toString() || 
+                         item.itemId?._id?.toString() || 
+                         item.itemId ||
+                         item._id?.toString() ||
+                         item._id;
+      
+      await budgetApi.reportExpense(
+        eventId,
+        departmentId,
+        budget._id,
+        itemIdToUse,
+        {
+          actualAmount: parseFloat(inlineFormData.actualAmount) || 0,
+          memberNote: inlineFormData.memberNote || "",
+          evidence: item.evidence || []
+        }
+      );
+      setEditingInlineItem(null);
+      setInlineFormData({ actualAmount: "", memberNote: "" });
+      await fetchData();
+    } catch (error) {
+      console.error("Error saving inline expense:", error);
+      toast.error(error?.response?.data?.message || "Lưu thất bại!");
+    }
+  };
+
+  const handleAutoSaveExpense = async (item) => {
+    if (!item || !budget) return;
+    
+    // Đợi một chút để đảm bảo state đã được cập nhật
+    setTimeout(async () => {
+      try {
+        const itemIdToUse = item.itemId?.toString() || 
+                           item.itemId?._id?.toString() || 
+                           item.itemId ||
+                           item._id?.toString() ||
+                           item._id;
+        
+        await budgetApi.reportExpense(
+          eventId,
+          departmentId,
+          budget._id,
+          itemIdToUse,
+          {
+            actualAmount: parseFloat(inlineFormData.actualAmount) || 0,
+            memberNote: inlineFormData.memberNote || "",
+            evidence: item.evidence || []
+          }
+        );
+        // Tự động thoát khỏi chế độ edit sau khi lưu thành công
+        setEditingInlineItem(null);
+        // Không hiển thị toast để không làm phiền user
+        await fetchData();
+      } catch (error) {
+        console.error("Error auto-saving expense:", error);
+        // Chỉ log error, không hiển thị toast
+      }
+    }, 100);
+  };
+
+  const handleSubmitExpense = async (item) => {
+    if (!item || !budget) return;
+    
+    try {
+      setIsSubmitting(true);
+      const itemIdToUse = item.itemId?.toString() || 
+                         item.itemId?._id?.toString() || 
+                         item.itemId ||
+                         item._id?.toString() ||
+                         item._id;
+      
+      await budgetApi.submitExpense(eventId, departmentId, budget._id, itemIdToUse);
+      toast.success("Đã nộp thành công!");
+      await fetchData();
+    } catch (error) {
+      console.error("Error submitting expense:", error);
+      toast.error(error?.response?.data?.message || "Nộp thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUndoSubmitExpense = async (item) => {
+    if (!item || !budget) return;
+    
+    try {
+      setIsSubmitting(true);
+      const itemIdToUse = item.itemId?.toString() || 
+                         item.itemId?._id?.toString() || 
+                         item.itemId ||
+                         item._id?.toString() ||
+                         item._id;
+      
+      await budgetApi.undoSubmitExpense(eventId, departmentId, budget._id, itemIdToUse);
+      toast.success("Đã hoàn tác thành công!");
+      await fetchData();
+    } catch (error) {
+      console.error("Error undoing submit:", error);
+      toast.error(error?.response?.data?.message || "Hoàn tác thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStartInlineEdit = (item) => {
+    setEditingInlineItem(item.itemId || item._id);
+    setInlineFormData({
+      actualAmount: item.actualAmount || "",
+      memberNote: item.memberNote || ""
+    });
+  };
+
+  const handleCancelInlineEdit = () => {
+    setEditingInlineItem(null);
+    setInlineFormData({ actualAmount: "", memberNote: "" });
   };
 
   // Kiểm tra xem tất cả items đã được assign chưa
@@ -579,7 +803,7 @@ const ViewDepartmentBudget = () => {
       <UserLayout
         title="Xem Ngân sách của Ban"
         activePage="finance-budget"
-        sidebarType="hod"
+        sidebarType={sidebarType}
         eventId={eventId}
       >
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -617,7 +841,7 @@ const ViewDepartmentBudget = () => {
     <UserLayout
       title="Xem Ngân sách của Ban"
       activePage="finance-budget"
-      sidebarType="hod"
+      sidebarType={sidebarType}
       eventId={eventId}
     >
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -1670,12 +1894,32 @@ const ViewDepartmentBudget = () => {
                     }}>
                       Tổng tiền thực tế
                     </th>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151",
+                      minWidth: "140px",
+                      width: "140px",
+                      whiteSpace: "nowrap"
+                    }}>
+                      Hành động
+                    </th>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151",
+                      minWidth: "140px",
+                      width: "140px",
+                      whiteSpace: "nowrap"
+                    }}>
+                      Trạng thái
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={isApproved && isHoD ? 11 : 10} className="text-center text-muted py-4">
+                      <td colSpan={isApproved && isHoD ? 13 : 12} className="text-center text-muted py-4">
                         Không tìm thấy mục nào
                       </td>
                     </tr>
@@ -1762,8 +2006,9 @@ const ViewDepartmentBudget = () => {
                                 onChange={(e) => {
                                   handleAssignItem(itemIdToUse, e.target.value || null);
                                 }}
-                                disabled={isAssigningThisItem}
+                                disabled={isAssigningThisItem || (item.submittedStatus === 'submitted')}
                                 style={{ width: "100%", minWidth: 0 }}
+                                title={(item.submittedStatus === 'submitted') ? "Không thể thay đổi phân công vì đã được nộp" : ""}
                               >
                                 <option value="">Chưa phân công</option>
                                 {members.map((member) => (
@@ -1846,10 +2091,76 @@ const ViewDepartmentBudget = () => {
                               )}
                               {(() => {
                                 // Kiểm tra xem có thể chỉnh sửa bằng chứng không
-                                // HoD có thể chỉnh sửa tất cả
-                                // Member chỉ có thể chỉnh sửa item được assign cho mình
-                                const canEditEvidence = isHoD || 
-                                  (assignedMemberId && currentMemberId && String(assignedMemberId) === String(currentMemberId));
+                                // Logic mới:
+                                // 1. Nếu HoD tự giao công việc cho mình (assignedTo = currentMemberId của HoD hoặc userId) thì được chỉnh sửa như member
+                                // 2. Nếu công việc không giao cho mình thì không được chỉnh sửa
+                                // 3. Nếu người được giao đã nộp expense (actualAmount > 0) thì HoD không được chỉnh sửa
+                                
+                                // Lấy userId của HoD để so sánh
+                                const hodUserId = user?._id || user?.id;
+                                
+                                // Kiểm tra xem item có được giao cho HoD không
+                                // Có thể giao bằng memberId (nếu HoD có trong members) hoặc userId
+                                let isAssignedToHoD = false;
+                                
+                                if (assignedMemberId && isHoD) {
+                                  // Trường hợp 1: Giao cho memberId của HoD (nếu HoD có trong members)
+                                  if (currentMemberId && String(assignedMemberId) === String(currentMemberId)) {
+                                    isAssignedToHoD = true;
+                                  }
+                                  // Trường hợp 2: Kiểm tra qua assignedToInfo (thông tin người được giao)
+                                  // Nếu HoD không có trong members, kiểm tra qua assignedToInfo
+                                  if (!isAssignedToHoD && item.assignedToInfo) {
+                                    const assignedUserId = item.assignedToInfo?.userId?._id || 
+                                                          item.assignedToInfo?.userId || 
+                                                          item.assignedToInfo?.userId?.id;
+                                    const assignedMemberIdFromInfo = item.assignedToInfo?._id || 
+                                                                     item.assignedToInfo?.id;
+                                    
+                                    // So sánh với userId của HoD (nếu assignedToInfo có userId)
+                                    if (hodUserId && assignedUserId && String(assignedUserId) === String(hodUserId)) {
+                                      isAssignedToHoD = true;
+                                    }
+                                    // So sánh với memberId của HoD (nếu assignedToInfo có memberId)
+                                    else if (currentMemberId && assignedMemberIdFromInfo && String(assignedMemberIdFromInfo) === String(currentMemberId)) {
+                                      isAssignedToHoD = true;
+                                    }
+                                    // So sánh assignedMemberId với memberId từ info (nếu cả hai đều là memberId)
+                                    else if (currentMemberId && String(assignedMemberId) === String(assignedMemberIdFromInfo) && String(assignedMemberId) === String(currentMemberId)) {
+                                      isAssignedToHoD = true;
+                                    }
+                                  }
+                                }
+                                
+                                const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
+                                
+                                const isMemberAssigned = !isHoD && 
+                                  assignedMemberId && 
+                                  currentMemberId && 
+                                  String(assignedMemberId) === String(currentMemberId);
+                                
+                                // Kiểm tra xem người được giao đã nộp expense chưa
+                                const hasExpenseSubmitted = actualAmount > 0;
+                                
+                                // HoD chỉ được chỉnh sửa nếu:
+                                // - Tự giao cho mình VÀ chưa có expense được nộp
+                                // Member được chỉnh sửa nếu được assign cho mình
+                                const canEditEvidence = (isHoDAssignedToSelf && !hasExpenseSubmitted) || isMemberAssigned;
+                                
+                                // Debug log để kiểm tra
+                                if (isHoD && assignedMemberId) {
+                                  console.log('Debug edit evidence:', {
+                                    isHoD,
+                                    assignedMemberId: String(assignedMemberId),
+                                    currentMemberId: currentMemberId ? String(currentMemberId) : 'null',
+                                    isHoDAssignedToSelf,
+                                    hasExpenseSubmitted,
+                                    canEditEvidence,
+                                    actualAmount,
+                                    isApproved,
+                                    isSentToMembers
+                                  });
+                                }
                                 
                                 if ((isApproved || isSentToMembers) && canEditEvidence) {
                                   return (
@@ -1882,9 +2193,70 @@ const ViewDepartmentBudget = () => {
                             whiteSpace: "normal",
                             verticalAlign: "top"
                           }}>
-                            <span style={{ color: "#111827", fontSize: "13px" }}>
-                              {item.memberNote || "—"}
-                            </span>
+                            {(() => {
+                              // Kiểm tra xem có thể chỉnh sửa memberNote không
+                              const isMemberAssigned = !isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const isHoDAssignedToSelf = isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const canEdit = (isApproved || isSentToMembers) && (isMemberAssigned || isHoDAssignedToSelf);
+                              const isEditing = editingInlineItem === (item.itemId || item._id);
+                              
+                              if (canEdit) {
+                                if (isEditing) {
+                                  return (
+                                    <textarea
+                                      className="form-control form-control-sm"
+                                      rows="2"
+                                      value={inlineFormData.memberNote}
+                                      onChange={(e) => setInlineFormData({ ...inlineFormData, memberNote: e.target.value })}
+                                      onBlur={() => handleAutoSaveExpense(item)}
+                                      placeholder="Nhập ghi chú..."
+                                      style={{ fontSize: "13px" }}
+                                    />
+                                  );
+                                } else {
+                                  return (
+                                    <div
+                                      onClick={() => handleStartInlineEdit(item)}
+                                      style={{
+                                        cursor: "pointer",
+                                        padding: "4px 8px",
+                                        borderRadius: "4px",
+                                        border: "1px dashed #d1d5db",
+                                        minHeight: "32px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        color: item.memberNote ? "#111827" : "#9ca3af",
+                                        fontSize: "13px"
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = "#f9fafb";
+                                        e.currentTarget.style.borderColor = "#3b82f6";
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = "transparent";
+                                        e.currentTarget.style.borderColor = "#d1d5db";
+                                      }}
+                                    >
+                                      {item.memberNote || "Nhấp để nhập ghi chú..."}
+                                    </div>
+                                  );
+                                }
+                              } else {
+                                return (
+                                  <span style={{ color: "#111827", fontSize: "13px" }}>
+                                    {item.memberNote || "—"}
+                                  </span>
+                                );
+                              }
+                            })()}
                           </td>
                           <td style={{ padding: "12px" }}>
                             <span className="fw-semibold" style={{ color: "#111827" }}>
@@ -1892,31 +2264,228 @@ const ViewDepartmentBudget = () => {
                             </span>
                           </td>
                           <td style={{ padding: "12px" }}>
-                            {actualAmount > 0 ? (
-                              <span
-                                className="fw-semibold"
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  color: actualAmount < estimatedTotal 
-                                    ? "#DC2626"  // Đỏ nếu thực tế < dự trù
-                                    : actualAmount > estimatedTotal 
-                                    ? "#10B981"  // Xanh nếu thực tế > dự trù
-                                    : "#6B7280", // Xám nếu bằng nhau
-                                }}
-                              >
-                                {actualAmount < estimatedTotal && (
-                                  <ArrowDown size={16} />
-                                )}
-                                {actualAmount > estimatedTotal && (
-                                  <ArrowUp size={16} />
-                                )}
-                                {formatCurrency(actualAmount)}
-                              </span>
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
+                            {(() => {
+                              // Kiểm tra xem có thể chỉnh sửa actualAmount không
+                              const isMemberAssigned = !isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const isHoDAssignedToSelf = isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const canEdit = (isApproved || isSentToMembers) && (isMemberAssigned || isHoDAssignedToSelf);
+                              const isEditing = editingInlineItem === (item.itemId || item._id);
+                              
+                              if (canEdit) {
+                                if (isEditing) {
+                                  return (
+                                    <div>
+                                      <div className="input-group input-group-sm">
+                                        <input
+                                          type="number"
+                                          className="form-control"
+                                          value={inlineFormData.actualAmount}
+                                          onChange={(e) => setInlineFormData({ ...inlineFormData, actualAmount: e.target.value })}
+                                          onBlur={() => handleAutoSaveExpense(item)}
+                                          placeholder="Nhập số tiền..."
+                                          style={{ fontSize: "13px" }}
+                                        />
+                                        <span className="input-group-text">VNĐ</span>
+                                      </div>
+                                      {inlineFormData.actualAmount && (
+                                        <div className="mt-1">
+                                          <span className={`badge ${
+                                            parseFloat(inlineFormData.actualAmount) < estimatedTotal
+                                              ? 'bg-success'
+                                              : parseFloat(inlineFormData.actualAmount) > estimatedTotal
+                                              ? 'bg-danger'
+                                              : 'bg-info'
+                                          }`} style={{ fontSize: "10px" }}>
+                                            {parseFloat(inlineFormData.actualAmount) < estimatedTotal ? (
+                                              <>Tiết kiệm {formatCurrency(estimatedTotal - parseFloat(inlineFormData.actualAmount))}</>
+                                            ) : parseFloat(inlineFormData.actualAmount) > estimatedTotal ? (
+                                              <>Vượt {formatCurrency(parseFloat(inlineFormData.actualAmount) - estimatedTotal)}</>
+                                            ) : (
+                                              <>Đúng dự kiến</>
+                                            )}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div
+                                      onClick={() => handleStartInlineEdit(item)}
+                                      style={{
+                                        cursor: "pointer",
+                                        padding: "4px 8px",
+                                        borderRadius: "4px",
+                                        border: "1px dashed #d1d5db",
+                                        minHeight: "32px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between"
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = "#f9fafb";
+                                        e.currentTarget.style.borderColor = "#3b82f6";
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = "transparent";
+                                        e.currentTarget.style.borderColor = "#d1d5db";
+                                      }}
+                                    >
+                                      {actualAmount > 0 ? (
+                                        <span
+                                          className="fw-semibold"
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "4px",
+                                            color: actualAmount < estimatedTotal 
+                                              ? "#DC2626"
+                                              : actualAmount > estimatedTotal 
+                                              ? "#10B981"
+                                              : "#6B7280",
+                                          }}
+                                        >
+                                          {actualAmount < estimatedTotal && <ArrowDown size={14} />}
+                                          {actualAmount > estimatedTotal && <ArrowUp size={14} />}
+                                          {formatCurrency(actualAmount)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted" style={{ fontSize: "13px" }}>
+                                          Nhấp để nhập số tiền...
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                              } else {
+                                // Không được chỉnh sửa, chỉ hiển thị
+                                if (actualAmount > 0) {
+                                  return (
+                                    <span
+                                      className="fw-semibold"
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        color: actualAmount < estimatedTotal 
+                                          ? "#DC2626"
+                                          : actualAmount > estimatedTotal 
+                                          ? "#10B981"
+                                          : "#6B7280",
+                                      }}
+                                    >
+                                      {actualAmount < estimatedTotal && <ArrowDown size={16} />}
+                                      {actualAmount > estimatedTotal && <ArrowUp size={16} />}
+                                      {formatCurrency(actualAmount)}
+                                    </span>
+                                  );
+                                } else {
+                                  return <span className="text-muted">—</span>;
+                                }
+                              }
+                            })()}
+                          </td>
+                          {/* Cột Hành động */}
+                          <td style={{ 
+                            padding: "12px",
+                            minWidth: "140px",
+                            width: "140px",
+                            whiteSpace: "nowrap"
+                          }}>
+                            {(() => {
+                              const isMemberAssigned = !isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const isHoDAssignedToSelf = isHoD && 
+                                assignedMemberId && 
+                                currentMemberId && 
+                                String(assignedMemberId) === String(currentMemberId);
+                              
+                              const canEdit = (isApproved || isSentToMembers) && (isMemberAssigned || isHoDAssignedToSelf);
+                              const submittedStatus = item.submittedStatus || 'draft';
+                              const isSubmitted = submittedStatus === 'submitted';
+                              
+                              if (canEdit) {
+                                if (isSubmitted) {
+                                  return (
+                                    <button
+                                      className="btn btn-sm btn-warning"
+                                      onClick={() => handleUndoSubmitExpense(item)}
+                                      disabled={isSubmitting}
+                                      style={{ fontSize: "12px", padding: "4px 10px", whiteSpace: "nowrap" }}
+                                    >
+                                      <i className="bi bi-arrow-counterclockwise me-1"></i>
+                                      Hoàn tác
+                                    </button>
+                                  );
+                                } else {
+                                  return (
+                                    <button
+                                      className="btn btn-sm btn-success"
+                                      onClick={() => handleSubmitExpense(item)}
+                                      disabled={isSubmitting}
+                                      style={{ fontSize: "12px", padding: "4px 10px", whiteSpace: "nowrap" }}
+                                    >
+                                      <i className="bi bi-send me-1"></i>
+                                      Nộp
+                                    </button>
+                                  );
+                                }
+                              }
+                              return <span className="text-muted">—</span>;
+                            })()}
+                          </td>
+                          {/* Cột Trạng thái */}
+                          <td style={{ 
+                            padding: "12px",
+                            minWidth: "140px",
+                            width: "140px",
+                            whiteSpace: "nowrap"
+                          }}>
+                            {(() => {
+                              const submittedStatus = item.submittedStatus || 'draft';
+                              const isSubmitted = submittedStatus === 'submitted';
+                              
+                              if (isSubmitted) {
+                                return (
+                                  <span className="badge" style={{ 
+                                    background: "rgba(16, 185, 129, 0.1)", 
+                                    color: "#10B981",
+                                    fontSize: "12px",
+                                    padding: "4px 8px",
+                                    whiteSpace: "nowrap",
+                                    display: "inline-block"
+                                  }}>
+                                    <i className="bi bi-check-circle-fill me-1"></i>
+                                    Đã nộp
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="badge" style={{ 
+                                    background: "rgba(107, 114, 128, 0.1)", 
+                                    color: "#6B7280",
+                                    fontSize: "12px",
+                                    padding: "4px 8px",
+                                    whiteSpace: "nowrap",
+                                    display: "inline-block"
+                                  }}>
+                                    <i className="bi bi-clock me-1"></i>
+                                    Chưa nộp
+                                  </span>
+                                );
+                              }
+                            })()}
                           </td>
                         </tr>
                       );
@@ -2205,6 +2774,210 @@ const ViewDepartmentBudget = () => {
                   onClick={handleSaveEvidence}
                   disabled={isSubmitting}
                 >
+                  {isSubmitting ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expense Modal - Cho phép member chỉnh sửa actualAmount, memberNote và evidence */}
+      {showExpenseModal && editingExpenseItem && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 9999 }}
+          onClick={handleCloseExpenseModal}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: "12px" }}>
+              <div className="modal-header" style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <h5 className="modal-title fw-bold">Chỉnh sửa chi tiêu</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseExpenseModal}
+                ></button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <p className="text-muted mb-4">{editingExpenseItem.name}</p>
+
+                {/* Actual Amount */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-cash-coin me-2"></i>
+                    Số tiền thực tế <span className="text-danger">*</span>
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control form-control-lg"
+                      value={expenseFormData.actualAmount}
+                      onChange={(e) => setExpenseFormData({ ...expenseFormData, actualAmount: e.target.value })}
+                      placeholder="Nhập số tiền thực tế..."
+                    />
+                    <span className="input-group-text">VNĐ</span>
+                  </div>
+                  {expenseFormData.actualAmount && (
+                    <div className="mt-2">
+                      <span className={`badge ${
+                        parseFloat(expenseFormData.actualAmount) < parseDecimal(editingExpenseItem.total)
+                          ? 'bg-success'
+                          : parseFloat(expenseFormData.actualAmount) > parseDecimal(editingExpenseItem.total)
+                          ? 'bg-danger'
+                          : 'bg-info'
+                      }`}>
+                        {parseFloat(expenseFormData.actualAmount) < parseDecimal(editingExpenseItem.total) ? (
+                          <>
+                            <i className="bi bi-arrow-down me-1"></i>
+                            Tiết kiệm {formatCurrency(parseDecimal(editingExpenseItem.total) - parseFloat(expenseFormData.actualAmount))} VNĐ
+                          </>
+                        ) : parseFloat(expenseFormData.actualAmount) > parseDecimal(editingExpenseItem.total) ? (
+                          <>
+                            <i className="bi bi-arrow-up me-1"></i>
+                            Vượt {formatCurrency(parseFloat(expenseFormData.actualAmount) - parseDecimal(editingExpenseItem.total))} VNĐ
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-check-circle me-1"></i>
+                            Đúng dự kiến
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Member Note */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-chat-left-text me-2"></i>
+                    Ghi chú
+                  </label>
+                  <textarea
+                    className="form-control"
+                    rows="4"
+                    value={expenseFormData.memberNote}
+                    onChange={(e) => setExpenseFormData({ ...expenseFormData, memberNote: e.target.value })}
+                    placeholder="Nhập ghi chú nếu cần..."
+                  />
+                </div>
+
+                {/* Evidence */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-paperclip me-2"></i>
+                    Bằng chứng
+                  </label>
+                  {expenseFormData.evidence && expenseFormData.evidence.length > 0 && (
+                    <div className="mb-3">
+                      {expenseFormData.evidence.map((ev, idx) => (
+                        <div key={idx} className="d-flex justify-content-between align-items-center p-2 mb-2" style={{ background: "#f9fafb", borderRadius: "8px" }}>
+                          <div className="d-flex align-items-center gap-2">
+                            {ev.type === 'image' && <i className="bi bi-image text-primary"></i>}
+                            {ev.type === 'pdf' && <i className="bi bi-file-pdf text-danger"></i>}
+                            {ev.type === 'doc' && <i className="bi bi-file-word text-info"></i>}
+                            {ev.type === 'link' && <i className="bi bi-link-45deg text-success"></i>}
+                            <span>{ev.name}</span>
+                          </div>
+                          <div className="d-flex gap-2">
+                            {ev.type === 'image' && (
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => {
+                                  setSelectedImage(ev.url);
+                                  setShowImageModal(true);
+                                }}
+                              >
+                                <Eye size={18} />
+                              </button>
+                            )}
+                            {ev.type === 'link' && (
+                              <a
+                                href={ev.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-outline-primary"
+                              >
+                                <ExternalLink size={18} />
+                              </a>
+                            )}
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => {
+                                setExpenseFormData(prev => ({
+                                  ...prev,
+                                  evidence: (prev.evidence || []).filter((_, i) => i !== idx)
+                                }));
+                              }}
+                            >
+                              <Trash size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-outline-primary"
+                      onClick={() => {
+                        setLinkInput("");
+                        setShowLinkModal(true);
+                      }}
+                    >
+                      <i className="bi bi-link-45deg me-2"></i>
+                      Thêm link
+                    </button>
+                    <label className="btn btn-outline-primary">
+                      <i className="bi bi-upload me-2"></i>
+                      Tải file lên
+                      <input
+                        type="file"
+                        className="d-none"
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const fileType = file.type.startsWith('image/') ? 'image' : 
+                                          file.type === 'application/pdf' ? 'pdf' : 'doc';
+                            setExpenseFormData(prev => ({
+                              ...prev,
+                              evidence: [...(prev.evidence || []), {
+                                type: fileType,
+                                url: event.target.result,
+                                name: file.name
+                              }]
+                            }));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ borderTop: "1px solid #e5e7eb" }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleCloseExpenseModal}
+                  disabled={isSubmitting}
+                >
+                  <i className="bi bi-x-circle me-2"></i>
+                  Hủy
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveExpense}
+                  disabled={isSubmitting}
+                >
+                  <i className="bi bi-check-circle me-2"></i>
                   {isSubmitting ? "Đang lưu..." : "Lưu"}
                 </button>
               </div>

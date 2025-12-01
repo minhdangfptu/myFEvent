@@ -43,10 +43,11 @@ const DepartmentBudgetsListPage = () => {
           const deptId = userDepartment._id || userDepartment.id;
           setHodDepartmentId(deptId);
           
-          // Lấy tất cả budgets của department (bao gồm cả draft và submitted)
+          // Chỉ load summary của budgets (không load items để tối ưu)
           const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, deptId, {
             page: 1,
-            limit: 1000
+            limit: 100, // Giảm từ 1000 xuống 100
+            includeItems: false // Chỉ load summary, không load items
           });
           
           const budgetsList = Array.isArray(budgetsResponse) 
@@ -58,7 +59,7 @@ const DepartmentBudgetsListPage = () => {
             budgetId: budget._id || budget.id,
             departmentId: budget.departmentId || deptId,
             departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
-            requestName: budget.name || "Budget Ban",
+            requestName: (budget.name && budget.name.trim()) || "Budget Ban",
             creatorName: budget.creatorName || "",
             budgetStatus: budget.status || null,
             totalItems: budget.totalItems || 0,
@@ -230,7 +231,7 @@ const DepartmentBudgetsListPage = () => {
                       <tr key={budget.budgetId}>
                         <td style={{ padding: "12px", maxWidth: 240 }}>
                           <span className="fw-semibold" style={{ fontSize: "16px" }}>
-                            {budget.requestName || "Chưa đặt tên"}
+                            {budget.requestName || "Budget Ban"}
                           </span>
                           {budget.creatorName && (
                             <div className="text-muted" style={{ fontSize: "13px" }}>
