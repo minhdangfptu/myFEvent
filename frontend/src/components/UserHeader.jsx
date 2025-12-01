@@ -20,8 +20,7 @@ export default function UserHeader({
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
   const navigate = useNavigate();
 
-  // Sắp xếp thông báo mới nhất lên trước, hiển thị tất cả (có scroll),
-  // nhưng giới hạn chiều cao để nhìn giống ~3 thông báo như hiện tại.
+  
   const sortedNotifications = [...notifications].sort((a, b) => {
     const da = new Date(a.createdAt).getTime();
     const db = new Date(b.createdAt).getTime();
@@ -105,13 +104,10 @@ export default function UserHeader({
   }, [setUser]);
 
   const getNotificationTargetUrl = (n) => {
-    // Backend can optionally send a direct URL (ưu tiên cao nhất)
     if (n.targetUrl) {
-      // Validate targetUrl - nếu không bắt đầu bằng / thì có thể là relative path
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
       
-      // Fix URL cũ có budgetId trong path review: /budget/{budgetId}/review -> /budget/review
-      // Pattern: /events/.../departments/.../budget/{budgetId}/review
+      
       url = url.replace(
         /\/events\/([^/]+)\/departments\/([^/]+)\/budget\/([^/]+)\/review$/,
         '/events/$1/departments/$2/budget/review'
@@ -122,29 +118,22 @@ export default function UserHeader({
 
     // TÀI CHÍNH notifications
     if (n.eventId && n.category === 'TÀI CHÍNH') {
-      // Budget notifications - backend đã set targetUrl, nếu không có thì fallback về trang home
       if (n.relatedBudgetId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event để tránh 404
+        
         return `/home-page/events/${n.eventId}`;
       }
-      // Expense notifications
       if (n.relatedExpenseId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event
+      
         return `/home-page/events/${n.eventId}`;
       }
     }
 
-    // PHẢN HỒI notifications
     if (n.eventId && n.category === 'PHẢN HỒI') {
       if (n.relatedFeedbackId) {
-        // HoOC: summary page, Member/HoD: member feedback page
         return `/events/${n.eventId}/feedback/member`;
       }
     }
 
-    // RỦI RO notifications
     if (n.eventId && n.category === 'RỦI RO') {
       if (n.relatedRiskId) {
         return `/events/${n.eventId}/risks/detail/${n.relatedRiskId}`;
@@ -152,7 +141,6 @@ export default function UserHeader({
       return `/events/${n.eventId}/risks`;
     }
 
-    // LỊCH HỌP notifications
     if (n.eventId && n.category === 'LỊCH HỌP') {
       if (n.relatedCalendarId) {
         return `/events/${n.eventId}/my-calendar`;
@@ -163,41 +151,32 @@ export default function UserHeader({
       return `/events/${n.eventId}/my-calendar`;
     }
 
-    // CÔNG VIỆC notifications - điều hướng đến trang task
     if (n.eventId && n.category === "CÔNG VIỆC") {
-      // Nếu có relatedTaskId thì đi đến task detail
       if (n.relatedTaskId) {
         return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;
       }
-      // Nếu không có relatedTaskId thì đi đến trang danh sách tasks
       return `/events/${n.eventId}/tasks`;
     }
 
-    // THÀNH VIÊN notifications - điều hướng đến trang thành viên
     if (n.eventId && n.category === "THÀNH VIÊN") {
       return `/events/${n.eventId}/members`;
     }
 
-    // Mặc định nếu có eventId thì đưa về trang chi tiết sự kiện
     if (n.eventId) {
       return `/home-page/events/${n.eventId}`;
     }
 
-    // Fallback: về trang danh sách thông báo
     return "/notifications";
   };
 
   const handleNotificationClick = (n) => {
-    // Đánh dấu đã đọc
     if (n.id) {
       markRead(n.id);
     }
-    // Điều hướng tới trang phù hợp
     const url = getNotificationTargetUrl(n);
     navigate(url);
   };
 
-  // Format time display
   const formatTime = () => {
     if (timeFormat === '24h') {
       return currentTime.toLocaleTimeString("vi-VN", {
@@ -214,11 +193,9 @@ export default function UserHeader({
     }
   };
 
-  // Format date display - rút gọn
   const formatDate = () => {
     const day = currentTime.toLocaleDateString("vi-VN", { weekday: "long" });
     
-    // Đảm bảo ngày và tháng luôn có 2 chữ số
     const dayNum = currentTime.getDate().toString().padStart(2, '0');
     const monthNum = (currentTime.getMonth() + 1).toString().padStart(2, '0');
     const year = currentTime.getFullYear();

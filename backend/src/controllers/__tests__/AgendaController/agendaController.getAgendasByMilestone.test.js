@@ -1,19 +1,15 @@
-// src/controllers/__test__/getAgendasByMilestone.test.js
+// src/controllers/__tests__/agendaController.getAgendasByMilestone.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as agendaController from '../agendaController.js';
-
-/* -------------------- Mocks -------------------- */
+import * as agendaController from '../../agendaController.js';
 
 vi.mock('express-validator', () => ({
   validationResult: vi.fn(),
 }));
 
-vi.mock('../../services/agendaService.js', () => ({
+vi.mock('../../../services/agendaService.js', () => ({
   __esModule: true,
   getAgendaByMilestoneId: vi.fn(),
 }));
-
-/* -------------------- Helpers -------------------- */
 
 const mockRes = () => {
   const res = {};
@@ -24,21 +20,17 @@ const mockRes = () => {
 
 beforeEach(() => vi.clearAllMocks());
 
-/* -------------------- Tests -------------------- */
-
 describe('agendaController.getAgendasByMilestone', () => {
   it('[Normal] TC01 - should return agenda by milestoneId successfully', async () => {
     const { validationResult } = await import('express-validator');
-    const { getAgendaByMilestoneId } = await import('../../services/agendaService.js');
+    const { getAgendaByMilestoneId } = await import('../../../services/agendaService.js');
 
     validationResult.mockReturnValue({
       isEmpty: () => true,
       array: () => [],
     });
 
-    const req = {
-      params: { milestoneId: 'mile1' },
-    };
+    const req = { params: { milestoneId: 'mile1' } };
     const res = mockRes();
 
     const mockAgenda = { _id: 'ag1', milestoneId: 'mile1' };
@@ -59,11 +51,11 @@ describe('agendaController.getAgendasByMilestone', () => {
 
   it('[Abnormal] TC02 - should return 400 when validation fails', async () => {
     const { validationResult } = await import('express-validator');
-    const { getAgendaByMilestoneId } = await import('../../services/agendaService.js');
+    const { getAgendaByMilestoneId } = await import('../../../services/agendaService.js');
 
     validationResult.mockReturnValue({
       isEmpty: () => false,
-      array: () => [{ msg: 'Invalid milestoneId', param: 'milestoneId' }],
+      array: () => [{ msg: 'Invalid milestoneId' }],
     });
 
     const req = { params: { milestoneId: '' } };
@@ -83,7 +75,7 @@ describe('agendaController.getAgendasByMilestone', () => {
 
   it('[Abnormal] TC03 - should return 500 when service throws error', async () => {
     const { validationResult } = await import('express-validator');
-    const { getAgendaByMilestoneId } = await import('../../services/agendaService.js');
+    const { getAgendaByMilestoneId } = await import('../../../services/agendaService.js');
 
     validationResult.mockReturnValue({
       isEmpty: () => true,

@@ -5,7 +5,7 @@ import UserLayout from '../../components/UserLayout';
 import Loading from '../../components/Loading';
 import { feedbackApi } from '../../apis/feedbackApi';
 import { useEvents } from '../../contexts/EventContext';
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, Star } from "lucide-react";
 
 
 const getSidebarType = (role) => {
@@ -27,6 +27,7 @@ export default function SubmitFeedbackResponsePage() {
   const [responses, setResponses] = useState({});
   const [loading, setLoading] = useState(!location.state?.form);
   const [submitting, setSubmitting] = useState(false);
+  const [hoveredRatings, setHoveredRatings] = useState({});
 
   useEffect(() => {
     if (!eventId || !formId) return;
@@ -208,26 +209,48 @@ export default function SubmitFeedbackResponsePage() {
                 {question.questionText} {question.required && <span style={{ color: '#dc2626' }}>*</span>}
               </div>
               {question.questionType === 'rating' && (
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => handleAnswerChange(index, value)}
-                      disabled={!canSubmit || isSubmitted}
-                      style={{
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '8px',
-                        border: responses[index] === value ? '2px solid #2563eb' : '1px solid #d1d5db',
-                        background: responses[index] === value ? '#dbeafe' : '#fff',
-                        fontWeight: '600',
-                        cursor: (!canSubmit || isSubmitted) ? 'not-allowed' : 'pointer',
-                        color: responses[index] === value ? '#2563eb' : '#6b7280'
-                      }}
-                    >
-                      {value}
-                    </button>
-                  ))}
+                <div 
+                  style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                  onMouseLeave={() => setHoveredRatings(prev => ({ ...prev, [index]: null }))}
+                >
+                  {[1, 2, 3, 4, 5].map((value) => {
+                    const currentRating = responses[index];
+                    const hoveredValue = hoveredRatings[index];
+                    const displayValue = hoveredValue !== null ? hoveredValue : currentRating;
+                    const isSelected = displayValue >= value;
+                    
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => handleAnswerChange(index, value)}
+                        onMouseEnter={() => {
+                          if (canSubmit && !isSubmitted) {
+                            setHoveredRatings(prev => ({ ...prev, [index]: value }));
+                          }
+                        }}
+                        disabled={!canSubmit || isSubmitted}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '4px',
+                          cursor: (!canSubmit || isSubmitted) ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title={`${value} sao`}
+                      >
+                        <Star
+                          size={32}
+                          fill={isSelected ? '#fbbf24' : 'none'}
+                          stroke={isSelected ? '#fbbf24' : '#d1d5db'}
+                          strokeWidth={isSelected ? 0 : 2}
+                          style={{ transition: 'all 0.2s ease' }}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
