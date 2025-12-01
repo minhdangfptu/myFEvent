@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function SystemSettingsPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  console.debug('DEBUG Settings.jsx user:', user);
   const [activeTab, setActiveTab] = useState('General Settings');
   const [settings, setSettings] = useState({ language: i18n.language?.split('-')[0] || 'vi', backgroundColor: getSavedTheme() === 'dark' ? 'Tối' : 'Sáng', notifications: true });
   const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -90,16 +91,16 @@ export default function SystemSettingsPage() {
           ))}
         </div> */}
 
-        <div style={{backgroundColor:"white"}} className="set-card p-4 mb-4">
+        {/* <div style={{backgroundColor:"white"}} className="set-card p-4 mb-4">
           <div className="fw-semibold mb-3">{t('general')}</div>
           <div className="row gy-4">
-            {/* <div className="col-md-6">
+            <div className="col-md-6">
               <div className="mb-2 small text-muted">{t('language')}</div>
               <select className="form-select input-soft" value={settings.language} onChange={(e) => handleSettingChange('language', e.target.value)}>
                 <option value="vi">{t('languages.vi')}</option>
                 <option value="en">{t('languages.en')}</option>
               </select>
-            </div> */}
+            </div> 
             <div className="col-md-6">
               <div className="mb-2 small text-muted">{t('notifications')}</div>
               <div className="input-soft d-flex align-items-center justify-content-between px-3">
@@ -109,21 +110,21 @@ export default function SystemSettingsPage() {
                 </div>
               </div>
             </div>
-            {/* <div className="col-md-6">
+            <div className="col-md-6">
               <div className="mb-2 small text-muted">{t('theme')}</div>
               <select className="form-select input-soft" value={settings.backgroundColor} onChange={(e) => handleSettingChange('backgroundColor', e.target.value)}>
                 <option>{t('light')}</option>
                 <option>{t('dark')}</option>
               </select>
-            </div> */}
-            {/* <div className="col-md-6 d-flex justify-content-end align-items-end">
+            </div>
+            <div className="col-md-6 d-flex justify-content-end align-items-end">
               <button className="btn btn-primary-soft px-4" onClick={handleSave}>{t('save')}</button>
-            </div> */}
+            </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Change Password - Only show for local auth users */}
-        {user?.authProvider !== 'google' && (
+        {(user?.authProvider || 'local') !== 'google' && (
           <div style={{backgroundColor:"white"}} className="set-card p-4">
             <div className="fw-semibold mb-3">Đổi mật khẩu</div>
             <form onSubmit={submitChangePassword} className="row gy-3">
@@ -184,7 +185,7 @@ export default function SystemSettingsPage() {
         )}
 
         {/* Google Auth Users - Password Setup Guidance */}
-        {user?.authProvider === 'google' && (
+        {(user?.authProvider || 'local') === 'google' && (
           <div style={{backgroundColor:"white"}} className="set-card p-4">
             <div className="fw-semibold mb-3">Bảo mật tài khoản</div>
             <div className="text-muted">

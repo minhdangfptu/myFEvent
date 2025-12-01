@@ -15,7 +15,7 @@ const pendingRegistrations = new Map();
 const deleteEventOtpStore = new Map();
 const setEmailVerificationCode = (email) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const ttlMs = 60 * 1000; // 1 minute
+  const ttlMs = 3 * 60 * 1000; // 3 minutes
   const expiresAt = new Date(Date.now() + ttlMs);
 
   const existing = emailVerificationStore.get(email);
