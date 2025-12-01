@@ -4,10 +4,13 @@ import { authApi } from '../../apis/authApi';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Loading from '~/components/Loading';
+import { useAuth } from '../../contexts/AuthContext';
+import authStorage from '../../utils/authStorage';
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { setUser } = useAuth?.() || {};
 
   // notify wrapper using react-toastify
   const notify = (type, msg) => {
@@ -165,7 +168,6 @@ export default function UserProfilePage() {
 
       if (newProfile) {
         setProfile(newProfile);
-        // Cập nhật form state với dữ liệu mới từ server
         setForm({
           fullName: newProfile.fullName || '',
           phone: newProfile.phone || '',
@@ -174,15 +176,18 @@ export default function UserProfilePage() {
           tags: Array.isArray(newProfile.tags) ? newProfile.tags : []
         });
         setAvatarPreview(newProfile.avatarUrl || null);
-
+        setUnsavedAvatar(false);
+        // Đồng bộ context, storage, event
+        if (setUser) setUser(newProfile);
+        authStorage.setUser(newProfile);
+        window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
         try {
           window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
-        } catch (e) { /* noop */ }
+        } catch (e) {}
       }
 
       setEditing(false);
       setAvatarFile(null);
-      setUnsavedAvatar(false);
       cleanupObjectUrl();
 
       notify('success', 'Lưu thay đổi thành công!');
@@ -216,9 +221,12 @@ export default function UserProfilePage() {
         setProfile(newProfile);
 
         // Dispatch event to update other components
+        if (setUser) setUser(newProfile);
+        authStorage.setUser(newProfile);
+        window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
         try {
           window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
-        } catch (e) { /* noop */ }
+        } catch (e) {}
       }
 
       setShowAvatarConfirm(false);

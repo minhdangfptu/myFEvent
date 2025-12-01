@@ -42,7 +42,11 @@ const AxiosInterceptor = ({ children }) => {
               }
               break;
             case 404:
-              navigate("/404");
+              // Don't redirect to 404 page for auth endpoints (let component handle it)
+              const isAuthEndpoint = error.config?.url?.includes('/auth/');
+              if (!isAuthEndpoint) {
+                navigate("/404");
+              }
               break;
             case 502:
               navigate("/502");
