@@ -134,36 +134,8 @@ function EventDetailPage() {
                     <InfoItem icon={UserIcon} label="Người tổ chức" value={event.organizerName || "Chưa cập nhật"} />
                     <InfoItem icon={CalendarDays} label="Thời gian diễn ra" value={dateText} />
                     <InfoItem icon={MapPin} label="Địa điểm" value={address || "Chưa xác định"} />
-                    <InfoItem icon={InfoIcon} label="Trạng thái" value={statusText} badge />
+                    <InfoItem icon={InfoIcon } label="Trạng thái" value={statusText} badge />
                     <InfoItem icon={FileText} label="Mô tả" value={event.description || "Chưa có mô tả"} />
-                  </div>
-                </div>
-                <div className="col-12 col-lg-4">
-                  <div className="event-info-card" style={{ background: "#fff1f0" }}>
-                    <div className="d-flex align-items-center gap-2 mb-4">
-                      <div className="chip-status chip-status-scheduled d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: 12, background: "#fff", color: "#ef4444" }}>
-                        <LinkIcon />
-                      </div>
-                      <h5 className="fw-bold mb-0" style={{ fontSize: 18, color: "#b91c1c" }}>Mã mời tham gia</h5>
-                    </div>
-                    <div className="mb-3">
-                      <div className="text-muted small mb-2">Đường dẫn mời</div>
-                      <div className="input-group">
-                        <input className="form-control" value={`https://myfevent.vn/e/${event.joinCode || ""}`} readOnly />
-                        <button className="btn btn-light" onClick={copyJoinCode}>
-                          <Copy size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-muted small mb-2">Mã tham gia</div>
-                      <div className="input-group">
-                        <input className="form-control" value={event.joinCode || ""} readOnly />
-                        <button className="btn btn-light" onClick={copyJoinCode}>
-                          <Copy size={16} />
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -207,4 +179,4 @@ const InfoItem = ({ icon: Icon = FileText, label, value, badge }) => (
 );
 
 const LinkIcon = () => <Copy size={18} />;
-const InfoIcon = () => <FileText size={18} />;
+const InfoIcon = () => <FileText size={18} style={{ color: "#ef4444" }} />;

@@ -75,19 +75,6 @@ export const riskApi = {
     return res.data;
   },
 
-  
-
-  // ========== UTILITY OPERATIONS ==========
-
-  // Bulk update risk statuses
-  // PATCH /api/events/:eventId/risks/bulk-status
-  bulkUpdateRiskStatus: async (eventId, { riskIds, status }) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/risks/bulk-status`, {
-      riskIds,
-      status
-    });
-    return res.data;
-  },
 
   // Export risk data
   // GET /api/events/:eventId/risks/export
@@ -107,14 +94,6 @@ export const riskApi = {
     const res = await axiosClient.post(`/api/events/${eventId}/risks/${riskId}/update-status`);
     return res.data;
   },
-
-  // Batch auto-update all risk statuses
-  // POST /api/events/:eventId/risks/batch-update-status
-  batchUpdateRiskStatuses: async (eventId) => {
-    const res = await axiosClient.post(`/api/events/${eventId}/risks/batch-update-status`);
-    return res.data;
-  },
-
 
   // ========== GLOBAL OPERATIONS ==========
 
@@ -345,23 +324,9 @@ export const riskApiWithErrorHandling = {
     );
   },
 
-  // ===== UTILITIES WITH ERROR HANDLING =====
-
-  bulkUpdateRiskStatus: async (eventId, data) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.bulkUpdateRiskStatus(eventId, data)
-    );
-  },
-
   updateRiskStatusManually: async (eventId, riskId) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
       riskApi.updateRiskStatusManually(eventId, riskId)
-    );
-  },
-
-  batchUpdateRiskStatuses: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.batchUpdateRiskStatuses(eventId)
     );
   },
 

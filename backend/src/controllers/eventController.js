@@ -6,8 +6,6 @@ const ok = (res, status, body) => res.status(status).json(body);
 const handle = async (res, fn) => {
   try {
     const result = await fn();
-    // controller functions dưới đây đều return đối tượng đã có {message?, data?, pagination?}
-    // nên nếu fn() trả về null/undefined thì mặc định 200 OK rỗng
     return;
   } catch (err) {
     const status = err.status || 500;

@@ -6,6 +6,8 @@ import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
 import { useEvents } from "../../contexts/EventContext"
+import { CalendarX2 } from "lucide-react"
+import Loading from "~/components/Loading"
 
 const styles = {
   container: {
@@ -26,7 +28,7 @@ const styles = {
     margin: 0,
   },
   btnCreate: {
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     border: "none",
     padding: "0.75rem 1.5rem",
@@ -179,7 +181,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s ease",
     fontSize: "0.95rem",
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
   },
@@ -202,6 +204,45 @@ const styles = {
     height: "300px",
     color: "#9ca3af",
     fontSize: "1rem",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "3rem 2rem",
+    textAlign: "center",
+    color: "#9ca3af",
+  },
+  emptyStateIcon: {
+    width: "80px",
+    height: "80px",
+    color: "#d1d5db",
+    marginBottom: "1.5rem",
+  },
+  emptyStateTitle: {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    marginBottom: "0.5rem",
+  },
+  emptyStateText: {
+    fontSize: "0.95rem",
+    color: "#9ca3af",
+    maxWidth: "300px",
+  },
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4rem 2rem",
+    minHeight: "400px",
+  },
+  loadingText: {
+    marginTop: "1.5rem",
+    fontSize: "1rem",
+    color: "#6b7280",
   },
   modalOverlay: {
     position: "fixed",
@@ -380,9 +421,9 @@ const Milestone = () => {
     return null
   }
 
-  const fetchMilestones = async () => {
+  const fetchMilestones = async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       const response = await milestoneApi.listMilestonesByEvent(eventId)
       const sorted = [...(response.data || [])].sort((a, b) => {
         const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000)
@@ -404,7 +445,7 @@ const Milestone = () => {
       console.error("Error fetching milestones:", err)
       setError("Không thể tải danh sách cột mốc")
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -413,7 +454,6 @@ const Milestone = () => {
   }
 
   const handleViewDetails = (milestoneId) => {
-    setLoading(true)
     navigate(`/events/${eventId}/milestone-detail/${milestoneId}`)
   }
 
@@ -441,23 +481,19 @@ const Milestone = () => {
     }
 
     try {
-      setLoading(true)
-
       await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
         targetDate: createForm.targetDate,
       })
 
-      await fetchMilestones()
+      await fetchMilestones(false)
       setShowCreateModal(false)
       setCreateForm({ name: "", description: "", targetDate: "" })
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
       setError(err.response?.data?.message || "Tạo cột mốc thất bại")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -494,44 +530,64 @@ const Milestone = () => {
 
         {error && <div style={styles.errorMessage}>{error}</div>}
 
-        <div style={styles.content} className="milestone-content-responsive">
-          <div style={styles.timelineSection}>
-            <div style={styles.timelineLine}></div>
-            <div style={styles.milestonesList}>
-              {milestones.map((milestone, index) => (
-                <div
-                  key={milestone.id}
-                  style={{
-                    ...styles.milestoneItem,
-                    ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
-                  }}
-                  onClick={() => handleMilestoneClick(milestone)}
-                  onMouseEnter={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "#f3f4f6"
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "transparent"
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      ...styles.milestoneDot,
-                      background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
-                    }}
-                  >
-                    <div style={styles.dotInner}></div>
-                  </div>
-                  <div style={styles.milestoneInfo}>
-                    <div style={styles.milestoneDate}>{milestone.date}</div>
-                    <div style={styles.milestoneName}>{milestone.name}</div>
-                  </div>
+        {loading ? (
+          <div style={{ ...styles.content, ...styles.loadingContainer }}>
+            <Loading size={80} />
+            <div style={styles.loadingText}>Đang tải danh sách cột mốc...</div>
+          </div>
+        ) : (
+          <div style={styles.content} className="milestone-content-responsive">
+            <div style={styles.timelineSection}>
+              {milestones.length > 0 ? (
+              <>
+                <div style={styles.timelineLine}></div>
+                <div style={styles.milestonesList}>
+                  {milestones.map((milestone, index) => (
+                    <div
+                      key={milestone.id}
+                      style={{
+                        ...styles.milestoneItem,
+                        ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
+                      }}
+                      onClick={() => handleMilestoneClick(milestone)}
+                      onMouseEnter={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "#f3f4f6"
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "transparent"
+                        }
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...styles.milestoneDot,
+                          background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
+                        }}
+                      >
+                        <div style={styles.dotInner}></div>
+                      </div>
+                      <div style={styles.milestoneInfo}>
+                        <div style={styles.milestoneDate}>{milestone.date}</div>
+                        <div style={styles.milestoneName}>{milestone.name}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div style={styles.emptyState}>
+                <CalendarX2 style={styles.emptyStateIcon} strokeWidth={1.5} />
+                <h3 style={styles.emptyStateTitle}>Chưa có cột mốc nào</h3>
+                <p style={styles.emptyStateText}>
+                  {eventRole === "HoOC"
+                    ? "Hãy tạo cột mốc đầu tiên để bắt đầu quản lý tiến độ sự kiện của bạn"
+                    : "Chưa có cột mốc nào được tạo cho sự kiện này"}
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={styles.detailsSection} className="details-section-responsive">
@@ -594,11 +650,12 @@ const Milestone = () => {
               </div>
             ) : (
               <div style={styles.noSelection}>
-                <p>Chọn một cột mốc để xem chi tiết</p>
+                {/* <p>Chọn một cột mốc để xem chi tiết</p> */}
               </div>
             )}
           </div>
         </div>
+        )}
 
         {showCreateModal && (
           <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
@@ -606,7 +663,7 @@ const Milestone = () => {
               <h2 style={styles.modalTitle}>Tạo Cột Mốc Mới</h2>
               <form onSubmit={handleCreateSubmit}>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Tên cột mốc:</label>
+                  <label style={styles.formLabel}>Tên cột mốc* :</label>
                   <input
                     type="text"
                     style={styles.formInput}
@@ -640,7 +697,7 @@ const Milestone = () => {
                   />
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Ngày dự kiến:</label>
+                  <label style={styles.formLabel}>Ngày dự kiến* :</label>
                   <input
                     type="date"
                     style={styles.formInput}

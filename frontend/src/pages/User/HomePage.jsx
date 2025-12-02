@@ -13,6 +13,7 @@ import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
 import { Calendar, CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Copy, Flag, LogIn, MapPin, Plus, Search, Ticket, Upload, UserCheck, X, Zap } from "lucide-react";
+import { currentEventStorage } from "../../utils/currentEventStorage";
 
 
 const unwrapApiData = (payload) => {
@@ -211,6 +212,12 @@ export default function HomePage() {
     fetchBlogs(1, '', '');
   }, []);
 
+  // Clear current event cache when user is on HomePage
+  useEffect(() => {
+    // Clear cache when component mounts (user navigates to homepage)
+    currentEventStorage.clear();
+  }, []);
+
   // Show login success toast once
   const loginToastShown = useRef(false);
   useEffect(() => {
@@ -388,7 +395,7 @@ export default function HomePage() {
               aria-label="Mở menu tạo/tham gia sự kiện"
             >
               <Plus size={18} />
-              {t("createEvent")}/{t("joinEvent")}
+              Tạo sự kiện/Tham gia sự kiện
               <ChevronDown size={18} />
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
@@ -399,7 +406,7 @@ export default function HomePage() {
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
                   <CalendarPlus className="me-2" size={18} />
-                  {t("createEvent")}
+                  Tạo sự kiện mới
                 </button>
               </li>
               <li>
@@ -409,7 +416,7 @@ export default function HomePage() {
                   style={{ textAlign: "left", paddingLeft: 16 }}
                 >
                   <LogIn className="me-2" size={18} />
-                  {t("joinEvent")}
+                  Tham gia sự kiện
                 </button>
               </li>
             </ul>
@@ -772,6 +779,9 @@ export default function HomePage() {
                           fontWeight: 500,
                         }}
                         onClick={() => {
+                          // Save current event to cache
+                          currentEventStorage.set(event);
+
                           const role = event.eventMember?.role;
                           const eid = event.id || event._id || idx;
                           if (role === "Member") {
@@ -1207,10 +1217,14 @@ export default function HomePage() {
 
                     try {
                       setCreateSubmitting(true);
-                      const res = await eventApi.create({
+                      // Convert datetime-local values to ISO string (UTC) to avoid timezone issues
+                      const eventData = {
                         ...createForm,
                         type: "private",
-                      });
+                        eventStartDate: createForm.eventStartDate ? new Date(createForm.eventStartDate).toISOString() : "",
+                        eventEndDate: createForm.eventEndDate ? new Date(createForm.eventEndDate).toISOString() : "",
+                      };
+                      const res = await eventApi.create(eventData);
                       setShowCreateModal(false);
                       setCreateForm({
                         name: "",

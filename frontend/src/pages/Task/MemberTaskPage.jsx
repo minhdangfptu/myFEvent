@@ -134,6 +134,7 @@ export default function MemberTaskPage() {
 
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [activeTab, setActiveTab] = useState("list");
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -141,15 +142,17 @@ export default function MemberTaskPage() {
   const fetchTasks = useCallback(() => {
     if (!eventId || !memberId) {
       console.log("Cannot fetch tasks - eventId:", eventId, "memberId:", memberId);
+      setLoadingTasks(false);
       return;
     }
+    setLoadingTasks(true);
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
         console.log("Total tasks fetched:", arr.length);
         console.log("Looking for memberId:", memberId);
-        
+
         // Filter tasks by assigneeId - chỉ hiển thị tasks được giao cho member
         const myTasks = arr.filter(task => {
           const taskAssigneeId = task.assigneeId?._id || task.assigneeId;
@@ -159,9 +162,9 @@ export default function MemberTaskPage() {
           }
           return matches;
         });
-        
+
         console.log("Filtered tasks for member:", myTasks.length);
-        
+
         const mapped = myTasks.map((task) => {
           const statusCode = task?.status || "chua_bat_dau";
           const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
@@ -191,7 +194,8 @@ export default function MemberTaskPage() {
         });
         setTasks(mapped);
       })
-      .catch((err) => setTasks([]));
+      .catch((err) => setTasks([]))
+      .finally(() => setLoadingTasks(false));
   }, [eventId, memberId]);
 
   useEffect(() => {
@@ -500,7 +504,13 @@ export default function MemberTaskPage() {
                 </select>
               </div>
 
-              <div className="soft-card rounded-table">
+              {loadingTasks ? (
+                <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+                  <Loading />
+                  <p className="text-muted mt-3">Đang tải danh sách công việc...</p>
+                </div>
+              ) : (
+                <div className="soft-card rounded-table">
                 <div className="table-responsive">
                   <table className="table align-middle">
                     <thead>
@@ -616,6 +626,7 @@ export default function MemberTaskPage() {
                   </table>
                 </div>
               </div>
+              )}
             </>
           )}
 

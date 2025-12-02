@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
-import { APP_VERSION } from "~/config";
+import { APP_VERSION } from "~/config/index";
 import { Calendar, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Database, Menu, Home, MessageSquareText } from "lucide-react";
+import { currentEventStorage } from "../utils/currentEventStorage";
 
 export default function HoOCSidebar({
   sidebarOpen,
@@ -83,70 +84,26 @@ export default function HoOCSidebar({
   }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
 
   // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
-  const { events, loading, refetchEvents } = useEvents();
-  
-  // Lưu eventId vào sessionStorage để restore khi quay lại từ error page
-  useEffect(() => {
-    if (eventId) {
-      try {
-        sessionStorage.setItem('lastEventId', eventId);
-      } catch (err) {
-        console.error('Failed to save eventId to sessionStorage:', err);
+  const { events, loading } = useEvents();
+  const event = useMemo(() => {
+    // Tìm event từ context
+    const foundEvent = events.find(e => (e._id || e.id) === eventId);
+
+    // Nếu không tìm thấy, lấy từ cache
+    if (!foundEvent && eventId) {
+      const cachedEvent = currentEventStorage.get();
+      if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+        return cachedEvent;
       }
     }
-  }, [eventId]);
 
-  // Restore eventId từ sessionStorage nếu không có eventId từ props
-  const effectiveEventId = useMemo(() => {
-    if (eventId) return eventId;
-    try {
-      const savedEventId = sessionStorage.getItem('lastEventId');
-      return savedEventId || null;
-    } catch {
-      return null;
-    }
-  }, [eventId]);
-
-  const event = useMemo(() => {
-    if (!effectiveEventId) return null;
-    return events.find(e => (e._id || e.id) === effectiveEventId);
-  }, [events, effectiveEventId]);
-  
+    return foundEvent;
+  }, [events, eventId]);
   const hasEvent = !!event;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
 
-  // Track if we've already tried to refetch for this eventId
-  const refetchAttemptedRef = useRef(null);
-  
-  // Fetch lại events nếu có eventId nhưng không tìm thấy event trong events array
-  useEffect(() => {
-    if (!effectiveEventId) {
-      refetchAttemptedRef.current = null;
-      return;
-    }
-    
-    // Chỉ refetch một lần cho mỗi eventId
-    if (refetchAttemptedRef.current === effectiveEventId) {
-      return; // Đã thử refetch cho eventId này rồi
-    }
-    
-    if (!loading && events.length > 0 && !event) {
-      // Có eventId nhưng không tìm thấy event, có thể events chưa được fetch đầy đủ
-      // Thử fetch lại một lần
-      refetchAttemptedRef.current = effectiveEventId;
-      refetchEvents();
-    } else if (!loading && events.length === 0) {
-      // Nếu có effectiveEventId nhưng events array rỗng và không đang loading, thử fetch lại
-      refetchAttemptedRef.current = effectiveEventId;
-      refetchEvents();
-    }
-  }, [effectiveEventId, events, event, loading, refetchEvents]);
-
   // Chỉ show loading khi chưa có events VÀ đang loading
   const showLoading = loading && events.length === 0;
-  
-  // Kiểm tra xem có đang chờ event data không (có effectiveEventId nhưng chưa có event)
-  const isWaitingForEvent = effectiveEventId && !event && !loading;
   const navigate = useNavigate();
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
@@ -364,9 +321,9 @@ export default function HoOCSidebar({
               <Calendar size={18} className="me-2" />
               <span
                 style={{ overflow: "hidden", wordWrap: "break-word", whiteSpace: "normal", lineHeight: "1.2" }}
-                title={event?.name || (effectiveEventId ? "Đang tải..." : "(Chưa có sự kiện)")}
+                title={event?.name || "(Chưa có sự kiện)"}
               >
-                {event?.name || (effectiveEventId ? "Đang tải..." : "(Chưa có sự kiện)")}
+                {event?.name || "(Chưa có sự kiện)"}
               </span>
             </div>
           </div>

@@ -141,9 +141,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
     
     // Tính tổng số sự kiện user đã tham gia
     const totalEvents = await EventMember.countDocuments({ userId: req.user.id, status: { $ne: 'deactive' } });
-    
-    return res.status(200).json({ 
-      message: 'Updated', 
+
+    return res.status(200).json({
+      message: 'Updated',
       data: {
         id: user._id,
         email: user.email,
@@ -154,7 +154,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
         highlight: user.highlight || '',
         tags: user.tags || [],
         totalEvents: totalEvents || 0,
-        verified: !!user.verified
+        verified: !!user.verified,
+        role: user.role || 'user',
+        authProvider: user.authProvider || 'local'
       }
     });
   } catch (error) {

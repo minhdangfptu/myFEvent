@@ -3,7 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
 import { milestoneService } from '../../services/milestoneService';
 import { formatDateForInput } from '~/utils/formatDate';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import "react-toastify/dist/ReactToastify.css";
 import Loading from '../../components/Loading';
 
 const HoOCEditMilestone = () => {
@@ -68,15 +69,28 @@ const HoOCEditMilestone = () => {
   };
 
   const handleSaveChanges = async () => {
+    // Validate required fields
+    if (!milestone.name || !milestone.name.trim()) {
+      toast.error('Tên cột mốc không được để trống');
+      return;
+    }
+
+    if (!milestone.date) {
+      toast.error('Ngày không được để trống');
+      return;
+    }
+
     setActionLoading(true);
     try {
       await milestoneService.updateMilestone(eventId, id, milestone);
       toast.success('Cập nhật cột mốc thành công');
+      setTimeout(() => {
       navigate(`/events/${eventId}/milestone-detail/${id}`);
-      // no immediate setActionLoading(false) here because navigate will unmount
+      }, 1200);
     } catch (error) {
       console.error('Error updating milestone:', error);
-      toast.error('Cập nhật cột mốc thất bại');
+      const errorMessage = error.response?.data?.message || error.message || 'Cập nhật cột mốc thất bại';
+      toast.error(errorMessage);
     } finally {
       if (mountedRef.current) setActionLoading(false);
     }
@@ -121,6 +135,7 @@ const HoOCEditMilestone = () => {
 
   return (
     <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
+      <ToastContainer position="top-right" autoClose={3000} />
 
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
@@ -166,12 +181,13 @@ const HoOCEditMilestone = () => {
               <label className="form-label" style={{ color: '#374151', fontWeight: '500' }}>
                 Tên cột mốc <span className="text-danger">*</span>
               </label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 className="form-control"
                 value={milestone.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 style={{ borderRadius: '8px' }}
+                placeholder="Nhập tên cột mốc"
               />
             </div>
 
@@ -180,8 +196,8 @@ const HoOCEditMilestone = () => {
                 Ngày <span className="text-danger">*</span>
               </label>
               <div className="position-relative">
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   className="form-control"
                   value={formatDateForInput(milestone.date)}
                   onChange={(e) => handleInputChange('date', e.target.value)}
@@ -202,12 +218,13 @@ const HoOCEditMilestone = () => {
               <label className="form-label" style={{ color: '#374151', fontWeight: '500' }}>
                 Mô tả
               </label>
-              <textarea 
+              <textarea
                 className="form-control"
                 rows="6"
                 value={milestone.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 style={{ borderRadius: '8px' }}
+                placeholder="Nhập mô tả cho cột mốc (tùy chọn)"
               ></textarea>
             </div>
           </div>

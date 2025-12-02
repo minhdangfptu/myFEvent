@@ -3,6 +3,7 @@ import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import NoDataImg from "~/assets/no-data.png";
+import Loading from "../../components/Loading";
 import { taskApi } from "~/apis/taskApi";
 import { departmentService } from "~/services/departmentService";
 import { milestoneApi } from "~/apis/milestoneApi";
@@ -103,6 +104,7 @@ export default function HoDTaskPage() {
 
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [expandedEpicIds, setExpandedEpicIds] = useState(() => new Set());
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
@@ -179,18 +181,22 @@ export default function HoDTaskPage() {
   }, [eventId, departmentId]);
 
   const fetchTasks = useCallback(() => {
-    if (!eventId || !departmentId) return;
+    if (!eventId || !departmentId) {
+      setLoadingTasks(false);
+      return;
+    }
+    setLoadingTasks(true);
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
-        
+
         // Filter tasks by departmentId - chỉ hiển thị tasks của ban mình
         const deptTasks = arr.filter(task => {
           const taskDeptId = task.departmentId?._id || task.departmentId || task.department?._id || task.department;
           return String(taskDeptId) === String(departmentId);
         });
-        
+
         const titleMap = new Map(deptTasks.map((t) => [String(t?._id), t?.title || ""]));
         const mapped = deptTasks.map((task) => {
           const statusCode = task?.status || "chua_bat_dau";
@@ -221,7 +227,8 @@ export default function HoDTaskPage() {
         });
         setTasks(mapped);
       })
-      .catch((err) => setTasks([]));
+      .catch((err) => setTasks([]))
+      .finally(() => setLoadingTasks(false));
   }, [eventId, departmentId]);
 
   useEffect(() => {
@@ -1098,13 +1105,19 @@ export default function HoDTaskPage() {
               </div>
 
               {/* Epic Groups */}
-              <div className="soft-card p-3">
-                {paginatedGroups.length === 0 ? (
-                  <div className="text-center py-5">
-                    <img src={NoDataImg} alt="No data" width={180} className="mb-3" />
-                    <p className="text-muted mb-0">Không có công việc nào</p>
-                  </div>
-                ) : (
+              {loadingTasks ? (
+                <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+                  <Loading />
+                  <p className="text-muted mt-3">Đang tải danh sách công việc...</p>
+                </div>
+              ) : (
+                <div className="soft-card p-3">
+                  {paginatedGroups.length === 0 ? (
+                    <div className="text-center py-5">
+                      <img src={NoDataImg} alt="No data" width={180} className="mb-3" />
+                      <p className="text-muted mb-0">Không có công việc nào</p>
+                    </div>
+                  ) : (
                   paginatedGroups.map((group, idx) => {
                     const epic = group.epic;
                     const epicId = epic?.id || `orphan-${idx}`;
@@ -1336,11 +1349,12 @@ export default function HoDTaskPage() {
                       </div>
                     );
                   })
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {!loadingTasks && totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center mt-3">
                   <div className="text-muted small">
                     Hiển thị {startIndex + 1}-{Math.min(endIndex, groupedEpics.length)} trong tổng số {groupedEpics.length} công việc lớn

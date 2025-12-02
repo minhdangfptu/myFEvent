@@ -4,7 +4,7 @@ import Header from "../../components/Header"
 import Footer from "../../components/Footer"
 import { eventService } from '../../services/eventService';
 import { formatDate } from '../../utils/formatDate';
-import {deriveEventStatus} from '../../utils/getEventStatus';
+import { deriveEventStatus } from '../../utils/getEventStatus';
 import Loading from '../../components/Loading';
 import { getEventImage } from '../../utils/getEventImage';
 
@@ -49,13 +49,23 @@ export default function EventsPage() {
 
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase()
+
+    const mapped = {
+      ALL: null,
+      UPCOMING: "scheduled",
+      ONGOING: "ongoing",
+      ENDED: "completed",
+      CANCELLED: "cancelled"
+    }
+
     return eventsList
-      .filter(e => (k ? (( e.name || '').toLowerCase().includes(k)) : true))
+      .filter(e => k ? (e.name || "").toLowerCase().includes(k) : true)
       .filter(e => {
-        if (statusFilter === 'ALL') return true
-        return e.status.toUpperCase() === statusFilter
+        if (!mapped[statusFilter]) return true
+        return e.status === mapped[statusFilter]
       })
   }, [keyword, eventsList, statusFilter])
+
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const currentPage = Math.min(page, totalPages)
@@ -144,6 +154,7 @@ export default function EventsPage() {
                             }
                           }}
                         />
+
                         {/* Button Xem chi tiết */}
                         <button
                           className="position-absolute btn btn-light border soft-btn-top-right"
@@ -153,20 +164,25 @@ export default function EventsPage() {
                           Xem chi tiết
                         </button>
                       </div>
+
                       <div className="blog-body">
                         <div className="blog-title">{title}</div>
                         <div className="blog-meta">
                           {event.status ? (
                             <span className={`badge-soft chip-status-${event.status}`}>
                               <i className="bi bi-lightning-charge-fill me-1" />
-                              {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
+                              {event.status === "scheduled" ? "Sắp diễn ra" :
+                                event.status === "ongoing" ? "Đang diễn ra" :
+                                  event.status === "completed" ? "Đã kết thúc" :
+                                    event.status === "cancelled" ? "Đã hủy" : event.status}
                             </span>
                           ) : null}
                         </div>
+
                         {event.description && (
                           <div className="event-desc mt-2">{event.description}</div>
                         )}
-                        {/* Location và Date info */}
+
                         <div className="pt-2 pb-2 mt-auto">
                           {event.location && (
                             <div style={{ fontSize: '14px' }} className="d-flex align-items-center">
@@ -174,6 +190,7 @@ export default function EventsPage() {
                               <small className="text-muted fw-medium text-truncate">{event.location}</small>
                             </div>
                           )}
+
                           {event.eventStartDate && event.eventEndDate && (
                             <div style={{ fontSize: '14px' }} className="d-flex align-items-center">
                               <i className="bi bi-calendar-event me-2 text-danger" style={{ fontSize: '12px', width: '12px' }} />
@@ -190,6 +207,14 @@ export default function EventsPage() {
               );
             })}
           </div>
+
+          {/* ⭐ Empty state khi không có kết quả */}
+          {visible.length === 0 && !loading && (
+            <div className="text-center w-100 py-5 text-muted" style={{ fontSize: 18 }}>
+              Không tìm thấy sự kiện nào phù hợp.
+            </div>
+          )}
+
 
           {/* Pagination */}
           <div className="d-flex justify-content-center mt-4">

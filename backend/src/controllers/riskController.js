@@ -4,7 +4,6 @@ import ensureEventRole from '../utils/ensureEventRole.js';
 import {
   notifyRiskCreated,
   notifyRiskUpdated,
-  notifyRiskAssigned,
   notifyRiskOccurred,
   notifyOccurredRiskUpdated,
   notifyRiskStatusChanged,
@@ -841,71 +840,6 @@ export const getRisksByDepartment = async (req, res) => {
         });
     }
 };
-// ====== UTILITY ENDPOINTS ======
-
-/**
- * Bulk update risk statuses
- * PATCH /api/events/:eventId/risks/bulk-status
- */
-export const bulkUpdateRiskStatus = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: chỉ HoOC hoặc HoD mới được bulk update status
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Chỉ HoOC hoặc HoD được bulk update risk status'
-            });
-        }
-
-        const { riskIds, status } = req.body;
-
-        if (!Array.isArray(riskIds) || riskIds.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'riskIds array is required and cannot be empty'
-            });
-        }
-
-        if (!status) {
-            return res.status(400).json({
-                success: false,
-                message: 'status is required'
-            });
-        }
-
-        const result = await RiskService.bulkUpdateRiskStatus(eventId, riskIds, status);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: result.data,
-            message: result.message
-        });
-
-    } catch (error) {
-        console.error('Error in bulkUpdateRiskStatus controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
 
 /**
  * Get risk categories
@@ -1000,78 +934,6 @@ export const updateRiskStatusManually = async (req, res) => {
     }
 };
 
-/**
- * Batch update all risk statuses in an event
- * POST /api/events/:eventId/risks/batch-update-status
- */
-export const batchUpdateRiskStatuses = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: chỉ HoOC hoặc HoD mới được batch update statuses
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Chỉ HoOC hoặc HoD được batch update risk statuses'
-            });
-        }
-
-        // Get all risks for the event
-        const allRisksResult = await RiskService.getAllRisksByEventWithoutPagination(eventId);
-        if (!allRisksResult.success) {
-            return res.status(400).json(allRisksResult);
-        }
-
-        const risks = allRisksResult.data;
-        const statusUpdates = [];
-
-        // Update status for each risk
-        for (const risk of risks) {
-            const oldStatus = risk.risk_status;
-            const updateResult = await updateRiskStatusBasedOnOccurred(eventId, risk._id);
-
-            if (updateResult.success) {
-                statusUpdates.push({
-                    riskId: risk._id,
-                    riskName: risk.name,
-                    from: oldStatus,
-                    to: updateResult.newStatus,
-                    changed: updateResult.changed
-                });
-            }
-        }
-
-        const changedCount = statusUpdates.filter(update => update.changed).length;
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                totalRisks: risks.length,
-                updatedCount: changedCount,
-                statusUpdates: statusUpdates
-            },
-            message: `Batch status update completed. ${changedCount} risks had status changes.`
-        });
-
-    } catch (error) {
-        console.error('Error in batchUpdateRiskStatuses controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
 /**
  * Get risk statistics by category for pie charts
  * GET /api/events/:eventId/risks/category-statistics

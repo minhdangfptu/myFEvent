@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { milestoneService } from "../../services/milestoneService";
 import { formatDate } from "~/utils/formatDate";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useEvents } from "../../contexts/EventContext";
 import Loading from "../../components/Loading";
 
@@ -121,10 +122,13 @@ const MilestoneDetail = () => {
       try {
         const response = await milestoneService.deleteMilestone(eventId, id);
         toast.success("Xoá cột mốc thành công");
-        navigate(`/events/${eventId}/hooc-manage-milestone`);
+        navigate(`/events/${eventId}/milestones`);
       } catch (error) {
-        toast.error("Xoá cột mốc thất bại");
+        const errorMessage = error.response?.data?.message || error.message || "Xoá cột mốc thất bại";
+        toast.error(errorMessage);
         console.error("Error deleting milestone:", error);
+        setShowDeleteModal(false);
+        setDeleteConfirmName("");
       } finally {
         setIsDeleting(false);
       }
@@ -133,7 +137,7 @@ const MilestoneDetail = () => {
 
   const handleCancelDelete = () => {
     setShowDeleteModal(false);
-    setDeleteConfirmName(milestone.name);
+    setDeleteConfirmName("");
   };
 
   const sidebarType =
@@ -180,6 +184,7 @@ const MilestoneDetail = () => {
       activePage="overview-timeline"
       eventId={eventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: "30px" }}>
         {/* Milestone Header */}

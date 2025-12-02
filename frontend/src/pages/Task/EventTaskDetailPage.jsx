@@ -43,6 +43,9 @@ const STATUS_TRANSITIONS = {
 };
 
 const statusToLabel = (code) => STATUS_LABELS[code] || "Không xác định";
+const FORBIDDEN_CONFIG = { skipGlobal403: true };
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message || fallback;
 
 export default function EventTaskDetailPage() {
   const { t } = useTranslation();
@@ -80,6 +83,7 @@ export default function EventTaskDetailPage() {
     createdAt: "",
     updatedAt: "",
   });
+  const [originalTask, setOriginalTask] = useState(null); // Lưu task gốc để so sánh khi validate
   const [taskCreatorId, setTaskCreatorId] = useState("");
   const [taskCreatorName, setTaskCreatorName] = useState("");
   const [taskCreatorRole, setTaskCreatorRole] = useState("");
@@ -96,6 +100,28 @@ export default function EventTaskDetailPage() {
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
+
+  const handleNavigateToTaskList = () => {
+    console.log("Navigating based on role:", eventRole);
+    if (eventRole === "HoOC") {
+      navigate(`/events/${eventId}/tasks`);
+    } else  if (eventRole === "HoD") {
+      navigate(`/events/${eventId}/hod-tasks`);
+    } else{
+      navigate(`/events/${eventId}/member-tasks`);
+    }
+  }
+
+  // Helper function to convert UTC time to local datetime string for datetime-local input
+  const toLocalDateTimeString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    // Get timezone offset in minutes and convert to milliseconds
+    const offset = date.getTimezoneOffset() * 60 * 1000;
+    // Create new date adjusted for local timezone
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
 
   const getTaskCreatorId = (task) =>
     toId(task?.createdBy?.userId) || toId(task?.createdBy);
@@ -144,6 +170,7 @@ const getRoleLabel = (role) => {
             setEventInfo({
               eventStartDate: event.eventStartDate,
               eventEndDate: event.eventEndDate,
+              createdAt: event.createdAt,
             });
           }
         })
@@ -163,6 +190,7 @@ const getRoleLabel = (role) => {
     ])
       .then(async ([taskRes, depts, ms]) => {
         const task = taskRes?.data;
+        setOriginalTask(task); // Lưu task gốc để so sánh khi validate
         setDepartments(depts || []);
         setMilestones(ms?.data || []);
         if (task?.departmentId?._id) {
@@ -193,12 +221,8 @@ const getRoleLabel = (role) => {
           departmentId: toId(task?.departmentId),
           assigneeId: toId(task?.assigneeId),
           milestoneId: toId(task?.milestoneId),
-          startDate: task?.startDate
-            ? new Date(task.startDate).toISOString().slice(0, 16)
-            : "",
-          dueDate: task?.dueDate
-            ? new Date(task.dueDate).toISOString().slice(0, 16)
-            : "",
+          startDate: toLocalDateTimeString(task?.startDate),
+          dueDate: toLocalDateTimeString(task?.dueDate),
           status: task?.status || STATUS.NOT_STARTED,
           progressPct:
             typeof task?.progressPct === "number" ? task.progressPct : 0,
@@ -299,9 +323,14 @@ const getRoleLabel = (role) => {
     const targetStatus = newStatusCode || STATUS.NOT_STARTED;
     setUpdatingStatus(true);
     try {
-      await taskApi.updateTaskProgress(eventId, taskId, {
-        status: targetStatus,
-      });
+      await taskApi.updateTaskProgress(
+        eventId,
+        taskId,
+        {
+          status: targetStatus,
+        },
+        FORBIDDEN_CONFIG
+      );
       setForm((f) => ({ ...f, status: targetStatus }));
       setIsEditing(false);
       setShowStatusModal(false);
@@ -322,7 +351,7 @@ const getRoleLabel = (role) => {
     }
     try {
       if (!newAssigneeId) {
-        await taskApi.unassignTask(eventId, taskId);
+        await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
         setForm((f) => ({ ...f, assigneeId: "" }));
         setAssigneeFallbackName("");
         setIsEditing(false);
@@ -333,15 +362,20 @@ const getRoleLabel = (role) => {
             String(x.userId?._id) === String(newAssigneeId)
         );
         const membershipId = member?._id || newAssigneeId;
-        await taskApi.assignTask(eventId, taskId, membershipId);
+        await taskApi.assignTask(
+          eventId,
+          taskId,
+          membershipId,
+          FORBIDDEN_CONFIG
+        );
         setForm((f) => ({ ...f, assigneeId: String(membershipId) }));
         const a = member;
         setAssigneeFallbackName(a?.userId?.fullName || a?.fullName || "");
         setIsEditing(false);
         // Backend sẽ tự động tạo notification khi giao việc cho Member
       }
-    } catch {
-      toast.error("Cập nhật người thực hiện thất bại");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Cập nhật người thực hiện thất bại"));
     }
   };
 
@@ -351,12 +385,12 @@ const getRoleLabel = (role) => {
       return;
     }
     try {
-      await taskApi.unassignTask(eventId, taskId);
+      await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
       setForm((f) => ({ ...f, assigneeId: "" }));
       setAssigneeFallbackName("");
       toast.success("Đã huỷ gán người thực hiện");
-    } catch {
-      toast.error("Huỷ gán thất bại");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Huỷ gán thất bại"));
     }
   };
 
@@ -421,7 +455,7 @@ const getRoleLabel = (role) => {
         estimateUnit: form.estimateUnit || "h",
         parentId: form.parentId || undefined,
         dependencies: dependencies.length ? dependencies : [],
-      });
+      }, FORBIDDEN_CONFIG);
       toast.success("Lưu thay đổi thành công");
       setIsEditing(false);
     } catch (err) {
@@ -449,11 +483,11 @@ const getRoleLabel = (role) => {
 
   const confirmDelete = async () => {
     try {
-      await taskApi.deleteTask(eventId, taskId);
+      await taskApi.deleteTask(eventId, taskId, FORBIDDEN_CONFIG);
       toast.success("Đã xóa công việc");
       navigate(`/events/${eventId}/tasks`);
-    } catch {
-      toast.error("Xóa công việc thất bại");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Xóa công việc thất bại"));
     } finally {
       setShowDeleteModal(false);
     }
@@ -469,6 +503,7 @@ const getRoleLabel = (role) => {
         milestoneApi.listMilestonesByEvent(eventId),
       ]);
       const task = taskRes?.data;
+      setOriginalTask(task); // Lưu task gốc để so sánh khi validate
       setDepartments(depts || []);
       setMilestones(ms?.data || []);
       if (task?.departmentId?._id) {
@@ -498,22 +533,9 @@ const getRoleLabel = (role) => {
         departmentId: toId(task?.departmentId),
         assigneeId: toId(task?.assigneeId),
         milestoneId: toId(task?.milestoneId),
-        startDate: task?.startDate
-          ? new Date(task.startDate).toISOString().slice(0, 16)
-          : "",
-        dueDate: task?.dueDate
-          ? new Date(task.dueDate).toISOString().slice(0, 16)
-          : "",
-        status:
-          task?.status === "done"
-            ? "Đã xong"
-            : task?.status === "in_progress"
-            ? "Đang làm"
-            : task?.status === "blocked"
-            ? "Tạm hoãn"
-            : task?.status === "cancelled"
-            ? "Đã huỷ"
-            : "Chưa bắt đầu",
+        startDate: toLocalDateTimeString(task?.startDate),
+        dueDate: toLocalDateTimeString(task?.dueDate),
+        status: task?.status || STATUS.NOT_STARTED,
         progressPct:
           typeof task?.progressPct === "number" ? task.progressPct : 0,
         estimate: task?.estimate ?? "",
@@ -590,13 +612,16 @@ const getRoleLabel = (role) => {
     }
     try {
       setClaimingTask(true);
-      await taskApi.assignTask(eventId, taskId, currentMembershipId);
+      await taskApi.assignTask(
+        eventId,
+        taskId,
+        currentMembershipId,
+        FORBIDDEN_CONFIG
+      );
       toast.success("Đã nhận công việc");
       await refetchDetail();
     } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "Không thể nhận công việc"
-      );
+      toast.error(getErrorMessage(error, "Không thể nhận công việc"));
     } finally {
       setClaimingTask(false);
     }
@@ -605,13 +630,11 @@ const getRoleLabel = (role) => {
   const handleSelfUnassign = async () => {
     try {
       setReleasingSelf(true);
-      await taskApi.unassignTask(eventId, taskId);
+      await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
       toast.success("Đã bỏ nhận công việc");
       await refetchDetail();
     } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "Không thể bỏ nhận công việc"
-      );
+      toast.error(getErrorMessage(error, "Không thể bỏ nhận công việc"));
     } finally {
       setReleasingSelf(false);
     }
@@ -698,20 +721,24 @@ const getRoleLabel = (role) => {
     !!taskCreatorId &&
     !!currentUserId &&
     String(taskCreatorId) === String(currentUserId);
-  const canManageTask = isHoOC || (isHoD && isTaskCreator);
-  const canModifyTask = canManageTask;
+  const canManageTask = isHoOC || isTaskCreator;
+  // Không cho phép chỉnh sửa/xóa khi task đang "Đang làm"
+  const isTaskLocked =
+  form.status === STATUS.IN_PROGRESS ||
+  form.status === STATUS.DONE ||
+  form.status === STATUS.CANCELLED;
+
+  const canModifyTask = canManageTask && !isTaskLocked;
   const assignedToOther =
     !!form.assigneeId &&
     (!currentMembershipId ||
       String(form.assigneeId) !== String(currentMembershipId));
 
-  const canUpdateStatus =
-    isHoOC ||
-    isSelfAssigned ||
-    (isHoD && canManageTask && !assignedToOther);
+  // Chỉ người được giao task mới có thể cập nhật trạng thái
+  const canUpdateStatus = isSelfAssigned;
 
-  // HoOC hoặc HoD tạo task có thể chỉnh sửa ở mọi trạng thái
-  const canEdit = canManageTask;
+  // HoOC hoặc HoD tạo task có thể chỉnh sửa, nhưng không khi đang "Đang làm"
+  const canEdit = canManageTask && !isTaskLocked;
   const creatorRoleLabel = getRoleLabel(taskCreatorRole);
   const creatorBadgeLabel = creatorRoleLabel || taskCreatorRole || "";
   const isTaskFromHoOC = (taskCreatorRole || "").toLowerCase() === "hooc";
@@ -742,10 +769,12 @@ const getRoleLabel = (role) => {
 
   // Hiển thị thông báo khi không thể edit
   const editDisabledMessage = !canEditFields
-    ? !canModifyTask
-      ? "Chỉ HoOC hoặc HoD tạo công việc này mới có quyền chỉnh sửa."
-      : "Bạn không thể chỉnh sửa công việc này."
-    : null;
+  ? isTaskLocked
+    ? 'Không thể chỉnh sửa công việc khi trạng thái không phải "Chưa bắt đầu".'
+    : !canManageTask
+    ? "Chỉ TBTC/TBan hoặc người tạo công việc này mới có quyền chỉnh sửa."
+    : "Bạn không thể chỉnh sửa công việc này."
+  : null;
 
   const leftBlock = (
     <div className="col-lg-7">
@@ -793,32 +822,6 @@ const getRoleLabel = (role) => {
       </div>
       <div className="row">
         <div className="col-md-6 mb-3">
-          <label className="form-label">Ước lượng</label>
-          <div className="input-group">
-            <input
-              type="number"
-              className="form-control"
-              min={0}
-              step="0.5"
-              value={form.estimate}
-              onChange={(e) => handleChange("estimate", e.target.value)}
-              placeholder="Số lượng"
-              disabled={!canEditFields}
-            />
-            <select
-              className="form-select"
-              value={form.estimateUnit}
-              onChange={(e) => handleChange("estimateUnit", e.target.value)}
-              style={{ maxWidth: 120 }}
-              disabled={!canEditFields}
-            >
-              <option value="h">giờ</option>
-              <option value="d">ngày</option>
-              <option value="w">tuần</option>
-            </select>
-          </div>
-        </div>
-        <div className="col-md-6 mb-3">
           <label className="form-label">Công việc lớn</label>
           {isEditing ? (
             <select
@@ -845,23 +848,6 @@ const getRoleLabel = (role) => {
         </div>
       </div>
       <div className="row">
-        <div className="col-md-6 mb-3">
-          <label className="form-label">Tiến độ (%)</label>
-          <input
-            type="number"
-            className="form-control"
-            min={0}
-            max={100}
-            step={1}
-            value={form.progressPct}
-            onChange={(e) => handleChange("progressPct", e.target.value)}
-            placeholder="0-100"
-            disabled={!canEditFields}
-          />
-          <div className="form-text small text-muted">
-            Nhập phần trăm hoàn thành (0-100)
-          </div>
-        </div>
       </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
@@ -1030,10 +1016,23 @@ const getRoleLabel = (role) => {
             const now = new Date();
             now.setMinutes(now.getMinutes() + 1);
             const minDateTime = now.toISOString().slice(0, 16);
-            if (eventInfo?.eventStartDate) {
-              const eventStart = new Date(eventInfo.eventStartDate);
-              const eventStartStr = eventStart.toISOString().slice(0, 16);
-              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+
+            // Nếu có startDate cũ và nó đã ở quá khứ, chỉ giới hạn theo thời gian tạo sự kiện
+            if (originalTask?.startDate) {
+              const oldStartDate = new Date(originalTask.startDate);
+              if (oldStartDate <= now) {
+                // Cho phép giữ nguyên thời gian cũ (dù ở quá khứ)
+                return eventInfo?.createdAt
+                  ? new Date(eventInfo.createdAt).toISOString().slice(0, 16)
+                  : undefined;
+              }
+            }
+
+            // Trường hợp còn lại: yêu cầu thời gian sau hiện tại
+            if (eventInfo?.createdAt) {
+              const eventCreated = new Date(eventInfo.createdAt);
+              const eventCreatedStr = eventCreated.toISOString().slice(0, 16);
+              return eventCreatedStr > minDateTime ? eventCreatedStr : minDateTime;
             }
             return minDateTime;
           })()}
@@ -1042,38 +1041,41 @@ const getRoleLabel = (role) => {
             if (form.parentId) {
               const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
               if (parentTask && parentTask.dueDate) {
-                const parentDeadline = new Date(parentTask.dueDate).toISOString().slice(0, 16);
-                // Nếu có eventEndDate, lấy giá trị nhỏ hơn giữa parent deadline và event end date
-                if (eventInfo?.eventEndDate) {
-                  const eventEnd = new Date(eventInfo.eventEndDate).toISOString().slice(0, 16);
-                  return parentDeadline < eventEnd ? parentDeadline : eventEnd;
-                }
-                return parentDeadline;
+                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
               }
             }
-            // Nếu không có parent, dùng event end date
-            return eventInfo?.eventEndDate
-              ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined;
+            return undefined;
           })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
-            Thời gian bắt đầu phải sau thời điểm hiện tại
-            {eventInfo.eventStartDate &&
-              ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {eventInfo.eventEndDate &&
-              `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {form.parentId && (() => {
-              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
-              if (parentTask && parentTask.dueDate) {
-                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+            {(() => {
+              const now = new Date();
+              const oldStartDate = originalTask?.startDate ? new Date(originalTask.startDate) : null;
+              const isOldDateInPast = oldStartDate && oldStartDate <= now;
+
+              let message = "";
+              if (isOldDateInPast) {
+                // Nếu thời gian cũ đã ở quá khứ, chỉ cảnh báo về event constraints
+                if (eventInfo.createdAt) {
+                  message = `Thời gian bắt đầu phải sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
+              } else {
+                // Nếu không, yêu cầu thời gian sau hiện tại
+                message = "Thời gian bắt đầu phải sau thời điểm hiện tại";
+                if (eventInfo.createdAt) {
+                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
               }
-              return "";
+
+              if (form.parentId) {
+                const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+                if (parentTask && parentTask.dueDate) {
+                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                }
+              }
+
+              return message;
             })()}
           </div>
         )}
@@ -1092,13 +1094,27 @@ const getRoleLabel = (role) => {
               startDate.setMinutes(startDate.getMinutes() + 1);
               return startDate.toISOString().slice(0, 16);
             }
+
             const now = new Date();
             now.setMinutes(now.getMinutes() + 1);
             const minDateTime = now.toISOString().slice(0, 16);
-            if (eventInfo?.eventStartDate) {
-              const eventStart = new Date(eventInfo.eventStartDate);
-              const eventStartStr = eventStart.toISOString().slice(0, 16);
-              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+
+            // Nếu có dueDate cũ và nó đã ở quá khứ, chỉ giới hạn theo thời gian tạo sự kiện
+            if (originalTask?.dueDate) {
+              const oldDueDate = new Date(originalTask.dueDate);
+              if (oldDueDate <= now) {
+                // Cho phép giữ nguyên thời gian cũ (dù ở quá khứ)
+                return eventInfo?.createdAt
+                  ? new Date(eventInfo.createdAt).toISOString().slice(0, 16)
+                  : undefined;
+              }
+            }
+
+            // Trường hợp còn lại: yêu cầu thời gian sau hiện tại
+            if (eventInfo?.createdAt) {
+              const eventCreated = new Date(eventInfo.createdAt);
+              const eventCreatedStr = eventCreated.toISOString().slice(0, 16);
+              return eventCreatedStr > minDateTime ? eventCreatedStr : minDateTime;
             }
             return minDateTime;
           })()}
@@ -1107,39 +1123,44 @@ const getRoleLabel = (role) => {
             if (form.parentId) {
               const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
               if (parentTask && parentTask.dueDate) {
-                const parentDeadline = new Date(parentTask.dueDate).toISOString().slice(0, 16);
-                // Nếu có eventEndDate, lấy giá trị nhỏ hơn giữa parent deadline và event end date
-                if (eventInfo?.eventEndDate) {
-                  const eventEnd = new Date(eventInfo.eventEndDate).toISOString().slice(0, 16);
-                  return parentDeadline < eventEnd ? parentDeadline : eventEnd;
-                }
-                return parentDeadline;
+                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
               }
             }
-            // Nếu không có parent, dùng event end date
-            return eventInfo?.eventEndDate
-              ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined;
+            return undefined;
           })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
-            Deadline phải sau thời điểm hiện tại
-            {form.startDate && " và sau thời gian bắt đầu"}
-            {eventInfo.eventStartDate &&
-              `, sau ${new Date(eventInfo.eventStartDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {eventInfo.eventEndDate &&
-              `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {form.parentId && (() => {
-              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
-              if (parentTask && parentTask.dueDate) {
-                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+            {(() => {
+              const now = new Date();
+              const oldDueDate = originalTask?.dueDate ? new Date(originalTask.dueDate) : null;
+              const isOldDateInPast = oldDueDate && oldDueDate <= now;
+
+              let message = "";
+
+              if (form.startDate) {
+                message = "Deadline phải sau thời gian bắt đầu";
+              } else if (isOldDateInPast) {
+                // Nếu thời gian cũ đã ở quá khứ, chỉ cảnh báo về event constraints
+                if (eventInfo.createdAt) {
+                  message = `Deadline phải sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
+              } else {
+                // Nếu không, yêu cầu thời gian sau hiện tại
+                message = "Deadline phải sau thời điểm hiện tại";
+                if (eventInfo.createdAt) {
+                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
               }
-              return "";
+
+              if (form.parentId) {
+                const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+                if (parentTask && parentTask.dueDate) {
+                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                }
+              }
+
+              return message;
             })()}
           </div>
         )}
@@ -1192,14 +1213,7 @@ const getRoleLabel = (role) => {
               </div>
             )}
           </div>
-          <div className="col-md-6 mb-2">
-            <div className="text-muted small">Ước lượng</div>
-            <div className="fw-medium">
-              {(form.estimate ?? "") === ""
-                ? "—"
-                : `${form.estimate}${form.estimateUnit}`}
-            </div>
-          </div>
+          
         </div>
       </div>
       <div className="soft-card p-3 mb-3">
@@ -1237,7 +1251,7 @@ const getRoleLabel = (role) => {
       <div className="soft-card p-3">
         <div className="fw-medium mb-2">Liên kết công việc</div>
         <div className="mb-3">
-          <div className="text-muted small mb-1">Công việc tổng</div>
+          <div className="text-muted small mb-1">Công việc lớn</div>
           {relatedTasks.parent ? (
             <div className="fw-medium">
               <a
@@ -1408,38 +1422,29 @@ const getRoleLabel = (role) => {
               )}
             </div>
             <div className="d-flex align-items-center gap-2">
-              <button className="btn btn-warning" onClick={() => navigate(-1)}>
+              <button className="btn btn-warning" onClick={() => handleNavigateToTaskList()}>
                 Danh sách công việc
               </button>
               {!isEditing ? (
                 <>
-                  {canManageTask && (
+                  {canModifyTask && (
                     <button
                       className="btn btn-outline-secondary"
                       onClick={() => {
                         setIsEditing(true);
                       }}
+                      title={isTaskLocked ? 'Không thể chỉnh sửa công việc khi trạng thái không phải "Chưa bắt đầu".' : ''}
                     >
                       Chỉnh sửa
                     </button>
                   )}
-                  {canManageTask && (
+                  {canModifyTask && (
                     <button
                       className="btn btn-danger"
                       onClick={handleDelete}
+                      title={isTaskLocked ? 'Không thể xóa công việc khi trạng thái không phải "Chưa bắt đầu".' : ''}
                     >
                       Xóa
-                    </button>
-                  )}
-                  {canUpdateStatus && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setPendingStatus(form.status || STATUS.NOT_STARTED);
-                        setShowStatusModal(true);
-                      }}
-                    >
-                      Cập nhật trạng thái
                     </button>
                   )}
                 </>
@@ -1473,19 +1478,10 @@ const getRoleLabel = (role) => {
             </div>
           </div>
           {loading ? (
-            <div className="soft-card p-5 text-center text-muted">
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(255,255,255,1)",
-                  zIndex: 2000,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Loading size={100} />
+            <div className="soft-card p-5 text-center">
+              <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: "400px" }}>
+                <Loading size={80} />
+                <div className="text-muted mt-3">Đang tải thông tin công việc...</div>
               </div>
             </div>
           ) : (

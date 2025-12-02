@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { timeAgo } from "../utils/timeAgo";
 import { Clock, Bell, User } from "lucide-react";
+import loadingGif from "../assets/loading.gif";
 
 export default function UserHeader({
   title,
@@ -33,12 +34,45 @@ export default function UserHeader({
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);
   }, [timeFormat]);
-  
+
   const handleLogout = async () => {
+    // Create loading overlay directly in body to persist during route changes
+    const overlay = document.createElement('div');
+    overlay.id = 'logout-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 1);
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+    `;
+
+    overlay.innerHTML = `
+      <img
+        src="${loadingGif}"
+        alt="Loading..."
+        style="width: 120px; height: auto;"
+      />
+      <div style="font-size: 1.1rem; font-weight: 500; color: #6b7280;">
+        Đang đăng xuất...
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
     try {
+      // Wait for logout to complete (clears storage and calls API)
       await logout();
+      // Redirect to landingpage after logout completes
       window.location.href = "/landingpage?toast=logout-success";
     } catch (error) {
+      // Remove overlay on error
+      const overlayEl = document.getElementById('logout-overlay');
+      if (overlayEl) overlayEl.remove();
       toast.error("Có lỗi xảy ra khi đăng xuất");
     }
   };
@@ -56,6 +90,18 @@ export default function UserHeader({
   const toggleTimeFormat = () => {
     setTimeFormat(prev => prev === '24h' ? '12h' : '24h');
   };
+
+  // Listen for user profile updates
+  useEffect(() => {
+    const handleUserUpdate = (event) => {
+      if (event.detail && setUser) {
+        setUser(event.detail);
+      }
+    };
+
+    window.addEventListener('user-updated', handleUserUpdate);
+    return () => window.removeEventListener('user-updated', handleUserUpdate);
+  }, [setUser]);
 
   const getNotificationTargetUrl = (n) => {
     if (n.targetUrl) {

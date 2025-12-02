@@ -54,16 +54,30 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login error:", error);
-      setIsLoggingIn(false);
       const errorCode = error?.response?.data?.code;
-      if (error?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
+      const errorStatus = error?.response?.status;
+      // Fixed: Handle 404, 401, 400 errors properly
+
+      // Handle ACCOUNT_PENDING (403)
+      if (errorStatus === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
+        setIsLoggingIn(false);
         return;
       }
+
+      // Handle NOT_FOUND (404), UNAUTHORIZED (401), or BAD_REQUEST (400)
+      if (errorStatus === 404 || errorStatus === 401 || errorStatus === 400) {
+        setError(error?.response?.data?.message || "Email hoặc mật khẩu không đúng.");
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // Generic error
       setError(
         error?.response?.data?.message ||
         "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
       );
+      setIsLoggingIn(false);
     } finally {
       setLoading(false);
     }
@@ -112,17 +126,30 @@ export default function LoginPage() {
       navigate("/home-page", { replace: true, state: { loginSuccess: true } });
     } catch (err) {
       console.error("Google login error:", err);
-      setIsLoggingIn(false);
       const errorCode = err?.response?.data?.code;
-      if (err?.response?.status === 403 && errorCode === "ACCOUNT_PENDING") {
+      const errorStatus = err?.response?.status;
+
+      // Handle ACCOUNT_PENDING (403)
+      if (errorStatus === 403 && errorCode === "ACCOUNT_PENDING") {
         navigate("/email-confirmation", { state: { email } });
+        setIsLoggingIn(false);
         return;
       }
+
+      // Handle NOT_FOUND (404), UNAUTHORIZED (401), or BAD_REQUEST (400)
+      if (errorStatus === 404 || errorStatus === 401 || errorStatus === 400) {
+        setError(err?.response?.data?.message || "Đăng nhập Google thất bại.");
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // Generic error
       setError(
         err?.response?.data?.message ||
         err?.message ||
         "Đăng nhập Google thất bại."
       );
+      setIsLoggingIn(false);
     } finally {
       setLoading(false);
     }

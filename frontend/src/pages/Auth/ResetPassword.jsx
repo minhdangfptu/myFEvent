@@ -76,7 +76,25 @@ export default function ResetPassword() {
                 disabled={loading} 
               />
             </div>
-            {error && <div className="alert alert-danger mb-3" role="alert">{error}</div>}
+            {error && (
+              <div className="alert alert-danger mb-3" role="alert">
+                {error}
+                {(error.toLowerCase().includes('already been used') ||
+                  error.toLowerCase().includes('đã được sử dụng')) 
+                  || error.toLowerCase().includes('link đã hết hạn.') && (
+                  <div className="mt-2">
+                    <a
+                      href="/forgot-password"
+                      className="btn btn-sm btn-outline-danger"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <i className="bi bi-arrow-right-circle me-1"></i>
+                      Yêu cầu đặt lại mật khẩu mới
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="d-flex gap-2">
               <button type="button" className="btn btn-light flex-fill" onClick={() => navigate('/login')} disabled={loading}>Hủy</button>
               <button type="submit" className="btn btn-danger flex-fill" disabled={loading}>{loading ? 'Đang xác nhận...' : 'Xác nhận'}</button>

@@ -4,6 +4,11 @@ import EventMember from '../models/eventMember.js';
 import Task from '../models/task.js';
 import Department from '../models/department.js';
 
+const formatEventName = (event) => {
+  const name = typeof event?.name === 'string' ? event.name.trim() : '';
+  return name ? `[Sự kiện ${name}]` : 'Sự kiện';
+};
+
 /**
  * Tạo thông báo cho một user
  */
@@ -89,7 +94,7 @@ export const notifyTaskAssigned = async (eventId, taskId, assigneeId) => {
     const assigneeUserId = assigneeMember.userId._id;
     const taskTitle = task.title || 'Công việc';
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
 
     await createNotification({
       userId: assigneeUserId,
@@ -119,7 +124,7 @@ export const notifyTaskCompleted = async (eventId, taskId) => {
       return;
     }
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
     const departmentId = task.departmentId._id || task.departmentId;
     const assigneeMember = await EventMember.findById(task.assigneeId._id || task.assigneeId)
       .populate('userId');
@@ -205,7 +210,7 @@ export const notifyTaskOverdue = async (eventId, taskId) => {
     
     if (!task) return;
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
     const userIds = [];
 
     // Thông báo cho Member được giao việc
@@ -264,7 +269,7 @@ export const notifyMajorTaskStatus = async (eventId, taskId, isCompleted) => {
     if (!isMajorTask) return; // Chỉ là task con, không phải task lớn
 
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
 
     // Lấy tất cả HoOC của event
     const hoocMembers = await EventMember.find({
@@ -312,7 +317,7 @@ export const notifyAgendaCreated = async (eventId, agendaId, milestoneId) => {
       status: { $ne: 'deactive' },
     }).populate('userId');
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
 
     if (members.length === 0) return;
 
@@ -351,7 +356,7 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
       return;
     }
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
 
     const newMemberName = newMember.userId.fullName || 'Thành viên mới';
     const departmentName = newMember.departmentId?.name || 'Ban';
@@ -401,6 +406,7 @@ export const notifyMemberJoined = async (eventId, departmentId, newMemberId) => 
 
 export const notifyAddedToCalendar = async ({ eventId, calendarId, userIds, calendarName, creatorUserId }) => {
   try {
+    void creatorUserId;
     const filteredUserIds = (userIds || []).filter(Boolean);
     if (filteredUserIds.length === 0) {
       console.log('No valid userIds to notify for calendar');
@@ -408,7 +414,7 @@ export const notifyAddedToCalendar = async ({ eventId, calendarId, userIds, cale
     }
 
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     await createNotificationsForUsers(filteredUserIds, {
       eventId,
@@ -431,7 +437,7 @@ export const notifyAddedToCalendar = async ({ eventId, calendarId, userIds, cale
 export const notifyRemovedFromCalendar = async (eventId, calendarId, userId, calendarName) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
     await createNotification({
       userId,
       eventId,
@@ -454,7 +460,7 @@ export const notifyMeetingReminder = async (eventId, calendarId, participants, c
   try {
     const meetingDate = new Date(startAt).toLocaleDateString('vi-VN');
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
     const userIds = participants
       .filter(p => p.member && p.member.userId)
       .map(p => p.member.userId._id);
@@ -494,7 +500,7 @@ export const notifyCalendarUpdated = async (eventId, calendarId, participants, c
     }
 
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện'
+    const eventName = formatEventName(event);
 
     await createNotificationsForUsers(userIds, {
       eventId,
@@ -522,7 +528,7 @@ export const notifyCalendarUpdated = async (eventId, calendarId, participants, c
 export const notifyBudgetSubmitted = async (eventId, departmentId, budgetId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
     
     const department = await Department.findById(departmentId).select('name').lean();
     const departmentName = department?.name || 'Ban';
@@ -566,7 +572,7 @@ export const notifyBudgetSubmitted = async (eventId, departmentId, budgetId) => 
 export const notifyBudgetApproved = async (eventId, departmentId, budgetId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const hodMember = await EventMember.findOne({
       eventId,
@@ -603,7 +609,7 @@ export const notifyBudgetApproved = async (eventId, departmentId, budgetId) => {
 export const notifyBudgetRejected = async (eventId, departmentId, budgetId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const hodMember = await EventMember.findOne({
       eventId,
@@ -640,7 +646,7 @@ export const notifyBudgetRejected = async (eventId, departmentId, budgetId) => {
 export const notifyBudgetSentToMembers = async (eventId, departmentId, budgetId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const members = await EventMember.find({
       eventId,
@@ -682,7 +688,7 @@ export const notifyBudgetSentToMembers = async (eventId, departmentId, budgetId)
 export const notifyItemAssigned = async (eventId, departmentId, budgetId, itemId, memberId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const member = await EventMember.findById(memberId).populate('userId');
     if (!member || !member.userId) return 0;
@@ -716,7 +722,7 @@ export const notifyItemAssigned = async (eventId, departmentId, budgetId, itemId
 export const notifyExpenseReported = async (eventId, departmentId, budgetId, itemId, memberId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const member = await EventMember.findById(memberId).populate('userId');
     const memberName = member?.userId?.fullName || 'Thành viên';
@@ -757,7 +763,7 @@ export const notifyExpenseReported = async (eventId, departmentId, budgetId, ite
 export const notifyExpenseSubmitted = async (eventId, departmentId, budgetId, itemId, memberId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const member = await EventMember.findById(memberId).populate('userId');
     const memberName = member?.userId?.fullName || 'Thành viên';
@@ -800,7 +806,7 @@ export const notifyExpenseSubmitted = async (eventId, departmentId, budgetId, it
 export const notifyFormPublished = async (eventId, formId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const members = await EventMember.find({
       eventId,
@@ -841,7 +847,7 @@ export const notifyFormPublished = async (eventId, formId) => {
 export const notifyResponseSubmitted = async (eventId, formId, memberId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const member = await EventMember.findById(memberId).populate('userId');
     const memberName = member?.userId?.fullName || 'Thành viên';
@@ -887,7 +893,7 @@ export const notifyResponseSubmitted = async (eventId, formId, memberId) => {
 export const notifyAgendaUpdated = async (eventId, milestoneId, agendaId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     // Lấy tất cả HoD và Member của event (vì agenda thường gửi cho tất cả)
     const members = await EventMember.find({
@@ -932,7 +938,7 @@ export const notifyAgendaUpdated = async (eventId, milestoneId, agendaId) => {
 export const notifyRiskCreated = async (eventId, riskId, riskScope, departmentId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const userIds = [];
 
@@ -992,7 +998,7 @@ export const notifyRiskCreated = async (eventId, riskId, riskScope, departmentId
 export const notifyRiskUpdated = async (eventId, riskId, riskScope, departmentId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const userIds = [];
 
@@ -1052,7 +1058,7 @@ export const notifyRiskUpdated = async (eventId, riskId, riskScope, departmentId
 export const notifyRiskAssigned = async (eventId, riskId, assigneeId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const assigneeMember = await EventMember.findById(assigneeId).populate('userId');
     if (!assigneeMember || !assigneeMember.userId) return 0;
@@ -1083,7 +1089,7 @@ export const notifyRiskAssigned = async (eventId, riskId, assigneeId) => {
 export const notifyRiskOccurred = async (eventId, riskId, occurredRiskId, riskScope, departmentId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const userIds = [];
 
@@ -1143,7 +1149,7 @@ export const notifyRiskOccurred = async (eventId, riskId, occurredRiskId, riskSc
 export const notifyOccurredRiskUpdated = async (eventId, riskId, occurredRiskId, riskScope, departmentId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const userIds = [];
 
@@ -1203,7 +1209,7 @@ export const notifyOccurredRiskUpdated = async (eventId, riskId, occurredRiskId,
 export const notifyRiskStatusChanged = async (eventId, riskId, oldStatus, newStatus, riskScope, departmentId) => {
   try {
     const event = await Event.findById(eventId).select('name').lean();
-    const eventName = ("Sự kiện " + event?.name) || 'Sự kiện';
+    const eventName = formatEventName(event);
 
     const userIds = [];
 

@@ -171,7 +171,12 @@ export default function KanbanBoardTask({
       // Gọi API để cập nhật status
       const newStatus = getStatusFromColumn(newColumnId);
       try {
-        await taskApi.updateTaskProgress(eventId, activeId, newStatus);
+        await taskApi.updateTaskProgress(
+          eventId,
+          activeId,
+          newStatus,
+          { skipGlobal403: true }
+        );
         toast.success('Cập nhật trạng thái task thành công!');
         
         // Gọi callback để parent refresh data nếu có
@@ -181,7 +186,12 @@ export default function KanbanBoardTask({
       } catch (error) {
         // Rollback nếu API fail
         setItems(items);
-        if (error?.response?.status === 403) {
+        const backendMessage = error?.response?.data?.message;
+        if (error?.response?.status === 403 && backendMessage) {
+          toast.error(backendMessage);
+        } else if (backendMessage) {
+          toast.error(backendMessage);
+        } else if (error?.response?.status === 403) {
           toast.error('Bạn không được cập nhật trạng thái của công việc này');
         } else {
           toast.error('Cập nhật trạng thái task thất bại!');
@@ -218,7 +228,12 @@ export default function KanbanBoardTask({
     // Gọi API
     const newStatus = getStatusFromColumn(overColumnId);
     try {
-      await taskApi.updateTaskProgress(eventId, activeId, newStatus);
+      await taskApi.updateTaskProgress(
+        eventId,
+        activeId,
+        newStatus,
+        { skipGlobal403: true }
+      );
       toast.success('Cập nhật trạng thái task thành công!');
       
       if (onTaskMove) {
@@ -226,7 +241,12 @@ export default function KanbanBoardTask({
       }
     } catch (error) {
       setItems(items);
-      if (error?.response?.status === 403) {
+      const backendMessage = error?.response?.data?.message;
+      if (error?.response?.status === 403 && backendMessage) {
+        toast.error(backendMessage);
+      } else if (backendMessage) {
+        toast.error(backendMessage);
+      } else if (error?.response?.status === 403) {
         toast.error('Bạn không được cập nhật trạng thái của công việc này');
       } else {
         toast.error('Cập nhật trạng thái task thất bại!');

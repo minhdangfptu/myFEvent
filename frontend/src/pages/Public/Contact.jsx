@@ -307,12 +307,13 @@ export default function ContactPage({ hideLayout = false }) {
     return content;
   }
 
+
   // Còn bình thường /contact route vẫn có Header + Footer
   return (
     <>
-      <Header />
+      {!hideLayout && <Header />}
       {content}
-      <Footer />
+      {!hideLayout && <Footer />}
     </>
   );
 }

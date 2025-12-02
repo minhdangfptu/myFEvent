@@ -30,10 +30,27 @@ const AxiosInterceptor = ({ children }) => {
               navigate("/login");
               break;
             case 403:
-              navigate("/unauthorized");
+              if (error.config?.skipGlobal403) {
+                // Cho phép component tự xử lý toast/message
+                return Promise.reject(error);
+              }
+              // Log để debug
+              console.log('403 Error:', error.config.url, error.response.data);
+              // Không redirect nếu đang ở các trang user để tránh loop
+              const currentPath = window.location.pathname;
+              if (!currentPath.includes('/user/')) {
+                toast.error(error.response?.data?.message || "Bạn không có quyền truy cập.");
+                navigate("/unauthorized");
+              } else {
+                console.warn('403 error on user page, not redirecting to avoid loop');
+              }
               break;
             case 404:
-              navigate("/404");
+              // Don't redirect to 404 page for auth endpoints (let component handle it)
+              const isAuthEndpoint = error.config?.url?.includes('/auth/');
+              if (!isAuthEndpoint) {
+                navigate("/404");
+              }
               break;
             case 502:
               navigate("/502");

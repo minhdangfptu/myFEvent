@@ -7,6 +7,7 @@ import { sendMail } from '../mailer.js';
 import { config } from '../config/environment.js';
 import User from '../models/user.js';
 import AuthToken from '../models/authToken.js';
+import UsedResetToken from '../models/usedResetToken.js';
 
 const emailVerificationStore = new Map();
 // Pending registrations kept in-memory until verified
@@ -14,7 +15,7 @@ const pendingRegistrations = new Map();
 const deleteEventOtpStore = new Map();
 const setEmailVerificationCode = (email) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const ttlMs = 60 * 1000; // 1 minute
+  const ttlMs = 3 * 60 * 1000; // 3 minutes
   const expiresAt = new Date(Date.now() + ttlMs);
 
   const existing = emailVerificationStore.get(email);
@@ -88,12 +89,12 @@ export const signup = async (req, res) => {
 
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
-      return res.status(400).json({ message: 'Email already exists!' });
+      return res.status(400).json({ message: 'Email đã được đăng kí. Vui lòng sử dụng Email khác' });
     }
 
 
     if (!email || !password || !fullName ) {
-      return res.status(400).json({ message: 'Missing required fields!' });
+      return res.status(400).json({ message: 'Vui lòng điền đầy đủ các trường' });
     }
 
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
@@ -355,17 +356,17 @@ export const verifyEmail = async (req, res) => {
     
     // Get pending registration data
     const pendingUser = pendingRegistrations.get(email);
-    if (!pendingUser) return res.status(400).json({ message: 'No pending registration found for this email' });
+    if (!pendingUser) return res.status(400).json({ message: 'Không tìm thấy mã xác nhận. Vui lòng gửi lại' });
 
     const entry = emailVerificationStore.get(email);
-    if (!entry) return res.status(400).json({ message: 'Code not found. Please resend.' });
+    if (!entry) return res.status(400).json({ message: 'Không tìm thấy mã xác nhận. Vui lòng gửi lại' });
     if (entry.expiresAt < new Date()) {
       emailVerificationStore.delete(email);
-      return res.status(400).json({ message: 'Code expired. Please resend.' });
+      return res.status(400).json({ message: 'Mã đã hết hạn. Vui lòng gửi lại mã xác nhận' });
     }
 
     if (entry.code !== code) {
-      return res.status(400).json({ message: 'Invalid code' });
+      return res.status(400).json({ message: 'Mã xác thực không hợp lệ. Vui lòng kiểm tra lại' });
     }
 
     // Consume code
@@ -427,9 +428,19 @@ export const resendVerification = async (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const dbUser = await User.findOne({ email });
-    if (!dbUser) {
+
+    // Validate email format
+    if (!email || !email.trim()) {
       return res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
+    }
+
+    const dbUser = await User.findOne({ email: email.trim() });
+
+    // Always return the same message for security (don't reveal if email exists)
+    // But only send email if user actually exists
+    if (!dbUser) {
+      console.log(`Password reset requested for non-existent email: ${email}`);
+      return res.status(400).json({ message: 'Email không tồn tại, vui lòng kiểm tra lại' });
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -438,11 +449,11 @@ export const forgotPassword = async (req, res) => {
     const resetLink = `${config.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${resetJwt}`;
 
     // Send response immediately, then send email in background (non-blocking)
-    res.status(200).json({ message: 'Reset email sent' });
+    res.status(200).json({ message: 'If the email exists, a reset link has been sent.' });
 
-    // Send email asynchronously without blocking the response
+    // Only send email if user exists (this code only runs if dbUser is truthy)
     sendMail({
-      to: email,
+      to: dbUser.email, // Use dbUser.email instead of request email for security
       subject: 'Đặt lại mật khẩu myFEvent',
       html: `
         <div style="font-family:Arial,sans-serif;font-size:14px;color:#111827">
@@ -475,15 +486,30 @@ export const resetPassword = async (req, res) => {
     const user = await User.findById(decoded.userId);
     if (!user) return res.status(400).json({ message: 'Invalid token' });
 
+    // Create a hash of the token to check if it's been used
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Check if token has already been used
+    const alreadyUsed = await UsedResetToken.findOne({ tokenHash });
+    if (alreadyUsed) {
+      return res.status(400).json({ message: 'Liên kết đặc lại mật khẩu đã được sử dụng. Vui lòng tạo yêu cầu đặt mật khẩu mới' });
+    }
+
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
     await user.save();
+
+    // Mark token as used to prevent reuse
+    await UsedResetToken.create({
+      tokenHash,
+      userId: user._id,
+    });
 
     return res.status(200).json({ message: 'Password updated successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
     if (error.name === 'TokenExpiredError') {
-      return res.status(400).json({ message: 'Token expired' });
+      return res.status(400).json({ message: 'Link đã hết hạn. Vui lòng kiểm tra lại' });
     }
     return res.status(500).json({ message: 'Failed to reset password' });
   }
@@ -508,7 +534,7 @@ export const changePassword = async (req, res) => {
     }
 
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
+    if (!ok) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng, vui lòng kiểm tra lại' });
 
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
