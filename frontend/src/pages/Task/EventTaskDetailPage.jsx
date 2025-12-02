@@ -77,6 +77,7 @@ export default function EventTaskDetailPage() {
     estimateUnit: "h",
     parentId: "",
     dependenciesText: "",
+    taskType: "",
   });
   const [eventInfo, setEventInfo] = useState(null);
   const [meta, setMeta] = useState({
@@ -230,6 +231,7 @@ const getRoleLabel = (role) => {
           estimateUnit: task?.estimateUnit || "h",
           parentId: parentId,
           dependenciesText: dependencies.join(","),
+          taskType: task?.taskType || "normal",
         });
         setMeta({
           createdAt: task?.createdAt || "",
@@ -721,7 +723,13 @@ const getRoleLabel = (role) => {
     !!taskCreatorId &&
     !!currentUserId &&
     String(taskCreatorId) === String(currentUserId);
-  const canManageTask = isHoOC || isTaskCreator;
+  const isNormalTask = form.taskType === "normal" || !form.taskType || form.taskType === "";
+  const isEpicTask = form.taskType === "epic";
+  
+  // HoOC không thể chỉnh sửa/xóa normal task (chỉ HoD hoặc người tạo)
+  // HoOC chỉ có thể quản lý epic task
+  const canManageTask = isEpicTask ? (isHoOC || isTaskCreator) : (isHoD || isTaskCreator);
+  
   // Không cho phép chỉnh sửa/xóa khi task đang "Đang làm"
   const isTaskLocked =
   form.status === STATUS.IN_PROGRESS ||
@@ -734,10 +742,14 @@ const getRoleLabel = (role) => {
     (!currentMembershipId ||
       String(form.assigneeId) !== String(currentMembershipId));
 
-  // Chỉ người được giao task mới có thể cập nhật trạng thái
-  const canUpdateStatus = isSelfAssigned;
+  // HoOC có thể hủy task từ Chưa bắt đầu hoặc Đang làm (không được hủy nếu đã hoàn thành)
+  // Người được giao task có thể cập nhật trạng thái bình thường
+  const canHoOCCancel = isHoOC && isNormalTask && 
+    (form.status === STATUS.NOT_STARTED || form.status === STATUS.IN_PROGRESS);
+  const canUpdateStatus = isSelfAssigned || canHoOCCancel;
 
   // HoOC hoặc HoD tạo task có thể chỉnh sửa, nhưng không khi đang "Đang làm"
+  // HoOC không thể chỉnh sửa normal task
   const canEdit = canManageTask && !isTaskLocked;
   const creatorRoleLabel = getRoleLabel(taskCreatorRole);
   const creatorBadgeLabel = creatorRoleLabel || taskCreatorRole || "";
@@ -752,9 +764,15 @@ const getRoleLabel = (role) => {
   const canEditFields = canEdit;
   const statusOptions = useMemo(() => {
     const current = form.status || STATUS.NOT_STARTED;
-    const candidates = [current, ...(STATUS_TRANSITIONS[current] || [])];
+    let candidates = [current, ...(STATUS_TRANSITIONS[current] || [])];
+    
+    // HoOC có thể hủy task từ Chưa bắt đầu hoặc Đang làm (không được hủy nếu đã hoàn thành)
+    if (canHoOCCancel && !candidates.includes(STATUS.CANCELLED)) {
+      candidates.push(STATUS.CANCELLED);
+    }
+    
     return Array.from(new Set(candidates));
-  }, [form.status]);
+  }, [form.status, canHoOCCancel]);
 
   const handleQuickStatusAdvance = () => {
     if (!canUpdateStatus) return;

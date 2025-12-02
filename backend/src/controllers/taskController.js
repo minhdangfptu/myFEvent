@@ -227,6 +227,7 @@ export const updateTaskProgress = async (req, res) => {
         taskId,
         userId: req.user.id,
         body: req.body,
+        member,
       });
 
     if (justDone) {

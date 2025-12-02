@@ -252,14 +252,7 @@ const validateDate = (dateString) => {
       return { valid: false, message: "Định dạng ngày không hợp lệ" };
     }
 
-  const today = new Date(todayISODate);
-  today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-
-  if (date < today) {
-    return { valid: false, message: "Không thể chọn ngày trong quá khứ" };
-  }
-
+    // Bỏ validate 6 tháng - cho phép chọn bất kỳ ngày nào
     return { valid: true };
   };
 
@@ -412,14 +405,26 @@ const validateDate = (dateString) => {
       return;
     }
 
-    const newDateKey = getLocalDateKey(dateToAdd);
-    debugLog("Attempting to add date", { dateToAdd, newDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
+    // Ensure date is in ISO string format (YYYY-MM-DD)
+    let dateString = dateToAdd;
+    if (dateToAdd instanceof Date) {
+      dateString = dateToAdd.toISOString().split('T')[0];
+    } else if (typeof dateToAdd === 'string') {
+      // If it's already a string, ensure it's in YYYY-MM-DD format
+      const dateObj = new Date(dateToAdd);
+      if (!isNaN(dateObj.getTime())) {
+        dateString = dateObj.toISOString().split('T')[0];
+      }
+    }
+
+    const newDateKey = getLocalDateKey(dateString);
+    debugLog("Attempting to add date", { dateToAdd, dateString, newDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
     const isDuplicateDate = dates.some(
       (d) => getLocalDateKey(d.rawDate) === newDateKey
     );
 
     if (isDuplicateDate) {
-      debugLog("Duplicate date detected", { dateToAdd, newDateKey });
+      debugLog("Duplicate date detected", { dateToAdd, dateString, newDateKey });
       toast.error("Ngày này đã tồn tại trong agenda");
       return;
     }
@@ -431,8 +436,8 @@ const validateDate = (dateString) => {
         await createAgenda(eventId, milestoneId, {});
       }
 
-      // Add date to agenda using new API
-      const response = await addDateToAgenda(eventId, milestoneId, dateToAdd);
+      // Add date to agenda using new API - ensure dateString is in correct format
+      const response = await addDateToAgenda(eventId, milestoneId, dateString);
       debugLog("Add date API response", response);
 
       setNewDate("");
