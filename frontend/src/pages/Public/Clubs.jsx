@@ -52,7 +52,82 @@ const clubs = [
     image: "/Clubs/english.png",
     icon: "bi-chat-dots",
   },
+
+  // ⭐ Thêm mới
+  {
+    name: "FPT Dance Club",
+    email: "fptudance@gmail.com",
+    image: "/Clubs/dance.jpg",
+    icon: "bi-lightning-charge",
+  },
+  {
+    name: "FPT Esports Club",
+    email: "fptuesports@gmail.com",
+    image: "/Clubs/esports.jpg",
+    icon: "bi-controller",
+  },
+  {
+    name: "FPT Volunteer Club",
+    email: "fptuvolunteer@gmail.com",
+    image: "/Clubs/volunteer.jpg",
+    icon: "bi-hand-thumbs-up",
+  },
+  {
+    name: "FPTU Media Club",
+    email: "fptumedia@gmail.com",
+    image: "/Clubs/media.jpg",
+    icon: "bi-film",
+  },
+  {
+    name: "FPTU Coding & Development Club",
+    email: "fptucodeclub@gmail.com",
+    image: "/Clubs/code.jpg",
+    icon: "bi-code-slash",
+  },
+  {
+    name: "FPTU AI & Robotics Club",
+    email: "fpturobotics@gmail.com",
+    image: "/Clubs/robotics.jpg",
+    icon: "bi-robot",
+  },
+  {
+    name: "FPTU Marketing Club",
+    email: "fptumarketing@gmail.com",
+    image: "/Clubs/marketing.jpg",
+    icon: "bi-bullseye",
+  },
+  {
+    name: "FPTU Startup & Innovation Club",
+    email: "fptustartup@gmail.com",
+    image: "/Clubs/startup.jpg",
+    icon: "bi-lightbulb",
+  },
+  {
+    name: "FPT Anime & Manga Club",
+    email: "fptuanimeclub@gmail.com",
+    image: "/Clubs/anime.jpg",
+    icon: "bi-stars",
+  },
+  {
+    name: "FPT Chess Club",
+    email: "fptuchess@gmail.com",
+    image: "/Clubs/chess.jpg",
+    icon: "bi-shield",
+  },
+  {
+    name: "FPT Football Club",
+    email: "fptufootball@gmail.com",
+    image: "/Clubs/football.jpg",
+    icon: "bi-dribbble",
+  },
+  {
+    name: "FPT Basketball Club",
+    email: "fptubasketball@gmail.com",
+    image: "/Clubs/basketball.jpg",
+    icon: "bi-disc",
+  }
 ];
+
 
 export default function ClubsPage() {
   //time 1s loaidng
