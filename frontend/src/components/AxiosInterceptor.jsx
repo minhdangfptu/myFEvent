@@ -30,15 +30,23 @@ const AxiosInterceptor = ({ children }) => {
               navigate("/login");
               break;
             case 403:
+              if (error.config?.skipGlobal403) {
+                // Cho phép component tự xử lý toast/message
+                return Promise.reject(error);
+              }
               // Log để debug
               console.log('403 Error:', error.config.url, error.response.data);
-              // Không redirect nếu đang ở các trang user để tránh loop
+              // Không redirect nếu đang ở các trang user hoặc admin để tránh loop
               const currentPath = window.location.pathname;
-              if (!currentPath.includes('/user/')) {
+              if (currentPath.includes('/user/')) {
+                console.warn('403 error on user page, not redirecting to avoid loop');
+              } else if (currentPath.includes('/admin/')) {
+                console.warn('403 error on admin page, not redirecting to avoid loop');
+                // Chỉ show toast, không redirect
+                toast.error("Bạn không có quyền truy cập trang admin.");
+              } else {
                 toast.error("Bạn không có quyền truy cập.");
                 navigate("/unauthorized");
-              } else {
-                console.warn('403 error on user page, not redirecting to avoid loop');
               }
               break;
             case 404:

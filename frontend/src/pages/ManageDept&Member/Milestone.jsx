@@ -7,6 +7,7 @@ import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
 import { useEvents } from "../../contexts/EventContext"
 import { CalendarX2 } from "lucide-react"
+import Loading from "~/components/Loading"
 
 const styles = {
   container: {
@@ -230,6 +231,19 @@ const styles = {
     color: "#9ca3af",
     maxWidth: "300px",
   },
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4rem 2rem",
+    minHeight: "400px",
+  },
+  loadingText: {
+    marginTop: "1.5rem",
+    fontSize: "1rem",
+    color: "#6b7280",
+  },
   modalOverlay: {
     position: "fixed",
     top: 0,
@@ -407,9 +421,9 @@ const Milestone = () => {
     return null
   }
 
-  const fetchMilestones = async () => {
+  const fetchMilestones = async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       const response = await milestoneApi.listMilestonesByEvent(eventId)
       const sorted = [...(response.data || [])].sort((a, b) => {
         const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000)
@@ -431,7 +445,7 @@ const Milestone = () => {
       console.error("Error fetching milestones:", err)
       setError("Không thể tải danh sách cột mốc")
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -440,7 +454,6 @@ const Milestone = () => {
   }
 
   const handleViewDetails = (milestoneId) => {
-    setLoading(true)
     navigate(`/events/${eventId}/milestone-detail/${milestoneId}`)
   }
 
@@ -468,23 +481,19 @@ const Milestone = () => {
     }
 
     try {
-      setLoading(true)
-
       await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
         targetDate: createForm.targetDate,
       })
 
-      await fetchMilestones()
+      await fetchMilestones(false)
       setShowCreateModal(false)
       setCreateForm({ name: "", description: "", targetDate: "" })
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
       setError(err.response?.data?.message || "Tạo cột mốc thất bại")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -521,9 +530,15 @@ const Milestone = () => {
 
         {error && <div style={styles.errorMessage}>{error}</div>}
 
-        <div style={styles.content} className="milestone-content-responsive">
-          <div style={styles.timelineSection}>
-            {milestones.length > 0 ? (
+        {loading ? (
+          <div style={{ ...styles.content, ...styles.loadingContainer }}>
+            <Loading size={80} />
+            <div style={styles.loadingText}>Đang tải danh sách cột mốc...</div>
+          </div>
+        ) : (
+          <div style={styles.content} className="milestone-content-responsive">
+            <div style={styles.timelineSection}>
+              {milestones.length > 0 ? (
               <>
                 <div style={styles.timelineLine}></div>
                 <div style={styles.milestonesList}>
@@ -640,6 +655,7 @@ const Milestone = () => {
             )}
           </div>
         </div>
+        )}
 
         {showCreateModal && (
           <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>

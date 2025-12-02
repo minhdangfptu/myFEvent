@@ -1,65 +1,86 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import UserLayout from "~/components/UserLayout";
+import adminService from "~/services/adminService";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("moi-tao");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Dữ liệu mẫu
-  const bannedEvents = [
-    {
-      name: "FPTU Fest 2025",
-      organizer: "Đặng Quang Huy",
-      date: "07/11/2025",
-    },
-    {
-      name: "Tech Summit",
-      organizer: "Trần Anh",
-      date: "05/11/2025",
-    },
-    {
-      name: "Music Festival",
-      organizer: "Phạm Thùy Linh",
-      date: "03/11/2025",
-    },
-  ];
+  // Stats data
+  const [stats, setStats] = useState({
+    totalEvents: { value: 0, changeThisWeek: 0 },
+    bannedEvents: { value: 0, changeThisWeek: 0 },
+    totalUsers: { value: 0, changeThisWeek: 0 },
+    bannedUsers: { value: 0, changeThisWeek: 0 },
+  });
 
-  const weeklyStats = [
-    { activity: "Sự kiện tạo mới", count: 24 },
-    { activity: "Sự kiện bị cấm", count: 3 },
-    { activity: "Người dùng mới", count: 10 },
-    { activity: "Người dùng bị cấm", count: 2 },
-  ];
+  // Banned events
+  const [bannedEvents, setBannedEvents] = useState([]);
 
-  const recentEvents = {
-    "moi-tao": [
-      {
-        title: "Hội thảo Công nghệ AI 2024",
-        organizer: "Nguyễn Văn A",
-        date: "15/11/2024",
-      },
-      {
-        title: "Workshop Thiết kế UX/UI",
-        organizer: "Trần Thị B",
-        date: "18/11/2024",
-      },
-      {
-        title: "Triển lãm Nghệ thuật Đương đại",
-        organizer: "Lê Minh C",
-        date: "20/11/2024",
-      },
-    ],
-    "sap-dien-ra": [
-      {
-        title: "Hội thảo Công nghệ AI 2024",
-        organizer: "Nguyễn Văn A",
-        date: "15/11/2024",
-      },
-      {
-        title: "Workshop Thiết kế UX/UI",
-        organizer: "Trần Thị B",
-        date: "18/11/2024",
-      },
-    ],
+  // Weekly activity
+  const [weeklyStats, setWeeklyStats] = useState([]);
+
+  // Recent events
+  const [recentEvents, setRecentEvents] = useState({
+    "moi-tao": [],
+    "sap-dien-ra": [],
+  });
+
+  // Fetch all dashboard data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch all data in parallel
+        const [statsData, bannedEventsData, weeklyActivityData, newEventsData, upcomingEventsData] = await Promise.all([
+          adminService.getDashboardStats(),
+          adminService.getRecentBannedEvents(10),
+          adminService.getWeeklyActivity(),
+          adminService.getRecentEvents("new", 10),
+          adminService.getRecentEvents("upcoming", 10),
+        ]);
+
+        setStats(statsData);
+        setBannedEvents(bannedEventsData);
+        setWeeklyStats(weeklyActivityData);
+        setRecentEvents({
+          "moi-tao": newEventsData,
+          "sap-dien-ra": upcomingEventsData,
+        });
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError("Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Helper function to format change text
+  const formatChangeText = (change) => {
+    if (change > 0) {
+      return `+${change} trong tuần này`;
+    } else if (change < 0) {
+      return `${change} trong tuần này`;
+    } else {
+      return "= trong tuần này";
+    }
+  };
+
+  // Helper function to get change color
+  const getChangeColor = (change) => {
+    if (change > 0) {
+      return "#10b981"; // green
+    } else if (change < 0) {
+      return "#ef4444"; // red
+    } else {
+      return "#6b7280"; // gray
+    }
   };
 
   const StatCard = ({ icon, iconBg, title, value, change, changeColor }) => (
@@ -103,6 +124,26 @@ export default function AdminDashboard() {
     </div>
   );
 
+  if (loading) {
+    return (
+      <UserLayout title="Tổng quan" sidebarType="admin" activePage="dashboard">
+        <div style={{ background: "#f9fafb", minHeight: "100vh", padding: "24px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+          <div style={{ fontSize: "16px", color: "#6b7280" }}>Đang tải dữ liệu...</div>
+        </div>
+      </UserLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <UserLayout title="Tổng quan" sidebarType="admin" activePage="dashboard">
+        <div style={{ background: "#f9fafb", minHeight: "100vh", padding: "24px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+          <div style={{ fontSize: "16px", color: "#ef4444" }}>{error}</div>
+        </div>
+      </UserLayout>
+    );
+  }
+
   return (
     <UserLayout title="Tổng quan" sidebarType="admin" activePage="dashboard">
       <div style={{ background: "#f9fafb", minHeight: "100vh", padding: "24px" }}>
@@ -119,33 +160,33 @@ export default function AdminDashboard() {
             icon="📅"
             iconBg="#dbeafe"
             title="Tổng sự kiện"
-            value="23"
-            change="+3 trong tuần này"
-            changeColor="#10b981"
+            value={stats.totalEvents.value}
+            change={formatChangeText(stats.totalEvents.changeThisWeek)}
+            changeColor={getChangeColor(stats.totalEvents.changeThisWeek)}
           />
           <StatCard
             icon="🚫"
             iconBg="#fee2e2"
             title="Sự kiện bị cấm"
-            value="2"
-            change="+1 trong tuần này"
-            changeColor="#ef4444"
+            value={stats.bannedEvents.value}
+            change={formatChangeText(stats.bannedEvents.changeThisWeek)}
+            changeColor={getChangeColor(stats.bannedEvents.changeThisWeek)}
           />
           <StatCard
             icon="👥"
             iconBg="#e9d5ff"
             title="Tổng người dùng"
-            value="41"
-            change="+5 trong tuần này"
-            changeColor="#10b981"
+            value={stats.totalUsers.value}
+            change={formatChangeText(stats.totalUsers.changeThisWeek)}
+            changeColor={getChangeColor(stats.totalUsers.changeThisWeek)}
           />
           <StatCard
             icon="👤"
             iconBg="#f3f4f6"
             title="Người dùng bị cấm"
-            value="1"
-            change="= trong tuần này"
-            changeColor="#6b7280"
+            value={stats.bannedUsers.value}
+            change={formatChangeText(stats.bannedUsers.changeThisWeek)}
+            changeColor={getChangeColor(stats.bannedUsers.changeThisWeek)}
           />
         </div>
 
@@ -217,40 +258,48 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bannedEvents.map((event, idx) => (
-                    <tr key={idx}>
-                      <td
-                        style={{
-                          padding: "12px 0",
-                          fontSize: "14px",
-                          color: "#111827",
-                          borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
-                        }}
-                      >
-                        {event.name}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 0",
-                          fontSize: "14px",
-                          color: "#6b7280",
-                          borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
-                        }}
-                      >
-                        {event.organizer}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 0",
-                          fontSize: "14px",
-                          color: "#6b7280",
-                          borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
-                        }}
-                      >
-                        {event.date}
+                  {bannedEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{ padding: "24px", textAlign: "center", color: "#6b7280", fontSize: "14px" }}>
+                        Không có sự kiện bị cấm
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    bannedEvents.map((event, idx) => (
+                      <tr key={idx}>
+                        <td
+                          style={{
+                            padding: "12px 0",
+                            fontSize: "14px",
+                            color: "#111827",
+                            borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
+                          }}
+                        >
+                          {event.name}
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 0",
+                            fontSize: "14px",
+                            color: "#6b7280",
+                            borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
+                          }}
+                        >
+                          {event.organizer}
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 0",
+                            fontSize: "14px",
+                            color: "#6b7280",
+                            borderBottom: idx < bannedEvents.length - 1 ? "1px solid #f3f4f6" : "none",
+                          }}
+                        >
+                          {event.date}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -398,70 +447,73 @@ export default function AdminDashboard() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {recentEvents[activeTab].map((event, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: "12px",
-                    background: "#f9fafb",
-                    borderRadius: "8px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: "500",
-                        color: "#111827",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      {event.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <span>👤</span>
-                      <span>Người tổ chức: {event.organizer}</span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        marginTop: "2px",
-                      }}
-                    >
-                      <span>📅</span>
-                      <span>{event.date}</span>
-                    </div>
-                  </div>
-                  <button
+              {recentEvents[activeTab] && recentEvents[activeTab].length === 0 ? (
+                <div style={{ padding: "24px", textAlign: "center", color: "#6b7280", fontSize: "14px" }}>
+                  Không có sự kiện
+                </div>
+              ) : (
+                recentEvents[activeTab]?.map((event, idx) => (
+                  <div
+                    key={idx}
                     style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "#3b82f6",
-                      fontSize: "13px",
-                      fontWeight: "500",
-                      cursor: "pointer",
-                      padding: "4px 8px",
+                      padding: "12px",
+                      background: "#f9fafb",
+                      borderRadius: "8px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
                     }}
                   >
-                    Mới tạo
-                  </button>
-                </div>
-              ))}
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: "500",
+                          color: "#111827",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        {event.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <span>👤</span>
+                        <span>Người tổ chức: {event.organizer}</span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          marginTop: "2px",
+                        }}
+                      >
+                        <span>📅</span>
+                        <span>{event.date}</span>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        color: "#3b82f6",
+                        fontSize: "13px",
+                        fontWeight: "500",
+                        padding: "4px 8px",
+                      }}
+                    >
+                      {activeTab === "moi-tao" ? "Mới tạo" : "Sắp diễn ra"}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

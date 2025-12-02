@@ -85,7 +85,7 @@ export const sendVerificationEmail = async (email, fullName, req) => {
 
 export const signup = async (req, res) => {
   try {
-    const { email, password, fullName} = req.body;
+    const { email, password, fullName } = req.body;
 
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
@@ -93,7 +93,7 @@ export const signup = async (req, res) => {
     }
 
 
-    if (!email || !password || !fullName ) {
+    if (!email || !password || !fullName) {
       return res.status(400).json({ message: 'Vui lòng điền đầy đủ các trường' });
     }
 
@@ -108,7 +108,7 @@ export const signup = async (req, res) => {
       verified: false,
       status: 'pending',
     };
-    
+
     pendingRegistrations.set(email, pendingUser);
     await sendVerificationEmail(email, fullName, req);
 
@@ -118,7 +118,7 @@ export const signup = async (req, res) => {
     });
   } catch (error) {
     if (error.message && error.message.includes('email')) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: 'Failed to send verification email. Please check email configuration.'
       });
     }
@@ -130,22 +130,29 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'Tài khoản không tồn tại' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email và mật khẩu là bắt buộc' });
+    }
 
-    // Check if user registered with Google OAuth (no password)
+    const user = await User.findOne({ email });
+    const DUMMY_HASH = '$2b$10$A1B2C3D4E5F6G7H8I9J0KlmnopqrstuvwxYZabcdefghi12JK';
+
+    if (!user) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+    }
+
+    if (user.authProvider === 'google') {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+    }
+
     if (!user.passwordHash) {
-      if (user.authProvider === 'google') {
-        return res.status(400).json({
-          message: 'Tài khoản này đã được đăng ký bằng Google. Vui lòng đăng nhập bằng Google.',
-          code: 'USE_GOOGLE_LOGIN'
-        });
-      }
-      return res.status(400).json({ message: 'Lỗi xác thực. Vui lòng liên hệ admin.' });
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng' });
+    if (!ok) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+    }
 
     if (user.status === 'pending') {
       return res.status(403).json({
@@ -153,6 +160,7 @@ export const login = async (req, res) => {
         code: 'ACCOUNT_PENDING'
       });
     }
+
     if (user.status === 'banned') {
       return res.status(403).json({
         message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
@@ -162,7 +170,8 @@ export const login = async (req, res) => {
 
     const { accessToken, refreshToken } = createTokens(user._id, user.email);
     await saveRefreshToken(user._id, refreshToken, req);
-    return res.json({
+
+    return res.status(200).json({
       message: 'Login successful!',
       user: {
         id: user._id,
@@ -172,11 +181,13 @@ export const login = async (req, res) => {
       },
       tokens: { accessToken, refreshToken },
     });
+
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ message: 'Failed to login!' });
   }
 };
+
 
 export const refreshToken = async (req, res) => {
   try {
@@ -198,121 +209,121 @@ export const refreshToken = async (req, res) => {
 };
 
 export const loginWithGoogle = async (req, res) => {
-    try {
-      const { credential, g_csrf_token } = req.body;           
-      if (!credential) return res.status(400).json({ message: 'Missing Google credential!' });
-  
-      const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
-  
-      const csrfCookie = req.cookies?.g_csrf_token;
-      if (csrfCookie && g_csrf_token && csrfCookie !== g_csrf_token) {
-        return res.status(400).json({ message: 'CSRF check failed' });
-      }
-  
-      const ticket = await client.verifyIdToken({
-        idToken: credential,
-        audience: config.GOOGLE_CLIENT_ID,
+  try {
+    const { credential, g_csrf_token } = req.body;
+    if (!credential) return res.status(400).json({ message: 'Missing Google credential!' });
+
+    const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+
+    const csrfCookie = req.cookies?.g_csrf_token;
+    if (csrfCookie && g_csrf_token && csrfCookie !== g_csrf_token) {
+      return res.status(400).json({ message: 'CSRF check failed' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: config.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload(); // { sub, email, email_verified, name, picture, iss, ... }
+    if (!payload) return res.status(401).json({ message: 'Invalid Google token' });
+
+    const { email, name, picture, sub, iss, email_verified } = payload;
+    if (!['accounts.google.com', 'https://accounts.google.com'].includes(iss) || !email_verified) {
+      return res.status(401).json({ message: 'Unverified Google account' });
+    }
+
+    let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
+
+    if (!user) {
+      // Create new user with Google - mark as verified since Google already verified the email
+      user = await User.create({
+        email,
+        fullName: name,
+        avatarUrl: picture,
+        googleId: sub,
+        authProvider: 'google',
+        status: 'active',
+        isFirstLogin: true,
+        verified: true, // Google accounts are pre-verified
       });
-  
-      const payload = ticket.getPayload(); // { sub, email, email_verified, name, picture, iss, ... }
-      if (!payload) return res.status(401).json({ message: 'Invalid Google token' });
-  
-      const { email, name, picture, sub, iss, email_verified } = payload;
-      if (!['accounts.google.com', 'https://accounts.google.com'].includes(iss) || !email_verified) {
-        return res.status(401).json({ message: 'Unverified Google account' });
-      }
-  
-      let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
-  
-      if (!user) {
-        // Create new user with Google - mark as verified since Google already verified the email
-        user = await User.create({
-          email,
-          fullName: name,
-          avatarUrl: picture,
-          googleId: sub,
-          authProvider: 'google',
-          status: 'active',
-          isFirstLogin: true,
-          verified: true, // Google accounts are pre-verified
-        });
-      } else {
-        // Update existing user
-        if (!user.googleId) {
-          user.googleId = sub;
-        }
-
-        if (!user.fullName && name) user.fullName = name;
-        if (!user.avatarUrl && picture) user.avatarUrl = picture;
-
-        // Mark as verified if logging in with Google (Google already verified the email)
-        if (!user.verified) {
-          user.verified = true;
-        }
-
-        await user.save();
+    } else {
+      // Update existing user
+      if (!user.googleId) {
+        user.googleId = sub;
       }
 
-      if (user.status === 'pending') {
-        return res.status(403).json({
-          message: 'Account is not active',
-          code: 'ACCOUNT_PENDING'
-        });
+      if (!user.fullName && name) user.fullName = name;
+      if (!user.avatarUrl && picture) user.avatarUrl = picture;
+
+      // Mark as verified if logging in with Google (Google already verified the email)
+      if (!user.verified) {
+        user.verified = true;
       }
 
-      if (user.status === 'banned') {
-        return res.status(403).json({
-          message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
-          code: 'ACCOUNT_BANNED'
-        });
-      }
+      await user.save();
+    }
 
-       const accessToken = jwt.sign(
-         { userId: user._id, email: user.email, role: user.role },
-         config.JWT_SECRET,
-         { expiresIn: config.JWT_EXPIRE }
-       );
-  
-      const refreshToken = jwt.sign(
-        { userId: user._id, typ: 'refresh' },
-        config.JWT_REFRESH_SECRET,
-        { expiresIn: config.JWT_REFRESH_EXPIRE }
-      );
-  
-      const authToken = new AuthToken({
-        userId: user._id,
-        token: refreshToken,
-        userAgent: req.get('User-Agent'),
-        ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim(),
-
-        expiresAt: (() => {
-          const { exp } = jwt.decode(refreshToken) || {};
-          return exp ? new Date(exp * 1000) : new Date(Date.now() + 7*24*60*60*1000);
-        })(),
-      });
-      await authToken.save();
-  
-      return res.status(200).json({
-        message: 'Google login successful!',
-        accessToken,
-        refreshToken,
-         user: {
-           id: user._id,
-           email: user.email,
-           fullName: user.fullName,
-           avatarUrl: user.avatarUrl,
-           role: user.role,
-           authProvider: user.authProvider,
-         }
-      });
-    } catch (error) {
-      const isBadToken = /invalid|wrong number of segments|jwt/i.test(error?.message || '');
-      return res.status(isBadToken ? 401 : 500).json({
-        message: isBadToken ? 'Invalid Google token' : 'Fail to login with Google!'
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        message: 'Account is not active',
+        code: 'ACCOUNT_PENDING'
       });
     }
-  };
-  
+
+    if (user.status === 'banned') {
+      return res.status(403).json({
+        message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
+        code: 'ACCOUNT_BANNED'
+      });
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      config.JWT_SECRET,
+      { expiresIn: config.JWT_EXPIRE }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id, typ: 'refresh' },
+      config.JWT_REFRESH_SECRET,
+      { expiresIn: config.JWT_REFRESH_EXPIRE }
+    );
+
+    const authToken = new AuthToken({
+      userId: user._id,
+      token: refreshToken,
+      userAgent: req.get('User-Agent'),
+      ipAddress: (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim(),
+
+      expiresAt: (() => {
+        const { exp } = jwt.decode(refreshToken) || {};
+        return exp ? new Date(exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      })(),
+    });
+    await authToken.save();
+
+    return res.status(200).json({
+      message: 'Google login successful!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        role: user.role,
+        authProvider: user.authProvider,
+      }
+    });
+  } catch (error) {
+    const isBadToken = /invalid|wrong number of segments|jwt/i.test(error?.message || '');
+    return res.status(isBadToken ? 401 : 500).json({
+      message: isBadToken ? 'Invalid Google token' : 'Fail to login with Google!'
+    });
+  }
+};
+
 
 export const logout = async (req, res) => {
   try {
@@ -353,7 +364,7 @@ export const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
     if (!email || !code) return res.status(400).json({ message: 'Email and code are required' });
-    
+
     // Get pending registration data
     const pendingUser = pendingRegistrations.get(email);
     if (!pendingUser) return res.status(400).json({ message: 'Không tìm thấy mã xác nhận. Vui lòng gửi lại' });
@@ -372,18 +383,18 @@ export const verifyEmail = async (req, res) => {
     // Consume code
     if (entry.timeout) clearTimeout(entry.timeout);
     emailVerificationStore.delete(email);
-    
+
     // Create and save the verified user
     const newUser = new User({
       ...pendingUser,
       verified: true,
       status: 'active'
     });
-    
+
     await newUser.save();
     pendingRegistrations.delete(email);
 
-    return res.status(201).json({ 
+    return res.status(201).json({
       message: 'Verified successfully',
       user: {
         id: newUser._id,
@@ -484,7 +495,7 @@ export const resetPassword = async (req, res) => {
 
     const decoded = jwt.verify(token, config.JWT_SECRET);
     const user = await User.findById(decoded.userId);
-    if (!user) return res.status(400).json({ message: 'Invalid token' });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     // Create a hash of the token to check if it's been used
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -492,7 +503,7 @@ export const resetPassword = async (req, res) => {
     // Check if token has already been used
     const alreadyUsed = await UsedResetToken.findOne({ tokenHash });
     if (alreadyUsed) {
-      return res.status(400).json({ message: 'Liên kết đặc lại mật khẩu đã được sử dụng. Vui lòng tạo yêu cầu đặt mật khẩu mới' });
+      return res.status(400).json({ message: 'Liên kết đặt lại mật khẩu đã được sử dụng. Vui lòng tạo yêu cầu mới' });
     }
 
     const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);

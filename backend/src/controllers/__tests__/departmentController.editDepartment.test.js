@@ -8,6 +8,7 @@ vi.mock('../../services/departmentService.js', () => ({
   ensureEventExists: vi.fn(),
   ensureDepartmentInEvent: vi.fn(),
   updateDepartmentDoc: vi.fn(),
+  findDepartmentByName: vi.fn(),  // <-- FIX
 }));
 
 vi.mock('../../services/eventMemberService.js', () => ({
@@ -24,7 +25,11 @@ const mockRes = () => {
   return res;
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(async () => {
+  vi.clearAllMocks();
+  const { findDepartmentByName } = await import('../../services/departmentService.js');
+  findDepartmentByName.mockResolvedValue(null); // <-- FIX
+});
 
 /* -------------------- Tests -------------------- */
 

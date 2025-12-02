@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import Notification from '../models/notification.js';
 import EventMember from '../models/eventMember.js';
 import Department from '../models/department.js';
