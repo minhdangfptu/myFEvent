@@ -20,8 +20,9 @@ import WBSPreviewModal from "~/components/WBSPreviewModal";
 import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
 import { aiApi } from "~/apis/aiApi";
 import ConfirmModal from "../../components/ConfirmModal";
-import { RotateCw, Trash, AlertTriangle, X } from "lucide-react";
-
+import Loading from "~/components/Loading";
+import { RotateCw, Trash, AlertTriangle, X, Bot, FileCheck, ClipboardList } from "lucide-react";
+import { FileText, Users, User, Calendar, BarChart3 } from "lucide-react";
 
 const TASK_TYPE_LABELS = {
   epic: "Công việc lớn",
@@ -131,6 +132,7 @@ export default function EventTaskPage() {
 
   const initialTasks = useMemo(() => [], []);
   const [tasks, setTasks] = useState(initialTasks);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [expandedEpicIds, setExpandedEpicIds] = useState(() => new Set());
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
@@ -161,7 +163,7 @@ export default function EventTaskPage() {
       .getDepartments(eventId)
       .then((depts) => setDepartments(depts || []))
       .catch(() => setDepartments([]));
-    
+
     eventApi.getById(eventId)
       .then((res) => {
         const event = res?.data?.event || res?.data;
@@ -189,7 +191,12 @@ export default function EventTaskPage() {
   }, [eventId, eventRole, hoDDepartmentId]);
 
   const fetchTasks = useCallback(() => {
-    if (!eventId) return;
+    if (!eventId) {
+      setTasks([]);
+      setLoadingTasks(false);
+      return;
+    }
+    setLoadingTasks(true);
     taskApi
       .getTaskByEvent(eventId)
       .then((apiRes) => {
@@ -224,7 +231,8 @@ export default function EventTaskPage() {
         });
         setTasks(mapped);
       })
-      .catch((err) => setTasks([]));
+      .catch(() => setTasks([]))
+      .finally(() => setLoadingTasks(false));
   }, [eventId]);
 
   useEffect(() => {
@@ -294,7 +302,7 @@ export default function EventTaskPage() {
     groupedEpics.push({
       epic: {
         id: "orphan",
-        name: "Task chưa thuộc Epic",
+        name: "Công việc chưa thuộc Công việc lớn",
         department: "Chưa xác định",
         status: "Chưa xác định",
         statusCode: "chua_bat_dau",
@@ -491,6 +499,29 @@ export default function EventTaskPage() {
           const errorMessage = error?.response?.data?.message || "Xóa công việc thất bại";
           toast.error(errorMessage);
           console.error("Error deleting tasks:", error);
+        } finally {
+          setIsDeletingTasks(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteEpic = (epic) => {
+    if (!epic || !epic.id || epic.id === "orphan") return;
+    const epicName = epic.name || epic.title || "Công việc lớn";
+    setConfirmModal({
+      show: true,
+      message: `Bạn có chắc chắn muốn xóa "${epicName}"?`,
+      onConfirm: async () => {
+        setConfirmModal({ show: false, message: "", onConfirm: null });
+        setIsDeletingTasks(true);
+        try {
+          await taskApi.deleteTask(eventId, epic.id);
+          fetchTasks();
+          toast.success(`Đã xóa "${epicName}"`);
+        } catch (error) {
+          const errorMessage = error?.response?.data?.message || "Xóa công việc lớn thất bại";
+          toast.error(errorMessage);
         } finally {
           setIsDeletingTasks(false);
         }
@@ -890,7 +921,7 @@ const closeAddTaskModal = () => {
           .overlay { 
             position: fixed; 
             inset: 0; 
-            background: rgba(0,0,0,0.3); 
+            background: rgba(0, 0, 0, 0.53); 
             z-index: 999; 
           }
           .task-detail-panel {
@@ -1079,8 +1110,15 @@ const closeAddTaskModal = () => {
             </div>
           </div>
 
-          {/* List View */}
-          {activeTab === "list" && (
+        {loadingTasks ? (
+          <div className="soft-card p-5 text-center text-muted my-4 d-flex flex-column align-items-center gap-2">
+            <Loading />
+            <span className="text-muted">Đang tải danh sách công việc...</span>
+          </div>
+        ) : (
+          <>
+        {/* List View */}
+        {activeTab === "list" && (
             <>
               <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
                 <input
@@ -1138,14 +1176,14 @@ const closeAddTaskModal = () => {
                       onClick={() => setShowAIChat(true)}
                       style={{ fontSize: 14 }}
                     >
-                      🤖 AI Assistant
+                      <Bot size="18px" /> Trợ lý feAI
                     </button>
                   )}
                   <button
                     className="add-btn btn btn-primary"
                     onClick={() => openAddTaskModal("epic")}
                   >
-                    + Thêm công việc
+                    + Thêm công việc lớn
                   </button>
                 </div>
               </div>
@@ -1170,8 +1208,8 @@ const closeAddTaskModal = () => {
                           className="epic-header-row"
                           onClick={() => toggleEpicExpand(epicId)}
                         >
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div className="d-flex align-items-center gap-3">
+                          <div className="row g-3 align-items-center w-100">
+                            <div className="col-1 d-flex justify-content-center">
                               {epicId !== "orphan" && (
                                 <input
                                   type="checkbox"
@@ -1181,12 +1219,10 @@ const closeAddTaskModal = () => {
                                     const isChecked = e.target.checked;
                                     
                                     if (isChecked) {
-                                      // Chỉ chọn epic, không chọn task
                                       setSelectedEpicIds((prev) => 
                                         prev.includes(epicId) ? prev : [...prev, epicId]
                                       );
                                     } else {
-                                      // Bỏ chọn epic, không ảnh hưởng đến task
                                       setSelectedEpicIds((prev) => prev.filter((id) => id !== epicId));
                                     }
                                   }}
@@ -1194,19 +1230,21 @@ const closeAddTaskModal = () => {
                                   style={{ width: 18, height: 18, cursor: "pointer" }}
                                 />
                               )}
-                              <div>
-                                <div className="fw-semibold">{epic?.name || "Công việc chưa thuộc Công việc lớn"}</div>
-                                <div className="text-muted small">
-                                  Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"}
-                                </div>
+                            </div>
+                            <div className="col-4">
+                              <div className="fw-semibold">{epic?.name || "Công việc chưa thuộc Công việc lớn"}</div>
+                              <div className="text-muted small">
+                                Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"}
                               </div>
                             </div>
-                            <div className="d-flex align-items-center gap-2">
-                              <span className="badge-custom text-bg-secondary">
-                                Số lượng công việc: {group.tasks.length}
+                            <div className="col-2 text-center">
+                              <span className="badge-custom text-bg-secondary w-100">
+                                {group.tasks.length} công việc
                               </span>
+                            </div>
+                            <div className="col-2 text-center">
                               <span
-                                className="badge-custom"
+                                className="badge-custom d-inline-flex justify-content-center px-3"
                                 style={{
                                   backgroundColor: epicStatusStyle.bg,
                                   color: epicStatusStyle.color,
@@ -1214,18 +1252,33 @@ const closeAddTaskModal = () => {
                               >
                                 {STATUS_LABEL_MAP[epic?.statusCode] || epic?.status || "Chưa bắt đầu"}
                               </span>
+                            </div>
+                            <div className="col-3 d-flex justify-content-end gap-2">
                               {epicId !== "orphan" && (
-                                <button
-                                  className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openAddTaskModal("normal", epic);
-                                  }}
-                                  title="Thêm công việc"
-                                >
-                                  <i className="bi bi-plus-lg" />
-                                  <span className="d-none d-md-inline">Công việc</span>
-                                </button>
+                                <>
+                                  <button
+                                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openAddTaskModal("normal", epic);
+                                    }}
+                                    title="Thêm công việc"
+                                  >
+                                    <i className="bi bi-plus-lg" />
+                                    <span className="d-none d-xl-inline">Thêm công việc</span>
+                                  </button>
+                                  <button
+                                    className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteEpic(epic);
+                                    }}
+                                    title="Xóa công việc lớn"
+                                  >
+                                    <Trash size={16} />
+                                    <span className="d-none d-xl-inline">Xóa</span>
+                                  </button>
+                                </>
                               )}
                               <i className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"} text-muted`} />
                             </div>
@@ -1426,6 +1479,8 @@ const closeAddTaskModal = () => {
               </div>
             </div>
           )}
+          </>
+        )}
         </div>
 
         {/* Task Detail Panel */}
@@ -1454,21 +1509,25 @@ const closeAddTaskModal = () => {
 
                 <div className="flex-grow-1 overflow-auto">
                   <div className="mb-4">
-                    <label className="text-muted small mb-2">Tên công việc</label>
-                    <div className="fw-semibold fs-5">{selectedTask.name}</div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="text-muted small mb-2">Mô tả</label>
-                    <div className="text-muted">
-                      {selectedTask.description || "Chưa có mô tả"}
+                    <label className="text-muted medium mb-2">Tên công việc</label>
+                    <div className="d-flex align-items-center gap-2">
+                      <ClipboardList size={20} />
+                      <span>{selectedTask.name}</span>
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <label className="text-muted small mb-2">Ban phụ trách</label>
+                    <label className="text-muted medium mb-2">Mô tả</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>👤</span>
+                      <FileText size={20} />
+                      <span>{selectedTask.description || "Chưa có mô tả"}</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="text-muted medium mb-2">Ban phụ trách</label>
+                    <div className="d-flex align-items-center gap-2">
+                      <Users size={20} />
                       <span>{selectedTask.department}</span>
                     </div>
                   </div>
@@ -1476,37 +1535,28 @@ const closeAddTaskModal = () => {
                   <div className="mb-4">
                     <label className="text-muted small mb-2">Người phụ trách</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>👤</span>
+                      <User size={20} />
                       <span>{selectedTask.assignee}</span>
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <label className="text-muted small mb-2">Deadline</label>
+                    <label className="text-muted medium mb-2">Deadline</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📅</span>
+                      <Calendar size={20} />
                       <span>{selectedTask.due}</span>
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <label className="text-muted small mb-2">Trạng thái</label>
+                    <label className="text-muted medium mb-2">Trạng thái</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📈 </span>
+                      <BarChart3 size={20} />
                       <span>{selectedTask.status}</span>
                     </div>
                   </div>
-
-                  <div className="mb-4">
-                    <label className="text-muted small mb-2">
-                      Ước tính thời gian thực hiện
-                    </label>
-                    <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>⌛ </span>
-                      <span>{selectedTask.estimate}</span>
-                    </div>
-                  </div>
                 </div>
+
 
                 <div className="border-top pt-3">
                   <button
@@ -1525,7 +1575,7 @@ const closeAddTaskModal = () => {
         {showAddModal && (
           <>
             <div
-              className="modal-backdrop"
+              className="modal-backdrop overlay"
               style={{ position: "fixed", inset: 0, zIndex: 1050 }}
               onClick={closeAddTaskModal}
             />
@@ -1674,11 +1724,14 @@ const closeAddTaskModal = () => {
                               const now = new Date();
                               now.setMinutes(now.getMinutes() + 1);
                               const minDateTime = now.toISOString().slice(0, 16);
+
+                              // So sánh với thời gian tạo sự kiện, chọn thời gian nào lớn hơn
                               if (eventInfo?.createdAt) {
                                 const eventCreatedAt = new Date(eventInfo.createdAt);
                                 const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
                                 return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
                               }
+
                               return minDateTime;
                             })()}
                             max={(() => {
@@ -1694,10 +1747,19 @@ const closeAddTaskModal = () => {
                           />
                           {assignNow ? (
                             <div className="form-text small text-muted">Thời gian bắt đầu sẽ là: {new Date().toLocaleString('vi-VN')}</div>
-                          ) : eventInfo ? (
+                          ) : (
                             <div className="form-text small text-muted">
-                              Lưu ý: Thời gian bắt đầu phải sau thời điểm
-                              {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
+                              Lưu ý: Thời gian bắt đầu phải sau {(() => {
+                                const now = new Date();
+                                const eventCreated = eventInfo?.createdAt ? new Date(eventInfo.createdAt) : null;
+
+                                // Chọn thời gian nào lớn hơn để hiển thị
+                                if (eventCreated && eventCreated > now) {
+                                  return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN')})`;
+                                } else {
+                                  return "thời điểm hiện tại";
+                                }
+                              })()}
                               {addTaskMode === "normal" && addTaskForm.parentId && (() => {
                                 const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
                                 if (parentTask && parentTask.dueDate) {
@@ -1706,7 +1768,7 @@ const closeAddTaskModal = () => {
                                 return "";
                               })()}
                             </div>
-                          ) : null}
+                          )}
                       </div>
                       <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Deadline *</label>
@@ -1721,7 +1783,8 @@ const closeAddTaskModal = () => {
                             const now = new Date();
                             now.setMinutes(now.getMinutes() + 1);
                             let minDateTime = now.toISOString().slice(0, 16);
-                            
+
+                            // So sánh với thời gian tạo sự kiện, chọn thời gian nào lớn hơn
                             if (eventInfo?.createdAt) {
                               const eventCreatedAt = new Date(eventInfo.createdAt);
                               const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
@@ -1729,7 +1792,7 @@ const closeAddTaskModal = () => {
                                 minDateTime = eventCreatedAtStr;
                               }
                             }
-                            
+
                             if (addTaskForm.startDate) {
                               const startDate = new Date(addTaskForm.startDate);
                               startDate.setMinutes(startDate.getMinutes() + 1);
@@ -1738,7 +1801,7 @@ const closeAddTaskModal = () => {
                                 minDateTime = startDateStr;
                               }
                             }
-                            
+
                             return minDateTime;
                           })()}
                           max={(() => {
@@ -1752,19 +1815,27 @@ const closeAddTaskModal = () => {
                             return undefined;
                           })()}
                         />
-                        {eventInfo && (
-                          <div className="form-text small text-muted">
-                            Lưu ý: Deadline phải sau thời điểm {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
-                            {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
-                            {addTaskMode === "normal" && addTaskForm.parentId && (() => {
-                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
-                              if (parentTask && parentTask.dueDate) {
-                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
-                              }
-                              return "";
-                            })()}
-                          </div>
-                        )}
+                        <div className="form-text small text-muted">
+                          Lưu ý: Deadline phải sau {(() => {
+                            const now = new Date();
+                            const eventCreated = eventInfo?.createdAt ? new Date(eventInfo.createdAt) : null;
+
+                            // Chọn thời gian nào lớn hơn để hiển thị
+                            if (eventCreated && eventCreated > now) {
+                              return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN')})`;
+                            } else {
+                              return "thời điểm hiện tại";
+                            }
+                          })()}
+                          {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
+                          {addTaskMode === "normal" && addTaskForm.parentId && (() => {
+                            const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+                            if (parentTask && parentTask.dueDate) {
+                              return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                            }
+                            return "";
+                          })()}
+                        </div>
                       </div>
                     </div>
                     <div className="row">
