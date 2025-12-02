@@ -106,7 +106,7 @@ describe("calendarController.removeParticipant", () => {
       message: "Lịch họp không thuộc sự kiện này",
     })
   );
-});
+  });
 
 
   // -------------------------------------------------------
