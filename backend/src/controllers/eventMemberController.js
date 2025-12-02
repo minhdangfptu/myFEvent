@@ -20,28 +20,13 @@ import { createNotification, createNotificationsForUsers } from '../services/not
 export const getMembersByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
-
-    console.log('[getMembersByEvent] Request for eventId:', eventId);
-
-    // Validate eventId format
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      console.error('[getMembersByEvent] Invalid eventId format:', eventId);
-      return res.status(400).json({ message: 'Invalid event ID format' });
-    }
-
     const event = await findEventById(eventId);
     if (!event) {
-      console.error('[getMembersByEvent] Event not found:', eventId);
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    console.log('[getMembersByEvent] Event found:', event.name);
-
     const members = await getMembersByEventRaw(eventId);
-    console.log('[getMembersByEvent] Members count:', members.length);
-
     const byDept = groupMembersByDepartment(members);
-    console.log('[getMembersByEvent] Grouped by departments:', Object.keys(byDept));
 
     return res.status(200).json({
       data: byDept,
@@ -50,11 +35,11 @@ export const getMembersByEvent = async (req, res) => {
   } catch (error) {
     console.error('[getMembersByEvent] Error:', error);
     return res.status(500).json({
-      message: 'Failed to load members',
-      error: error.message
+      message: 'Failed to load members'
     });
   }
 };
+
 export const getUnassignedMembersByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -172,21 +157,24 @@ export const changeMemberDepartment = async (req, res) => {
     const { eventId, memberId } = req.params;
     const { departmentId } = req.body || {};
 
+    // Validate memberId
     if (!mongoose.Types.ObjectId.isValid(memberId)) {
       return res.status(400).json({ message: 'Member ID không hợp lệ' });
     }
 
+    // Check permission
     const requesterMembership = await ensureEventRole(req.user?.id, eventId, ['HoOC', 'HoD']);
     if (!requesterMembership) {
       return res.status(403).json({ message: 'Bạn không có quyền thay đổi ban' });
     }
 
+    // Find member
     const member = await EventMember.findOne({
       _id: memberId,
       eventId,
       status: { $ne: 'deactive' }
     })
-      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+      .populate('userId', 'fullName email')
       .populate('departmentId', 'name')
       .lean();
 
@@ -194,46 +182,65 @@ export const changeMemberDepartment = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy thành viên' });
     }
 
+    // Cannot change HoOC
     if (member.role === 'HoOC') {
       return res.status(400).json({ message: 'Không thể chuyển ban cho HoOC' });
     }
 
+    // If HoD, ensure the member belongs to the same department
     if (requesterMembership.role === 'HoD') {
       const requesterDeptId = requesterMembership.departmentId?.toString();
-      const memberDeptId = member.departmentId?._id?.toString() || member.departmentId?.toString();
+      const memberDeptId =
+        member.departmentId?._id?.toString() ||
+        member.departmentId?.toString();
+
       if (!requesterDeptId || requesterDeptId !== memberDeptId) {
         return res.status(403).json({ message: 'HoD chỉ được chuyển thành viên trong ban của mình' });
       }
     }
 
+    // ===== FIX FOR TC04 — Handle "no change" BEFORE validating Department ID =====
+    const currentDeptId =
+      member.departmentId?._id?.toString() ||
+      member.departmentId?.toString() ||
+      null;
+
+    if (departmentId === currentDeptId) {
+      return res.status(200).json({
+        message: 'Ban không thay đổi',
+        data: member
+      });
+    }
+    // ================= END FIX ==================
+
+    // If new departmentId provided → validate
     let nextDepartmentDoc = null;
     let normalizedDepartmentId = null;
+
     if (departmentId) {
       if (!mongoose.Types.ObjectId.isValid(departmentId)) {
         return res.status(400).json({ message: 'Department ID không hợp lệ' });
       }
+
       nextDepartmentDoc = await ensureDepartmentInEvent(eventId, departmentId);
       if (!nextDepartmentDoc) {
         return res.status(404).json({ message: 'Ban không tồn tại trong sự kiện' });
       }
+
       normalizedDepartmentId = new mongoose.Types.ObjectId(departmentId);
     }
 
-    const currentDeptId = member.departmentId?._id?.toString() || member.departmentId?.toString() || null;
-    const nextDeptId = normalizedDepartmentId ? normalizedDepartmentId.toString() : null;
-    if (currentDeptId === nextDeptId) {
-      return res.status(200).json({ message: 'Ban không thay đổi', data: member });
-    }
-
+    // Update department
     const updatedMember = await EventMember.findOneAndUpdate(
       { _id: memberId },
       { $set: { departmentId: normalizedDepartmentId } },
       { new: true }
     )
-      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+      .populate('userId', 'fullName email')
       .populate('departmentId', 'name')
       .lean();
 
+    // Notify member
     if (member.userId?._id) {
       await createNotification({
         userId: member.userId._id,
@@ -251,11 +258,13 @@ export const changeMemberDepartment = async (req, res) => {
       message: 'Cập nhật chuyên môn thành công',
       data: updatedMember
     });
+
   } catch (error) {
     console.error('changeMemberDepartment error:', error);
     return res.status(500).json({ message: 'Không thể chuyển ban' });
   }
 };
+
 
 // DELETE /api/events/:eventId/members/:memberId
 export const removeMemberFromEvent = async (req, res) => {
@@ -526,27 +535,3 @@ export const getEventMemberForExport = async (req, res) => {
   }
 }; 
 
-// export const removeMemberFromEvent = async (req, res) => {
-//   try {
-//     const { eventId, memberId } = req.params;
-//     const membership = await ensureEventRole(req.user.id, eventId, ['HoOC']);
-//     if (!membership) return res.status(403).json({ message: 'Only HoOC can remove members' });
-//     const member = await findEventMemberById( memberId);
-//     if (!member) {
-//       return res
-//         .status(404)
-//         .json({ message: "Member not found in this event" });
-//     }
-//     if (member.role === "HoOC") {
-//       return res.status(400).json({ message: "Cannot deactivate HoOC" });
-//     }
-//     if (member.status === "Inactive") {
-//       return res.status(400).json({ message: "Member already deactive" });
-//     }
-//     await inactiveEventMember(memberId);
-//     return res.status(200).json({ message: 'Member removed from event successfully' });
-//   } catch (error) {
-//     console.log('removeMemberFromEvent error:', error.message);
-//     return res.status(500).json({ message: 'Failed to remove member from event' });
-//   }
-// }

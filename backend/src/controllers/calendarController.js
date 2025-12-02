@@ -51,7 +51,7 @@ const toIdString = (value) => {
     return null;
 };
 
-const resolveCalendarEventId = async (calendar) => {
+export const resolveCalendarEventId = async (calendar) => {
     if (!calendar) return { eventId: null, department: null };
     if (calendar.eventId) {
         return { eventId: calendar.eventId.toString(), department: null };
@@ -315,13 +315,14 @@ export const createCalendarForDepartment = async (req, res) => {
         if (!department) {
             return res.status(404).json({ message: 'Department not found' });
         }
-		const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
+        const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
         const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId.toString() === departmentId;
         if (!isHoDOfDepartment) {
             return res.status(403).json({ message: 'Only HoD of this department can create calendar for this department!' });
         }
         const ownerMemberid = requesterMembership?._id;
-		let { name, startAt, endAt, locationType, location, meetingDate, startTime, endTime, participantType, members, notes, attachments } = req.body;
+        let { name, startAt, endAt, locationType, location, meetingDate, startTime, endTime, participantType, members, notes, attachments } = req.body;
+
         if (!startAt && meetingDate && startTime) {
             startAt = new Date(`${meetingDate}T${startTime}`).toISOString();
         }
@@ -341,104 +342,112 @@ export const createCalendarForDepartment = async (req, res) => {
                 message: 'locationType must be either "online" or "offline"'
             });
         }
-		const startDate = new Date(startAt);
-		const endDate = new Date(endAt);
-		if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-			return res.status(400).json({ message: 'Invalid date format' });
-		}
-		if (startDate >= endDate) {
-			return res.status(400).json({ message: 'endAt must be after startAt' });
-		}
 
-		let participants = [];
-		if (participantType === 'all') {
-			const allMembers = await EventMember.find({
-				departmentId,
-				status: { $ne: 'deactive' }
-			}).select('_id').lean();
-			participants = allMembers.map(member => ({
-				member: member._id,
-				participateStatus: (member._id?.toString() === ownerMemberid?.toString()) ? 'confirmed' : 'unconfirmed'
-			}));
-			const ownerIncluded = participants.some(p => p.member?.toString() === ownerMemberid?.toString());
-			if (!ownerIncluded && ownerMemberid) {
-				participants.unshift({
-					member: ownerMemberid,
-					participateStatus: 'confirmed'
-				});
-			}
-		} else {
-			// Manual selection path: accept `members` or `participants` from body
-			let selectedMemberIds = members;
-			if ((selectedMemberIds === undefined || selectedMemberIds === null) && Array.isArray(req.body.participants)) {
-				// If participants array is provided as full objects, keep as-is below
-				selectedMemberIds = null;
-			}
+        const startDate = new Date(startAt);
+        const endDate = new Date(endAt);
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            return res.status(400).json({ message: 'Invalid date format' });
+        }
+        if (startDate >= endDate) {
+            return res.status(400).json({ message: 'endAt must be after startAt' });
+        }
 
-			if (selectedMemberIds !== null) {
-				if (Array.isArray(selectedMemberIds)) {
-					// ok
-				} else if (typeof selectedMemberIds === 'string') {
-					const trimmed = selectedMemberIds.trim();
-					if (!trimmed || trimmed === 'null' || trimmed === 'undefined') {
-						return res.status(400).json({ message: 'members cannot be empty' });
-					}
-					try {
-						selectedMemberIds = JSON.parse(trimmed);
-					} catch (e) {
-						return res.status(400).json({ message: 'Invalid members JSON format: ' + e.message });
-					}
-				} else if (selectedMemberIds !== undefined) {
-					return res.status(400).json({
-						message: 'members must be an array or a JSON string',
-						receivedType: typeof selectedMemberIds
-					});
-				}
+        let participants = [];
+        if (participantType) {
+            if (participantType === 'all') {
+                const allMembers = await EventMember.find({
+                    departmentId,
+                    status: { $ne: 'deactive' }
+                }).select('_id').lean();
+                participants = allMembers.map(member => ({
+                    member: member._id,
+                    participateStatus: member._id?.toString() === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
+                }));
+                if (ownerMemberid && !participants.some(p => p.member?.toString() === ownerMemberid.toString())) {
+                    participants.unshift({
+                        member: ownerMemberid,
+                        participateStatus: 'confirmed'
+                    });
+                }
+            } else {
+                // Manual selection: accept `members` from body
+                if (members === undefined || members === null) {
+                    return res.status(400).json({
+                        message: 'members is required when participantType is not "all"',
+                        received: { members, participantType }
+                    });
+                }
 
-				if (selectedMemberIds !== null) {
-					if (!Array.isArray(selectedMemberIds)) {
-						return res.status(400).json({ message: 'members must parse to an array' });
-					}
-					if (selectedMemberIds.length === 0) {
-						return res.status(400).json({ message: 'members must be a non-empty array' });
-					}
-					const seen = new Set(selectedMemberIds.map(id => id?.toString()));
-					participants = selectedMemberIds.map(memberId => ({
-						member: memberId,
-						participateStatus: (memberId?.toString() === ownerMemberid?.toString()) ? 'confirmed' : 'unconfirmed'
-					}));
-					if (ownerMemberid && !seen.has(ownerMemberid.toString())) {
-						participants.unshift({
-							member: ownerMemberid,
-							participateStatus: 'confirmed'
-						});
-					}
-				}
-			}
+                let memberIds;
+                if (Array.isArray(members)) {
+                    memberIds = members;
+                } else if (typeof members === 'string') {
+                    const trimmed = members.trim();
+                    if (!trimmed || trimmed === 'null' || trimmed === 'undefined') {
+                        return res.status(400).json({
+                            message: 'members cannot be empty',
+                            received: trimmed
+                        });
+                    }
+                    try {
+                        memberIds = JSON.parse(trimmed);
+                    } catch (e) {
+                        console.error('JSON parse error for members:', e.message, 'value:', trimmed);
+                        return res.status(400).json({
+                            message: 'Invalid members JSON format: ' + e.message,
+                            received: trimmed.substring(0, 100)
+                        });
+                    }
+                } else {
+                    return res.status(400).json({
+                        message: 'members must be an array or a JSON string',
+                        receivedType: typeof members,
+                        received: members
+                    });
+                }
 
-			// If participants provided directly in body, trust it
-			if (participants.length === 0 && Array.isArray(req.body.participants) && req.body.participants.length > 0) {
-				participants = req.body.participants;
-			}
+                if (!Array.isArray(memberIds)) {
+                    return res.status(400).json({
+                        message: 'members must parse to an array',
+                        parsedType: typeof memberIds,
+                        parsed: memberIds
+                    });
+                }
 
-			if (participants.length === 0) {
-				return res.status(400).json({ message: 'At least one participant is required' });
-			}
-		}
+                if (memberIds.length === 0) {
+                    return res.status(400).json({ message: 'members must be a non-empty array' });
+                }
+                const seen = new Set(memberIds.map(id => id.toString()));
+                participants = memberIds.map(memberId => ({
+                    member: memberId,
+                    participateStatus: (memberId?.toString() === ownerMemberid.toString()) ? 'confirmed' : 'unconfirmed'
+                }));
+                if (!seen.has(ownerMemberid.toString())) {
+                    participants.unshift({
+                        member: ownerMemberid,
+                        participateStatus: 'confirmed'
+                    });
+                }
+            }
+        }
 
-		const calendarData = {
-			name: name || (notes ? String(notes).substring(0, 100) : `Cuộc họp ${new Date(startAt).toLocaleDateString('vi-VN')}`),
-			startAt: startDate,
-			endAt: endDate,
-			locationType,
-			location,
-			departmentId,
-			type: 'department',
-			notes: notes || '',
-			participants: participants.length > 0 ? participants : [],
-			attachments: attachments || [],
-			createdBy: ownerMemberid
-		};
+        if (Array.isArray(req.body.participants) && req.body.participants.length > 0) {
+            participants = req.body.participants;
+        }
+
+        const calendarData = {
+            name: name || (notes ? String(notes).substring(0, 100) : `Cuộc họp ${new Date(startAt).toLocaleDateString('vi-VN')}`),
+            startAt: startDate,
+            endAt: endDate,
+            locationType,
+            location,
+            departmentId,
+            type: 'department',
+            notes: notes || '',
+            participants: participants.length > 0 ? participants : [],
+            attachments: attachments || [],
+            createdBy: ownerMemberid
+        };
 
         const calendar = await createCalendar(calendarData);
         const participantMemberIds = calendar.participants?.map(p => p.member).filter(Boolean) || [];
@@ -458,9 +467,18 @@ export const createCalendarForDepartment = async (req, res) => {
         return res.status(201).json({ data: calendar });
     } catch (error) {
         console.error('createCalendarForDepartment error:', error.message);
-        return res.status(500).json({ message: 'Failed to create calendar' });
+
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message).join(', ');
+            return res.status(400).json({ message: 'Validation error: ' + messages });
+        }
+
+        // Handle other errors
+        const errorMessage = error?.message || 'Unknown error occurred';
+        return res.status(500).json({ message: 'Failed to create calendar: ' + errorMessage });
     }
-}
+};
 export const updateCalendarForEvent = async (req, res) => {
     try {
         const { calendarId } = req.params;

@@ -73,6 +73,7 @@ import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
 import CreateDepartmentCalendarPage from "./pages/Calendar/CreateDepartmentCalendarPage";
 import CalendarDetail from "./pages/Calendar/CalendarDetail";
 import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
+import UpdateDepartmentCalendarPage from "./pages/Calendar/UpdateDepartmentCalendarPage";
 
 // Feedback Pages
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
@@ -598,6 +599,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <UpdateEventCalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/departments/:departmentId/calendars/:calendarId/edit-department-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UpdateDepartmentCalendarPage />
               </ProtectedRoute>
             }
           />

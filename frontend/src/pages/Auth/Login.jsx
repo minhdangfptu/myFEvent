@@ -32,9 +32,16 @@ export default function LoginPage() {
 
     if (!authLoading && isAuthenticated) {
       const from = location.state?.from?.pathname || "/home-page";
+      console.log('Login useEffect: Redirect check', {
+        userRole: user?.role,
+        isAdmin: user?.role === "admin",
+        from: from
+      });
       if (user?.role === "admin") {
+        console.log('Redirecting admin to /admin/dashboard');
         navigate("/admin/dashboard", { replace: true });
       } else {
+        console.log('Redirecting user to', from);
         navigate(from, { replace: true });
       }
     }
@@ -47,9 +54,15 @@ export default function LoginPage() {
     setIsLoggingIn(true);
     try {
       const { user: loggedInUser } = await login(email, password);
+      console.log('Login handleSubmit: User logged in', {
+        userRole: loggedInUser?.role,
+        isAdmin: loggedInUser?.role === "admin"
+      });
       if (loggedInUser?.role === "admin") {
+        console.log('Redirecting admin to /admin/dashboard');
         navigate("/admin/dashboard", { replace: true });
       } else {
+        console.log('Redirecting user to /home-page');
         navigate("/home-page", { replace: true, state: { loginSuccess: true } });
       }
     } catch (error) {
@@ -118,12 +131,17 @@ export default function LoginPage() {
       }
 
       // Navigate based on user role
-      // if (userData?.role === 'HoOC') {
-      //   navigate('/hooc-landing-page', { replace: true });
-      // } else {
-      //   navigate('/user-landing-page', { replace: true });
-      // }
-      navigate("/home-page", { replace: true, state: { loginSuccess: true } });
+      console.log('Google login handleGoogleSuccess: User logged in', {
+        userRole: userData?.role,
+        isAdmin: userData?.role === "admin"
+      });
+      if (userData?.role === "admin") {
+        console.log('Redirecting admin to /admin/dashboard');
+        navigate("/admin/dashboard", { replace: true, state: { loginSuccess: true } });
+      } else {
+        console.log('Redirecting user to /home-page');
+        navigate("/home-page", { replace: true, state: { loginSuccess: true } });
+      }
     } catch (err) {
       console.error("Google login error:", err);
       const errorCode = err?.response?.data?.code;

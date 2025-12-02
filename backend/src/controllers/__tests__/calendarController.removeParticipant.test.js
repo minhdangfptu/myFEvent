@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
 import * as calendarService from "../../services/calendarService.js";
 import * as eventMemberService from "../../services/eventMemberService.js";
-import { resolveCalendarEventId } from "../../services/calendarEventResolver.js";
-import * as calendarController from "../calendarController.js";
+import * as notificationService from "../../services/notificationService.js";
+import * as controller from "../calendarController.js";
 
 vi.mock("../../services/calendarService.js");
 vi.mock("../../services/eventMemberService.js");
-vi.mock("../../services/calendarEventResolver.js");
+vi.mock("../../services/notificationService.js");
 
 const mockRes = () => {
   const res = {};
@@ -22,108 +23,167 @@ describe("calendarController.removeParticipant", () => {
     vi.clearAllMocks();
 
     req = {
-      user: { _id: "user1" },
-      params: {
-        calendarId: "cal1",
-        memberId: "mem2",
-      },
+      user: { id: "u1" },
+      params: { eventId: "event1", calendarId: "cal1", memberId: "mem2" },
     };
 
     res = mockRes();
 
-    // Default good mocks
-    calendarService.getCalendarById.mockResolvedValue({
-      _id: "cal1",
-      name: "Meeting",
-      createdBy: "mem1",
-      participants: [
-        { member: "mem1" },
-        { member: "mem2" },
-      ],
-    });
-
-    calendarService.removeParticipantFromCalendar.mockResolvedValue(true);
-
-    resolveCalendarEventId.mockResolvedValue({ eventId: "event1" });
+    // FIX QUAN TRỌNG:
+    const spy = vi.spyOn(controller, "resolveCalendarEventId");
+    spy.mockResolvedValueOnce({ eventId: "event1" });   // dùng cho TC01
+    spy.mockResolvedValue({ eventId: "event1" });       // fallback mặc định cho TC02–TC07
 
     eventMemberService.getRequesterMembership.mockResolvedValue({ _id: "mem1" });
-    eventMemberService.getEventMemberById.mockResolvedValue({ userId: "user2" });
+    eventMemberService.getEventMemberById.mockResolvedValue({
+      _id: "mem2",
+      userId: "u2",
+    });
+    calendarService.removeParticipantFromCalendar.mockResolvedValue(true);
   });
 
-  // ---------- TC01 ----------
-  it("[Normal] TC01 - should remove participant successfully", async () => {
-    await calendarController.removeParticipant(req, res);
+
+  // -------------------------------------------------------
+  it("[TC01] remove successfully", async () => {
+    // Lần 1: lấy calendar ban đầu
+    calendarService.getCalendarById
+      .mockResolvedValueOnce({
+        _id: "cal1",
+        eventId: "event1",
+        createdBy: "mem1",
+        name: "Meeting",
+        participants: [{ member: "mem1" }, { member: "mem2" }],
+      })
+      // Lần 2: lấy calendar sau khi đã remove
+      .mockResolvedValueOnce({
+        _id: "cal1",
+        eventId: "event1",
+        createdBy: "mem1",
+        name: "Meeting",
+        participants: [{ member: "mem1" }],
+      });
+
+    await controller.removeParticipant(req, res);
 
     expect(calendarService.removeParticipantFromCalendar)
       .toHaveBeenCalledWith("cal1", "mem2");
 
+    expect(notificationService.notifyRemovedFromCalendar)
+      .toHaveBeenCalled();
+
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: "Participant removed successfully",
-      })
+      expect.objectContaining({ message: "Đã xóa người tham gia" })
     );
   });
 
-  // ---------- TC02 calendar not found ----------
-  it("[Abnormal] TC02 - calendar not found", async () => {
-    calendarService.getCalendarById.mockResolvedValue(null);
+  // -------------------------------------------------------
+  it("[TC02] calendar not found", async () => {
+    calendarService.getCalendarById.mockResolvedValueOnce(null);
 
-    await calendarController.removeParticipant(req, res);
+    await controller.removeParticipant(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Không tìm thấy lịch họp" })
+    );
   });
 
-  // ---------- TC03 wrong event ----------
-  it("[Abnormal] TC03 - calendar not belong to this event", async () => {
-    calendarService.getCalendarById.mockResolvedValue({
-      createdBy: "mem1",
-      participants: [],
+  // -------------------------------------------------------
+  it("[TC03] calendar not belong to event", async () => {
+  calendarService.getCalendarById.mockResolvedValueOnce({
+    _id: "cal1",
+    eventId: "wrong",   
+    createdBy: "mem1",
+    participants: [{ member: "mem1" }],
+  });
+
+  await controller.removeParticipant(req, res);
+
+  expect(res.status).toHaveBeenCalledWith(400);
+  expect(res.json).toHaveBeenCalledWith(
+    expect.objectContaining({
+      message: "Lịch họp không thuộc sự kiện này",
+    })
+  );
+  });
+
+
+  // -------------------------------------------------------
+  it("[TC04] requester not creator", async () => {
+    // Quyền sai
+    eventMemberService.getRequesterMembership.mockResolvedValueOnce({
+      _id: "memX",
     });
 
-    resolveCalendarEventId.mockResolvedValue({ eventId: "wrong-event" });
-
-    await calendarController.removeParticipant(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400); // đúng với logic controller
-  });
-
-  // ---------- TC04 requester not creator ----------
-  it("[Abnormal] TC04 - requester not creator", async () => {
-    eventMemberService.getRequesterMembership.mockResolvedValue({ _id: "memX" });
-
-    await calendarController.removeParticipant(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400); // controller thực tế trả 400
-  });
-
-  // ---------- TC05 cannot remove creator ----------
-  it("[Abnormal] TC05 - cannot remove creator", async () => {
-    req.params.memberId = "mem1"; // cố gắng xóa creator
-
-    await calendarController.removeParticipant(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  // ---------- TC06 participant not found ----------
-  it("[Abnormal] TC06 - participant not found", async () => {
-    calendarService.getCalendarById.mockResolvedValue({
+    calendarService.getCalendarById.mockResolvedValueOnce({
+      _id: "cal1",
+      eventId: "event1",
       createdBy: "mem1",
       participants: [{ member: "mem1" }],
     });
 
-    await calendarController.removeParticipant(req, res);
+    await controller.removeParticipant(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400); // controller trả 400
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Bạn không có quyền xóa người tham gia",
+      })
+    );
   });
 
-  // ---------- TC07 service error ----------
-  it("[Abnormal] TC07 - service throws error", async () => {
-    calendarService.getCalendarById.mockRejectedValue(new Error("DB ERROR"));
+  // -------------------------------------------------------
+  it("[TC05] cannot remove creator", async () => {
+    req.params.memberId = "mem1";
 
-    await calendarController.removeParticipant(req, res);
+    calendarService.getCalendarById.mockResolvedValueOnce({
+      _id: "cal1",
+      eventId: "event1",
+      createdBy: "mem1",
+      participants: [{ member: "mem1" }],
+    });
+
+    await controller.removeParticipant(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Không thể xóa người tạo cuộc họp",
+      })
+    );
+  });
+
+  // -------------------------------------------------------
+  it("[TC06] participant not found", async () => {
+    calendarService.getCalendarById.mockResolvedValueOnce({
+      _id: "cal1",
+      eventId: "event1",
+      createdBy: "mem1",
+      participants: [{ member: "mem1" }],
+    });
+
+    await controller.removeParticipant(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Không tìm thấy người tham gia trong lịch họp",
+      })
+    );
+  });
+
+  // -------------------------------------------------------
+  it("[TC07] service throws error", async () => {
+    calendarService.getCalendarById.mockRejectedValueOnce(new Error("ERR"));
+
+    await controller.removeParticipant(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Lỗi server khi xóa người tham gia",
+      })
+    );
   });
 });

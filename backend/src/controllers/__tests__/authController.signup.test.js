@@ -1,67 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as authController from '../authController.js';
-import User from '../../models/user.js';
-import { sendMail } from '../../mailer.js';
-import bcrypt from 'bcrypt';
-import { config } from '../../config/environment.js';
 
-// 🧩 Mock dependencies (đúng chuẩn ESM)
+/* -------------------- Mocks -------------------- */
+
+// User model
 vi.mock('../../models/user.js', () => ({
   __esModule: true,
   default: {
     findOne: vi.fn(),
-    findById: vi.fn(),
     create: vi.fn(),
-    save: vi.fn(),
+    findById: vi.fn(),
   },
 }));
 
-vi.mock('../../models/authToken.js', () => ({
-  __esModule: true,
-  default: {
-    findOne: vi.fn(),
-    save: vi.fn(),
-    deleteOne: vi.fn(),
-    updateMany: vi.fn(),
-  },
-}));
-
+// sendMail
 vi.mock('../../mailer.js', () => ({
   __esModule: true,
   sendMail: vi.fn(),
 }));
 
+// bcrypt
 vi.mock('bcrypt', () => ({
   __esModule: true,
   default: {
     genSalt: vi.fn(),
     hash: vi.fn(),
-    compare: vi.fn(),
   },
 }));
 
-vi.mock('jsonwebtoken', () => ({
-  __esModule: true,
-  default: {
-    sign: vi.fn(),
-    verify: vi.fn(),
-    decode: vi.fn(),
-  },
-}));
-
-vi.mock('google-auth-library', () => ({
-  __esModule: true,
-  OAuth2Client: vi.fn().mockImplementation(() => ({
-    verifyIdToken: vi.fn(),
-  })),
-}));
-
-vi.mock('googleapis', () => ({
-  __esModule: true,
-  google: { auth: { OAuth2: vi.fn() } },
-}));
-
-// 🧰 Helper mock res
+/* -------------------- Helper Response -------------------- */
 const mockRes = () => {
   const res = {};
   res.status = vi.fn().mockReturnValue(res);
@@ -69,83 +36,120 @@ const mockRes = () => {
   return res;
 };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+beforeEach(() => vi.clearAllMocks());
+
+/* -------------------- TESTS -------------------- */
 
 describe('authController.signup', () => {
-  // [Normal] TC01
-  it('[Normal] TC01 - should create pending user and send verification email', async () => {
-    const req = {
-      body: { email: 'test@example.com', password: '123456', fullName: 'Tester' },
-    };
-    const res = mockRes();
+
+  it('[Normal] TC01 - should save pending registration & send verification email', async () => {
+    const User = (await import('../../models/user.js')).default;
+    const bcryptMock = (await import('bcrypt')).default;
+    const mailer = await import('../../mailer.js');
 
     User.findOne.mockResolvedValue(null);
-    bcrypt.genSalt.mockResolvedValue('salt');
-    bcrypt.hash.mockResolvedValue('hashedpw');
-    sendMail.mockResolvedValue(true);
+    bcryptMock.genSalt.mockResolvedValue('salt');
+    bcryptMock.hash.mockResolvedValue('hashed-pass');
+    mailer.sendMail.mockResolvedValue({});
+
+    const req = {
+      body: {
+        email: 'test@example.com',
+        password: '123456',
+        fullName: 'Tester',
+      },
+      get: vi.fn(),
+    };
+    const res = mockRes();
 
     await authController.signup(req, res);
 
     expect(User.findOne).toHaveBeenCalledWith({ email: 'test@example.com' });
-    expect(sendMail).toHaveBeenCalled();
+    expect(bcryptMock.genSalt).toHaveBeenCalled();
+    expect(bcryptMock.hash).toHaveBeenCalledWith('123456', 'salt');
+    expect(mailer.sendMail).toHaveBeenCalledTimes(1);
+
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining('verify your email'),
+        message: 'User created successfully! Please verify your email to activate your account.',
         email: 'test@example.com',
       })
     );
   });
 
-  // [Abnormal] TC02
-  it('[Abnormal] TC02 - should return 400 if missing required fields', async () => {
-    const req = { body: { email: '', password: '', fullName: '' } };
+  it('[Abnormal] TC02 - should return 400 if email already exists', async () => {
+    const User = (await import('../../models/user.js')).default;
     const res = mockRes();
 
+    User.findOne.mockResolvedValue({ email: 'test@example.com' });
+
+    await authController.signup(
+      { body: { email: 'test@example.com', password: '123', fullName: 'T' } },
+      res
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Email đã được đăng kí. Vui lòng sử dụng Email khác',
+    });
+  });
+
+  it('[Abnormal] TC03 - should return 400 if missing required fields', async () => {
+    const User = (await import('../../models/user.js')).default;
     User.findOne.mockResolvedValue(null);
 
-    await authController.signup(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Missing required fields!' })
-    );
-  });
-
-  // [Abnormal] TC03
-  it('[Abnormal] TC03 - should return 400 if email already exists', async () => {
-    const req = {
-      body: { email: 'dup@example.com', password: '123', fullName: 'DupUser' },
-    };
     const res = mockRes();
 
-    User.findOne.mockResolvedValue({ _id: 'u1' });
-
-    await authController.signup(req, res);
-
-    expect(User.findOne).toHaveBeenCalledWith({ email: 'dup@example.com' });
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Email already exists!' })
+    await authController.signup(
+      { body: { email: 'a@example.com', password: '', fullName: '' } },
+      res
     );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Vui lòng điền đầy đủ các trường',
+    });
   });
 
-  // [Abnormal] TC04
-  it('[Abnormal] TC04 - should return 500 on unexpected error', async () => {
+  it('[Abnormal] TC04 - should return 500 if sending email fails', async () => {
+    const User = (await import('../../models/user.js')).default;
+    const bcryptMock = (await import('bcrypt')).default;
+    const mailer = await import('../../mailer.js');
+
+    User.findOne.mockResolvedValue(null);
+    bcryptMock.genSalt.mockResolvedValue('salt');
+    bcryptMock.hash.mockResolvedValue('hashed-pass');
+    mailer.sendMail.mockRejectedValue(new Error('email fail'));
+
     const req = {
-      body: { email: 'error@example.com', password: '123', fullName: 'Error' },
+      body: { email: 'a@example.com', password: '123', fullName: 'A' },
+      get: vi.fn(),
     };
     const res = mockRes();
-
-    User.findOne.mockRejectedValue(new Error('DB crash'));
 
     await authController.signup(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Failed to signup!' })
-    );
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Failed to send verification email. Please check email configuration.',
+    });
   });
+
+  it('[Abnormal] TC05 - should return 500 for unexpected errors', async () => {
+    const User = (await import('../../models/user.js')).default;
+
+    User.findOne.mockRejectedValue(new Error('random error'));
+
+    const req = { body: { email: 'x@x.com', password: '1', fullName: 'X' } };
+    const res = mockRes();
+
+    await authController.signup(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Failed to signup!',
+    });
+  });
+
 });

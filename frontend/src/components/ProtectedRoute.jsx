@@ -48,9 +48,34 @@ export default function ProtectedRoute({ children, requiredRole = null, required
   }
 
   // Check user role if required
-  if (requiredRole && user?.role !== requiredRole) {
-    // Redirect to unauthorized page or home
-    return <Navigate to="/unauthorized" replace />;
+  // Admin can access all routes, including user-only routes
+  if (requiredRole) {
+    const isAdmin = user?.role === 'admin';
+    const hasRequiredRole = user?.role === requiredRole;
+    
+    // Debug logging for admin routes
+    if (requiredRole === 'admin') {
+      console.log('ProtectedRoute: Admin route check', {
+        requiredRole,
+        userRole: user?.role,
+        isAdmin,
+        hasRequiredRole,
+        user: user
+      });
+    }
+    
+    // If user is admin, allow access to all routes
+    // Otherwise, check if user has the exact required role
+    if (!isAdmin && !hasRequiredRole) {
+      // Debug logging
+      console.log('ProtectedRoute: Role check failed', {
+        requiredRole,
+        userRole: user?.role,
+        user: user
+      });
+      // Redirect to unauthorized page or home
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   // Check event role if required

@@ -32,6 +32,23 @@ const adminApi = {
     unbanEvent: async (eventId) => {
         const response = await axiosClient.put(`/api/admin/events/${eventId}/unban`);
         return response.data;
+    },
+    // Dashboard APIs
+    getDashboardStats: async () => {
+        const response = await axiosClient.get('/api/admin/dashboard/stats');
+        return response.data;
+    },
+    getRecentBannedEvents: async (limit = 10) => {
+        const response = await axiosClient.get(`/api/admin/dashboard/recent-banned-events?limit=${limit}`);
+        return response.data;
+    },
+    getWeeklyActivity: async () => {
+        const response = await axiosClient.get('/api/admin/dashboard/weekly-activity');
+        return response.data;
+    },
+    getRecentEvents: async (type = 'new', limit = 10) => {
+        const response = await axiosClient.get(`/api/admin/dashboard/recent-events?type=${type}&limit=${limit}`);
+        return response.data;
     }
 };
 
