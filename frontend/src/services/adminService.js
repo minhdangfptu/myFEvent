@@ -25,7 +25,19 @@ const adminService = {
     unbanEvent: async (eventId) => {
         return await adminApi.unbanEvent(eventId);
     },
-
+    // Dashboard services
+    getDashboardStats: async () => {
+        return await adminApi.getDashboardStats();
+    },
+    getRecentBannedEvents: async (limit) => {
+        return await adminApi.getRecentBannedEvents(limit);
+    },
+    getWeeklyActivity: async () => {
+        return await adminApi.getWeeklyActivity();
+    },
+    getRecentEvents: async (type, limit) => {
+        return await adminApi.getRecentEvents(type, limit);
+    }
 };
 
 export default adminService;
