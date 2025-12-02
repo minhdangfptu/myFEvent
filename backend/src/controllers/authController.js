@@ -138,17 +138,14 @@ export const login = async (req, res) => {
     const DUMMY_HASH = '$2b$10$A1B2C3D4E5F6G7H8I9J0KlmnopqrstuvwxYZabcdefghi12JK';
 
     if (!user) {
-      await bcrypt.compare(password, DUMMY_HASH);
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
 
     if (user.authProvider === 'google') {
-      await bcrypt.compare(password, DUMMY_HASH);
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
 
     if (!user.passwordHash) {
-      await bcrypt.compare(password, DUMMY_HASH);
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
 

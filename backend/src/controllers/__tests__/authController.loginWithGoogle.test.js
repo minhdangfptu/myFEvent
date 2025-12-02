@@ -3,7 +3,7 @@ import * as authController from '../authController.js';
 
 /* -------------------- Mocks -------------------- */
 
-// ✅ Mock User model
+// Mock User model
 vi.mock('../../models/user.js', () => ({
   __esModule: true,
   default: {
@@ -12,7 +12,7 @@ vi.mock('../../models/user.js', () => ({
   },
 }));
 
-// ✅ Mock AuthToken model
+// Mock AuthToken model
 vi.mock('../../models/authToken.js', async (importOriginal) => {
   const actual = await importOriginal();
   const mockSave = vi.fn();
@@ -28,7 +28,7 @@ vi.mock('../../models/authToken.js', async (importOriginal) => {
   };
 });
 
-// ✅ Mock JWT
+// Mock JWT
 vi.mock('jsonwebtoken', () => ({
   __esModule: true,
   default: {
@@ -37,9 +37,8 @@ vi.mock('jsonwebtoken', () => ({
   },
 }));
 
-// ✅ Mock Google Auth client
+// Mock Google Auth client
 const mockVerifyIdToken = vi.fn();
-const mockGetPayload = vi.fn();
 vi.mock('google-auth-library', () => ({
   __esModule: true,
   OAuth2Client: vi.fn().mockImplementation(() => ({
@@ -47,7 +46,7 @@ vi.mock('google-auth-library', () => ({
   })),
 }));
 
-// ✅ Mock Config
+// Mock config
 vi.mock('../../config/environment.js', () => ({
   __esModule: true,
   config: {
@@ -73,10 +72,11 @@ const mockRes = () => {
 beforeEach(() => vi.clearAllMocks());
 
 /* -------------------- Tests -------------------- */
+
 describe('authController.loginWithGoogle', () => {
-  // [Normal] TC01
+  /* ------------------ TC01 ------------------ */
   it('[Normal] TC01 - should login successfully and return tokens', async () => {
-    const UserMock = (await import('../../models/user.js')).default;
+    const User = (await import('../../models/user.js')).default;
     const { default: MockAuthToken, _mockSave } = await import('../../models/authToken.js');
     const jwtMock = (await import('jsonwebtoken')).default;
 
@@ -108,10 +108,11 @@ describe('authController.loginWithGoogle', () => {
       fullName: 'Test User',
       role: 'user',
       authProvider: 'google',
+      status: 'active',
       save: vi.fn(),
     };
 
-    UserMock.findOne.mockResolvedValue(user);
+    User.findOne.mockResolvedValue(user);
     jwtMock.sign
       .mockReturnValueOnce('access-token')
       .mockReturnValueOnce('refresh-token');
@@ -120,9 +121,10 @@ describe('authController.loginWithGoogle', () => {
     await authController.loginWithGoogle(req, res);
 
     expect(mockVerifyIdToken).toHaveBeenCalled();
-    expect(UserMock.findOne).toHaveBeenCalled();
+    expect(User.findOne).toHaveBeenCalled();
     expect(MockAuthToken).toHaveBeenCalledTimes(1);
     expect(_mockSave).toHaveBeenCalledTimes(1);
+
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -137,12 +139,14 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC02
+  /* ------------------ TC02 ------------------ */
   it('[Abnormal] TC02 - should return 400 if missing Google credential', async () => {
     const res = mockRes();
-    const req = { body: {}, cookies: {} };
 
-    await authController.loginWithGoogle(req, res);
+    await authController.loginWithGoogle(
+      { body: {}, cookies: {} },
+      res
+    );
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
@@ -150,9 +154,10 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC03
+  /* ------------------ TC03 ------------------ */
   it('[Abnormal] TC03 - should return 400 if CSRF check fails', async () => {
     const res = mockRes();
+
     const req = {
       body: { credential: 'cred', g_csrf_token: 'bad' },
       cookies: { g_csrf_token: 'different' },
@@ -166,16 +171,16 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC04
+  /* ------------------ TC04 ------------------ */
   it('[Abnormal] TC04 - should return 401 if Google token invalid or missing payload', async () => {
     const res = mockRes();
-    const req = {
-      body: { credential: 'cred' },
-      cookies: {},
-    };
+
     mockVerifyIdToken.mockResolvedValue({ getPayload: () => null });
 
-    await authController.loginWithGoogle(req, res);
+    await authController.loginWithGoogle(
+      { body: { credential: 'cred' }, cookies: {} },
+      res
+    );
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
@@ -183,13 +188,10 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC05
+  /* ------------------ TC05 ------------------ */
   it('[Abnormal] TC05 - should return 401 if unverified Google account', async () => {
     const res = mockRes();
-    const req = {
-      body: { credential: 'cred' },
-      cookies: {},
-    };
+
     mockVerifyIdToken.mockResolvedValue({
       getPayload: () => ({
         email_verified: false,
@@ -198,7 +200,10 @@ describe('authController.loginWithGoogle', () => {
       }),
     });
 
-    await authController.loginWithGoogle(req, res);
+    await authController.loginWithGoogle(
+      { body: { credential: 'cred' }, cookies: {} },
+      res
+    );
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
@@ -206,16 +211,16 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC06
+  /* ------------------ TC06 ------------------ */
   it('[Abnormal] TC06 - should return 401 if invalid JWT token error', async () => {
     const res = mockRes();
-    const req = {
-      body: { credential: 'cred' },
-      cookies: {},
-    };
+
     mockVerifyIdToken.mockRejectedValue(new Error('invalid token'));
 
-    await authController.loginWithGoogle(req, res);
+    await authController.loginWithGoogle(
+      { body: { credential: 'cred' }, cookies: {} },
+      res
+    );
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
@@ -223,16 +228,16 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
-  // [Abnormal] TC07
-  it('[Abnormal] TC07 - should return 500 on other unexpected error', async () => {
+  /* ------------------ TC07 ------------------ */
+  it('[Abnormal] TC07 - should return 500 on unexpected error', async () => {
     const res = mockRes();
-    const req = {
-      body: { credential: 'cred' },
-      cookies: {},
-    };
+
     mockVerifyIdToken.mockRejectedValue(new Error('random error'));
 
-    await authController.loginWithGoogle(req, res);
+    await authController.loginWithGoogle(
+      { body: { credential: 'cred' }, cookies: {} },
+      res
+    );
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith(
@@ -240,9 +245,11 @@ describe('authController.loginWithGoogle', () => {
     );
   });
 
+  /* ------------------ TC08 ------------------ */
   it('[Abnormal] TC08 - should block banned accounts from logging in', async () => {
-    const UserMock = (await import('../../models/user.js')).default;
+    const User = (await import('../../models/user.js')).default;
     const jwtMock = (await import('jsonwebtoken')).default;
+
     const req = {
       body: { credential: 'cred' },
       cookies: {},
@@ -250,6 +257,7 @@ describe('authController.loginWithGoogle', () => {
       get: vi.fn().mockReturnValue('Mozilla'),
       ip: '127.0.0.1',
     };
+
     const res = mockRes();
 
     mockVerifyIdToken.mockResolvedValue({
@@ -262,8 +270,10 @@ describe('authController.loginWithGoogle', () => {
       }),
     });
 
-    UserMock.findOne.mockResolvedValue({
+    // IMPORTANT FIX: Must include googleId to match controller query
+    User.findOne.mockResolvedValue({
       _id: 'userBan',
+      googleId: 'google-banned', 
       email: 'banned@example.com',
       fullName: 'Banned User',
       authProvider: 'google',
@@ -278,8 +288,9 @@ describe('authController.loginWithGoogle', () => {
       expect.objectContaining({
         message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ với admin để được hỗ trợ.',
         code: 'ACCOUNT_BANNED',
-      }),
+      })
     );
+
     expect(jwtMock.sign).not.toHaveBeenCalled();
   });
 });

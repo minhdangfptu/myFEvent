@@ -59,7 +59,10 @@ export const unbanUser = async (req, res) => {
 
 export const getUserProfileWithEvents = async (req, res) => {
     try {
-        const userId = req.params.userId || req.user.id;
+        const userId = req.params.userId;
+        if (!userId) {
+            return res.status(400).json({ message: 'userId is required' });
+        }
 
         const result = await userService.getUserProfileWithEvents(userId);
 

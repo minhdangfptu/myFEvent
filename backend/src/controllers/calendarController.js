@@ -51,7 +51,7 @@ const toIdString = (value) => {
     return null;
 };
 
-const resolveCalendarEventId = async (calendar) => {
+export const resolveCalendarEventId = async (calendar) => {
     if (!calendar) return { eventId: null, department: null };
     if (calendar.eventId) {
         return { eventId: calendar.eventId.toString(), department: null };
