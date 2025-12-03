@@ -15,10 +15,7 @@ import KanbanBoardTask from "~/components/KanbanBoardTask";
 import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import { useNotifications } from "~/contexts/NotificationsContext";
-import AIChatAssistant from "~/components/AIChatAssistant";
-import WBSPreviewModal from "~/components/WBSPreviewModal";
 import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
-import { aiApi } from "~/apis/aiApi";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "~/components/Loading";
 import { RotateCw, Trash, AlertTriangle, X, Bot, FileCheck, ClipboardList } from "lucide-react";
@@ -77,10 +74,6 @@ export default function EventTaskPage() {
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
   const [filterAssignee, setFilterAssignee] = useState("Tất cả");
   const [filterType, setFilterType] = useState("all");
-  const [showAIChat, setShowAIChat] = useState(false);
-  const [wbsData, setWbsData] = useState(null);
-  const [showWBSModal, setShowWBSModal] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const navigate = useNavigate();
 
@@ -1193,15 +1186,6 @@ const closeAddTaskModal = () => {
                   </select>
 
 
-                  {eventRole === "HoOC" && (
-                    <button
-                      className="btn btn-success me-2"
-                      onClick={() => setShowAIChat(true)}
-                      style={{ fontSize: 14 }}
-                    >
-                      <Bot size="18px" /> Trợ lý feAI
-                    </button>
-                  )}
                   <button
                     className="add-btn btn btn-primary"
                     onClick={() => openAddTaskModal("epic")}
@@ -1938,37 +1922,6 @@ const closeAddTaskModal = () => {
           </>
         )}
 
-        {/* AI Chat Assistant for HOOC */}
-        {showAIChat && eventRole === "HoOC" && (
-          <AIChatAssistant
-            eventId={eventId}
-            onWBSGenerated={(data) => {
-              setWbsData(data);
-              setSessionId(data.data?.session_id);
-              setShowWBSModal(true);
-              setShowAIChat(false);
-            }}
-            onClose={() => setShowAIChat(false)}
-          />
-        )}
-
-        {/* WBS Preview Modal */}
-        {showWBSModal && wbsData && (
-          <WBSPreviewModal
-            eventId={eventId}
-            wbsData={wbsData}
-            sessionId={sessionId}
-            onClose={() => {
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-            onApplied={() => {
-              fetchTasks();
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-          />
-        )}
 
         {/* Action Bar - Hiển thị khi có task hoặc epic được chọn */}
         {(selectedTaskIds.length > 0 || selectedEpicIds.length > 0) && (

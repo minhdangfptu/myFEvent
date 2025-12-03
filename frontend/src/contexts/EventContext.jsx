@@ -37,7 +37,7 @@ export function EventProvider({ children }) {
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 8,
+    limit: 8, // Luôn hiển thị 8 sự kiện mỗi trang
     total: 0,
     totalPages: 0
   });
@@ -113,7 +113,7 @@ export function EventProvider({ children }) {
     return [];
   }, []);
 
-  const fetchEvents = useCallback(async (page = 1, limit = 8, search = '') => {
+  const fetchEvents = useCallback(async (page = 1, _limit = 8, search = '', status = '') => {
     // Skip if auth is still loading
     if (authLoading) {
       setLoading(true);
@@ -137,12 +137,23 @@ export function EventProvider({ children }) {
     setLoading(true);
     setError("");
     try {
-      const res = await eventService.listMyEvents({ page, limit, search });
+      // Ép backend luôn trả về 8 sự kiện mỗi trang
+      const res = await eventService.listMyEvents({ page, limit: 8, search, status });
       const list = extractEventArray(res);
       setEvents(list);
       // Update pagination if available
       if (res?.pagination) {
-        setPagination(res.pagination);
+        setPagination({
+          ...res.pagination,
+          limit: 8, // Đảm bảo state phân trang phía client cũng cố định 8
+        });
+      } else {
+        // Fallback nếu backend không trả pagination
+        setPagination((prev) => ({
+          ...prev,
+          page,
+          limit: 8,
+        }));
       }
     } catch (err) {
       setEvents([]);
@@ -221,10 +232,11 @@ export function EventProvider({ children }) {
     return eventMembers[eventId] || { role: "", departmentId: null };
   }, [eventMembers]);
 
-  // Function to change page with search
-  const changePage = useCallback((newPage, search = '') => {
-    fetchEvents(newPage, pagination.limit, search);
-  }, [fetchEvents, pagination.limit]);
+  // Function to change page with search & status
+  const changePage = useCallback((newPage, search = '', status = '') => {
+    // Luôn dùng limit = 8 cho mọi lần chuyển trang
+    fetchEvents(newPage, 8, search, status);
+  }, [fetchEvents]);
 
   return (
     <EventContext.Provider value={{

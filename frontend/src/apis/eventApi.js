@@ -57,11 +57,12 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
-  listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
+  listMyEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
     const params = new URLSearchParams();
     if (page) params.append('page', page);
     if (limit) params.append('limit', limit);
     if (search) params.append('search', search);
+    if (status) params.append('status', status);
     const res = await axiosClient.get(`/api/events/me/list?${params.toString()}`);
     return res.data;
   },
