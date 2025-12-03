@@ -6,6 +6,7 @@ export const getPaginatedUsers = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
+        console.log(page, limit);
         const search = req.query.search || '';
         const status = req.query.status || 'all';
         const users = await userService.getPaginatedUsers(page, limit, search,status);
