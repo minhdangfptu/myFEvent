@@ -317,18 +317,36 @@ export default function HoOCEventDetail() {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // Clear any previous error and preview when selecting a new file
+    setError("");
+    setImagePreview("");
+    
+    // Validate file type
     if (!file.type.startsWith("image/")) {
       setError("Vui lòng chọn file hình ảnh hợp lệ");
+      // Clear file input
+      event.target.value = "";
       return;
     }
+    
+    // Validate file size (5MB = 5 * 1024 * 1024 bytes)
     if (file.size > 5 * 1024 * 1024) {
-      setError("Kích thước file không được vượt quá 5MB");
+      setError("Ảnh vượt quá 5MB");
+      // Clear file input
+      event.target.value = "";
       return;
     }
+    
+    // Read file as base64
     const reader = new FileReader();
     reader.onload = (e) => {
       setImagePreview(e.target.result);
-      setError("");
+      setError(""); // Clear error when file is successfully loaded
+    };
+    reader.onerror = () => {
+      setError("Không thể đọc file hình ảnh");
+      event.target.value = "";
     };
     reader.readAsDataURL(file);
   };
@@ -343,6 +361,7 @@ export default function HoOCEventDetail() {
       async () => {
         try {
           setSubmitting(true);
+          setError(""); // Clear any previous error
           await eventApi.updateEventImage(eventId, null);
           await fetchEventDetails();
           toast.success("Xóa ảnh thành công!");
@@ -361,13 +380,31 @@ const handleImageUpload = async () => {
   try {
     setSubmitting(true);
     setError("");
-    await eventApi.updateEventImage(eventId, imagePreview);
+    
+    // Upload image - if this succeeds, the image is saved
+    const response = await eventApi.updateEventImage(eventId, imagePreview);
+    
+    // If we get here without error, upload was successful
+    // Clear preview first
     setImagePreview("");
-    setImageUrl("");
-    await fetchEventDetails();
+    
+    // Refresh event details (this might fail but shouldn't affect the upload success)
+    try {
+      await fetchEventDetails();
+    } catch (fetchError) {
+      // If fetchEventDetails fails, log it but don't show error to user
+      // because the image was already uploaded successfully
+      console.warn("Failed to refresh event details after image upload:", fetchError);
+    }
+    
+    // Show success message
     toast.success("Cập nhật hình ảnh thành công!");
   } catch (error) {
-    toast.error("Cập nhật hình ảnh thất bại");
+    // Only show error if there's actually an error response from the upload
+    const errorMessage = error.response?.data?.message || error.message || "Cập nhật hình ảnh thất bại";
+    setError(errorMessage);
+    toast.error(errorMessage);
+    console.error("Image upload error:", error);
   } finally {
     setSubmitting(false);
   }
@@ -1510,6 +1547,11 @@ const handleImageUpload = async () => {
                       <small style={{ color: "#64748b", fontSize: "0.8125rem", marginTop: "0.5rem", display: "block" }}>
                         JPG, PNG, GIF. Tối đa 5MB
                       </small>
+                      {error && (
+                        <div className="alert alert-danger py-2 mt-2" style={{ fontSize: "0.875rem", marginBottom: 0 }}>
+                          {error}
+                        </div>
+                      )}
                     </div>
 
                     {imagePreview && (
