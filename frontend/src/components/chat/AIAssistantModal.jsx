@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, User } from 'lucide-react';
+import { Send, User, Bot, X } from 'lucide-react';
 import { aiAgentApi } from '../../apis/aiAgentApi.js';
 
 const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là AI Assistant của myFEvent.
@@ -301,7 +301,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
           width: 'min(900px, 60vw)',
           height: '75vh',
           background: '#fff',
-          borderRadius: '16px',
+          borderRadius: '16px 16px 16px 16px',
           boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
           display: 'flex',
           flexDirection: 'column',
@@ -323,11 +323,31 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
             </div>
           </div>
           <button
-            className="btn btn-sm btn-outline-secondary"
             onClick={onClose}
             type="button"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              color: '#6b7280',
+              transition: 'background-color 0.2s, color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#111827';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6b7280';
+            }}
+            aria-label="Đóng"
           >
-            Đóng
+            <X size={20} />
           </button>
         </div>
 
@@ -385,8 +405,8 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                     onClick={() => openSession(sid)}
                     className="btn btn-light w-100 text-start mb-1"
                     style={{
-                      borderColor: active ? '#1c9c6d' : '#e5e7eb',
-                      backgroundColor: active ? '#ecfdf5' : '#ffffff',
+                      borderColor: active ? '#dc2626' : '#e5e7eb',
+                      backgroundColor: active ? '#fef2f2' : '#ffffff',
                       fontSize: 13,
                     }}
                   >
@@ -433,7 +453,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                       width: 32,
                       height: 32,
                       borderRadius: '50%',
-                      background: '#1c9c6d',
+                      background: '#dc2626',
                       color: '#fff',
                       display: 'flex',
                       alignItems: 'center',
@@ -442,13 +462,13 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                       flexShrink: 0,
                     }}
                   >
-                    🤖
+                    <Bot size={18} />
                   </div>
                 )}
                 <div
                   style={{
                     maxWidth: '80%',
-                    backgroundColor: m.role === 'user' ? '#1c9c6d' : '#fff',
+                    backgroundColor: m.role === 'user' ? '#dc2626' : '#fff',
                     color: m.role === 'user' ? '#fff' : '#111827',
                     border: '1px solid #e5e7eb',
                     borderRadius: 12,
@@ -565,9 +585,9 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                   marginTop: 12,
                   padding: 12,
                   borderRadius: 12,
-                  background: '#ecfdf5',
-                  border: '1px solid #bbf7d0',
-                  color: '#065f46',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
                   fontSize: 13,
                 }}
               >
@@ -673,6 +693,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
             display: 'flex',
             gap: 8,
             background: '#fff',
+            borderRadius: `16px`
           }}
         >
           <textarea
@@ -697,11 +718,31 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
             disabled={loading}
           />
           <button
-            className="btn btn-success d-flex align-items-center gap-2"
             onClick={send}
             disabled={loading || !input.trim()}
             type="button"
-            style={{ whiteSpace: 'nowrap' }}
+            style={{
+              whiteSpace: 'nowrap',
+              background: loading || !input.trim() ? '#d1d5db' : '#dc2626',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading && input.trim()) {
+              e.currentTarget.style.backgroundColor = '#b91c1c';
+            }}}
+            onMouseLeave={(e) => {
+              if (!loading && input.trim()) {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+            }}}
           >
             <Send size={16} />
             Gửi

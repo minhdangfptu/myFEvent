@@ -71,7 +71,7 @@ export const eventApi = {
     return res.data;
   },
   debugAuth: async () => {
-    const res = await axiosClient.get('/api/auth/profile');
+    const res = await axiosClient.get('/api/user/profile');
     return res.data;
   },
   getMembersByEvent: async (eventId) => {

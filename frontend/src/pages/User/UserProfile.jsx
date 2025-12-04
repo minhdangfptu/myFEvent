@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
-import { authApi } from '../../apis/authApi';
+import { userApi } from '../../apis/userApi';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Loading from '~/components/Loading';
@@ -23,7 +23,7 @@ export default function UserProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await authApi.getProfile();
+        const res = await userApi.getProfile();
         setProfile(res?.data || res || null);
       } catch (e) {
         setProfile(null);
@@ -161,7 +161,7 @@ export default function UserProfilePage() {
       }
       // Nếu không có avatarFile mới, không gửi avatarUrl để giữ nguyên avatar hiện tại
 
-      const response = await authApi.updateProfile(payload);
+      const response = await userApi.updateProfile(payload);
 
       // Backend trả về data đầy đủ trong response
       const newProfile = response?.data || null;
@@ -213,7 +213,7 @@ export default function UserProfilePage() {
     setPerformingAvatarSave(true);
     try {
       const b64 = await fileToBase64(avatarFile);
-      const response = await authApi.updateProfile({ avatarUrl: b64 });
+      const response = await userApi.updateProfile({ avatarUrl: b64 });
 
       // Backend trả về data đầy đủ trong response
       const newProfile = response?.data || null;
@@ -498,7 +498,7 @@ export default function UserProfilePage() {
                             className="btn btn-sm p-0 border-0 bg-transparent"
                             style={{ fontSize: '18px', lineHeight: 1, color: '#6b7280' }}
                             onClick={async () => {
-                              try { await authApi.removeTag(t); } catch (_) {}
+                              try { await userApi.removeTag(t); } catch (_) {}
                               setForm({ ...form, tags: form.tags.filter(x => x !== t) });
                             }}
                           >

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import AIAssistantButton from './AIAssistantButton';
+import FeAI from './AIAssistantButton';
 import AIAssistantModal from './AIAssistantModal';
 import { getEventIdFromUrl } from '../../utils/getEventIdFromUrl';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,7 +20,7 @@ export default function GlobalAIAssistant() {
 
   return (
     <>
-      <AIAssistantButton onClick={() => setIsOpen(true)} />
+      <FeAI onClick={() => setIsOpen(true)} />
       <AIAssistantModal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}

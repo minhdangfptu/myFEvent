@@ -86,14 +86,14 @@ export const getUnassignedMembersRaw = async (eventId) => {
     role: { $ne: 'HoOC' }, // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
     status: { $ne: 'deactive' }
   })
-    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+    .populate('userId', 'fullName email verified') // Include verified field
     .lean();
 };
 
 
 export const getMembersByDepartmentRaw = async (departmentId) => {
   const members = await EventMember.find({ departmentId, status: { $ne: 'deactive' } })
-    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+    .populate('userId', 'fullName email verified') // Include verified field
     .lean();
 
   return members.map(member => ({
@@ -102,10 +102,13 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     userId: member.userId?._id,
     name: member.userId?.fullName || 'Unknown',
     email: member.userId?.email || '',
+    verified: member.userId?.verified || false,
     // Use UI Avatars API instead of base64 from DB
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
     role: member.role,
-    departmentId: member.departmentId
+    departmentId: member.departmentId,
+    createdAt: member.createdAt,
+    updatedAt: member.updatedAt
   }));
 };
 
