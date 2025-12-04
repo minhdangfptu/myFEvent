@@ -211,25 +211,6 @@ export default function AdminSidebar({
             </button>
           </div>
         </div>
-
-        {/* Nhóm Cài đặt */}
-        <div className="mb-4">
-          {sidebarOpen && <div className="group-title">CÀI ĐẶT</div>}
-          <div className="d-flex flex-column gap-1">
-            <button
-              className={`btn-nav ${
-                activePage === "settings" ? "active" : ""
-              }`}
-              onClick={() => navigate("/admin/settings")}
-              title="Cài đặt"
-            >
-              <div className="d-flex align-items-center">
-                <i className="bi bi-gear me-3" style={{ width: 20 }} />
-                {sidebarOpen && <span>Cài đặt</span>}
-              </div>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Theme toggle hoặc Expand button */}
