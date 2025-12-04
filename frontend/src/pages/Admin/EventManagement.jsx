@@ -32,7 +32,7 @@ const EventManagement = () => {
 
   const fetchEvents = async () => {
     try {
-      const response = await adminService.getPaginatedEvents(currentPage, 10, searchText, statusFilter, dateFilter);
+      const response = await adminService.getPaginatedEvents(currentPage, limit, searchText, statusFilter, dateFilter);
       setEvents(response.data);
       setCurrentPage(response.page);
       setTotalPages(response.totalPages);
