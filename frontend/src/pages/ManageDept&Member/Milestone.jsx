@@ -493,7 +493,15 @@ const Milestone = () => {
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
-      setError(err.response?.data?.message || "Tạo cột mốc thất bại")
+      const errorMessage = err.response?.data?.message || "Tạo cột mốc thất bại"
+      setError(errorMessage)
+      
+      // Show toast for duplicate error
+      if (err.response?.status === 409) {
+        toast.error(errorMessage)
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 

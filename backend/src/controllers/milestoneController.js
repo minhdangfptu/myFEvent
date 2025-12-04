@@ -1,6 +1,7 @@
 import ensureEventRole from '../utils/ensureEventRole.js';
 import {
   ensureEventExists,
+  checkDuplicateMilestone,
   createMilestoneDoc,
   listMilestonesByEvent,
   findMilestoneDetail,
@@ -24,10 +25,18 @@ export const createMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    // Check for duplicate milestone name in the same event
+    const isDuplicate = await checkDuplicateMilestone(eventId, name);
+    if (isDuplicate) {
+      return res.status(409).json({ 
+        message: 'Milestone with this name already exists in this event' 
+      });
+    }
+
     // 1. Create milestone first
     const milestone = await createMilestoneDoc({
       eventId,
-      name,
+      name: name.trim(),
       description,
       targetDate
     });
@@ -75,6 +84,14 @@ export const createMilestone = async (req, res) => {
     
   } catch (error) {
     console.error('createMilestone error:', error.message);
+    
+    // Handle duplicate key error from MongoDB unique index
+    if (error.code === 11000 || error.name === 'MongoServerError') {
+      return res.status(409).json({ 
+        message: 'Milestone with this name already exists in this event' 
+      });
+    }
+    
     return res.status(500).json({ message: 'Failed to create milestone' });
   }
 };
@@ -120,17 +137,40 @@ export const getMilestoneDetail = async (req, res) => {
     const result = await findMilestoneDetail(eventId, milestoneId);
     if (!result) return res.status(404).json({ message: 'Milestone not found' });
     const { milestone, tasks } = result;
+    
+    // Map task status from Vietnamese format to English format
+    const mapTaskStatus = (status) => {
+      const statusMap = {
+        'chua_bat_dau': 'todo',
+        'da_bat_dau': 'in_progress',
+        'hoan_thanh': 'done',
+        'huy': 'cancelled'
+      };
+      return statusMap[status] || 'todo';
+    };
+    
+    console.log(`[getMilestoneDetail] Processing ${tasks?.length || 0} tasks`);
+    console.log(`[getMilestoneDetail] First task sample:`, tasks?.[0]);
+    
+    const relatedTasks = (tasks || []).map(t => {
+      const taskData = {
+        id: String(t._id),
+        name: t.title || 'Không có tên',
+        status: mapTaskStatus(t.status)
+      };
+      console.log(`[getMilestoneDetail] Mapped task:`, taskData);
+      return taskData;
+    });
+    
     const payload = {
       id: String(milestone._id),
       name: milestone.name,
       date: milestone.targetDate,
       description: milestone.description || '',
-      relatedTasks: (tasks || []).map(t => ({
-        id: String(t._id),
-        name: t.name,
-        status: t.status
-      }))
+      relatedTasks: relatedTasks
     };
+    
+    console.log(`[getMilestoneDetail] Final payload relatedTasks count:`, payload.relatedTasks.length);
     return res.status(200).json({ data: payload });
   } catch (error) {
     console.error('getMilestoneDetail error:', error);

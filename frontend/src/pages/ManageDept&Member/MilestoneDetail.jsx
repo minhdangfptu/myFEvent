@@ -28,6 +28,9 @@ const MilestoneDetail = () => {
         setLoading(true);
         setError("");
         const response = await milestoneService.getMilestoneDetail(eventId, id);
+        console.log("[MilestoneDetail] Raw response:", response);
+        console.log("[MilestoneDetail] Related tasks:", response?.relatedTasks);
+        console.log("[MilestoneDetail] First task:", response?.relatedTasks?.[0]);
         setMilestone(response);
       } catch (err) {
         console.error("Error fetching milestone:", err);
@@ -175,7 +178,7 @@ const MilestoneDetail = () => {
     );
   }
 
-  const isMember = eventRole === "Member";
+  const isHoOC = eventRole === "HoOC";
 
   return (
     <UserLayout
@@ -192,7 +195,7 @@ const MilestoneDetail = () => {
           <h3 style={{ color: "#1f2937", fontWeight: "600", margin: 0 }}>
             {milestone.name}
           </h3>
-          {!isMember && (
+          {isHoOC && (
             <div className="d-flex gap-2">
               <button
                 className="btn btn-outline-primary d-flex align-items-center"
@@ -261,32 +264,39 @@ const MilestoneDetail = () => {
               marginBottom: "20px",
             }}
           >
-            Công việc liên quan ({milestone.relatedTasks.length})
+            Công việc liên quan ({milestone.relatedTasks?.length || 0})
           </h4>
 
           <div className="d-flex flex-column gap-3">
-            {milestone.relatedTasks.map((task) => (
-              <div
-                key={task.id}
-                className="d-flex justify-content-between align-items-center p-3 border rounded-3"
-                style={{ border: "1px solid #e5e7eb" }}
-              >
-                <span style={{ color: "#374151", fontWeight: "500" }}>
-                  {task.name}
-                </span>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    backgroundColor: getTaskStatusColor(task.status),
-                    color: "white",
-                    fontSize: "0.9rem",
-                    borderRadius: "20px",
-                  }}
+            {milestone.relatedTasks && milestone.relatedTasks.length > 0 ? (
+              milestone.relatedTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="d-flex justify-content-between align-items-center p-3 border rounded-3"
+                  style={{ border: "1px solid #e5e7eb" }}
                 >
-                  {getTaskStatusLabel(task.status)}
-                </span>
+                  <span style={{ color: "#374151", fontWeight: "500" }}>
+                    {task.name || "Không có tên"}
+                  </span>
+                  <span
+                    className="badge px-3 py-2"
+                    style={{
+                      backgroundColor: getTaskStatusColor(task.status),
+                      color: "white",
+                      fontSize: "0.9rem",
+                      borderRadius: "20px",
+                    }}
+                  >
+                    {getTaskStatusLabel(task.status)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-muted text-center py-4">
+                <i className="bi bi-inbox me-2"></i>
+                Chưa có công việc nào được gán cho cột mốc này
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

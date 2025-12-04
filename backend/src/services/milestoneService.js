@@ -8,6 +8,15 @@ export const ensureEventExists = async (eventId) => {
   return !!exists;
 };
 
+export const checkDuplicateMilestone = async (eventId, name) => {
+  const existing = await Milestone.findOne({
+    eventId,
+    name: name.trim(),
+    isDeleted: false
+  }).lean();
+  return !!existing;
+};
+
 export const createMilestoneDoc = async (payload) => {
   return await Milestone.create(payload);
 };
@@ -30,7 +39,27 @@ export const listMilestonesByEvent = async (eventId, { status, skip, limit, sort
 export const findMilestoneDetail = async (eventId, milestoneId) => {
   const milestone = await Milestone.findOne({ _id: milestoneId, eventId }).lean();
   if (!milestone) return null;
-  const tasks = await Task.find({ milestoneId, eventId }).select('name status').lean();
+  
+  // Query tasks with all fields first to debug
+  const allTasks = await Task.find({ 
+    milestoneId: milestoneId, 
+    eventId: eventId 
+  }).lean();
+  
+  console.log(`[findMilestoneDetail] Found ${allTasks.length} tasks for milestone ${milestoneId} in event ${eventId}`);
+  if (allTasks.length > 0) {
+    console.log(`[findMilestoneDetail] First task full data:`, JSON.stringify(allTasks[0], null, 2));
+    console.log(`[findMilestoneDetail] First task title:`, allTasks[0].title);
+    console.log(`[findMilestoneDetail] First task status:`, allTasks[0].status);
+  }
+  
+  // Select only needed fields
+  const tasks = allTasks.map(t => ({
+    _id: t._id,
+    title: t.title,
+    status: t.status
+  }));
+  
   return { milestone, tasks };
 };
 
