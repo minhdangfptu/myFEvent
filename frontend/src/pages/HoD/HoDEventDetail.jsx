@@ -769,15 +769,6 @@ export default function HoDEventDetail() {
                 <p style={{ marginBottom: "1.5rem", opacity: 0.9 }}>
                   Chia sẻ nhanh mã/mã QR đến các trưởng bộ phận khác. HoD chỉ có quyền xem nên vui lòng liên hệ HoOC khi cần thay đổi.
                 </p>
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
-                  <div className="join-code-input-group">
-                    <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
-                    <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
-                      <Copy size={18} />
-                    </button>
-                  </div>
-                </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">
