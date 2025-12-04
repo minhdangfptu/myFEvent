@@ -14,7 +14,7 @@ const router = express.Router();
 
 router.use('/auth', authRoute);
 router.use('/events', eventRoute);
-router.use('/user', userRoute)
+router.use('/user', userRoute);
 router.use('/tasks', taskRoute);
 router.use('/feedback', feedbackRoute);
 router.use('/notifications', notificationRoute);

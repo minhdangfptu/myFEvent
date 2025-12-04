@@ -680,7 +680,7 @@ export default function HoOCDashBoard() {
               <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
                 <div className="card-body p-4" style={{ minHeight: "320px", display: "flex", flexDirection: "column" }}>
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
-                    Tiến độ Epic
+                    Tiến độ Công việc lớn
                   </h6>
 
                   {epicTasks.length > 0 ? (

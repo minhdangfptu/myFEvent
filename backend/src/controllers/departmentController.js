@@ -21,6 +21,7 @@ import {
   countDepartmentMembersExcludingHoOC,
   getMembersByDepartmentRaw,
 } from '../services/eventMemberService.js';
+import EventMember from '../models/eventMember.js';
 
 // GET /api/events/:eventId/departments
 export const listDepartmentsByEvent = async (req, res) => {
@@ -73,6 +74,23 @@ export const getDepartmentDetail = async (req, res) => {
     if (!department) return res.status(404).json({ message: 'Department not found' });
 
     const memberCount = await countDepartmentMembersExcludingHoOC(department._id);
+    
+    // Calculate new members today (members added to department today)
+    // Check EventMember records where departmentId was set today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const newMembersToday = await EventMember.countDocuments({
+      departmentId: departmentId,
+      status: { $ne: 'deactive' },
+      role: { $ne: 'HoOC' },
+      updatedAt: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
 
     const formattedDepartment = {
       _id: department._id,
@@ -83,6 +101,7 @@ export const getDepartmentDetail = async (req, res) => {
       leader: department.leaderId,
       leaderName: department.leaderId?.fullName || 'Chưa có',
       memberCount: memberCount,
+      newMembersToday: newMembersToday,
       createdAt: department.createdAt,
       updatedAt: department.updatedAt
     };
@@ -110,17 +129,17 @@ export const createDepartment = async (req, res) => {
 
     // Validate và trim name
     if (!name || typeof name !== 'string') {
-      return res.status(400).json({ message: 'Tên Department là bắt buộc' });
+      return res.status(400).json({ message: 'Tên ban là bắt buộc' });
     }
     const trimmedName = name.trim();
     if (trimmedName === '') {
-      return res.status(400).json({ message: 'Tên Department không được để trống' });
+      return res.status(400).json({ message: 'Tên ban không được để trống' });
     }
 
     // Kiểm tra duplicate name
     const existingDept = await findDepartmentByName(eventId, trimmedName);
     if (existingDept) {
-      return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+      return res.status(409).json({ message: 'Tên ban đã tồn tại trong sự kiện này' });
     }
 
     const populatedDepart = await createDepartmentDoc({ eventId, name: trimmedName, description, leaderId });
@@ -157,11 +176,19 @@ export const editDepartment = async (req, res) => {
     }
     const department = await ensureDepartmentInEvent(eventId, departmentId);
     if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
-    // Kiểm tra quyền HooC
+    // Kiểm tra quyền: HoOC hoặc HoD của department này
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     
-    if (!requesterMembership || requesterMembership.role !== 'HoOC') {
-      return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
+    if (!requesterMembership) {
+      return res.status(403).json({ message: 'Bạn không có quyền sửa ban' });
+    }
+    
+    const isHoOC = requesterMembership.role === 'HoOC';
+    const isHoDOfThis = requesterMembership.role === 'HoD' && 
+                        requesterMembership.departmentId?.toString() === departmentId;
+    
+    if (!isHoOC && !isHoDOfThis) {
+      return res.status(403).json({ message: 'Chỉ HoOC hoặc HoD của ban này mới được sửa thông tin ban' });
     }
 
     // Cập nhật qua service
@@ -170,13 +197,13 @@ export const editDepartment = async (req, res) => {
     if (typeof name === 'string') {
         const trimmedName = name.trim();
         if (trimmedName === '') {
-             return res.status(400).json({ message: 'Tên Department không được để trống' });
+             return res.status(400).json({ message: 'Tên ban không được để trống' });
         }
 
         // Kiểm tra xem có department nào KHÁC department hiện tại đang dùng tên này không
         const existingDept = await findDepartmentByName(eventId, trimmedName);
         if (existingDept && existingDept._id.toString() !== departmentId) {
-            return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+            return res.status(409).json({ message: 'Tên ban đã tồn tại trong sự kiện này' });
         }
         set.name = trimmedName;
     }
@@ -210,7 +237,7 @@ export const deleteDepartment = async (req, res) => {
     
     // Nếu có nhiều hơn 1 member, không cho phép xóa
     if (members.length > 1) {
-      return res.status(409).json({ message: 'Cannot delete department with multiple members. Please remove all members first.' });
+      return res.status(409).json({ message: 'Không thể xóa ban khi còn nhiều thành viên. Vui lòng xóa tất cả thành viên trước.' });
     }
     
     // Nếu có 1 member và member đó là HoD, tự động remove member đó trước khi xóa
@@ -221,7 +248,7 @@ export const deleteDepartment = async (req, res) => {
         await removeMemberFromDepartmentDoc(eventId, departmentId, member._id);
       } else {
         // Nếu member không phải HoD, không cho phép xóa
-        return res.status(409).json({ message: 'Cannot delete department with members. Please remove all members first.' });
+        return res.status(409).json({ message: 'Không thể xóa ban khi còn thành viên. Vui lòng xóa tất cả thành viên trước.' });
       }
     }
     

@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Bot } from 'lucide-react';
 
-export default function AIAssistantButton({ onClick }) {
+export default function FeAI({ onClick }) {
   const [hover, setHover] = useState(false);
 
   return (
@@ -13,10 +14,10 @@ export default function AIAssistantButton({ onClick }) {
         right: '24px',
         bottom: '24px',
         borderRadius: '999px',
-        background: '#1c9c6d',
+        background: '#dc2626',
         color: '#fff',
         border: 'none',
-        boxShadow: '0 10px 20px rgba(0,0,0,0.15)',
+        boxShadow: '0 10px 20px rgba(220, 38, 38, 0.3)',
         cursor: 'pointer',
         zIndex: 1050,
         transition: 'transform 0.15s ease, box-shadow 0.15s ease',
@@ -30,9 +31,7 @@ export default function AIAssistantButton({ onClick }) {
       aria-label="AI Assistant"
       type="button"
     >
-      <span role="img" aria-hidden="true" style={{ fontSize: '1.25rem' }}>
-        🤖
-      </span>
+      <Bot size={20} />
       <span>AI Assistant</span>
     </button>
   );

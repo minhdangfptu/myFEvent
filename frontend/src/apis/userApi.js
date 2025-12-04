@@ -13,6 +13,38 @@ export const userApi = {
       throw error;
     }
   },
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await axiosClient.post('/api/user/change-password', { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  getProfile: async () => {
+    try {
+      const response = await axiosClient.get('/api/user/profile');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  updateProfile: async (payload) => {
+    try {
+      const response = await axiosClient.put('/api/user/profile', payload);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  removeTag: async (value) => {
+    try {
+      const response = await axiosClient.delete('/api/user/profile/tag', { data: { value } });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
   sendDeleteOtp: async (email) => {
     try {
       const response = await axiosClient.post('/api/auth/send-delete-otp', { email });
