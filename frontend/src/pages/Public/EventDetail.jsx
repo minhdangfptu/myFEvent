@@ -147,15 +147,6 @@ export default function EventDetailPage() {
           <div className="row g-4 mt-4">
             <div className="col-12 col-lg-8">
               <div className="info-card shadow-sm">
-                <div className="d-flex align-items-center gap-3 mb-4">
-                  <div className="info-card-icon">
-                    <Info size={20} />
-                  </div>
-                  <div>
-                    <p className="text-muted mb-1">Thông tin sự kiện</p>
-                    <h4 className="mb-0">Khoảnh khắc bạn không nên bỏ lỡ</h4>
-                  </div>
-                </div>
                 <InfoRow icon={FileText} label="Tên sự kiện" value={title} />
                 <InfoRow icon={User} label="Đơn vị tổ chức" value={event?.organizerName || event?.organizer || "FPT University"} />
                 <InfoRow icon={CalendarDays} label="Thời gian" value={dateText || "Chưa cập nhật"} />
