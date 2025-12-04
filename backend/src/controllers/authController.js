@@ -225,18 +225,30 @@ export const loginWithGoogle = async (req, res) => {
       audience: config.GOOGLE_CLIENT_ID,
     });
 
-    const payload = ticket.getPayload(); // { sub, email, email_verified, name, picture, iss, ... }
+    const payload = ticket.getPayload();
     if (!payload) return res.status(401).json({ message: 'Invalid Google token' });
-
+    
     const { email, name, picture, sub, iss, email_verified } = payload;
     if (!['accounts.google.com', 'https://accounts.google.com'].includes(iss) || !email_verified) {
       return res.status(401).json({ message: 'Unverified Google account' });
     }
 
-    let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
+    // ✅ FIX: Tìm user CHỈ bằng googleId, không dùng email
+    let user = await User.findOne({ googleId: sub });
 
     if (!user) {
-      // Create new user with Google - mark as verified since Google already verified the email
+      // Kiểm tra xem email đã tồn tại với authProvider='local' không
+      const existingLocalUser = await User.findOne({ email, authProvider: 'local' });
+      
+      if (existingLocalUser) {
+        // Email đã được đăng ký với tài khoản local - YÊU CẦU người dùng đăng nhập bằng email/password
+        return res.status(400).json({ 
+          message: 'Email này đã được đăng ký dưới dạng tài khoản địa phương. Vui lòng đăng nhập bằng email và mật khẩu.',
+          code: 'EMAIL_EXISTS_LOCAL'
+        });
+      }
+
+      // Tạo user mới với Google
       user = await User.create({
         email,
         fullName: name,
@@ -245,22 +257,15 @@ export const loginWithGoogle = async (req, res) => {
         authProvider: 'google',
         status: 'active',
         isFirstLogin: true,
-        verified: true, // Google accounts are pre-verified
+        verified: true,
       });
     } else {
-      // Update existing user
-      if (!user.googleId) {
-        user.googleId = sub;
-      }
-
+      // User đã tồn tại với googleId - chỉ update thông tin không cần thiết
       if (!user.fullName && name) user.fullName = name;
       if (!user.avatarUrl && picture) user.avatarUrl = picture;
-
-      // Mark as verified if logging in with Google (Google already verified the email)
       if (!user.verified) {
         user.verified = true;
       }
-
       await user.save();
     }
 
