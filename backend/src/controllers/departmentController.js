@@ -30,11 +30,16 @@ export const listDepartmentsByEvent = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const skip = (page - 1) * limit;
     const search = (req.query.search || '').trim();
-    const { items, total, memberCounts } = await findDepartmentsByEvent(eventId, { search, skip, limit });
 
-    // Format data for frontend
-    const formattedItems = items.map((dept) => {
-      const memberCount = memberCounts?.[dept._id?.toString()] ?? 0;
+    const { items, total } = await findDepartmentsByEvent(eventId, { search, skip, limit });
+
+    // 👉 Lấy memberCount cho từng department bằng service countDepartmentMembersExcludingHoOC
+    const memberCounts = await Promise.all(
+      items.map((dept) => countDepartmentMembersExcludingHoOC(dept._id))
+    );
+
+    const formattedItems = items.map((dept, index) => {
+      const memberCount = memberCounts[index] ?? 0;
 
       return {
         _id: dept._id,
@@ -46,7 +51,7 @@ export const listDepartmentsByEvent = async (req, res) => {
         leaderName: dept.leaderId?.fullName || 'Chưa có',
         memberCount,
         createdAt: dept.createdAt,
-        updatedAt: dept.updatedAt
+        updatedAt: dept.updatedAt,
       };
     });
 
@@ -56,8 +61,8 @@ export const listDepartmentsByEvent = async (req, res) => {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('listDepartmentsByEvent error:', error);
@@ -100,50 +105,59 @@ export const createDepartment = async (req, res) => {
   try {
     const { eventId } = req.params;
     const { name, description, leaderId } = req.body || {};
-    if (!(await ensureEventExists(eventId))) {
-      return res.status(404).json({ message: 'Event không tồn tại' });
+
+    // Event exists
+    const eventExists = await ensureEventExists(eventId);
+    if (!eventExists) {
+      return res.status(404).json({ message: 'Event not found' });
     }
+
+    // Permission
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
-      return res.status(403).json({ message: 'Chỉ HooC mới được tạo Department' });
+      return res.status(403).json({ message: 'Only HoOC can create department' });
     }
 
-    // Validate và trim name
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ message: 'Tên Department là bắt buộc' });
+    // Validate name
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return res.status(400).json({ message: 'Name is required' });
     }
     const trimmedName = name.trim();
-    if (trimmedName === '') {
-      return res.status(400).json({ message: 'Tên Department không được để trống' });
-    }
 
-    // Kiểm tra duplicate name
+    // Check duplicate name
     const existingDept = await findDepartmentByName(eventId, trimmedName);
     if (existingDept) {
-      return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+      return res.status(409).json({ message: 'Department name already exists' });
     }
 
-    const populatedDepart = await createDepartmentDoc({ eventId, name: trimmedName, description, leaderId });
+    // Create department
+    const created = await createDepartmentDoc({
+      eventId,
+      name: trimmedName,
+      description: description || '',
+      leaderId: leaderId || null
+    });
 
-    const formattedDepartment = {
-      _id: populatedDepart._id,
-      id: populatedDepart._id,
-      name: populatedDepart.name,
-      description: populatedDepart.description,
-      leaderId: populatedDepart.leaderId,
-      leader: populatedDepart.leaderId,
-      leaderName: populatedDepart.leaderId?.fullName || 'Chưa có',
-      memberCount: 0,
-      createdAt: populatedDepart.createdAt,
-      updatedAt: populatedDepart.updatedAt
-    };
-
-    return res.status(201).json({ data: formattedDepartment });
+    return res.status(201).json({
+      data: {
+        id: created._id,
+        _id: created._id,
+        name: created.name,
+        description: created.description,
+        leaderId: created.leaderId,
+        leader: created.leaderId,
+        leaderName: created.leaderId?.fullName || 'Chưa có',
+        memberCount: 0,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt
+      }
+    });
   } catch (error) {
     console.error('createDepartment error:', error);
-    return res.status(500).json({ message: 'Tạo department thất bại' });
+    return res.status(500).json({ message: 'Failed to create department' });
   }
 };
+
 
 // ================= EDIT department =================
 // PATCH /api/events/:eventId/departments/:departmentId
@@ -159,28 +173,28 @@ export const editDepartment = async (req, res) => {
     if (!department) return res.status(404).json({ message: 'Department không tồn tại' });
     // Kiểm tra quyền HooC
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-    
+
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
       return res.status(403).json({ message: 'Chỉ HooC mới được sửa Department' });
     }
 
     // Cập nhật qua service
     const set = {};
-    
-    if (typeof name === 'string') {
-        const trimmedName = name.trim();
-        if (trimmedName === '') {
-             return res.status(400).json({ message: 'Tên Department không được để trống' });
-        }
 
-        // Kiểm tra xem có department nào KHÁC department hiện tại đang dùng tên này không
-        const existingDept = await findDepartmentByName(eventId, trimmedName);
-        if (existingDept && existingDept._id.toString() !== departmentId) {
-            return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
-        }
-        set.name = trimmedName;
+    if (typeof name === 'string') {
+      const trimmedName = name.trim();
+      if (trimmedName === '') {
+        return res.status(400).json({ message: 'Tên Department không được để trống' });
+      }
+
+      // Kiểm tra xem có department nào KHÁC department hiện tại đang dùng tên này không
+      const existingDept = await findDepartmentByName(eventId, trimmedName);
+      if (existingDept && existingDept._id.toString() !== departmentId) {
+        return res.status(409).json({ message: 'Tên Department đã tồn tại trong sự kiện này' });
+      }
+      set.name = trimmedName;
     }
-    
+
     if (typeof description === 'string') set.description = description.trim();
     if (leaderId) set.leaderId = leaderId;
     const updated = await updateDepartmentDoc(departmentId, set);
@@ -191,84 +205,102 @@ export const editDepartment = async (req, res) => {
   }
 };
 
-// ================= DELETE department =================
-// DELETE /api/events/:eventId/departments/:departmentId
 export const deleteDepartment = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
-    // Kiểm tra event/department
+
     if (!(await ensureEventExists(eventId))) {
       return res.status(404).json({ message: 'Event không tồn tại' });
     }
+
     const department = await ensureDepartmentInEvent(eventId, departmentId);
-    if (!department) return res.status(404).json({ message: 'Department not found' });
+    if (!department) {
+      return res.status(404).json({ message: 'Department không tồn tại' });
+    }
+
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
-      return res.status(403).json({ message: 'Only HoOC can delete department' });
+      return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
     }
+
     const members = await getMembersByDepartmentRaw(departmentId);
-    
-    // Nếu có nhiều hơn 1 member, không cho phép xóa
-    if (members.length > 1) {
-      return res.status(409).json({ message: 'Cannot delete department with multiple members. Please remove all members first.' });
+
+    // === FIX CHO TC01 — Nếu 0 member → xóa ngay ===
+    if (members.length === 0) {
+      await deleteDepartmentDoc(departmentId);
+      return res.status(200).json({ message: 'Xoá department thành công' });
     }
-    
-    // Nếu có 1 member và member đó là HoD, tự động remove member đó trước khi xóa
+
+    // >1 member → không xoá được
+    if (members.length > 1) {
+      return res.status(409).json({
+        message: 'Không thể xoá Department khi vẫn còn nhiều thành viên',
+      });
+    }
+
+    // 1 member
     if (members.length === 1) {
       const member = members[0];
+
+      // Nếu là HoD → remove trước
       if (member.role === 'HoD') {
-        // Tự động remove HoD member trước khi xóa department
         await removeMemberFromDepartmentDoc(eventId, departmentId, member._id);
       } else {
-        // Nếu member không phải HoD, không cho phép xóa
-        return res.status(409).json({ message: 'Cannot delete department with members. Please remove all members first.' });
+        return res.status(409).json({
+          message: 'Không thể xoá Department khi vẫn còn thành viên',
+        });
       }
     }
-    
+
     await deleteDepartmentDoc(departmentId);
+
     return res.status(200).json({ message: 'Xoá department thành công' });
+
   } catch (error) {
     console.error('deleteDepartment error:', error);
     return res.status(500).json({ message: 'Xoá department thất bại' });
   }
 };
 
+
+
+
 // PATCH /api/events/:eventId/departments/:departmentId/assign-hod
 export const assignHod = async (req, res) => {
-	try {
-		const { eventId, departmentId } = req.params;
-		const { userId } = req.body || {};
-		if (!userId) return res.status(400).json({ message: 'userId is required' });
+  try {
+    const { eventId, departmentId } = req.params;
+    const { userId } = req.body || {};
+    if (!userId) return res.status(400).json({ message: 'userId is required' });
 
-		if (!(await ensureEventExists(eventId))) {
-			return res.status(404).json({ message: 'Event not found' });
-		}
-		const department = await ensureDepartmentInEvent(eventId, departmentId);
-		if (!department) return res.status(404).json({ message: 'Department not found' });
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department not found' });
 
-		// Only HooC can assign HoD
-		const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-		if (!requesterMembership || requesterMembership.role !== 'HooC') {
-			return res.status(403).json({ message: 'Only HooC can assign HoD' });
-		}
+    // Only HooC can assign HoD
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    if (!requesterMembership || requesterMembership.role !== 'HooC') {
+      return res.status(403).json({ message: 'Only HooC can assign HoD' });
+    }
 
-		// Ensure target user exists
-		const targetUser = await ensureUserExists(userId);
-		if (!targetUser) return res.status(404).json({ message: 'User not found' });
+    // Ensure target user exists
+    const targetUser = await ensureUserExists(userId);
+    if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-		const updated = await assignHoDToDepartment(eventId, department, userId);
-		return res.status(200).json({ data: updated });
-	} catch (error) {
-		console.error('assignHod error:', error);
-		return res.status(500).json({ message: 'Failed to assign HoD' });
-	}
+    const updated = await assignHoDToDepartment(eventId, department, userId);
+    return res.status(200).json({ data: updated });
+  } catch (error) {
+    console.error('assignHod error:', error);
+    return res.status(500).json({ message: 'Failed to assign HoD' });
+  }
 };
 
 export const changeHoD = async (req, res) => {
   try {
     const { eventId, departmentId } = req.params;
     const { newHoDId } = req.body || {};
-    
+
     if (!newHoDId) {
       return res.status(400).json({ message: 'newHoDId is required' });
     }
@@ -293,14 +325,14 @@ export const changeHoD = async (req, res) => {
     // Check if new HoD exists
     const newHoD = await ensureUserExists(newHoDId);
     if (!newHoD) {
-      return res.status(404).json({ message: 'New HoD user not found'  });
+      return res.status(404).json({ message: 'New HoD user not found' });
     }
 
     // Check if new HoD is a member of this department
     const isMember = await isUserMemberOfDepartment(eventId, department._id, newHoDId);
     if (!isMember) {
-      return res.status(400).json({ 
-        message: 'New HoD must be a member of this department' 
+      return res.status(400).json({
+        message: 'New HoD must be a member of this department'
       });
     }
 
@@ -321,9 +353,9 @@ export const changeHoD = async (req, res) => {
       updatedAt: updatedDepartment.updatedAt
     };
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: 'Department head changed successfully',
-      data: formattedDepartment 
+      data: formattedDepartment
     });
   } catch (error) {
     console.error('changeHoD error:', error.message);
@@ -333,37 +365,37 @@ export const changeHoD = async (req, res) => {
 
 // POST /api/events/:eventId/departments/:departmentId/members
 export const addMemberToDepartment = async (req, res) => {
-	try {
-		const { eventId, departmentId } = req.params;
-		const membership = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
-		if (!membership) return res.status(403).json({ message: 'Only HoOC or HoD can add member to department' });
+  try {
+    const { eventId, departmentId } = req.params;
+    const membership = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
+    if (!membership) return res.status(403).json({ message: 'Only HoOC or HoD can add member to department' });
 
-		if (!(await ensureEventExists(eventId))) {
-			return res.status(404).json({ message: 'Event not found' });
-		}
-		const department = await ensureDepartmentInEvent(eventId, departmentId);
-		if (!department) return res.status(404).json({ message: 'Department not found' });
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department not found' });
 
-		// Permission: HooC or HoD of this department
-		const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-		const isHoOC = requesterMembership?.role === 'HoOC';
-		const isHoDOfThis = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === departmentId;
-		if (!isHoOC && !isHoDOfThis) {
-			return res.status(403).json({ message: 'Insufficient permissions' });
-		}
+    // Permission: HooC or HoD of this department
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    const isHoOC = requesterMembership?.role === 'HoOC';
+    const isHoDOfThis = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === departmentId;
+    if (!isHoOC && !isHoDOfThis) {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
     const { memberId } = req.body || {};
-		if (!memberId) return res.status(400).json({ message: 'memberId is required' });
-    
+    if (!memberId) return res.status(400).json({ message: 'memberId is required' });
+
     const targetMembership = await findEventMemberById(memberId);
-		if (!targetMembership) {
-			return res.status(404).json({ message: "EventMember not found!" });
-		}
-		if (targetMembership?.role === 'HoOC') {
-			return res.status(409).json({ message: 'Cannot move HooC into a department' });
-		}
-		if (targetMembership?.role === 'HoD' && targetMembership?.departmentId?.toString() !== departmentId) {
-			return res.status(409).json({ message: 'User is HoD of another department' });
-		}
+    if (!targetMembership) {
+      return res.status(404).json({ message: "EventMember not found!" });
+    }
+    if (targetMembership?.role === 'HoOC') {
+      return res.status(409).json({ message: 'Cannot move HooC into a department' });
+    }
+    if (targetMembership?.role === 'HoD' && targetMembership?.departmentId?.toString() !== departmentId) {
+      return res.status(409).json({ message: 'User is HoD of another department' });
+    }
 
     const roleToSet = targetMembership.role === 'HoD' ? 'HoD' : 'Member';
     const updatedMembership = await addMemberToDepartmentDoc(eventId, departmentId, memberId, roleToSet);
@@ -377,31 +409,31 @@ export const addMemberToDepartment = async (req, res) => {
       // Không throw error, chỉ log
     }
 
-		return res.status(200).json({ data: updatedMembership });
-	} catch (error) {
-		console.error('addMemberToDepartment error:', error.message);
-		return res.status(500).json({ message:  error.message });
-	}
+    return res.status(200).json({ data: updatedMembership });
+  } catch (error) {
+    console.error('addMemberToDepartment error:', error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 // DELETE /api/events/:eventId/departments/:departmentId/members/:memberId
 export const removeMemberFromDepartment = async (req, res) => {
-	try {
-		const { eventId, departmentId, memberId } = req.params;
+  try {
+    const { eventId, departmentId, memberId } = req.params;
 
-		if (!(await ensureEventExists(eventId))) {
-			return res.status(404).json({ message: 'Event not found' });
-		}
-		const department = await ensureDepartmentInEvent(eventId, departmentId);
-		if (!department) return res.status(404).json({ message: 'Department not found' });
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department not found' });
 
-		// Permission: HooC or HoD of this department
-		const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
-		const isHooC = requesterMembership?.role === 'HoOC';
-		const isHoDOfThis = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === departmentId;
-		if (!isHooC && !isHoDOfThis) {
-			return res.status(403).json({ message: 'Insufficient permissions' });
-		}
+    // Permission: HooC or HoD of this department
+    const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
+    const isHooC = requesterMembership?.role === 'HoOC';
+    const isHoDOfThis = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === departmentId;
+    if (!isHooC && !isHoDOfThis) {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
 
     const targetMembership = await findEventMemberById(memberId);
 		if (!targetMembership || targetMembership.departmentId?.toString() !== departmentId) {
@@ -422,8 +454,8 @@ export const removeMemberFromDepartment = async (req, res) => {
 
     await removeMemberFromDepartmentDoc(eventId, departmentId, memberId);
     return res.status(200).json({ message: 'Member removed from department' });
-	} catch (error) {
-		console.error('removeMemberFromDepartment error:', error);
-		return res.status(500).json({ message: 'Failed to remove member from department' });
-	}
+  } catch (error) {
+    console.error('removeMemberFromDepartment error:', error);
+    return res.status(500).json({ message: 'Failed to remove member from department' });
+  }
 };

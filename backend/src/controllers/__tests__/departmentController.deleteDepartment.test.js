@@ -13,7 +13,9 @@ vi.mock('../../services/departmentService.js', () => ({
 vi.mock('../../services/eventMemberService.js', () => ({
   __esModule: true,
   getRequesterMembership: vi.fn(),
+  getMembersByDepartmentRaw: vi.fn(), // ⬅ THÊM DÒNG NÀY
 }));
+
 
 /* -------------------- Helpers -------------------- */
 
@@ -30,28 +32,35 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('departmentController.deleteDepartment', () => {
   it('[Normal] TC01 - should delete department successfully by HoOC', async () => {
-    const { ensureEventExists, ensureDepartmentInEvent, deleteDepartmentDoc } = await import('../../services/departmentService.js');
-    const { getRequesterMembership } = await import('../../services/eventMemberService.js');
+  const {
+    ensureEventExists,
+    ensureDepartmentInEvent,
+    deleteDepartmentDoc,
+  } = await import('../../services/departmentService.js');
+  const { getRequesterMembership, getMembersByDepartmentRaw } = await import('../../services/eventMemberService.js');
+  getMembersByDepartmentRaw.mockResolvedValue([]); 
+  const req = {
+    params: { eventId: 'evt123', departmentId: 'dept1' },
+    user: { id: 'hooc1' }
+  };
+  const res = mockRes();
 
-    const req = {
-      params: { eventId: 'evt123', departmentId: 'dept1' },
-      user: { id: 'hooc1' }
-    };
-    const res = mockRes();
+  ensureEventExists.mockResolvedValue(true);
+  ensureDepartmentInEvent.mockResolvedValue({ _id: 'dept1' });
+  getRequesterMembership.mockResolvedValue({ role: 'HoOC' });
 
-    ensureEventExists.mockResolvedValue(true);
-    ensureDepartmentInEvent.mockResolvedValue({ _id: 'dept1' });
-    getRequesterMembership.mockResolvedValue({ role: 'HooC' });
-    deleteDepartmentDoc.mockResolvedValue();
+  getMembersByDepartmentRaw.mockResolvedValue([]);   
+  deleteDepartmentDoc.mockResolvedValue();
 
-    await departmentController.deleteDepartment(req, res);
+  await departmentController.deleteDepartment(req, res);
 
-    expect(deleteDepartmentDoc).toHaveBeenCalledWith('dept1');
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Xoá department thành công' })
-    );
-  });
+  expect(deleteDepartmentDoc).toHaveBeenCalledWith('dept1');
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith(
+    expect.objectContaining({ message: 'Xoá department thành công' })
+  );
+});
+
 
   it('[Abnormal] TC02 - should return 404 if event not found', async () => {
     const { ensureEventExists } = await import('../../services/departmentService.js');
