@@ -3,6 +3,8 @@ import { useParams, useLocation, useNavigate } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { dashboardApi } from "../../apis/dashboardApi"
 import calendarService from "../../services/calendarService"
+import { taskApi } from "../../apis/taskApi"
+import { budgetApi } from "../../apis/budgetApi"
 import Loading from "../../components/Loading"
 import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
@@ -122,6 +124,9 @@ export default function HoOCDashBoard() {
   const [calendarEvents, setCalendarEvents] = useState([])
   const [eventRole, setEventRole] = useState("")
   const [hoveredDay, setHoveredDay] = useState(null)
+  const [epicTasks, setEpicTasks] = useState([])
+  const [allTasks, setAllTasks] = useState([])
+  const [budgetData, setBudgetData] = useState({ planned: 0, actual: 0 })
   
   // Get event ID from URL
   const eventId = paramEventId || getEventIdFromUrl(location.pathname, location.search)
@@ -208,7 +213,7 @@ export default function HoOCDashBoard() {
         // Show dashboard immediately
         setLoading(false)
 
-        // Lazy load calendar events (non-critical)
+        // Lazy load calendar events and epic tasks (non-critical)
         if (!cancelled) {
           calendarService.getCalendarsByEventId(eventId)
             .then(calendarsResponse => {
@@ -219,6 +224,79 @@ export default function HoOCDashBoard() {
             .catch(err => {
               if (!cancelled) {
                 console.error("Error loading calendar events:", err)
+              }
+            })
+
+          // Fetch all tasks for progress display (epic tasks and major tasks)
+            taskApi.getTaskByEvent(eventId)
+            .then(tasksResponse => {
+              if (!cancelled) {
+                const tasksData = unwrapApiData(tasksResponse)
+                const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.data || tasksData?.tasks || [])
+                
+                // Store all tasks
+                if (!cancelled) {
+                  setAllTasks(tasksArray)
+                }
+                
+                // Filter epic tasks (taskType === 'epic') with progressPct
+                const epics = tasksArray
+                  .filter(task => task?.taskType === 'epic' || task?.taskType === 'Epic')
+                  .map(epic => ({
+                    ...epic,
+                    progressPct: typeof epic.progressPct === "number" ? epic.progressPct : (epic.progress || 0)
+                  }))
+                
+                if (!cancelled) {
+                  setEpicTasks(epics)
+                }
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading tasks:", err)
+              }
+            })
+
+          // Fetch budget statistics: planned (HoD) vs actual (Member paid)
+          budgetApi.getBudgetStatistics(eventId)
+            .then(statsResponse => {
+              if (!cancelled) {
+                const stats = unwrapApiData(statsResponse)
+                // totalEstimated = tiền dự trù kinh phí từ budget mà HoD nộp
+                // totalActual = tiền thực tế member nộp
+                const planned = Number(stats?.totalEstimated || stats?.data?.totalEstimated || 0)
+                const actual = Number(stats?.totalActual || stats?.data?.totalActual || 0)
+                
+                if (!cancelled) {
+                  setBudgetData({ planned, actual })
+                }
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading budget statistics:", err)
+              }
+            })
+
+          // Fetch budget statistics: planned (HoD) vs actual (Member paid)
+          budgetApi.getBudgetStatistics(eventId)
+            .then(statsResponse => {
+              if (!cancelled) {
+                const stats = unwrapApiData(statsResponse)
+                // totalEstimated = tiền dự trù kinh phí từ budget mà HoD nộp
+                // totalActual = tiền thực tế member nộp
+                const planned = Number(stats?.totalEstimated || stats?.data?.totalEstimated || 0)
+                const actual = Number(stats?.totalActual || stats?.data?.totalActual || 0)
+                
+                if (!cancelled) {
+                  setBudgetData({ planned, actual })
+                }
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading budget statistics:", err)
               }
             })
         }
@@ -275,76 +353,60 @@ export default function HoOCDashBoard() {
   const totalMembers = members.length
   const totalDepartments = departments.length
 
+  // Calculate budget stats from actual budget data
   const budgetStats = useMemo(() => {
-    let allocated = 0
-    let spent = 0
-    const items = []
-
-    departments.forEach((dept) => {
-      const name = dept?.name || "Ban chưa đặt tên"
-
-      const budgetValue = Number(
-        dept?.budget ??
-        dept?.allocatedBudget ??
-        dept?.budgetAllocated ??
-        dept?.budgetEstimate ??
-        dept?.totalBudget ??
-        dept?.planBudget ??
-        0
-      ) || 0
-
-      const spendingValue = Number(
-        dept?.spent ??
-        dept?.budgetSpent ??
-        dept?.actualBudget ??
-        dept?.actualSpending ??
-        dept?.actualCost ??
-        dept?.spending ??
-        0
-      ) || 0
-
-      if (budgetValue > 0 || spendingValue > 0) {
-        items.push({
-          category: name,
-          budget: Math.max(0, Math.round(budgetValue)),
-          spending: Math.max(0, Math.round(spendingValue))
-        })
-      }
-
-      allocated += Math.max(0, budgetValue)
-      spent += Math.max(0, spendingValue)
-    })
-
-    const percent = allocated > 0
-      ? Math.max(0, Math.min(100, Math.round((spent / allocated) * 100)))
+    const planned = budgetData.planned || 0
+    const actual = budgetData.actual || 0
+    
+    // Calculate percentage without capping at 100% to show actual usage rate
+    // If actual > planned, it will show > 100% (e.g., 150% means 50% over budget)
+    const percent = planned > 0
+      ? Math.max(0, Math.round((actual / planned) * 100))
       : null
 
     return {
-      items,
-      percent,
-      allocated,
-      spent
+      planned,
+      actual,
+      percent
     }
-  }, [departments])
+  }, [budgetData])
 
-  const { items: budgetItems, percent: budgetUsagePercent } = budgetStats
-  const totalBudgetAllocated = budgetStats.allocated
-  const totalBudgetSpent = budgetStats.spent
+  const { planned: totalPlanned, actual: totalActual, percent: budgetUsagePercent } = budgetStats
   const budgetUsageDisplay = budgetUsagePercent != null ? `${budgetUsagePercent}%` : "—"
-  const budgetSummaryLabel = totalBudgetAllocated > 0
-    ? `${totalBudgetSpent.toLocaleString("vi-VN")} / ${totalBudgetAllocated.toLocaleString("vi-VN")}`
+  const budgetSummaryLabel = totalPlanned > 0
+    ? `${totalActual.toLocaleString("vi-VN")} / ${totalPlanned.toLocaleString("vi-VN")}`
     : "Chưa có dữ liệu"
-  const budgetSpendingData = useMemo(() => budgetItems.slice(0, 4), [budgetItems])
+  
+  // Calculate chart scale for comparison
   const budgetChartScale = useMemo(() => {
-    if (!budgetSpendingData.length) return 1
-    const maxValue = budgetSpendingData.reduce(
-      (max, item) => Math.max(max, item.budget, item.spending),
-      0
-    )
+    const maxValue = Math.max(totalPlanned, totalActual)
     return maxValue > 0 ? 160 / maxValue : 1
-  }, [budgetSpendingData])
+  }, [totalPlanned, totalActual])
 
   const majorTasks = useMemo(() => {
+    // Get epic tasks (parent tasks) with actual progress
+    const epicTasksWithProgress = allTasks
+      .filter(task => (task?.taskType === 'epic' || task?.taskType === 'Epic') && !task?.parentTaskId)
+      .slice(0, 2)
+      .map(epic => {
+        const progressPct = typeof epic.progressPct === "number" ? epic.progressPct : (epic.progress || 0)
+        const normalizedProgress = Math.max(0, Math.min(100, Math.round(progressPct)))
+        
+        const deadlineSource = epic?.dueDate || epic?.deadline || epic?.plannedEndDate || epic?.expectedCompletionDate
+        
+        return {
+          title: epic?.title || epic?.name || "Epic",
+          progress: normalizedProgress,
+          deadline: deadlineSource ? formatDate(deadlineSource) : "Đang cập nhật"
+        }
+      })
+    
+    // If we have epic tasks, use them; otherwise fallback to departments
+    if (epicTasksWithProgress.length > 0) {
+      return epicTasksWithProgress
+    }
+    
+    // Fallback to departments if no epic tasks
     return departments.slice(0, 2).map((dept) => {
       const progressSources = [
         dept?.progress,
@@ -368,7 +430,7 @@ export default function HoOCDashBoard() {
         deadline: deadlineSource ? formatDate(deadlineSource) : "Đang cập nhật"
       }
     })
-  }, [departments])
+  }, [allTasks, departments])
 
   // Prepare timeline data from milestones (max 5)
   const eventTimeline = useMemo(
@@ -613,56 +675,155 @@ export default function HoOCDashBoard() {
 
           {/* Middle Section */}
           <div className="row g-3 mb-4">
+            {/* Epic Progress Section */}
+            <div className="col-12 col-lg-6">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "320px", display: "flex", flexDirection: "column" }}>
+                  <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
+                    Tiến độ Epic
+                  </h6>
+
+                  {epicTasks.length > 0 ? (
+                    <div style={{ 
+                      flex: 1, 
+                      overflowY: "auto", 
+                      maxHeight: "240px",
+                      paddingRight: "8px"
+                    }}>
+                      {epicTasks.map((epic, index) => {
+                        const progress = typeof epic.progressPct === "number" ? epic.progressPct : (epic.progress || 0)
+                        const normalizedProgress = Math.max(0, Math.min(100, Math.round(progress)))
+                        
+                        return (
+                          <div key={epic._id || epic.id || index} className={index !== epicTasks.length - 1 ? "mb-4" : ""}>
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <div className="d-flex align-items-center">
+                                <span
+                                  className="rounded-circle me-2"
+                                  style={{
+                                    width: "8px",
+                                    height: "8px",
+                                    backgroundColor: "#fbbf24",
+                                  }}
+                                ></span>
+                                <span style={{ fontSize: "14px", color: "#374151" }}>{epic.title || epic.name || "Epic"}</span>
+                              </div>
+                            </div>
+                            <div className="d-flex align-items-center">
+                              <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                                <div
+                                  className="progress-fill rounded"
+                                  style={{
+                                    width: `${normalizedProgress}%`,
+                                    height: "100%",
+                                    backgroundColor: "#fbbf24",
+                                    transition: "width 0.3s ease"
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="text-muted ms-2" style={{ fontSize: "12px" }}>
+                                {normalizedProgress}%
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted py-4">
+                      Chưa có dữ liệu epic
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Progress Section */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
                 <div className="card-body p-4" style={{ minHeight: "320px" }}>
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
-                    Công việc lớn của các ban
+                    Tiến độ của các ban
                   </h6>
 
-                  {majorTasks.length > 0 ? (
-                    majorTasks.map((task, index) => (
-                      <div key={index} className={index !== majorTasks.length - 1 ? "mb-4" : ""}>
-                        <div className="d-flex justify-content-between align-items-center mb-2">
+                  {(() => {
+                    // Calculate progress for each department based on epic tasks
+                    const departmentProgress = departments.map(dept => {
+                      const deptId = dept?._id || dept?.id
+                      if (!deptId) return null
+                      
+                      // Get epic tasks for this department
+                      const deptEpicTasks = epicTasks.filter(epic => {
+                        const epicDeptId = epic?.departmentId?._id || epic?.departmentId || epic?.departmentId?.id
+                        return String(epicDeptId) === String(deptId)
+                      })
+                      
+                      const totalEpicTasks = deptEpicTasks.length
+                      const completedEpicTasks = deptEpicTasks.filter(epic => {
+                        const status = epic?.status || ""
+                        return isCompletedStatus(status)
+                      }).length
+                      
+                      const progressPercent = totalEpicTasks > 0
+                        ? Math.round((completedEpicTasks / totalEpicTasks) * 100)
+                        : 0
+                      
+                      return {
+                        departmentId: deptId,
+                        name: dept?.name || "Ban chưa đặt tên",
+                        progress: progressPercent,
+                        completed: completedEpicTasks,
+                        total: totalEpicTasks
+                      }
+                    }).filter(Boolean)
+                    
+                    if (departmentProgress.length > 0) {
+                      return departmentProgress.slice(0, 2).map((dept, index) => (
+                        <div key={dept.departmentId || index} className={index !== departmentProgress.length - 1 ? "mb-4" : ""}>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <div className="d-flex align-items-center">
+                              <span
+                                className="rounded-circle me-2"
+                                style={{
+                                  width: "8px",
+                                  height: "8px",
+                                  backgroundColor: "#fbbf24",
+                                }}
+                              ></span>
+                              <span style={{ fontSize: "14px", color: "#374151" }}>{dept.name}</span>
+                            </div>
+                          </div>
                           <div className="d-flex align-items-center">
-                            <span
-                              className="rounded-circle me-2"
-                              style={{
-                                width: "8px",
-                                height: "8px",
-                                backgroundColor: "#fbbf24",
-                              }}
-                            ></span>
-                            <span style={{ fontSize: "14px", color: "#374151" }}>{task.title}</span>
+                            <div className="progress flex-grow-1" style={{ height: "8px" }}>
+                              <div
+                                className="progress-fill rounded"
+                                style={{
+                                  width: `${dept.progress}%`,
+                                  height: "100%",
+                                  backgroundColor: "#fbbf24",
+                                  transition: "width 0.3s ease"
+                                }}
+                              ></div>
+                            </div>
+                            <span className="text-muted ms-2" style={{ fontSize: "12px" }}>
+                              {dept.progress}%
+                            </span>
                           </div>
-                          <span className="text-muted" style={{ fontSize: "12px" }}>
-                            Deadline: {task.deadline}
-                          </span>
+                          {dept.total > 0 && (
+                            <div className="text-muted mt-2" style={{ fontSize: "11px" }}>
+                              ({dept.completed} / {dept.total} công việc lớn đã hoàn thành)
+                            </div>
+                          )}
                         </div>
-                        <div className="d-flex align-items-center">
-                          <div className="progress flex-grow-1" style={{ height: "8px" }}>
-                            <div
-                              className="progress-fill rounded"
-                              style={{
-                                width: `${task.progress}%`,
-                                height: "100%",
-                                backgroundColor: "#fbbf24",
-                                transition: "width 0.3s ease"
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-muted ms-2" style={{ fontSize: "12px" }}>
-                            {task.progress}%
-                          </span>
+                      ))
+                    } else {
+                      return (
+                        <div className="text-center text-muted py-4">
+                          Chưa có dữ liệu công việc
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted py-4">
-                      Chưa có dữ liệu công việc
-                    </div>
-                  )}
+                      )
+                    }
+                  })()}
                 </div>
               </div>
             </div>
@@ -683,11 +844,11 @@ export default function HoOCDashBoard() {
                             style={{
                               width: "8px",
                               height: "8px",
-                              backgroundColor: "#ef4444",
+                              backgroundColor: "#3b82f6",
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Ngân sách
+                            Tiền dự trù (HoD)
                           </span>
                         </div>
                         <div className="d-flex align-items-center gap-1">
@@ -696,49 +857,89 @@ export default function HoOCDashBoard() {
                             style={{
                               width: "8px",
                               height: "8px",
-                              backgroundColor: "#991b1b",
+                              backgroundColor: "#10b981",
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Chi tiêu
+                            Tiền thực tế (Member)
                           </span>
                         </div>
                       </div>
-                      <select className="form-select form-select-sm" style={{ fontSize: "13px", width: "auto" }}>
-                        <option>Tháng này</option>
-                      </select>
                     </div>
                   </div>
 
-                  {budgetSpendingData.length > 0 ? (
-                    <div className="d-flex align-items-end justify-content-around" style={{ height: "200px", marginTop: "20px" }}>
-                      {budgetSpendingData.map((item, index) => (
-                        <div key={index} className="d-flex flex-column align-items-center" style={{ flex: 1 }}>
-                          <div className="d-flex gap-1 align-items-end" style={{ height: "160px" }}>
-                            <div
-                              className="chart-bar rounded-top"
-                              style={{
-                                width: "32px",
-                                height: `${Math.max(4, Math.round(item.budget * budgetChartScale))}px`,
-                                backgroundColor: "#ef4444",
-                                transition: "height 0.5s ease"
-                              }}
-                            ></div>
-                            <div
-                              className="chart-bar rounded-top"
-                              style={{
-                                width: "32px",
-                                height: `${Math.max(4, Math.round(item.spending * budgetChartScale))}px`,
-                                backgroundColor: "#991b1b",
-                                transition: "height 0.5s ease"
-                              }}
-                            ></div>
-                          </div>
-                          <div className="text-muted mt-2" style={{ fontSize: "12px" }}>
-                            {item.category}
+                  {totalPlanned > 0 || totalActual > 0 ? (
+                    <div style={{ marginTop: "20px" }}>
+                      {/* Comparison bars */}
+                      <div className="d-flex align-items-end justify-content-center gap-4" style={{ minHeight: "200px", marginBottom: "30px", position: "relative" }}>
+                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
+                          <div
+                            className="chart-bar rounded-top"
+                            style={{
+                              width: "60px",
+                              height: `${Math.max(4, Math.min(160, Math.round(totalPlanned * budgetChartScale)))}px`,
+                              backgroundColor: "#3b82f6",
+                              transition: "height 0.5s ease",
+                              marginBottom: "12px",
+                              flexShrink: 0
+                            }}
+                          ></div>
+                          <div className="text-center" style={{ marginTop: "8px" }}>
+                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
+                              {totalPlanned.toLocaleString("vi-VN")} VNĐ
+                            </div>
+                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
+                              Tiền dự trù
+                            </div>
                           </div>
                         </div>
-                      ))}
+                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
+                          <div
+                            className="chart-bar rounded-top"
+                            style={{
+                              width: "60px",
+                              height: `${Math.max(4, Math.min(160, Math.round(totalActual * budgetChartScale)))}px`,
+                              backgroundColor: "#10b981",
+                              transition: "height 0.5s ease",
+                              marginBottom: "12px",
+                              flexShrink: 0
+                            }}
+                          ></div>
+                          <div className="text-center" style={{ marginTop: "8px" }}>
+                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
+                              {totalActual.toLocaleString("vi-VN")} VNĐ
+                            </div>
+                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
+                              Tiền thực tế
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Summary info */}
+                      <div className="d-flex justify-content-center align-items-start gap-4 pt-3" style={{ borderTop: "1px solid #e5e7eb", marginTop: "20px" }}>
+                        <div className="text-center" style={{ minWidth: "120px" }}>
+                          <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                            Tỷ lệ sử dụng
+                          </div>
+                          <div className="fw-semibold" style={{ fontSize: "16px", color: "#1f2937" }}>
+                            {budgetUsageDisplay}
+                          </div>
+                        </div>
+                        {totalPlanned > 0 && (
+                          <div className="text-center" style={{ minWidth: "120px" }}>
+                            <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                              Chênh lệch
+                            </div>
+                            <div className="fw-semibold" style={{ 
+                              fontSize: "16px", 
+                              color: totalActual > totalPlanned ? "#ef4444" : totalActual < totalPlanned ? "#10b981" : "#6b7280"
+                            }}>
+                              {(totalActual - totalPlanned).toLocaleString("vi-VN")} VNĐ
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center text-muted py-4">

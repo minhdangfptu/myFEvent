@@ -12,7 +12,7 @@ import { useEvents } from "../../contexts/EventContext";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import NoDataImg from "~/assets/no-data.png";
-import { Calendar, CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Copy, Flag, LogIn, MapPin, Plus, Search, Ticket, Upload, UserCheck, X, Zap } from "lucide-react";
+import { Calendar, CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Copy, Flag, LogIn, MapPin, Plus, Search, Ticket, Upload, UserCheck, X, XCircle, Zap } from "lucide-react";
 import { currentEventStorage } from "../../utils/currentEventStorage";
 
 
@@ -127,6 +127,8 @@ export default function HomePage() {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
+  const [showJoinErrorModal, setShowJoinErrorModal] = useState(false);
+  const [joinErrorMessage, setJoinErrorMessage] = useState("");
   const [blogs, setBlogs] = useState([]);
   const [showJoinCodeModal, setShowJoinCodeModal] = useState(false);
   const [joinCodeForModal, setJoinCodeForModal] = useState("");
@@ -1494,9 +1496,18 @@ export default function HomePage() {
                       );
                       toast.success("Tham gia sự kiện thành công!");
                     } catch (err) {
-                      setJoinError(
-                        err.response?.data?.message || "Tham gia thất bại"
-                      );
+                      // Handle 404 specifically - show modal with user-friendly message
+                      if (err.response?.status === 404) {
+                        const errorMsg = err.response?.data?.message || "Mã tham gia không hợp lệ. Vui lòng kiểm tra lại mã và thử lại.";
+                        setJoinErrorMessage(errorMsg);
+                        setShowJoinErrorModal(true);
+                        setJoinError(""); // Clear inline error
+                      } else {
+                        const errorMsg = err.response?.data?.message || "Tham gia thất bại. Vui lòng thử lại sau.";
+                        setJoinErrorMessage(errorMsg);
+                        setShowJoinErrorModal(true);
+                        setJoinError(""); // Clear inline error
+                      }
                     }
                   }}
                 >
@@ -1533,6 +1544,122 @@ export default function HomePage() {
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal for Invalid Join Code */}
+      {showJoinErrorModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowJoinErrorModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '480px',
+              width: '90%',
+              position: 'relative',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowJoinErrorModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#6b7280',
+                padding: '4px 8px',
+                borderRadius: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: '#fef2f2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}
+              >
+                <XCircle size={32} style={{ color: '#ef4444' }} />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#1f2937', marginBottom: '8px' }}>
+                Mã tham gia không hợp lệ
+              </h3>
+              <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                {joinErrorMessage}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => {
+                  setShowJoinErrorModal(false);
+                  setJoinErrorMessage("");
+                  setJoinCode(""); // Clear the join code input
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px 24px',
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#ef4444';
+                }}
+              >
+                <Check size={18} />
+                Đã hiểu
+              </button>
             </div>
           </div>
         </div>

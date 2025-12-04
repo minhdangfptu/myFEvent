@@ -15,10 +15,7 @@ import KanbanBoardTask from "~/components/KanbanBoardTask";
 import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import { useNotifications } from "~/contexts/NotificationsContext";
-import AIChatAssistant from "~/components/AIChatAssistant";
-import WBSPreviewModal from "~/components/WBSPreviewModal";
 import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
-import { aiApi } from "~/apis/aiApi";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "~/components/Loading";
 import { RotateCw, Trash, AlertTriangle, X, Bot, FileCheck, ClipboardList } from "lucide-react";
@@ -77,10 +74,6 @@ export default function EventTaskPage() {
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
   const [filterAssignee, setFilterAssignee] = useState("Tất cả");
   const [filterType, setFilterType] = useState("all");
-  const [showAIChat, setShowAIChat] = useState(false);
-  const [wbsData, setWbsData] = useState(null);
-  const [showWBSModal, setShowWBSModal] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const navigate = useNavigate();
 
@@ -273,7 +266,9 @@ export default function EventTaskPage() {
       return 0;
     });
 
-  const filteredNormalTasks = filteredTasks.filter((task) => task.taskType === "normal");
+  const filteredNormalTasks = filteredTasks.filter(
+    (task) => task.taskType === "normal" || !!task.parentId
+  );
   const filteredNormalTaskIds = filteredNormalTasks.map((task) => task.id);
   const filteredEpicIdSet = new Set(
     filteredNormalTasks
@@ -358,12 +353,14 @@ export default function EventTaskPage() {
     return STATUS_STYLE_MAP[code] || { bg: "#E2E8F0", color: "#1E293B" };
   };
 
+  // Một số dữ liệu cũ chưa set taskType cho epic ⇒ fallback theo parentId để loại khỏi thống kê
+  const normalTasks = tasks.filter((t) => t.taskType === "normal" || !!t.parentId);
   const taskStats = {
-    total: tasks.filter((t) => t.taskType === "normal").length,
-    completed: tasks.filter((t) => t.statusCode === "hoan_thanh").length,
-    inProgress: tasks.filter((t) => t.statusCode === "da_bat_dau").length,
-    notStarted: tasks.filter((t) => t.statusCode === "chua_bat_dau").length,
-    cancelled: tasks.filter((t) => t.statusCode === "huy").length,
+    total: normalTasks.length,
+    completed: normalTasks.filter((t) => t.statusCode === "hoan_thanh").length,
+    inProgress: normalTasks.filter((t) => t.statusCode === "da_bat_dau").length,
+    notStarted: normalTasks.filter((t) => t.statusCode === "chua_bat_dau").length,
+    cancelled: normalTasks.filter((t) => t.statusCode === "huy").length,
   };
 
   const handleUpdateTaskStatus = async (taskId, newStatusCode) => {
@@ -461,6 +458,17 @@ export default function EventTaskPage() {
       }
     });
     
+    // Kiểm tra quyền: HoOC không thể xóa normal task
+    if (eventRole === "HoOC") {
+      const normalTaskIdsToDelete = selectedTaskIds.filter(
+        (taskId) => !epicTaskIdsToDelete.includes(taskId)
+      );
+      if (normalTaskIdsToDelete.length > 0) {
+        toast.warning("HoOC không thể xóa công việc thường. Chỉ HoD hoặc người tạo công việc mới có thể xóa.");
+        return;
+      }
+    }
+    
     // Tổng số sẽ xóa: epic tasks + normal tasks (bao gồm cả task trong epic)
     const totalToDelete = selectedEpicIds.length + selectedTaskIds.length;
     const message = selectedEpicIds.length > 0 && selectedTaskIds.length > 0
@@ -482,6 +490,7 @@ export default function EventTaskPage() {
           );
 
           // Xóa normal tasks (loại bỏ các task đã nằm trong epic được xóa)
+          // HoOC không thể xóa normal task, đã được kiểm tra ở trên
           const normalTaskIdsToDelete = selectedTaskIds.filter(
             (taskId) => !epicTaskIdsToDelete.includes(taskId)
           );
@@ -597,12 +606,17 @@ const openAddTaskModal = (mode = "epic", epic = null) => {
   setAddTaskError("");
   setAddTaskForm(() => {
     const base = createEmptyAddTaskForm();
-    if (mode === "normal") {
+    if (mode === "normal" && epic) {
+      // Tìm epic task từ tasks list để lấy đầy đủ thông tin
+      const epicId = epic.id || epic._id;
+      const fullEpicTask = tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
+      const epicToUse = fullEpicTask || epic;
+      
       return {
         ...base,
         taskType: "normal",
-        departmentId: epic?.departmentId || "",
-        parentId: epic?.id || "",
+        // Không set departmentId và milestoneId - để backend tự động lấy từ parent
+        parentId: epic?.id || epic?._id || "",
       };
     }
     return base;
@@ -737,14 +751,17 @@ const closeAddTaskModal = () => {
       ? toISO(addTaskForm.startDate)
       : undefined;
 
+    // Nếu tạo task con (có parentId), không gửi departmentId và milestoneId để backend tự động lấy từ parent
     const payload = {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
-      departmentId: addTaskForm.departmentId,
+      // Chỉ gửi departmentId nếu không có parentId (tạo epic task hoặc normal task độc lập)
+      departmentId: addTaskForm.parentId ? undefined : addTaskForm.departmentId,
       assigneeId: orUndef(addTaskForm.assigneeId),
       startDate: computedStart,
       dueDate: toISO(addTaskForm.dueDate),
-      milestoneId: orUndef(addTaskForm.milestoneId),
+      // Chỉ gửi milestoneId nếu không có parentId
+      milestoneId: addTaskForm.parentId ? undefined : orUndef(addTaskForm.milestoneId),
       parentId: orUndef(addTaskForm.parentId),
       taskType: addTaskForm.taskType || "epic",
     };
@@ -771,8 +788,7 @@ const closeAddTaskModal = () => {
     }
   };
 
-  const statusGroup = tasks
-    .filter((t) => t.taskType === "normal")
+  const statusGroup = normalTasks
     .reduce(
     (acc, t) => {
         if (t.statusCode === "da_bat_dau") acc.inProgress.push(t);
@@ -1170,15 +1186,6 @@ const closeAddTaskModal = () => {
                   </select>
 
 
-                  {eventRole === "HoOC" && (
-                    <button
-                      className="btn btn-success me-2"
-                      onClick={() => setShowAIChat(true)}
-                      style={{ fontSize: 14 }}
-                    >
-                      <Bot size="18px" /> Trợ lý feAI
-                    </button>
-                  )}
                   <button
                     className="add-btn btn btn-primary"
                     onClick={() => openAddTaskModal("epic")}
@@ -1915,37 +1922,6 @@ const closeAddTaskModal = () => {
           </>
         )}
 
-        {/* AI Chat Assistant for HOOC */}
-        {showAIChat && eventRole === "HoOC" && (
-          <AIChatAssistant
-            eventId={eventId}
-            onWBSGenerated={(data) => {
-              setWbsData(data);
-              setSessionId(data.data?.session_id);
-              setShowWBSModal(true);
-              setShowAIChat(false);
-            }}
-            onClose={() => setShowAIChat(false)}
-          />
-        )}
-
-        {/* WBS Preview Modal */}
-        {showWBSModal && wbsData && (
-          <WBSPreviewModal
-            eventId={eventId}
-            wbsData={wbsData}
-            sessionId={sessionId}
-            onClose={() => {
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-            onApplied={() => {
-              fetchTasks();
-              setShowWBSModal(false);
-              setWbsData(null);
-            }}
-          />
-        )}
 
         {/* Action Bar - Hiển thị khi có task hoặc epic được chọn */}
         {(selectedTaskIds.length > 0 || selectedEpicIds.length > 0) && (

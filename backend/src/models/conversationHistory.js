@@ -4,6 +4,17 @@ const ConversationHistorySchema = new Schema({
   eventId: { type: Types.ObjectId, ref: 'Event', required: true },
   userId: { type: Types.ObjectId, ref: 'User', required: true },
   sessionId: { type: String, required: true, index: true },
+
+  // Phân loại kênh: 'wbs' (AI WBS cũ), 'event_planner_agent' (agent mới), ...
+  channel: {
+    type: String,
+    default: 'wbs',
+  },
+
+  // Tiêu đề gọn cho sidebar lịch sử (giống ChatGPT)
+  title: {
+    type: String,
+  },
   
   messages: [{
     role: { type: String, enum: ['user', 'assistant'], required: true },
@@ -43,13 +54,19 @@ const ConversationHistorySchema = new Schema({
   
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-}, { timestamps: true, versionKey: false });
+}, {
+  timestamps: true,
+  versionKey: false,
+  // Map model này sang collection 'conversations' (đang có dữ liệu sẵn)
+  collection: 'conversations'
+});
 
 // Indexes for efficient queries
 ConversationHistorySchema.index({ eventId: 1, userId: 1 });
 ConversationHistorySchema.index({ sessionId: 1 });
 ConversationHistorySchema.index({ createdAt: -1 });
 ConversationHistorySchema.index({ eventId: 1, applied: 1 });
+ConversationHistorySchema.index({ userId: 1, channel: 1, updatedAt: -1 });
 
 export default mongoose.model('ConversationHistory', ConversationHistorySchema);
 

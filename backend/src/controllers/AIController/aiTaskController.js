@@ -126,7 +126,7 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
         parentId: epic._id,
 
         taskType: 'normal',      // EPIC = 'epic', task con = 'normal'
-        status: 'suggested',     // task do AI sinh ra → trạng thái "gợi ý"
+        status: 'chua_bat_dau',  // task do AI sinh ra → trạng thái "chưa bắt đầu" (thay vì 'suggested' vì không có trong enum)
         progressPct: 0,
 
         estimate,

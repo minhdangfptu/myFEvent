@@ -1,5 +1,5 @@
 import express from 'express';
-import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, updateEventImage, updateEvent, deleteEvent, getAllEventDetail } from '../controllers/eventController.js';
+import { listPublicEvents, getPublicEventDetail, getPrivateEventDetail, createEvent, joinEventByCode, getEventSummary, listMyEvents, updateEventImage, updateEvent, deleteEvent, getAllEventDetail, getEventDetailForAI } from '../controllers/eventController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 import milestoneRoute from './milestoneRoute.js';
 import departmentRoute from './departmentRoute.js';
@@ -35,6 +35,7 @@ router.post(
   authenticateToken,
   aiBulkCreateTasksForEpic
 );
+router.get('/:eventId/ai-detail', authenticateToken, getEventDetailForAI);
 
 // Public events
 router.get('/public', listPublicEvents);

@@ -1025,24 +1025,74 @@ const ViewDepartmentBudget = () => {
           </div>
 
           {/* Tab Selection */}
-          <div className="d-flex gap-2 mb-4">
-            <button
-              className={`btn ${activeTable === "hooc" ? "btn-primary" : "btn-outline-primary"}`}
+          <div 
+            className="d-flex gap-4 mb-4"
+            style={{
+              borderBottom: "1px solid #E5E7EB",
+              paddingBottom: "0"
+            }}
+          >
+            <div
               onClick={() => setActiveTable("hooc")}
-              style={{ borderRadius: "8px" }}
+              style={{
+                padding: "12px 0",
+                cursor: "pointer",
+                userSelect: "none",
+                color: activeTable === "hooc" ? "#111827" : "#6B7280",
+                fontWeight: activeTable === "hooc" ? "600" : "400",
+                fontSize: "16px",
+                borderBottom: activeTable === "hooc" ? "2px solid #3B82F6" : "2px solid transparent",
+                marginBottom: "-1px",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onMouseEnter={(e) => {
+                if (activeTable !== "hooc") {
+                  e.currentTarget.style.color = "#374151";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTable !== "hooc") {
+                  e.currentTarget.style.color = "#6B7280";
+                }
+              }}
             >
-              <i className="bi bi-send me-2"></i>
+              <Send size={18} />
               Bảng gửi TBTC
-            </button>
+            </div>
             {(isApproved || isSentToMembers) && (
-              <button
-                className={`btn ${activeTable === "member" ? "btn-primary" : "btn-outline-primary"}`}
+              <div
                 onClick={() => setActiveTable("member")}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  padding: "12px 0",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  color: activeTable === "member" ? "#111827" : "#6B7280",
+                  fontWeight: activeTable === "member" ? "600" : "400",
+                  fontSize: "16px",
+                  borderBottom: activeTable === "member" ? "2px solid #3B82F6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTable !== "member") {
+                    e.currentTarget.style.color = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTable !== "member") {
+                    e.currentTarget.style.color = "#6B7280";
+                  }
+                }}
               >
-                <i className="bi bi-people me-2"></i>
+                <Users size={18} />
                 Bảng kiểm soát Member
-              </button>
+              </div>
             )}
           </div>
 

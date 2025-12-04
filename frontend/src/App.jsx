@@ -110,6 +110,7 @@ import AxiosInterceptor from "./components/AxiosInterceptor";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SupportPage from "./pages/User/SupportPage";
 import SupportButton from "./components/SupportButton";
+import GlobalAIAssistant from "./components/chat/GlobalAIAssistant";
 
 // Component để redirect URL cũ có budgetId trong path review
 const BudgetReviewRedirect = () => {
@@ -257,6 +258,7 @@ export default function App() {
       <AxiosInterceptor>
         <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
         <SupportButton />
+        <GlobalAIAssistant />
         <NotificationsProvider>
           <EventProvider>
             <ErrorBoundary>

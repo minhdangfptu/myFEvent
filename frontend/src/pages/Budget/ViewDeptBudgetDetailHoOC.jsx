@@ -75,6 +75,14 @@ const ViewDeptBudgetDetailHoOC = () => {
       ]);
 
       if (!budgetData) {
+        toast.error("Budget không tồn tại hoặc chưa được gửi lên để duyệt.");
+        navigate(`/events/${eventId}/budgets`);
+        return;
+      }
+
+      // HoOC không được xem draft budgets từ HoD
+      if (budgetData.status === 'draft') {
+        toast.error("Không thể xem budget nháp. Budget này chưa được gửi lên để duyệt.");
         navigate(`/events/${eventId}/budgets`);
         return;
       }
@@ -111,19 +119,20 @@ const ViewDeptBudgetDetailHoOC = () => {
       const errorMessage = error?.response?.data?.message || error?.message || "Không thể tải dữ liệu budget";
       toast.error(errorMessage);
       
-      // Handle different error cases
+      // Handle different error cases - always redirect back to budget list
       if (error?.response?.status === 404) {
-        toast.error("Budget không tồn tại hoặc đã bị xóa");
-        navigate(`/events/${eventId}/budgets`);
+        toast.error("Budget không tồn tại hoặc đã bị xóa. Đang quay lại danh sách...");
+        setTimeout(() => navigate(`/events/${eventId}/budgets`), 1000);
       } else if (error?.response?.status === 403) {
-        toast.error("Bạn không có quyền xem budget này");
-        navigate(`/events/${eventId}/budgets`);
+        toast.error("Bạn không có quyền xem budget này. Đang quay lại danh sách...");
+        setTimeout(() => navigate(`/events/${eventId}/budgets`), 1000);
       } else if (error?.response?.status === 500) {
-        toast.error("Lỗi server. Vui lòng thử lại sau.");
-        navigate(`/events/${eventId}/budgets`);
+        toast.error("Lỗi server. Đang quay lại danh sách...");
+        setTimeout(() => navigate(`/events/${eventId}/budgets`), 1000);
       } else {
-        // For other errors, try to stay on page but show error
-        console.error("Unexpected error:", error);
+        // For other errors, redirect back to list after showing error
+        toast.error("Đã xảy ra lỗi. Đang quay lại danh sách...");
+        setTimeout(() => navigate(`/events/${eventId}/budgets`), 1500);
       }
     } finally {
       setLoading(false);
@@ -360,7 +369,7 @@ const ViewDeptBudgetDetailHoOC = () => {
             onClick={() => navigate(`/events/${eventId}/budgets`)}
             style={{ color: "#6b7280" }}
           >
-            <i className="bi bi-arrow-left me-2"></i>
+            <ArrowLeft className="me-2" size={20} />
             <span className="fw-bold" style={{ fontSize: "20px", color: "#111827" }}>
               Chi tiết ngân sách – {department?.name || "Ban"}
             </span>
@@ -723,7 +732,7 @@ const ViewDeptBudgetDetailHoOC = () => {
             onClick={() => navigate(`/events/${eventId}/budgets`)}
             style={{ color: "#6b7280" }}
           >
-            <i className="bi bi-arrow-left me-2"></i>
+            <ArrowLeft className="me-2" size={18} />
             Trở lại danh sách
           </button>
           <div className="d-flex gap-2">
