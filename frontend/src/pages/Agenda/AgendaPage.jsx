@@ -359,7 +359,7 @@ const validateDate = (dateString) => {
       // Handle overnight schedule (e.g., 23:30 to 6:00 next day)
       const startTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.startTime);
       let endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
-      
+
       if (!startTimeISO) {
         toast.error("Định dạng thời gian bắt đầu không hợp lệ");
         return;
@@ -591,7 +591,7 @@ const validateDate = (dateString) => {
 
     setNewDate(newDateInput);
     setShowAddDateModal(false);
-    await handleAddDate(newDateInput);
+      await handleAddDate(newDateInput);
   };
 
   const handleStartEditing = (schedule) => {

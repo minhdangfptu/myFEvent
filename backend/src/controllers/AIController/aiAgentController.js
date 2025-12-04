@@ -7,14 +7,7 @@ import ConversationHistory from '../../models/conversationHistory.js';
 const AI_AGENT_BASE_URL = config.AI_AGENT_BASE_URL || 'http://localhost:9000';
 const CHANNEL_AGENT = 'event_planner_agent';
 const SELF_BASE_URL =
-  process.env.SELF_BASE_URL || `https://myfevent-ai-assitant-production.up.railway.app/`;
-
-// Log cấu hình khi khởi động
-console.log('[aiAgentController] Configuration:', {
-  AI_AGENT_BASE_URL,
-  SELF_BASE_URL,
-  NODE_ENV: process.env.NODE_ENV,
-});
+  config.SELF_BASE_URL || `https://myfevent-ai-assistant-production.up.railway.app/`;
 
 const generateTitleFromText = (text = '') => {
   if (!text || typeof text !== 'string') return 'Cuộc trò chuyện mới';

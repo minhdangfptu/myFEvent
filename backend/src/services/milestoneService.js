@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import Milestone from '../models/milestone.js';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
@@ -34,48 +33,27 @@ export const listMilestonesByEvent = async (eventId, { status, skip, limit, sort
       .lean(),
     Milestone.countDocuments(filter)
   ]);
-
-  // Calculate task count for each milestone (only normal tasks, not epic)
-  const milestoneIds = items.map(m => m._id);
-  const taskCounts = await Task.aggregate([
-    {
-      $match: {
-        eventId: new mongoose.Types.ObjectId(eventId),
-        milestoneId: { $in: milestoneIds },
-        taskType: 'normal'
-      }
-    },
-    {
-      $group: {
-        _id: '$milestoneId',
-        count: { $sum: 1 }
-      }
-    }
-  ]);
-
-  const taskCountMap = {};
-  taskCounts.forEach(tc => {
-    taskCountMap[tc._id.toString()] = tc.count;
-  });
-
-  const itemsWithCount = items.map(item => ({
-    ...item,
-    tasksCount: taskCountMap[item._id.toString()] || 0
-  }));
-
-  return { items: itemsWithCount, total };
+  return { items, total };
 };
 
 export const findMilestoneDetail = async (eventId, milestoneId) => {
   const milestone = await Milestone.findOne({ _id: milestoneId, eventId }).lean();
   if (!milestone) return null;
   
+  // Query tasks with all fields first to debug
   const allTasks = await Task.find({ 
     milestoneId: milestoneId, 
-    eventId: eventId,
-    taskType: 'normal'
+    eventId: eventId 
   }).lean();
   
+  console.log(`[findMilestoneDetail] Found ${allTasks.length} tasks for milestone ${milestoneId} in event ${eventId}`);
+  if (allTasks.length > 0) {
+    console.log(`[findMilestoneDetail] First task full data:`, JSON.stringify(allTasks[0], null, 2));
+    console.log(`[findMilestoneDetail] First task title:`, allTasks[0].title);
+    console.log(`[findMilestoneDetail] First task status:`, allTasks[0].status);
+  }
+  
+  // Select only needed fields
   const tasks = allTasks.map(t => ({
     _id: t._id,
     title: t.title,
