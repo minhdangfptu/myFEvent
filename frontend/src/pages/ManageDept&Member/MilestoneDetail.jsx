@@ -28,9 +28,6 @@ const MilestoneDetail = () => {
         setLoading(true);
         setError("");
         const response = await milestoneService.getMilestoneDetail(eventId, id);
-        console.log("[MilestoneDetail] Raw response:", response);
-        console.log("[MilestoneDetail] Related tasks:", response?.relatedTasks);
-        console.log("[MilestoneDetail] First task:", response?.relatedTasks?.[0]);
         setMilestone(response);
       } catch (err) {
         console.error("Error fetching milestone:", err);

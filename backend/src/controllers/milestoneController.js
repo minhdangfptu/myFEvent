@@ -138,7 +138,6 @@ export const getMilestoneDetail = async (req, res) => {
     if (!result) return res.status(404).json({ message: 'Milestone not found' });
     const { milestone, tasks } = result;
     
-    // Map task status from Vietnamese format to English format
     const mapTaskStatus = (status) => {
       const statusMap = {
         'chua_bat_dau': 'todo',
@@ -149,18 +148,11 @@ export const getMilestoneDetail = async (req, res) => {
       return statusMap[status] || 'todo';
     };
     
-    console.log(`[getMilestoneDetail] Processing ${tasks?.length || 0} tasks`);
-    console.log(`[getMilestoneDetail] First task sample:`, tasks?.[0]);
-    
-    const relatedTasks = (tasks || []).map(t => {
-      const taskData = {
-        id: String(t._id),
-        name: t.title || 'Không có tên',
-        status: mapTaskStatus(t.status)
-      };
-      console.log(`[getMilestoneDetail] Mapped task:`, taskData);
-      return taskData;
-    });
+    const relatedTasks = (tasks || []).map(t => ({
+      id: String(t._id),
+      name: t.title || 'Không có tên',
+      status: mapTaskStatus(t.status)
+    }));
     
     const payload = {
       id: String(milestone._id),
@@ -169,8 +161,6 @@ export const getMilestoneDetail = async (req, res) => {
       description: milestone.description || '',
       relatedTasks: relatedTasks
     };
-    
-    console.log(`[getMilestoneDetail] Final payload relatedTasks count:`, payload.relatedTasks.length);
     return res.status(200).json({ data: payload });
   } catch (error) {
     console.error('getMilestoneDetail error:', error);

@@ -530,20 +530,26 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
 
   const isEpic = isEpicTask(task);
   const isNormal = isNormalTask(task);
-  const isTaskCreator = task.createdBy && String(task.createdBy) === String(userId);
+  
+  const taskCreatorId = task.createdBy ? String(task.createdBy) : null;
+  const currentUserId = userId ? String(userId) : null;
+  const isTaskCreator = taskCreatorId && currentUserId && taskCreatorId === currentUserId;
 
   // Không cho phép xóa task đang ở trạng thái "đang làm"
   if (task.status === TASK_STATUSES.IN_PROGRESS) {
     throw makeError('Không thể xóa task khi đang ở trạng thái "Đang làm".', 403);
   }
 
-  if (isEpic && member?.role !== 'HoOC') {
-    throw makeError('Chỉ HoOC được xóa Epic task.', 403);
+  if (isEpic) {
+    if (member?.role !== 'HoOC' && !isTaskCreator) {
+      throw makeError('Chỉ HoOC được xóa Epic task.', 403);
+    }
   }
 
-  // Normal task: Chỉ HoD hoặc người tạo task được xóa (HoOC không thể xóa task thường)
-  if (isNormal && member?.role !== 'HoD' && !isTaskCreator) {
-    throw makeError('Chỉ HoD hoặc người tạo task được xóa task thường.', 403);
+  if (isNormal) {
+    if (!isTaskCreator) {
+      throw makeError('Chỉ người tạo task mới được xóa task này.', 403);
+    }
   }
 
   // Nếu task có parentId (task con trong epic), cho phép xóa luôn, không kiểm tra gì

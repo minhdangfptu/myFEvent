@@ -103,7 +103,6 @@ export default function EventTaskDetailPage() {
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
 
   const handleNavigateToTaskList = () => {
-    console.log("Navigating based on role:", eventRole);
     if (eventRole === "HoOC") {
       navigate(`/events/${eventId}/tasks`);
     } else  if (eventRole === "HoD") {
@@ -487,9 +486,15 @@ const getRoleLabel = (role) => {
     try {
       await taskApi.deleteTask(eventId, taskId, FORBIDDEN_CONFIG);
       toast.success("Đã xóa công việc");
-      navigate(`/events/${eventId}/tasks`);
+      // Navigate based on role to avoid 403 error
+      handleNavigateToTaskList();
     } catch (error) {
-      toast.error(getErrorMessage(error, "Xóa công việc thất bại"));
+      const errorMessage = getErrorMessage(error, "Xóa công việc thất bại");
+      toast.error(errorMessage);
+      // If delete was successful but navigation failed, still close modal
+      if (error?.response?.status !== 403 && error?.response?.status !== 404) {
+        handleNavigateToTaskList();
+      }
     } finally {
       setShowDeleteModal(false);
     }
@@ -726,9 +731,9 @@ const getRoleLabel = (role) => {
   const isNormalTask = form.taskType === "normal" || !form.taskType || form.taskType === "";
   const isEpicTask = form.taskType === "epic";
   
-  // HoOC không thể chỉnh sửa/xóa normal task (chỉ HoD hoặc người tạo)
-  // HoOC chỉ có thể quản lý epic task
-  const canManageTask = isEpicTask ? (isHoOC || isTaskCreator) : (isHoD || isTaskCreator);
+  const canManageTask = isEpicTask 
+    ? (isHoOC || isTaskCreator) 
+    : (isHoD || isTaskCreator);
   
   // Không cho phép chỉnh sửa/xóa khi task đang "Đang làm"
   const isTaskLocked =
@@ -846,7 +851,7 @@ const getRoleLabel = (role) => {
               className="form-select"
               value={form.parentId}
               onChange={e => handleChange('parentId', e.target.value)}
-              disabled={!canEditFields}
+              disabled={true}
             >
               <option value="">Không có</option>
               {tasksAll.filter(
@@ -900,7 +905,7 @@ const getRoleLabel = (role) => {
             className="form-select"
             value={form.departmentId}
             onChange={(e) => handleChange("departmentId", e.target.value)}
-            disabled={!canEditFields}
+            disabled={true}
           >
             <option value="">Chọn ban</option>
             {departments.map((d) => (
@@ -1025,41 +1030,43 @@ const getRoleLabel = (role) => {
       <div className="mb-3">
         <label className="form-label">Thời gian bắt đầu</label>
         <input
-          type="datetime-local"
+          type="date"
           className="form-control"
-          value={form.startDate}
-          onChange={(e) => handleChange("startDate", e.target.value)}
+          value={form.startDate ? form.startDate.split('T')[0] : form.startDate}
+          onChange={(e) => handleChange("startDate", e.target.value ? `${e.target.value}T00:00:00` : "")}
           disabled={!canEditFields}
           min={(() => {
             const now = new Date();
-            now.setMinutes(now.getMinutes() + 1);
-            const minDateTime = now.toISOString().slice(0, 16);
+            now.setHours(0, 0, 0, 0);
+            const minDate = now.toISOString().split('T')[0];
 
             // Nếu có startDate cũ và nó đã ở quá khứ, chỉ giới hạn theo thời gian tạo sự kiện
             if (originalTask?.startDate) {
               const oldStartDate = new Date(originalTask.startDate);
+              oldStartDate.setHours(0, 0, 0, 0);
               if (oldStartDate <= now) {
                 // Cho phép giữ nguyên thời gian cũ (dù ở quá khứ)
                 return eventInfo?.createdAt
-                  ? new Date(eventInfo.createdAt).toISOString().slice(0, 16)
+                  ? new Date(eventInfo.createdAt).toISOString().split('T')[0]
                   : undefined;
               }
             }
 
-            // Trường hợp còn lại: yêu cầu thời gian sau hiện tại
+            // Trường hợp còn lại: yêu cầu thời gian sau hoặc bằng hôm nay
             if (eventInfo?.createdAt) {
               const eventCreated = new Date(eventInfo.createdAt);
-              const eventCreatedStr = eventCreated.toISOString().slice(0, 16);
-              return eventCreatedStr > minDateTime ? eventCreatedStr : minDateTime;
+              eventCreated.setHours(0, 0, 0, 0);
+              const eventCreatedStr = eventCreated.toISOString().split('T')[0];
+              return eventCreatedStr > minDate ? eventCreatedStr : minDate;
             }
-            return minDateTime;
+            return minDate;
           })()}
           max={(() => {
             // Nếu có parent task, giới hạn startDate không vượt quá deadline của epic task
             if (form.parentId) {
               const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
               if (parentTask && parentTask.dueDate) {
-                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                return new Date(parentTask.dueDate).toISOString().split('T')[0];
               }
             }
             return undefined;
