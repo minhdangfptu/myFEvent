@@ -1,18 +1,22 @@
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom"; // Thêm Link
 import { useEffect, useState } from "react";
 import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
 import { getEventImage } from "../../utils/getEventImage";
 import { deriveEventStatus } from "../../utils/getEventStatus";
 import Loading from "~/components/Loading";
-import { CalendarDays, MapPin, User, FileText, AlignLeft, Zap, ExternalLink, Info } from "lucide-react";
+import { 
+  CalendarDays, MapPin, User, FileText, AlignLeft, 
+  Zap, ExternalLink, Info, AlertCircle, ArrowLeft 
+} from "lucide-react"; // Thêm icon AlertCircle, ArrowLeft
 
 export default function EventDetailPage() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // Đặt mặc định là true để tránh flash màn hình "không tìm thấy" khi mới vào
+  const [loading, setLoading] = useState(true); 
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -22,18 +26,59 @@ export default function EventDetailPage() {
       try {
         const res = await eventService.fetchEventById(id);
         const payload = res?.data ?? res;
-        setEvent(payload);
+        
+        // Kiểm tra kỹ hơn: nếu payload rỗng hoặc null
+        if (!payload) {
+            setEvent(null);
+        } else {
+            setEvent(payload);
+        }
       } catch (err) {
         console.error("fetch event detail error", err);
         setError("Không thể tải chi tiết sự kiện");
+        setEvent(null);
       } finally {
         setLoading(false);
       }
     };
 
-    loadDetail();
+    if (id) {
+        loadDetail();
+    } else {
+        setLoading(false);
+    }
   }, [id]);
 
+  // --- LOGIC XỬ LÝ KHI KHÔNG TÌM THẤY SỰ KIỆN ---
+  if (!loading && (!event || error)) {
+    return (
+      <>
+        <Header />
+        <div 
+          className="d-flex flex-column align-items-center justify-content-center" 
+          style={{ minHeight: "60vh", background: "#f8fafc", padding: "20px" }}
+        >
+          <div className="text-center p-5 bg-white shadow-sm rounded-4" style={{ maxWidth: "500px", width: "100%" }}>
+            <div className="mb-4 d-inline-flex align-items-center justify-content-center rounded-circle" 
+                 style={{ width: "80px", height: "80px", background: "#fee2e2", color: "#ef4444" }}>
+              <AlertCircle size={40} />
+            </div>
+            <h3 className="fw-bold text-dark mb-2">Không tìm thấy sự kiện</h3>
+            <p className="text-muted mb-4">
+              Sự kiện bạn đang tìm kiếm không tồn tại, đã bị xóa hoặc đường dẫn không chính xác.
+            </p>
+            <Link to="/events" className="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill fw-semibold">
+              <ArrowLeft size={18} />
+              Quay về danh sách sự kiện
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  // --- LOGIC HIỂN THỊ DỮ LIỆU KHI CÓ EVENT ---
   const defaultImg = "/default-events.jpg";
   const imageUrl = getEventImage(event ?? {}, defaultImg);
   const title = event?.name || "Sự kiện";
@@ -51,6 +96,8 @@ export default function EventDetailPage() {
   return (
     <>
       <Header />
+      
+      {/* Loading Overlay */}
       {loading && (
         <div
           style={{
@@ -66,78 +113,82 @@ export default function EventDetailPage() {
           <Loading size={80} />
         </div>
       )}
-      <div className="public-event-wrapper container-xl py-4">
-        <div className="public-event-hero shadow-sm">
-          <div
-            className="public-event-image"
-            style={{ backgroundImage: `url(${imageUrl})` }}
-          />
-          <div className="public-event-overlay" />
-          <div className="public-event-content">
-            <div className="d-flex flex-wrap gap-2 mb-3">
-              <span className="public-chip" style={{ background: statusConfig.bg, color: statusConfig.color }}>
-                <Zap size={16} />
-                {statusConfig.text}
-              </span>
-              {address && (
-                <span className="public-chip" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
-                  <MapPin size={16} />
-                  {address}
-                </span>
-              )}
-            </div>
-            <h1 className="public-title">{title}</h1>
-            <p className="public-date">
-              <CalendarDays size={18} className="me-2" />
-              {dateText || "Đang cập nhật"}
-            </p>
-          </div>
-        </div>
 
-        <div className="row g-4 mt-4">
-          <div className="col-12 col-lg-8">
-            <div className="info-card shadow-sm">
-              <div className="d-flex align-items-center gap-3 mb-4">
-                <div className="info-card-icon">
-                  <Info size={20} />
-                </div>
-                <div>
-                  <p className="text-muted mb-1">Thông tin sự kiện</p>
-                  <h4 className="mb-0">Khoảnh khắc bạn không nên bỏ lỡ</h4>
-                </div>
+      {/* Main Content - Chỉ hiện khi event tồn tại (đã được handle bởi if ở trên, nhưng giữ logic render an toàn) */}
+      {event && (
+        <div className="public-event-wrapper container-xl py-4">
+          <div className="public-event-hero shadow-sm">
+            <div
+              className="public-event-image"
+              style={{ backgroundImage: `url(${imageUrl})` }}
+            />
+            <div className="public-event-overlay" />
+            <div className="public-event-content">
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                <span className="public-chip" style={{ background: statusConfig.bg, color: statusConfig.color }}>
+                  <Zap size={16} />
+                  {statusConfig.text}
+                </span>
+                {address && (
+                  <span className="public-chip" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
+                    <MapPin size={16} />
+                    {address}
+                  </span>
+                )}
               </div>
-              <InfoRow icon={FileText} label="Tên sự kiện" value={title} />
-              <InfoRow icon={User} label="Đơn vị tổ chức" value={event?.organizerName || event?.organizer || "FPT University"} />
-              <InfoRow icon={CalendarDays} label="Thời gian" value={dateText || "Chưa cập nhật"} />
-              <InfoRow icon={MapPin} label="Địa điểm" value={address} />
-              <InfoRow icon={AlignLeft} label="Mô tả" value={event?.description || "Chưa có mô tả chi tiết."} multiline />
-            </div>
-          </div>
-          <div className="col-12 col-lg-4">
-            <div className="info-card shadow-sm" style={{ background: "#f8fafc" }}>
-              <div className="d-flex align-items-center gap-3 mb-4">
-                <div className="info-card-icon" style={{ background: "#fee2e2", color: "#b91c1c" }}>
-                  <ExternalLink size={18} />
-                </div>
-                <div>
-                  <p className="text-muted mb-1">Chia sẻ sự kiện</p>
-                  <h5 className="mb-0">Lan tỏa đến bạn bè</h5>
-                </div>
-              </div>
-              <p className="text-muted small mb-2">Đường dẫn sự kiện</p>
-              <div className="input-group">
-                <input className="form-control" value={window.location.href} readOnly />
-                <button className="btn btn-outline-secondary" onClick={() => navigator.clipboard.writeText(window.location.href)}>
-                  Sao chép
-                </button>
-              </div>
-              <p className="text-muted small mt-3 mb-0">
-                Hoặc lưu lại sự kiện để khám phá nhiều chương trình thú vị khác trên myFEvent.
+              <h1 className="public-title">{title}</h1>
+              <p className="public-date">
+                <CalendarDays size={18} className="me-2" />
+                {dateText || "Đang cập nhật"}
               </p>
             </div>
           </div>
+
+          <div className="row g-4 mt-4">
+            <div className="col-12 col-lg-8">
+              <div className="info-card shadow-sm">
+                <div className="d-flex align-items-center gap-3 mb-4">
+                  <div className="info-card-icon">
+                    <Info size={20} />
+                  </div>
+                  <div>
+                    <p className="text-muted mb-1">Thông tin sự kiện</p>
+                    <h4 className="mb-0">Khoảnh khắc bạn không nên bỏ lỡ</h4>
+                  </div>
+                </div>
+                <InfoRow icon={FileText} label="Tên sự kiện" value={title} />
+                <InfoRow icon={User} label="Đơn vị tổ chức" value={event?.organizerName || event?.organizer || "FPT University"} />
+                <InfoRow icon={CalendarDays} label="Thời gian" value={dateText || "Chưa cập nhật"} />
+                <InfoRow icon={MapPin} label="Địa điểm" value={address} />
+                <InfoRow icon={AlignLeft} label="Mô tả" value={event?.description || "Chưa có mô tả chi tiết."} multiline />
+              </div>
+            </div>
+            <div className="col-12 col-lg-4">
+              <div className="info-card shadow-sm" style={{ background: "#f8fafc" }}>
+                <div className="d-flex align-items-center gap-3 mb-4">
+                  <div className="info-card-icon" style={{ background: "#fee2e2", color: "#b91c1c" }}>
+                    <ExternalLink size={18} />
+                  </div>
+                  <div>
+                    <p className="text-muted mb-1">Chia sẻ sự kiện</p>
+                    <h5 className="mb-0">Lan tỏa đến bạn bè</h5>
+                  </div>
+                </div>
+                <p className="text-muted small mb-2">Đường dẫn sự kiện</p>
+                <div className="input-group">
+                  <input className="form-control" value={window.location.href} readOnly />
+                  <button className="btn btn-outline-secondary" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                    Sao chép
+                  </button>
+                </div>
+                <p className="text-muted small mt-3 mb-0">
+                  Hoặc lưu lại sự kiện để khám phá nhiều chương trình thú vị khác trên myFEvent.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       <Footer />
       <style>{`
