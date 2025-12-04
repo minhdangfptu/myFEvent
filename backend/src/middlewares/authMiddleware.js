@@ -72,14 +72,7 @@ export const authenticateRefreshToken = async (req, res, next) => {
     return res.status(500).json({ message: 'Authentication failed!' });
   }
 };
-export const isAdmin = (req, res, next) => {
-  // Debug logging
-  console.log('isAdmin middleware check:', {
-    hasUser: !!req.user,
-    userRole: req.user?.role,
-    userId: req.user?.id
-  });
-  
+export const isAdmin = (req, res, next) => {  
   if (req.user && req.user.role === 'admin') {
     next();
   } else {
