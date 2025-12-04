@@ -322,7 +322,7 @@ export const createCalendarForDepartment = async (req, res) => {
         }
         const ownerMemberid = requesterMembership?._id;
 		let { name, startAt, endAt, locationType, location, meetingDate, startTime, endTime, participantType, members, notes, attachments } = req.body;
-
+        console.log(members);
         if (!startAt && meetingDate && startTime) {
             startAt = new Date(`${meetingDate}T${startTime}`).toISOString();
         }
