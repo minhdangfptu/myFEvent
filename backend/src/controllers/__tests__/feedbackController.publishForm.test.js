@@ -20,7 +20,8 @@ describe("feedbackController.publishForm", () => {
     vi.clearAllMocks();
   });
 
-  it('[Normal] TC01 - should publish form successfully (200)', async () => {
+  it("[Normal] TC01 - should publish form successfully (200)", async () => {
+    // Controller returns `{ status: 200 }`, not message
     feedbackService.publishForm.mockResolvedValue({});
 
     await controller.publishForm(req, res);
@@ -30,15 +31,20 @@ describe("feedbackController.publishForm", () => {
       eventId: "e1",
       formId: "f1",
     });
+
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ status: 200 });
   });
 
-  it('[Abnormal] TC02 - should return 500 when service throws error', async () => {
+  it("[Abnormal] TC02 - should return 500 when service throws error", async () => {
+    // Controller returns `{ message: err.message }` for error
     feedbackService.publishForm.mockRejectedValue(new Error("ERR"));
 
     await controller.publishForm(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "ERR",
+    });
   });
-};
-
+});

@@ -41,7 +41,7 @@ describe('notificationController.getNotifications', () => {
 
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ data: [{ id: 1 }] });
-});
+  });
 
   it('[Normal] TC02 - should filter unread=true', async () => {
   const Notification = (await import('../../models/notification.js')).default;
@@ -57,7 +57,8 @@ describe('notificationController.getNotifications', () => {
   await getNotifications(req, res);
 
   expect(Notification.find).toHaveBeenCalledWith({ userId: 'u1', unread: true });
-});
+  expect(res.status).toHaveBeenCalledWith(200);
+  });
 
   it('[Abnormal] TC03 - should return 500 on DB error', async () => {
     const Notification = (await import('../../models/notification.js')).default;
