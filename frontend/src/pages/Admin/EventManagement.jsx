@@ -250,38 +250,6 @@ const EventManagement = () => {
               width: '140px'
             }}
           />
-
-          {/* Filter Button */}
-          <button style={{
-            padding: '10px 24px',
-            backgroundColor: '#2196F3',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <span>🔍</span>
-            Lọc
-          </button>
-
-          {/* Calendar Icon */}
-          <button style={{
-            padding: '10px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E0E0E0',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Calendar style={{ width: '18px', height: '18px', color: '#616161' }} />
-          </button>
         </div>
 
         {/* Table */}
