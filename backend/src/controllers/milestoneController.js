@@ -40,7 +40,6 @@ export const createMilestone = async (req, res) => {
       
       const agenda = await agendaService.createAgendaDoc(agendaPayload);
       
-      // Thông báo khi tạo lịch họp
       try {
         const { notifyAgendaCreated } = await import('../services/notificationService.js');
         await notifyAgendaCreated(eventId, agenda._id, milestone._id);
