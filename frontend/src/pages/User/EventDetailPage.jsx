@@ -6,13 +6,21 @@ import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
 import { getEventImage } from "../../utils/getEventImage";
 import { deriveEventStatus } from "../../utils/getEventStatus";
-import { CalendarDays, Copy, FileText, MapPin, User as UserIcon, Zap } from "lucide-react";
+import { 
+  CalendarDays, 
+  MapPin, 
+  User as UserIcon, 
+  Zap, 
+  ExternalLink, 
+  FileText,
+  Info 
+} from "lucide-react";
 import { toast } from "react-toastify";
 
 function EventDetailPage() {
   const { eventId } = useParams();
   const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true); // Start with true to show loading immediately
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
@@ -41,27 +49,23 @@ function EventDetailPage() {
   const defaultImg = "/default-events.jpg";
   const imageUrl = getEventImage(event ?? {}, defaultImg);
   const title = event?.name || "Sự kiện";
-  const dateText =
-    formatDate(event?.eventStartDate) + " - " + formatDate(event?.eventEndDate);
-  const address = event?.location || "";
-  const statusText = deriveEventStatus(event).text;
-  console.log(event);
-  const copyJoinCode = async () => {
-    if (!event?.joinCode) return;
-    try {
-      await navigator.clipboard.writeText(event.joinCode);
-      toast.success("Đã sao chép mã tham gia!");
-    } catch (err) {
-      toast.error("Không thể copy mã, vui lòng thử lại.");
-    }
+  const dateText = event?.eventStartDate && event?.eventEndDate
+    ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
+    : event?.eventDate ? formatDate(event?.eventDate) : "Chưa cập nhật";
+  const address = event?.location || "Chưa cập nhật";
+  const statusInfo = deriveEventStatus(event);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success("Đã sao chép đường dẫn sự kiện!");
   };
 
   if (loading) {
     return (
       <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user" eventId={eventId}>
-        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
           <Loading />
-          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin sự kiện...</div>
+          <div className="text-muted mt-3 fw-medium">Đang tải thông tin...</div>
         </div>
       </UserLayout>
     );
@@ -69,92 +73,170 @@ function EventDetailPage() {
 
   return (
     <UserLayout title="Chi tiết sự kiện" activePage="home" sidebarType="user" eventId={eventId}>
-      <div
-        className="container-xl py-4"
-        style={{
-          background: "white",
-          borderRadius: "16px",
-          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.04)",
-          paddingTop: "12px",
-        }}
-      >
-        <div className="bg-white rounded-3 shadow-sm overflow-hidden"></div>
-        {/* Banner ảnh */}
-        <div
-          style={{
-            borderRadius: "14px",
-            width: "100%",
-            height: 320,
-            backgroundImage: `url(${imageUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundColor: "#a0a0a0",
-          }}
-        />
-
-        <div className="p-4 p-md-5">
-          <h2 className="fw-bold text-danger mb-4" style={{ fontSize: 28 }}>
-            {title}
-          </h2>
-          <div className="d-flex gap-2 flex-wrap mb-4">
-            {event?.status && (
-              <span className={`event-chip chip-status-${event.status}`}>
-                <Zap className="me-1" size={14} />
-                {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
-              </span>
-            )}
-            {event?.eventStartDate && event?.eventEndDate ? (
-              <span className="event-chip chip-date">
-                <CalendarDays className="me-1" size={14} /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
-              </span>
-            ) : event?.eventDate ? (
-              <span className="event-chip chip-date">
-                <CalendarDays className="me-1" size={14} /> {formatDate(event.eventDate)}
-              </span>
-            ) : null}
-            {event?.location && (
-              <span className="event-chip chip-location">
-                <MapPin className="me-1" size={14} />{event.location}
-              </span>
-            )}
-          </div>
-          {error && <div className="text-danger mb-3">{error}</div>}
-          {event && (
-            <>
-              <div className="row g-4">
-                <div className="col-12 col-lg-8">
-                  <div className="event-info-card">
-                    <div className="d-flex align-items-center gap-2 mb-4">
-                      <div className="chip-status chip-status-scheduled d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: 12 }}>
-                        <InfoIcon />
-                      </div>
-                      <h5 className="fw-bold mb-0" style={{ fontSize: 18 }}>Thông tin sự kiện</h5>
-                    </div>
-                    <InfoItem icon={FileText} label="Tên sự kiện" value={event.name} />
-                    <InfoItem icon={UserIcon} label="Người tổ chức" value={event.organizerName || "Chưa cập nhật"} />
-                    <InfoItem icon={CalendarDays} label="Thời gian diễn ra" value={dateText} />
-                    <InfoItem icon={MapPin} label="Địa điểm" value={address || "Chưa xác định"} />
-                    <InfoItem icon={InfoIcon } label="Trạng thái" value={statusText} badge />
-                    <InfoItem icon={FileText} label="Mô tả" value={event.description || "Chưa có mô tả"} />
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-      <div
-        className="mb-3"
-        style={{ display: "flex", justifyContent: "center", marginTop: "12px" }}
-      >
-        <button
-          className="btn btn-outline-secondary rounded-pill px-4 py-2 d-inline-flex align-items-center"
-          onClick={() => navigate(-1)}
-          style={{ fontWeight: 500, fontSize: 15 }}
+      <div className="container-fluid px-0">
+        
+        {/* --- 1. HERO BANNER (Giống ảnh mẫu) --- */}
+        <div 
+          className="position-relative rounded-4 overflow-hidden mb-4 shadow-sm" 
+          style={{ height: "300px", marginTop: "10px" }}
         >
-          <i className="bi bi-arrow-left me-2" />
-          Quay lại
-        </button>
+            {/* Ảnh nền */}
+            <div 
+                className="position-absolute w-100 h-100"
+                style={{ 
+                    backgroundImage: `url(${imageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                }}
+            />
+            {/* Lớp phủ Gradient (Để chữ trắng nổi bật trên nền ảnh) */}
+            <div 
+                className="position-absolute w-100 h-100"
+                style={{
+                    background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.1) 100%)"
+                }}
+            />
+            
+            {/* Nội dung trên Banner */}
+            <div className="position-absolute bottom-0 start-0 p-4 text-white w-100">
+                 <div className="d-flex gap-2 mb-3">
+                    {/* Chip: Sắp diễn ra */}
+                    <span 
+                        className="badge rounded-pill d-flex align-items-center gap-1 px-3 py-2 border border-light border-opacity-25"
+                        style={{ 
+                            background: "rgba(255, 235, 238, 0.9)", // Màu hồng nhạt
+                            color: "#d32f2f", // Chữ đỏ đậm
+                            fontSize: "0.85rem",
+                            fontWeight: "600"
+                        }}
+                    >
+                        <Zap size={14} fill="#d32f2f" /> {statusInfo.text}
+                    </span>
+                    {/* Chip: Địa điểm */}
+                    {address && (
+                        <span 
+                            className="badge rounded-pill d-flex align-items-center gap-1 px-3 py-2 border border-light border-opacity-25"
+                            style={{ 
+                                background: "rgba(255,255,255,0.2)", 
+                                backdropFilter: "blur(4px)",
+                                fontSize: "0.85rem",
+                                fontWeight: "500"
+                            }}
+                        >
+                            <MapPin size={14} /> {address}
+                        </span>
+                    )}
+                 </div>
+                 <h1 className="fw-bold mb-2 display-6">{title}</h1>
+                 <div className="d-flex align-items-center opacity-90 small">
+                    <CalendarDays size={18} className="me-2" />
+                    {dateText}
+                 </div>
+            </div>
+        </div>
+
+        {/* --- 2. MAIN CONTENT --- */}
+        <div className="row g-4">
+            
+            {/* Cột trái: Thông tin chi tiết */}
+            <div className="col-12 col-lg-8">
+                <div className="bg-white rounded-4 border p-4 h-100 shadow-sm">
+                    <div className="d-flex flex-column gap-1">
+                        <InfoRow 
+                            icon={FileText} 
+                            label="TÊN SỰ KIỆN" 
+                            value={<span className="fw-bold text-dark fs-6">{event?.name}</span>} 
+                        />
+                        <div className="border-bottom my-3 opacity-50"></div>
+                        
+                        <InfoRow 
+                            icon={UserIcon} 
+                            label="ĐƠN VỊ TỔ CHỨC" 
+                            value={<span className="fw-semibold text-dark">{event?.organizerName || "FPTU BoardGame Club"}</span>} 
+                        />
+                        <div className="border-bottom my-3 opacity-50"></div>
+
+                        <InfoRow 
+                            icon={CalendarDays} 
+                            label="THỜI GIAN" 
+                            value={<span className="fw-semibold text-dark">{dateText}</span>} 
+                        />
+                        <div className="border-bottom my-3 opacity-50"></div>
+
+                        <InfoRow 
+                            icon={MapPin} 
+                            label="ĐỊA ĐIỂM" 
+                            value={<span className="fw-semibold text-dark">{address}</span>} 
+                        />
+                         <div className="border-bottom my-3 opacity-50"></div>
+                        
+                         <InfoRow 
+                            icon={Info} 
+                            label="MÔ TẢ" 
+                            value={<span className="text-secondary" style={{ lineHeight: 1.6 }}>{event?.description || "Sự kiện chưa có mô tả chi tiết."}</span>}
+                            alignStart
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Cột phải: BOX CHIA SẺ (Làm giống hệt ảnh mẫu) */}
+            <div className="col-12 col-lg-4">
+                <div className="bg-white rounded-4 border p-4 shadow-sm h-100">
+                    {/* Header Box */}
+                    <div className="d-flex align-items-center gap-3 mb-4">
+                         <div 
+                             className="d-flex align-items-center justify-content-center rounded-3" 
+                             style={{ width: 52, height: 52, background: "#fee2e2", color: "#ef4444" }}
+                         >
+                            <ExternalLink size={24} />
+                        </div>
+                        <div>
+                            <div className="text-secondary mb-0" style={{ fontSize: "0.85rem" }}>Chia sẻ sự kiện</div>
+                            <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: "1.1rem" }}>Lan tỏa đến bạn bè</h6>
+                        </div>
+                    </div>
+
+                    {/* Input Link */}
+                    <div className="mb-3">
+                        <label className="text-muted small mb-2 d-block">Đường dẫn sự kiện</label>
+                        <div className="input-group">
+                            <input 
+                                type="text" 
+                                className="form-control bg-white text-secondary" 
+                                value={window.location.href} 
+                                readOnly 
+                                style={{ fontSize: '0.9rem', borderColor: '#e5e7eb', padding: '10px 12px' }}
+                            />
+                            <button 
+                                className="btn btn-outline-secondary" 
+                                onClick={handleCopyLink}
+                                type="button"
+                                style={{ borderColor: '#e5e7eb', color: '#4b5563', padding: '0 16px' }}
+                            >
+                                Sao chép
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Footer Text */}
+                    <p className="text-muted small mt-3 mb-0" style={{ lineHeight: '1.5', fontSize: '0.85rem' }}>
+                        Hoặc lưu lại sự kiện để khám phá nhiều chương trình thú vị khác trên myFEvent.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {/* Nút quay lại */}
+        <div className="d-flex justify-content-center mt-5 pb-4">
+            <button
+            className="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium border shadow-sm bg-white"
+            onClick={() => navigate(-1)}
+            >
+            <i className="bi bi-arrow-left me-2"></i>
+            Quay lại danh sách
+            </button>
+        </div>
       </div>
     </UserLayout>
   );
@@ -162,21 +244,18 @@ function EventDetailPage() {
 
 export default EventDetailPage;
 
-const InfoItem = ({ icon: Icon = FileText, label, value, badge }) => (
-  <div className="d-flex align-items-start gap-3 mb-3">
-    <div className="rounded-3" style={{ width: 44, height: 44, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Icon size={18} style={{ color: "#ef4444" }} />
+// Component hiển thị từng dòng thông tin (đã style lại icon)
+const InfoRow = ({ icon: Icon, label, value, alignStart }) => (
+  <div className={`d-flex ${alignStart ? 'align-items-start' : 'align-items-center'} gap-3`}>
+    <div 
+        className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" 
+        style={{ width: 40, height: 40, background: "#fef2f2", color: "#ef4444" }}
+    >
+      <Icon size={18} />
     </div>
-    <div>
-      <div className="text-muted small">{label}</div>
-      {badge ? (
-        <span className="badge bg-success-subtle text-success px-3 py-2">{value}</span>
-      ) : (
-        <div className="fw-semibold">{value}</div>
-      )}
+    <div className="flex-grow-1">
+      <div className="text-muted small text-uppercase fw-bold mb-1" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>{label}</div>
+      <div>{value}</div>
     </div>
   </div>
 );
-
-const LinkIcon = () => <Copy size={18} />;
-const InfoIcon = () => <FileText size={18} style={{ color: "#ef4444" }} />;

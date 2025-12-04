@@ -8,7 +8,6 @@ export default function SupportButton() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  // Only show for authenticated users
   if (!isAuthenticated) {
     return null;
   }
@@ -22,8 +21,11 @@ export default function SupportButton() {
       style={{
         position: 'fixed',
         right: '24px',
-        bottom: '96px', // Positioned above AI Assistant button
+        bottom: '96px',
         zIndex: 1050,
+        // Thêm dòng này để đảm bảo div bao ngoài không làm lệch vị trí tooltip
+        display: 'flex', 
+        justifyContent: 'flex-end'
       }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
@@ -33,14 +35,14 @@ export default function SupportButton() {
         <div
           style={{
             position: 'absolute',
-            right: '70px',
+            right: '55px', 
             top: '50%',
             transform: 'translateY(-50%)',
             backgroundColor: '#1f2937',
             color: 'white',
             padding: '6px 8px',
             borderRadius: '6px',
-            fontSize: '14px',
+            fontSize: '12px', // Giảm font tooltip một chút cho tinh tế
             fontWeight: '500',
             whiteSpace: 'nowrap',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
@@ -71,18 +73,19 @@ export default function SupportButton() {
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         style={{
-          width: '56px',
-          height: '66px',
+          width: '40px',
+          height: '40px',
           borderRadius: '50%',
           background: '#e14040ff',
           color: 'white',
           border: 'none',
-          boxShadow: '0 10px 20px rgba(0,0,0,0.15)',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.15)', // Giảm bóng một chút cho hợp với nút nhỏ
           cursor: 'pointer',
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           transform: hover ? 'translateY(-2px) scale(1.05)' : 'none',
-          fontSize: '28px',
+          fontSize: '20px', 
           fontWeight: 'bold',
+          padding: 0,           
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
