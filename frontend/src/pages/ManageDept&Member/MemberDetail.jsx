@@ -677,21 +677,7 @@ export default function MemberProfilePage() {
             )}
 
             {/* Tags */}
-            {shouldShowDepartmentInfo && memberTags && memberTags.length > 0 && (
-              <div className="profile-card">
-                <h5 className="fw-bold mb-3 d-flex align-items-center">
-                  <Tag className="me-2 text-danger" size={20} />
-                  Ban đã tham gia
-                </h5>
-                <div className="d-flex flex-wrap gap-2">
-                  {memberTags.map((tag, idx) => (
-                    <span key={idx} className="badge bg-light text-dark px-3 py-2">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            
 
           </div>
         </div>

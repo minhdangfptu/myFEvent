@@ -217,7 +217,7 @@ export const getDashboardStats = async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('Get dashboard stats error:', err);
+        console.error('Get dashboard stats error:', err.message);
         return res.status(500).json({ message: 'Fail to get dashboard stats', error: err.message });
     }
 };
@@ -243,7 +243,7 @@ export const getRecentBannedEvents = async (req, res) => {
 
         return res.status(200).json(formattedEvents);
     } catch (err) {
-        console.error('Get recent banned events error:', err);
+        console.error('Get recent banned events error:', err.message);
         return res.status(500).json({ message: 'Fail to get recent banned events', error: err.message });
     }
 };
@@ -284,7 +284,7 @@ export const getWeeklyActivity = async (req, res) => {
             { activity: 'Người dùng bị cấm', count: bannedUsersThisWeek }
         ]);
     } catch (err) {
-        console.error('Get weekly activity error:', err);
+        console.error('Get weekly activity error:', err.message);
         return res.status(500).json({ message: 'Fail to get weekly activity', error: err.message });
     }
 };
@@ -322,7 +322,7 @@ export const getRecentEvents = async (req, res) => {
 
         return res.status(200).json(formattedEvents);
     } catch (err) {
-        console.error('Get recent events error:', err);
+        console.error('Get recent events error:', err.message);
         return res.status(500).json({ message: 'Fail to get recent events', error: err.message });
     }
 };
