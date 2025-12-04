@@ -593,12 +593,12 @@ const EventManagement = () => {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{
-            fontSize: '14px',
-            color: '#616161'
-          }}>
-            Hiển thị {start}–{end} trong tổng số {totalEvents} sự kiện
+          <div style={{ fontSize: '14px', color: '#616161' }}>
+            {totalEvents === 0
+              ? "Không có sự kiện nào"
+              : `Hiển thị ${start}–${end} trong tổng số ${totalEvents} sự kiện`}
           </div>
+
           {/* Pagination */}
           <div
             style={{
