@@ -78,7 +78,7 @@ export const aiAgentApi = {
       sessionId,
     };
     const response = await aiAxiosClient.post(
-      '/api/ai-agent/event-planner/turn',
+      '/api/agent/event-planner/turn',
       payload
     );
     return response?.data;
@@ -92,7 +92,7 @@ export const aiAgentApi = {
       plans,
     };
     const response = await aiAxiosClient.post(
-      '/api/ai-agent/event-planner/apply-plan',
+      '/api/agent/event-planner/apply-plan',
       payload
     );
     return response?.data;
@@ -100,7 +100,7 @@ export const aiAgentApi = {
 
   listSessions: async (eventId = null) => {
     const response = await aiAxiosClient.get(
-      '/api/ai-agent/event-planner/sessions',
+      '/api/agent/event-planner/sessions',
       {
         params: { eventId },
       }
@@ -110,7 +110,7 @@ export const aiAgentApi = {
 
   getSession: async (sessionId, eventId = null) => {
     const response = await aiAxiosClient.get(
-      `/api/ai-agent/event-planner/sessions/${sessionId}`,
+      `/api/agent/event-planner/sessions/${sessionId}`,
       {
         params: { eventId },
       }

@@ -28,7 +28,16 @@ const MilestoneDetail = () => {
         setLoading(true);
         setError("");
         const response = await milestoneService.getMilestoneDetail(eventId, id);
-        setMilestone(response);
+        // Handle response structure: could be { data: {...} } or direct object
+        const milestoneData = response?.data || response;
+        if (milestoneData) {
+          setMilestone({
+            ...milestoneData,
+            relatedTasks: milestoneData.relatedTasks || []
+          });
+        } else {
+          setError("Không tìm thấy cột mốc");
+        }
       } catch (err) {
         console.error("Error fetching milestone:", err);
         if (err.response?.status === 403) {
@@ -261,33 +270,38 @@ const MilestoneDetail = () => {
               marginBottom: "20px",
             }}
           >
-            Công việc liên quan ({milestone.relatedTasks?.length || 0})
+            Công việc liên quan ({milestone?.relatedTasks?.length || 0})
           </h4>
 
           <div className="d-flex flex-column gap-3">
-            {milestone.relatedTasks && milestone.relatedTasks.length > 0 ? (
-              milestone.relatedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="d-flex justify-content-between align-items-center p-3 border rounded-3"
-                  style={{ border: "1px solid #e5e7eb" }}
-                >
-                  <span style={{ color: "#374151", fontWeight: "500" }}>
-                    {task.name || "Không có tên"}
-                  </span>
-                  <span
-                    className="badge px-3 py-2"
-                    style={{
-                      backgroundColor: getTaskStatusColor(task.status),
-                      color: "white",
-                      fontSize: "0.9rem",
-                      borderRadius: "20px",
-                    }}
+            {milestone?.relatedTasks && Array.isArray(milestone.relatedTasks) && milestone.relatedTasks.length > 0 ? (
+              milestone.relatedTasks.map((task, index) => {
+                const taskId = task.id || task._id || `task-${index}`;
+                const taskName = task.name || task.title || "Không có tên";
+                const taskStatus = task.status || "todo";
+                return (
+                  <div
+                    key={taskId}
+                    className="d-flex justify-content-between align-items-center p-3 border rounded-3"
+                    style={{ border: "1px solid #e5e7eb" }}
                   >
-                    {getTaskStatusLabel(task.status)}
-                  </span>
-                </div>
-              ))
+                    <span style={{ color: "#374151", fontWeight: "500" }}>
+                      {taskName}
+                    </span>
+                    <span
+                      className="badge px-3 py-2"
+                      style={{
+                        backgroundColor: getTaskStatusColor(taskStatus),
+                        color: "white",
+                        fontSize: "0.9rem",
+                        borderRadius: "20px",
+                      }}
+                    >
+                      {getTaskStatusLabel(taskStatus)}
+                    </span>
+                  </div>
+                );
+              })
             ) : (
               <div className="text-muted text-center py-4">
                 <i className="bi bi-inbox me-2"></i>

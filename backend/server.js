@@ -95,10 +95,6 @@ const listenOnAvailablePort = async (preferredPort, maxRetries = 5) => {
 const startServer = async () => {
   try {
     await connectDB();
-    // Khởi động scheduled task để tự động cập nhật trạng thái task
-    const { startTaskAutoStatusScheduler } = await import('./src/services/taskAutoStatusService.js');
-    startTaskAutoStatusScheduler();
-
     await listenOnAvailablePort(config.PORT);
   } catch (error) {
     console.error('Failed to start server:', error);

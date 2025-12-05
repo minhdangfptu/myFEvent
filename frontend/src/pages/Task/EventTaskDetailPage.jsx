@@ -123,6 +123,17 @@ export default function EventTaskDetailPage() {
     return localDate.toISOString().slice(0, 16);
   };
 
+  // Helper function to convert date string to date-only format (YYYY-MM-DD) for date input
+  const toLocalDateString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    // Get timezone offset in minutes and convert to milliseconds
+    const offset = date.getTimezoneOffset() * 60 * 1000;
+    // Create new date adjusted for local timezone
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 10);
+  };
+
   const getTaskCreatorId = (task) =>
     toId(task?.createdBy?.userId) || toId(task?.createdBy);
 
@@ -221,7 +232,7 @@ const getRoleLabel = (role) => {
           departmentId: toId(task?.departmentId),
           assigneeId: toId(task?.assigneeId),
           milestoneId: toId(task?.milestoneId),
-          startDate: toLocalDateTimeString(task?.startDate),
+          startDate: toLocalDateString(task?.startDate),
           dueDate: toLocalDateTimeString(task?.dueDate),
           status: task?.status || STATUS.NOT_STARTED,
           progressPct:
@@ -445,7 +456,12 @@ const getRoleLabel = (role) => {
         // assignee is managed via assign/unassign API
         milestoneId: form.milestoneId || undefined,
         startDate: form.startDate
-          ? new Date(form.startDate).toISOString()
+          ? (() => {
+              // Ensure date-only format is converted properly (set to midnight local time)
+              const date = new Date(form.startDate);
+              date.setHours(0, 0, 0, 0);
+              return date.toISOString();
+            })()
           : undefined,
         dueDate: new Date(form.dueDate).toISOString(),
         // status is managed via updateTaskProgress API
@@ -483,20 +499,43 @@ const getRoleLabel = (role) => {
   };
 
   const confirmDelete = async () => {
+    // Store the role before deletion to ensure we have it for navigation
+    const currentRole = eventRole || (await fetchEventRole(eventId));
+    
     try {
       await taskApi.deleteTask(eventId, taskId, FORBIDDEN_CONFIG);
       toast.success("Đã xóa công việc");
+      setShowDeleteModal(false);
+      
       // Navigate based on role to avoid 403 error
-      handleNavigateToTaskList();
+      // Use window.location.href to bypass React Router permission checks that might fail after deletion
+      setTimeout(() => {
+        if (currentRole === "HoOC") {
+          window.location.href = `/events/${eventId}/tasks`;
+        } else if (currentRole === "HoD") {
+          window.location.href = `/events/${eventId}/hod-tasks`;
+        } else {
+          window.location.href = `/events/${eventId}/member-tasks`;
+        }
+      }, 100);
     } catch (error) {
       const errorMessage = getErrorMessage(error, "Xóa công việc thất bại");
       toast.error(errorMessage);
-      // If delete was successful but navigation failed, still close modal
-      if (error?.response?.status !== 403 && error?.response?.status !== 404) {
-        handleNavigateToTaskList();
-      }
-    } finally {
       setShowDeleteModal(false);
+      
+      // Only navigate if delete was successful (no error response or non-403/404 error)
+      // 403/404 errors indicate the operation failed, so don't navigate
+      if (!error?.response || (error.response.status !== 403 && error.response.status !== 404)) {
+        setTimeout(() => {
+          if (currentRole === "HoOC") {
+            window.location.href = `/events/${eventId}/tasks`;
+          } else if (currentRole === "HoD") {
+            window.location.href = `/events/${eventId}/hod-tasks`;
+          } else {
+            window.location.href = `/events/${eventId}/member-tasks`;
+          }
+        }, 100);
+      }
     }
   };
 
@@ -540,7 +579,7 @@ const getRoleLabel = (role) => {
         departmentId: toId(task?.departmentId),
         assigneeId: toId(task?.assigneeId),
         milestoneId: toId(task?.milestoneId),
-        startDate: toLocalDateTimeString(task?.startDate),
+        startDate: toLocalDateString(task?.startDate),
         dueDate: toLocalDateTimeString(task?.dueDate),
         status: task?.status || STATUS.NOT_STARTED,
         progressPct:
@@ -846,28 +885,14 @@ const getRoleLabel = (role) => {
       <div className="row">
         <div className="col-md-6 mb-3">
           <label className="form-label">Công việc lớn</label>
-          {isEditing ? (
-            <select
-              className="form-select"
-              value={form.parentId}
-              onChange={e => handleChange('parentId', e.target.value)}
-              disabled={true}
-            >
-              <option value="">Không có</option>
-              {tasksAll.filter(
-                t => (!t.assigneeId) && String(t._id) !== String(taskId)
-              ).map(t => (
-                <option key={t._id} value={t._id}>{t.title}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              className="form-control"
-              value={form.parentId}
-              disabled
-            />
-          )}
+          <div className="form-control" style={{ 
+            backgroundColor: '#f8f9fa', 
+            cursor: 'not-allowed',
+            border: '1px solid #dee2e6',
+            color: '#6c757d'
+          }}>
+            {relatedTasks.parent ? relatedTasks.parent.title : "Không có"}
+          </div>
         </div>
       </div>
       <div className="row">
@@ -900,21 +925,13 @@ const getRoleLabel = (role) => {
     <div className="col-lg-5">
       <div className="mb-3">
         <label className="form-label">Ban phụ trách</label>
-        <div className="input-group">
-          <select
-            className="form-select"
-            value={form.departmentId}
-            onChange={(e) => handleChange("departmentId", e.target.value)}
-            disabled={true}
-          >
-            <option value="">Chọn ban</option>
-            {departments.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <span className="input-group-text">▼</span>
+        <div className="form-control" style={{ 
+          backgroundColor: '#f8f9fa', 
+          cursor: 'not-allowed',
+          border: '1px solid #dee2e6',
+          color: '#6c757d'
+        }}>
+          {departments.find((d) => d._id === form.departmentId)?.name || "—"}
         </div>
       </div>
       <div className="mb-3">
@@ -1032,27 +1049,28 @@ const getRoleLabel = (role) => {
         <input
           type="date"
           className="form-control"
-          value={form.startDate ? form.startDate.split('T')[0] : form.startDate}
-          onChange={(e) => handleChange("startDate", e.target.value ? `${e.target.value}T00:00:00` : "")}
+          value={form.startDate || ""}
+          onChange={(e) => handleChange("startDate", e.target.value || "")}
           disabled={!canEditFields}
           min={(() => {
+            // Nếu có startDate cũ, cho phép giữ nguyên (không giới hạn theo ngày hiện tại)
+            if (originalTask?.startDate) {
+              const oldStartDate = new Date(originalTask.startDate);
+              oldStartDate.setHours(0, 0, 0, 0);
+              // Chỉ giới hạn theo thời gian tạo sự kiện nếu có
+              if (eventInfo?.createdAt) {
+                const eventCreated = new Date(eventInfo.createdAt);
+                eventCreated.setHours(0, 0, 0, 0);
+                return eventCreated.toISOString().split('T')[0];
+              }
+              return undefined;
+            }
+
+            // Khi tạo mới: yêu cầu ngày sau hoặc bằng hôm nay
             const now = new Date();
             now.setHours(0, 0, 0, 0);
             const minDate = now.toISOString().split('T')[0];
 
-            // Nếu có startDate cũ và nó đã ở quá khứ, chỉ giới hạn theo thời gian tạo sự kiện
-            if (originalTask?.startDate) {
-              const oldStartDate = new Date(originalTask.startDate);
-              oldStartDate.setHours(0, 0, 0, 0);
-              if (oldStartDate <= now) {
-                // Cho phép giữ nguyên thời gian cũ (dù ở quá khứ)
-                return eventInfo?.createdAt
-                  ? new Date(eventInfo.createdAt).toISOString().split('T')[0]
-                  : undefined;
-              }
-            }
-
-            // Trường hợp còn lại: yêu cầu thời gian sau hoặc bằng hôm nay
             if (eventInfo?.createdAt) {
               const eventCreated = new Date(eventInfo.createdAt);
               eventCreated.setHours(0, 0, 0, 0);
@@ -1066,7 +1084,9 @@ const getRoleLabel = (role) => {
             if (form.parentId) {
               const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
               if (parentTask && parentTask.dueDate) {
-                return new Date(parentTask.dueDate).toISOString().split('T')[0];
+                const parentDueDate = new Date(parentTask.dueDate);
+                parentDueDate.setHours(0, 0, 0, 0);
+                return parentDueDate.toISOString().split('T')[0];
               }
             }
             return undefined;
@@ -1075,28 +1095,25 @@ const getRoleLabel = (role) => {
         {eventInfo && (
           <div className="form-text small text-muted">
             {(() => {
-              const now = new Date();
-              const oldStartDate = originalTask?.startDate ? new Date(originalTask.startDate) : null;
-              const isOldDateInPast = oldStartDate && oldStartDate <= now;
-
               let message = "";
-              if (isOldDateInPast) {
-                // Nếu thời gian cũ đã ở quá khứ, chỉ cảnh báo về event constraints
+              
+              // Nếu có startDate cũ, không cảnh báo về quá khứ
+              if (originalTask?.startDate) {
                 if (eventInfo.createdAt) {
-                  message = `Thời gian bắt đầu phải sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                  message = `Thời gian bắt đầu phải sau ${new Date(eventInfo.createdAt).toLocaleDateString("vi-VN")}`;
                 }
               } else {
-                // Nếu không, yêu cầu thời gian sau hiện tại
-                message = "Thời gian bắt đầu phải sau thời điểm hiện tại";
+                // Khi tạo mới: yêu cầu ngày sau hoặc bằng hôm nay
+                message = "Thời gian bắt đầu phải từ hôm nay trở đi";
                 if (eventInfo.createdAt) {
-                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleDateString("vi-VN")}`;
                 }
               }
 
               if (form.parentId) {
                 const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
                 if (parentTask && parentTask.dueDate) {
-                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleDateString('vi-VN')})`;
                 }
               }
 
@@ -1247,12 +1264,10 @@ const getRoleLabel = (role) => {
             <div className="text-muted small">Thời gian bắt đầu</div>
             <div className="fw-medium">
               {form.startDate
-                ? new Date(form.startDate).toLocaleString("vi-VN", {
+                ? new Date(form.startDate).toLocaleDateString("vi-VN", {
                     year: "numeric",
                     month: "2-digit",
                     day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
                   })
                 : "—"}
             </div>

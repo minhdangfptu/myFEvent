@@ -20,5 +20,5 @@ router.use('/feedback', feedbackRoute);
 router.use('/notifications', notificationRoute);
 router.use('/admin', adminRoute);
 router.use('/dashboard', dashboardRoute);
-router.use('/ai-agent', aiAgentRoute);
+router.use('/agent', aiAgentRoute);
 export default router;
