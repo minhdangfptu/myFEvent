@@ -3,6 +3,12 @@ import axios from 'axios';
 import { config } from '../../config/environment.js';
 import Event from '../../models/event.js';
 import ConversationHistory from '../../models/conversationHistory.js';
+import Department from '../../models/department.js';
+import Task from '../../models/task.js';
+import EventMember from '../../models/eventMember.js';
+import Risk from '../../models/risk.js';
+import Calendar from '../../models/calendar.js';
+import Milestone from '../../models/milestone.js';
 
 const AI_AGENT_BASE_URL = config.AI_AGENT_BASE_URL || 'http://localhost:9000';
 const CHANNEL_AGENT = 'event_planner_agent';
@@ -14,6 +20,530 @@ const generateTitleFromText = (text = '') => {
   const words = text.trim().split(/\s+/);
   const firstFive = words.slice(0, 5).join(' ');
   return words.length > 5 ? `${firstFive} ...` : firstFive;
+};
+
+/**
+ * Helper function để lấy thông tin chi tiết đầy đủ của sự kiện cho AI
+ * Tương tự như getEventDetailForAI nhưng được gọi nội bộ
+ */
+const getFullEventContext = async (eventId, userId) => {
+  try {
+    // 1) Lấy event cơ bản
+    const event = await Event.findById(eventId)
+      .select(
+        'name type description eventStartDate eventEndDate location image status organizerName joinCode createdAt updatedAt'
+      )
+      .lean();
+
+    if (!event) {
+      return null;
+    }
+
+    // 2) Lấy thông tin membership của user hiện tại
+    let currentUserMembership = null;
+    if (userId) {
+      currentUserMembership = await EventMember.findOne({
+        eventId,
+        userId,
+        status: { $ne: 'deactive' },
+      })
+        .populate('departmentId', 'name')
+        .lean();
+    }
+
+    // Kiểm tra quyền truy cập
+    if (event.type !== 'public' && !currentUserMembership) {
+      return null; // Không có quyền truy cập
+    }
+
+    const userRole = currentUserMembership?.role || null;
+    const userDepartmentId = currentUserMembership?.departmentId?._id || null;
+
+    // 3) Lấy danh sách phòng ban
+    const departments = await Department.find({ eventId })
+      .select('_id name description leaderId createdAt updatedAt')
+      .lean();
+
+    // 4) Lấy danh sách member active
+    const members = await EventMember.find({
+      eventId,
+      status: 'active',
+    })
+      .select('userId departmentId role status')
+      .populate('userId', 'name email')
+      .populate('departmentId', 'name')
+      .lean();
+
+    const memberCountByDept = {};
+    const memberCountByRole = { HoOC: 0, HoD: 0, Member: 0 };
+    let totalMembers = 0;
+    members.forEach((m) => {
+      totalMembers += 1;
+      const key = m.departmentId ? String(m.departmentId._id) : 'no_dept';
+      memberCountByDept[key] = (memberCountByDept[key] || 0) + 1;
+      if (m.role && memberCountByRole[m.role] !== undefined) {
+        memberCountByRole[m.role] += 1;
+      }
+    });
+
+    // Lấy danh sách members với thông tin chi tiết (role, department) - lọc theo quyền
+    // Lưu ý: KHÔNG hiển thị email của người khác, chỉ hiển thị email của chính người dùng
+    let membersDetail = [];
+    if (userRole === 'HoOC') {
+      // HoOC xem tất cả thông tin nhưng không có email của người khác
+      membersDetail = members.map((m) => {
+        const isSelf = String(m.userId?._id) === String(userId);
+        return {
+          _id: m._id,
+          userId: m.userId?._id,
+          userName: m.userId?.name,
+          userEmail: isSelf ? m.userId?.email : undefined, // Chỉ hiển thị email của chính mình
+          role: m.role,
+          departmentId: m.departmentId?._id,
+          departmentName: m.departmentId?.name,
+        };
+      });
+    } else if (userRole === 'HoD' && userDepartmentId) {
+      // HoD chỉ xem ban của mình + thông tin chung
+      membersDetail = members
+        .filter((m) => 
+          !m.departmentId || 
+          String(m.departmentId._id) === String(userDepartmentId) ||
+          String(m.userId?._id) === String(userId)
+        )
+        .map((m) => {
+          const isSelf = String(m.userId?._id) === String(userId);
+          return {
+            _id: m._id,
+            userId: m.userId?._id,
+            userName: m.userId?.name,
+            userEmail: isSelf ? m.userId?.email : undefined, // Chỉ hiển thị email của chính mình
+            role: m.role,
+            departmentId: m.departmentId?._id,
+            departmentName: m.departmentId?.name,
+          };
+        });
+    } else {
+      // Member chỉ xem thông tin chung
+      membersDetail = members.map((m) => {
+        const isSelf = String(m.userId?._id) === String(userId);
+        return {
+          _id: m._id,
+          userId: isSelf ? m.userId?._id : undefined,
+          userName: m.userId?.name,
+          userEmail: isSelf ? m.userId?.email : undefined, // Chỉ hiển thị email của chính mình
+          role: m.role,
+          departmentId: m.departmentId?._id,
+          departmentName: m.departmentId?.name,
+        };
+      });
+    }
+
+    // 5) Lấy EPIC và TASK
+    const epics = await Task.find({ eventId, taskType: 'epic' })
+      .select('_id title description departmentId status')
+      .populate('departmentId', 'name')
+      .lean();
+
+    const tasks = await Task.find({ eventId, taskType: 'normal' })
+      .select(
+        '_id title description parentId departmentId status priority startDate dueDate'
+      )
+      .lean();
+
+    const tasksByEpic = {};
+    tasks.forEach((t) => {
+      const key = t.parentId ? String(t.parentId) : 'no_epic';
+      if (!tasksByEpic[key]) tasksByEpic[key] = [];
+      tasksByEpic[key].push({
+        _id: t._id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        startDate: t.startDate,
+        dueDate: t.dueDate,
+      });
+    });
+
+    const epicsWithTasks = epics.map((e) => {
+      const key = String(e._id);
+      const list = tasksByEpic[key] || [];
+      return {
+        ...e,
+        tasks: list,
+        taskCount: list.length,
+      };
+    });
+
+    // 6) Lấy risks (lọc theo quyền)
+    // HoOC: xem tất cả
+    // HoD và Member: xem rủi ro của ban mình + rủi ro chung (scope = 'event')
+    let riskQuery = { eventId };
+    if ((userRole === 'HoD' || userRole === 'Member') && userDepartmentId) {
+      riskQuery = {
+        eventId,
+        $or: [
+          { scope: 'event' },
+          { departmentId: userDepartmentId },
+        ],
+      };
+    } else if (userRole === 'Member' && !userDepartmentId) {
+      // Member không có ban thì chỉ xem rủi ro chung
+      riskQuery = {
+        eventId,
+        scope: 'event',
+      };
+    }
+    // HoOC không có filter, xem tất cả
+
+    const risks = await Risk.find(riskQuery)
+      .select('_id name risk_category impact likelihood risk_status scope departmentId risk_mitigation_plan risk_response_plan occurred_risk')
+      .populate('departmentId', 'name')
+      .lean();
+
+    // 7) Lấy calendar events sắp tới (lọc theo quyền)
+    // HoOC: xem tất cả
+    // HoD và Member: xem lịch của ban mình + lịch chung (type = 'event')
+    const now = new Date();
+    let calendarQuery = {
+      eventId,
+      startAt: { $gte: now },
+    };
+    if ((userRole === 'HoD' || userRole === 'Member') && userDepartmentId) {
+      calendarQuery = {
+        eventId,
+        startAt: { $gte: now },
+        $or: [
+          { type: 'event' },
+          { departmentId: userDepartmentId },
+        ],
+      };
+    } else if (userRole === 'Member' && !userDepartmentId) {
+      // Member không có ban thì chỉ xem lịch chung
+      calendarQuery = {
+        eventId,
+        startAt: { $gte: now },
+        type: 'event',
+      };
+    }
+    // HoOC không có filter, xem tất cả
+
+    const upcomingCalendars = await Calendar.find(calendarQuery)
+      .select('_id name type startAt endAt locationType location notes departmentId')
+      .populate('departmentId', 'name')
+      .sort({ startAt: 1 })
+      .limit(20)
+      .lean();
+
+    // 8) Lấy milestones
+    const milestones = await Milestone.find({
+      eventId,
+      isDeleted: false,
+    })
+      .select('_id name description targetDate')
+      .sort({ targetDate: 1 })
+      .lean();
+
+    return {
+      event,
+      currentUser: currentUserMembership ? {
+        role: userRole,
+        departmentId: userDepartmentId,
+        departmentName: currentUserMembership.departmentId?.name,
+        eventName: event.name,
+      } : null,
+      departments: departments.map((d) => ({
+        _id: d._id,
+        name: d.name,
+        description: d.description,
+        leaderId: d.leaderId,
+        memberCount: memberCountByDept[String(d._id)] || 0,
+      })),
+      members: {
+        total: totalMembers,
+        byDepartment: memberCountByDept,
+        byRole: memberCountByRole,
+        detail: membersDetail, // Danh sách chi tiết từng member (đã lọc theo quyền)
+      },
+      epics: epicsWithTasks,
+      risks: risks.map((r) => ({
+        _id: r._id,
+        name: r.name,
+        risk_category: r.risk_category,
+        impact: r.impact,
+        likelihood: r.likelihood,
+        risk_status: r.risk_status,
+        scope: r.scope,
+        departmentId: r.departmentId?._id,
+        departmentName: r.departmentId?.name,
+      })),
+      calendars: upcomingCalendars.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        type: c.type,
+        startAt: c.startAt,
+        endAt: c.endAt,
+        locationType: c.locationType,
+        location: c.location,
+        notes: c.notes,
+        departmentId: c.departmentId?._id,
+        departmentName: c.departmentId?.name,
+      })),
+      milestones: milestones.map((m) => ({
+        _id: m._id,
+        name: m.name,
+        description: m.description,
+        targetDate: m.targetDate,
+      })),
+      summary: {
+        totalDepartments: departments.length,
+        totalMembers,
+        totalEpics: epics.length,
+        totalTasks: tasks.length,
+        totalRisks: risks.length,
+        upcomingCalendarsCount: upcomingCalendars.length,
+        totalMilestones: milestones.length,
+      },
+    };
+  } catch (error) {
+    console.error('[getFullEventContext] Error:', error);
+    return null;
+  }
+};
+
+/**
+ * Format thông tin sự kiện thành context string cho AI
+ */
+const formatEventContextForAI = (eventData) => {
+  if (!eventData) return '';
+
+  const { event, currentUser, departments, members, epics, risks, calendars, milestones, summary } = eventData;
+
+  const lines = [
+    `Bạn đang hỗ trợ lập kế hoạch cho sự kiện "${event.name}" trong hệ thống myFEvent.`,
+    `EVENT_CONTEXT_JSON: {"eventId": "${event._id}"}`,
+    ``,
+    `=== THÔNG TIN SỰ KIỆN ===`,
+    `- Tên: ${event.name}`,
+    `- Loại: ${event.type}`,
+    `- Mô tả: ${event.description || 'N/A'}`,
+    `- Địa điểm: ${event.location || 'N/A'}`,
+    `- Thời gian: ${event.eventStartDate ? new Date(event.eventStartDate).toLocaleString('vi-VN') : 'N/A'} → ${event.eventEndDate ? new Date(event.eventEndDate).toLocaleString('vi-VN') : 'N/A'}`,
+    `- Người tổ chức: ${event.organizerName || 'N/A'}`,
+    ``,
+  ];
+
+  if (currentUser) {
+    lines.push(
+      `=== THÔNG TIN NGƯỜI DÙNG HIỆN TẠI ===`,
+      `- Vai trò: ${currentUser.role}`,
+      `- Ban: ${currentUser.departmentName || 'Chưa có ban'}`,
+      ``,
+    );
+  }
+
+  lines.push(
+    `=== TỔNG QUAN ===`,
+    `- Tổng số ban: ${summary.totalDepartments}`,
+    `- Tổng số thành viên: ${summary.totalMembers} (HoOC: ${members.byRole.HoOC}, HoD: ${members.byRole.HoD}, Member: ${members.byRole.Member})`,
+    `- Tổng số EPIC: ${summary.totalEpics}`,
+    `- Tổng số TASK: ${summary.totalTasks}`,
+    `- Tổng số rủi ro: ${summary.totalRisks}`,
+    `- Số lịch sắp tới: ${summary.upcomingCalendarsCount}`,
+    `- Số cột mốc: ${summary.totalMilestones}`,
+    ``,
+  );
+
+  if (departments.length > 0) {
+    lines.push(`=== DANH SÁCH CÁC BAN ===`);
+    departments.forEach((dept, idx) => {
+      lines.push(`${idx + 1}. ${dept.name}${dept.description ? `: ${dept.description}` : ''} (${dept.memberCount} thành viên)`);
+    });
+    lines.push(``);
+  }
+
+  // Hiển thị danh sách members chi tiết - đặc biệt quan trọng cho HoOC
+  if (members.detail && members.detail.length > 0) {
+    lines.push(`=== DANH SÁCH THÀNH VIÊN CHI TIẾT ===`);
+    
+    // Nhóm theo ban để dễ đọc
+    const membersByDept = {};
+    const membersNoDept = [];
+    
+    members.detail.forEach((m) => {
+      const deptKey = m.departmentName || 'Chưa có ban';
+      if (!membersByDept[deptKey]) {
+        membersByDept[deptKey] = [];
+      }
+      membersByDept[deptKey].push(m);
+    });
+
+    // Hiển thị theo từng ban
+    Object.keys(membersByDept).forEach((deptName) => {
+      lines.push(`\nBan: ${deptName}`);
+      membersByDept[deptName].forEach((m, idx) => {
+        const emailInfo = m.userEmail ? ` - Email: ${m.userEmail}` : '';
+        lines.push(`  ${idx + 1}. ${m.userName || 'N/A'} (${m.role || 'Member'})${emailInfo}`);
+      });
+    });
+
+    // Nếu là HoOC, hiển thị thêm thông tin tổng hợp
+    if (currentUser && currentUser.role === 'HoOC') {
+      lines.push(`\nTổng hợp:`);
+      lines.push(`- Tổng số thành viên: ${members.total}`);
+      lines.push(`- HoOC: ${members.byRole.HoOC} người`);
+      lines.push(`- HoD: ${members.byRole.HoD} người`);
+      lines.push(`- Member: ${members.byRole.Member} người`);
+    }
+    
+    lines.push(``);
+  }
+
+  if (epics.length > 0) {
+    lines.push(`=== DANH SÁCH EPIC VÀ TASK ===`);
+    epics.forEach((epic, idx) => {
+      const deptName = epic.departmentId?.name || 'Chưa có ban';
+      lines.push(`${idx + 1}. Epic: ${epic.title} (${deptName}) - Trạng thái: ${epic.status || 'N/A'} - Số task: ${epic.taskCount || 0}`);
+      if (epic.description) {
+        lines.push(`   Mô tả: ${epic.description}`);
+      }
+      
+      // Hiển thị danh sách tasks trong epic (nếu có)
+      if (epic.tasks && epic.tasks.length > 0) {
+        lines.push(`   Các task:`);
+        epic.tasks.forEach((task, taskIdx) => {
+          const priority = task.priority ? ` - Ưu tiên: ${task.priority}` : '';
+          const dueDate = task.dueDate ? ` - Hạn: ${new Date(task.dueDate).toLocaleDateString('vi-VN')}` : '';
+          lines.push(`     ${taskIdx + 1}. ${task.title} (${task.status || 'N/A'})${priority}${dueDate}`);
+          if (task.description) {
+            lines.push(`        ${task.description}`);
+          }
+        });
+      }
+    });
+    lines.push(``);
+  }
+
+  if (risks.length > 0) {
+    lines.push(`=== DANH SÁCH RỦI RO ===`);
+    // HoOC có thể xem tất cả, nên hiển thị đầy đủ
+    const risksToShow = currentUser && currentUser.role === 'HoOC' ? risks : risks.slice(0, 10);
+    risksToShow.forEach((risk, idx) => {
+      const deptName = risk.departmentName || (risk.scope === 'event' ? 'Sự kiện' : 'N/A');
+      lines.push(`${idx + 1}. ${risk.name}`);
+      lines.push(`   - Phân loại: ${risk.risk_category || 'N/A'}`);
+      lines.push(`   - Trạng thái: ${risk.risk_status || 'N/A'}`);
+      lines.push(`   - Phạm vi: ${deptName}`);
+      lines.push(`   - Tác động: ${risk.impact || 'N/A'}`);
+      lines.push(`   - Khả năng xảy ra: ${risk.likelihood || 'N/A'}`);
+    });
+    if (risks.length > risksToShow.length) {
+      lines.push(`... và ${risks.length - risksToShow.length} rủi ro khác`);
+    }
+    lines.push(``);
+  }
+
+  if (calendars.length > 0) {
+    lines.push(`=== LỊCH SẮP TỚI ===`);
+    // HoOC có thể xem tất cả, nên hiển thị đầy đủ
+    const calendarsToShow = currentUser && currentUser.role === 'HoOC' ? calendars : calendars.slice(0, 10);
+    calendarsToShow.forEach((cal, idx) => {
+      const deptName = cal.departmentName || (cal.type === 'event' ? 'Sự kiện' : 'N/A');
+      const startDate = new Date(cal.startAt).toLocaleString('vi-VN');
+      const endDate = cal.endAt ? new Date(cal.endAt).toLocaleString('vi-VN') : 'N/A';
+      lines.push(`${idx + 1}. ${cal.name}`);
+      lines.push(`   - Thời gian: ${startDate} → ${endDate}`);
+      lines.push(`   - Địa điểm: ${cal.location || 'N/A'} (${cal.locationType || 'N/A'})`);
+      lines.push(`   - Phạm vi: ${deptName}`);
+      if (cal.notes) {
+        lines.push(`   - Ghi chú: ${cal.notes}`);
+      }
+    });
+    if (calendars.length > calendarsToShow.length) {
+      lines.push(`... và ${calendars.length - calendarsToShow.length} lịch khác`);
+    }
+    lines.push(``);
+  }
+
+  if (milestones.length > 0) {
+    lines.push(`=== CỘT MỐC ===`);
+    milestones.forEach((ms, idx) => {
+      const targetDate = new Date(ms.targetDate).toLocaleDateString('vi-VN');
+      lines.push(`${idx + 1}. ${ms.name} - ${targetDate}`);
+      if (ms.description) {
+        lines.push(`   ${ms.description}`);
+      }
+    });
+    lines.push(``);
+  }
+
+  lines.push(
+    `=== HƯỚNG DẪN ===`,
+    `- Khi người dùng nói "sự kiện này" thì hiểu là eventId = ${event._id}`,
+    `- Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId này`,
+    `- Khi tạo task/epic, luôn gắn với eventId này (qua các tool tương ứng)`,
+    `- Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết hơn nếu cần`,
+    ``,
+    `=== QUYỀN TẠO EPIC VÀ TASK ===`,
+    `- Chỉ HoOC mới có quyền tạo EPIC mới`,
+    `- HoOC có thể tạo TASK cho bất kỳ EPIC nào`,
+    `- HoD CHỈ có thể tạo TASK trong EPIC của ban mình (KHÔNG được tạo EPIC mới)`,
+    `- Member KHÔNG được phép tạo EPIC hoặc TASK`,
+    `- Nếu HoD yêu cầu tạo EPIC, trả lời rằng chỉ HoOC mới có quyền tạo EPIC`,
+    `- Nếu Member yêu cầu tạo EPIC/TASK, trả lời rằng chỉ HoOC và HoD mới có quyền này`,
+  );
+
+  // Thêm hướng dẫn về quyền cho HoD và Member
+  if (currentUser && (currentUser.role === 'HoD' || currentUser.role === 'Member')) {
+    lines.push(
+      ``,
+      `=== QUYỀN HẠN CHO ${currentUser.role} ===`,
+    );
+    
+    if (currentUser.role === 'Member') {
+      lines.push(
+        `- Member KHÔNG được phép tạo EPIC hoặc TASK. Nếu Member yêu cầu tạo, trả lời rằng chỉ HoOC và HoD mới có quyền này.`,
+        `- Member có thể xem rủi ro của ban mình (nếu có ban) + rủi ro chung (scope = 'event')`,
+        `- Member có thể xem lịch của ban mình (nếu có ban) + lịch chung (type = 'event')`,
+      );
+    } else {
+      lines.push(
+        `- HoD CHỈ có thể tạo TASK trong EPIC của ban mình (KHÔNG được tạo EPIC mới)`,
+        `- HoD muốn tạo EPIC phải yêu cầu HoOC tạo`,
+        `- HoD có thể xem rủi ro của ban mình + rủi ro chung (scope = 'event')`,
+        `- HoD có thể xem lịch của ban mình + lịch chung (type = 'event')`,
+      );
+    }
+    
+    lines.push(
+      `- ${currentUser.role} KHÔNG được phép hỏi hoặc xem thông tin tài chính (budget, expense, chi phí) của người khác hoặc các ban khác`,
+      `- Nếu ${currentUser.role} hỏi về tài chính của ban khác hoặc người khác, trả lời rằng không thể cung cấp thông tin này`,
+      `- ${currentUser.role} chỉ có thể xem thông tin tài chính của ban mình (nếu có quyền) hoặc thông tin chung của sự kiện`,
+    );
+  }
+
+  // Thêm hướng dẫn đặc biệt cho HoOC
+  if (currentUser && currentUser.role === 'HoOC') {
+    lines.push(
+      ``,
+      `=== QUYỀN HẠN ĐẶC BIỆT CHO HoOC ===`,
+      `- Bạn đang hỗ trợ HoOC (Head of Organizing Committee) - người có quyền cao nhất trong sự kiện`,
+      `- HoOC có thể xem và truy cập TẤT CẢ thông tin về sự kiện:`,
+      `  + Thông tin chi tiết của TẤT CẢ thành viên (tên, role, ban)`,
+      `  + Thông tin chi tiết của TẤT CẢ các ban`,
+      `  + Thông tin chi tiết của TẤT CẢ EPIC và TASK`,
+      `  + Thông tin chi tiết của TẤT CẢ rủi ro (của tất cả các ban và sự kiện)`,
+      `  + Thông tin chi tiết của TẤT CẢ lịch (của tất cả các ban và sự kiện)`,
+      `- HoOC là người DUY NHẤT có quyền tạo EPIC mới`,
+      `- HoOC có thể tạo TASK cho bất kỳ EPIC nào`,
+      `- Khi HoOC hỏi về bất kỳ thông tin nào của sự kiện, bạn PHẢI trả lời đầy đủ và chi tiết dựa trên thông tin đã có trong context trên`,
+      `- Nếu HoOC hỏi về thông tin cụ thể (ví dụ: "ai là HoD của ban X?", "ban Y có bao nhiêu thành viên?", "task nào đang chậm tiến độ?"), hãy tìm trong context và trả lời chính xác`,
+      `- Nếu cần thông tin mới nhất, bạn có thể gọi tool get_event_detail_for_ai, nhưng thông thường context đã đủ đầy đủ`,
+    );
+  }
+
+  return lines.join('\n');
 };
 
 export const runEventPlannerAgent = async (req, res) => {
@@ -50,33 +580,88 @@ export const runEventPlannerAgent = async (req, res) => {
       }
     }
 
-    // Tăng cường ngữ cảnh: nếu có eventId thì lấy thông tin sự kiện từ Mongo
+    // Tăng cường ngữ cảnh: nếu có eventId thì lấy thông tin đầy đủ của sự kiện
     let enrichedMessages = [...history_messages];
-    if (eventId) {
+    if (eventId && userId) {
+      try {
+        // Lấy thông tin đầy đủ của sự kiện (departments, members, epics, tasks, risks, calendars, milestones)
+        const eventData = await getFullEventContext(eventId, userId);
+        
+        if (eventData) {
+          const contextLines = formatEventContextForAI(eventData);
+          
+          // Chỉ thêm system message nếu đây là lần đầu tiên (không có system message trong history)
+          const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
+          
+          if (!hasSystemMessage) {
+            // Lần đầu tiên: thêm system message với đầy đủ thông tin
+            enrichedMessages = [
+              { role: 'system', content: contextLines },
+              ...history_messages,
+            ];
+          } else {
+            // Đã có system message: chỉ cập nhật nếu cần (hoặc giữ nguyên để tránh làm dài context)
+            // Có thể bỏ qua hoặc chỉ thêm vào message đầu tiên nếu cần
+            console.log('[aiAgentController] System message already exists, keeping existing context');
+          }
+        } else {
+          // Fallback: nếu không lấy được thông tin đầy đủ, dùng thông tin cơ bản
+          const event = await Event.findById(eventId).lean();
+          if (event) {
+            const contextLines = [
+              `Bạn đang hỗ trợ lập kế hoạch cho một sự kiện trong hệ thống myFEvent.`,
+              `Nếu người dùng nói "sự kiện này" thì hiểu là eventId = ${eventId}.`,
+              `EVENT_CONTEXT_JSON: {"eventId": "${eventId}"}`,
+              `Thông tin sự kiện:`,
+              `- Tên: ${event.name}`,
+              `- Loại: ${event.type}`,
+              `- Địa điểm: ${event.location || 'N/A'}`,
+              `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
+              `Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId này.`,
+              `Khi tạo task/epic, luôn gắn với eventId này (qua các tool tương ứng).`,
+              `Lưu ý: Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết đầy đủ về sự kiện.`,
+            ].join('\n');
+
+            const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
+            if (!hasSystemMessage) {
+              enrichedMessages = [
+                { role: 'system', content: contextLines },
+                ...history_messages,
+              ];
+            }
+          }
+        }
+      } catch (e) {
+        // Không chặn toàn bộ flow nếu lỗi đọc DB
+        console.warn('runEventPlannerAgent: lỗi load event context', e);
+      }
+    } else if (eventId && !userId) {
+      // Có eventId nhưng không có userId (có thể là lần đầu, chưa đăng nhập)
+      // Vẫn thêm context cơ bản
       try {
         const event = await Event.findById(eventId).lean();
         if (event) {
           const contextLines = [
             `Bạn đang hỗ trợ lập kế hoạch cho một sự kiện trong hệ thống myFEvent.`,
-            `Nếu người dùng nói "sự kiện này" thì hiểu là eventId = ${eventId}.`,
             `EVENT_CONTEXT_JSON: {"eventId": "${eventId}"}`,
             `Thông tin sự kiện:`,
             `- Tên: ${event.name}`,
             `- Loại: ${event.type}`,
             `- Địa điểm: ${event.location || 'N/A'}`,
             `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
-            `Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId này.`,
-            `Khi tạo task/epic, luôn gắn với eventId này (qua các tool tương ứng).`,
+            `Lưu ý: Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết đầy đủ về sự kiện.`,
           ].join('\n');
 
-          enrichedMessages = [
-            { role: 'system', content: contextLines },
-            ...history_messages,
-          ];
+          const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
+          if (!hasSystemMessage) {
+            enrichedMessages = [
+              { role: 'system', content: contextLines },
+              ...history_messages,
+            ];
+          }
         }
       } catch (e) {
-        // Không chặn toàn bộ flow nếu lỗi đọc DB
-        console.warn('runEventPlannerAgent: lỗi load event context', e);
+        console.warn('runEventPlannerAgent: lỗi load basic event context', e);
       }
     }
 
@@ -139,11 +724,19 @@ export const runEventPlannerAgent = async (req, res) => {
           });
         }
 
-        // Thêm user message cuối cùng
-        const lastUser = [...history_messages]
+        // Lấy user message cuối cùng từ history_messages (bỏ qua system messages)
+        const userMessages = history_messages.filter((m) => m.role === 'user');
+        const lastUser = userMessages[userMessages.length - 1];
+        
+        // Kiểm tra xem user message cuối cùng đã được lưu chưa (tránh duplicate)
+        const lastSavedUserMsg = [...conversation.messages]
           .reverse()
           .find((m) => m.role === 'user');
-        if (lastUser) {
+        const isNewUserMessage = !lastSavedUserMsg || 
+          lastSavedUserMsg.content !== lastUser?.content;
+
+        // Thêm user message cuối cùng nếu là message mới
+        if (lastUser && isNewUserMessage) {
           conversation.messages.push({
             role: 'user',
             content: lastUser.content,
@@ -151,7 +744,7 @@ export const runEventPlannerAgent = async (req, res) => {
           });
         }
 
-        // Thêm assistant reply
+        // Thêm assistant reply (luôn thêm vì đây là response mới)
         if (assistantReply) {
           const plans = Array.isArray(agentData.plans) ? agentData.plans : [];
           conversation.messages.push({
@@ -173,9 +766,23 @@ export const runEventPlannerAgent = async (req, res) => {
 
         conversation.updatedAt = new Date();
         await conversation.save();
+        console.log(`[aiAgentController] Saved conversation: sessionId=${sessionId}, messagesCount=${conversation.messages.length}`);
       } catch (e) {
-        console.warn('runEventPlannerAgent: lỗi lưu ConversationHistory', e);
+        console.error('runEventPlannerAgent: lỗi lưu ConversationHistory', e);
+        // Log chi tiết để debug
+        console.error('Error details:', {
+          userId,
+          eventId,
+          sessionId,
+          error: e.message,
+          stack: e.stack,
+        });
       }
+    } else {
+      console.warn('[aiAgentController] Cannot save conversation: missing userId or eventId', {
+        hasUserId: !!userId,
+        hasEventId: !!eventId,
+      });
     }
 
     // Bao luôn sessionId trong response cho FE
@@ -372,9 +979,8 @@ export const listAgentSessions = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    // Mặc định ưu tiên channel agent mới,
-    // nhưng cũng có thể lấy thêm các session cũ (channel khác) cho cùng event.
-    const filter = { userId };
+    // Lọc theo channel agent mới để chỉ lấy các session từ AI Assistant
+    const filter = { userId, channel: CHANNEL_AGENT };
     if (eventId) filter.eventId = eventId;
 
     const sessions = await ConversationHistory.find(filter)
