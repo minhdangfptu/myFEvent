@@ -53,27 +53,7 @@ export default function ProtectedRoute({ children, requiredRole = null, required
     const isAdmin = user?.role === 'admin';
     const hasRequiredRole = user?.role === requiredRole;
     
-    // Debug logging for admin routes
-    if (requiredRole === 'admin') {
-      console.log('ProtectedRoute: Admin route check', {
-        requiredRole,
-        userRole: user?.role,
-        isAdmin,
-        hasRequiredRole,
-        user: user
-      });
-    }
-    
-    // If user is admin, allow access to all routes
-    // Otherwise, check if user has the exact required role
     if (!isAdmin && !hasRequiredRole) {
-      // Debug logging
-      console.log('ProtectedRoute: Role check failed', {
-        requiredRole,
-        userRole: user?.role,
-        user: user
-      });
-      // Redirect to unauthorized page or home
       return <Navigate to="/unauthorized" replace />;
     }
   }

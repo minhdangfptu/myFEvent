@@ -52,8 +52,6 @@ const clubs = [
     image: "/Clubs/english.png",
     icon: "bi-chat-dots",
   },
-
-  // ⭐ Thêm mới
   {
     name: "FPT Dance Club",
     email: "fptudance@gmail.com",
@@ -125,20 +123,22 @@ const clubs = [
     email: "fptubasketball@gmail.com",
     image: "/Clubs/basketball.jpg",
     icon: "bi-disc",
-  }
+  },
 ];
 
-
 export default function ClubsPage() {
-  //time 1s loaidng
+  // Time 1s loading
   const [loading, setLoading] = React.useState(true);
+  
   React.useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(t);
   }, []);
+
   const [keyword, setKeyword] = React.useState("");
-  const [page, setPage] = React.useState(1);
-  const totalPages = 1;
+
+  // Đã xóa state page và totalPages vì không còn dùng phân trang nữa
+
   const filtered = React.useMemo(() => {
     const k = keyword.trim().toLowerCase();
     if (!k) return clubs;
@@ -178,6 +178,7 @@ export default function ClubsPage() {
               Cùng khám phá hơn 48 câu lạc bộ đang hoạt động tại cơ sở Đại học FPT Hà Nội
             </p>
 
+            {/* Search Box */}
             <div className="d-flex justify-content-center mb-4">
               <div className="input-group" style={{ maxWidth: 560 }}>
                 <input
@@ -194,11 +195,15 @@ export default function ClubsPage() {
               </div>
             </div>
 
+            {/* Club List */}
             <div className="row g-3">
               {filtered.length === 0 ? (
                 <div className="col-12">
                   <div className="text-center py-5">
-                    <i className="bi bi-search" style={{ fontSize: "4rem", color: "#9ca3af" }}></i>
+                    <i
+                      className="bi bi-search"
+                      style={{ fontSize: "4rem", color: "#9ca3af" }}
+                    ></i>
                     <h4 className="mt-3 mb-2" style={{ color: "#6b7280" }}>
                       Không tìm thấy câu lạc bộ nào
                     </h4>
@@ -289,67 +294,7 @@ export default function ClubsPage() {
                 ))
               )}
             </div>
-
-            <div className="d-flex justify-content-center mt-4">
-              <div className="d-flex align-items-center" style={{ gap: 16 }}>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="btn"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                    background: "#fff",
-                    color: "#9ca3af",
-                    padding: 0,
-                  }}
-                >
-                  <i className="bi bi-chevron-left" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPage(n)}
-                      className="btn"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        border:
-                          "1px solid " + (n === page ? "#d42323ff" : "#e5e7eb"),
-                        background: n === page ? "#d42323ff" : "#fff",
-                        color: n === page ? "#fff" : "#111827",
-                        padding: 0,
-                      }}
-                    >
-                      {n}
-                    </button>
-                  )
-                )}
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="btn"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                    background: "#fff",
-                    color: "#9ca3af",
-                    padding: 0,
-                  }}
-                >
-                  <i className="bi bi-chevron-right" />
-                </button>
-              </div>
-            </div>
+            
           </div>
         </section>
       </main>
