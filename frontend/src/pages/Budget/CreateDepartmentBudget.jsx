@@ -5,15 +5,18 @@ import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
+import { useEvents } from "../../contexts/EventContext";
 import { ArrowLeft, Users, RotateCw, Save, Send, PlusCircle, CheckCircle, AlertTriangle, XCircle, Upload, Trash, Image, FileText, Link, Paperclip } from "lucide-react";
 
 const CreateDepartmentBudget = () => {
   const { eventId, departmentId, budgetId: budgetIdFromParams } = useParams();
   const navigate = useNavigate();
+  const { fetchEventRole, getEventRole } = useEvents();
   const location = window.location.pathname;
   const isEditMode = location.includes('/edit');
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [department, setDepartment] = useState(null);
+  const [eventRole, setEventRole] = useState(null);
   const [budget, setBudget] = useState(null);
   const [requestName, setRequestName] = useState("");
   const [requestNameTouched, setRequestNameTouched] = useState(false);
@@ -45,6 +48,17 @@ const CreateDepartmentBudget = () => {
   const [linkItemId, setLinkItemId] = useState(null);
 
   useEffect(() => {
+    const checkRole = async () => {
+      if (eventId) {
+        try {
+          const role = await fetchEventRole(eventId);
+          setEventRole(role);
+        } catch (error) {
+          console.error("Error fetching role:", error);
+        }
+      }
+    };
+    checkRole();
     fetchDepartment();
     if (isEditMode) {
       fetchBudget();
@@ -762,7 +776,8 @@ const CreateDepartmentBudget = () => {
       }
       toast.success("Gửi duyệt thành công!");
       // Navigate với budgetId cụ thể để đảm bảo hiển thị đúng budget vừa gửi
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      // Always navigate to view the budget after submit
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`, { replace: true });
     } catch (error) {
       const errorMessage = error?.response?.data?.message || "Gửi duyệt thất bại!";
       toast.error(errorMessage);
@@ -779,7 +794,22 @@ const CreateDepartmentBudget = () => {
   };
 
   const handleCancel = () => {
-    navigate(`/events/${eventId}/departments/${departmentId}/budget`);
+    // Navigate back based on role and whether we have a budgetId
+    if (budgetIdFromParams) {
+      // If we're editing, go back to view that specific budget
+      navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetIdFromParams}`, { replace: true });
+    } else {
+      // Sử dụng getEventRole từ context thay vì state để tránh race condition
+      // Nếu đang ở create page (không có budgetId), mặc định là HoD (vì chỉ HoD mới tạo budget)
+      const role = getEventRole(eventId) || eventRole;
+      if (role === 'HoOC') {
+        // HoOC: go to event budgets list
+        navigate(`/events/${eventId}/budgets`, { replace: true });
+      } else {
+        // HoD or default: go to department budget list (vì create page chỉ dành cho HoD)
+        navigate(`/events/${eventId}/departments/${departmentId}/budget`, { replace: true });
+      }
+    }
   };
 
   if (initialLoading) {
@@ -799,7 +829,10 @@ const CreateDepartmentBudget = () => {
           <div>
             <button
               className="btn btn-link text-decoration-none p-0 mb-2"
-              onClick={handleCancel}
+              onClick={(e) => {
+                e.preventDefault();
+                handleCancel();
+              }}
               style={{ color: "#6b7280" }}
             >
               <ArrowLeft className="me-2" size={20} />

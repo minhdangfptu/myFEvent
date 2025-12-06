@@ -153,6 +153,23 @@ export const mergeItemWithExpense = (item, expense) => {
     };
   }
   
+  // Chỉ merge dữ liệu nếu expense đã được submit (submittedStatus === 'submitted')
+  // Nếu expense ở trạng thái draft, không hiển thị dữ liệu cho HoD
+  const submittedStatus = expense.submittedStatus || 'draft';
+  if (submittedStatus !== 'submitted') {
+    return {
+      ...item,
+      actualAmount: 0,
+      evidence: [],
+      memberNote: '',
+      isPaid: false,
+      comparison: null,
+      reportedBy: null,
+      reportedAt: null,
+      submittedStatus: submittedStatus
+    };
+  }
+  
   return {
     ...item,
     actualAmount: decimalToNumber(expense.actualAmount),
@@ -162,7 +179,7 @@ export const mergeItemWithExpense = (item, expense) => {
     comparison: expense.comparison || null,
     reportedBy: expense.reportedBy,
     reportedAt: expense.reportedAt,
-    submittedStatus: expense.submittedStatus || 'draft'
+    submittedStatus: submittedStatus
   };
 };
 

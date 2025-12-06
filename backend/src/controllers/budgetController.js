@@ -47,6 +47,11 @@ export const getDepartmentBudgetById = async (req, res) => {
       departmentId: new mongoose.Types.ObjectId(departmentId)
     })
       .populate({
+        path: 'departmentId',
+        select: 'name',
+        options: { strictPopulate: false }
+      })
+      .populate({
         path: 'createdBy',
         select: 'fullName email',
         options: { strictPopulate: false }
@@ -120,6 +125,11 @@ export const getDepartmentBudget = async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
+        .populate({
           path: 'createdBy',
           select: 'fullName email',
           options: { strictPopulate: false }
@@ -147,6 +157,11 @@ export const getDepartmentBudget = async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
+        .populate({
           path: 'createdBy',
           select: 'fullName email',
           options: { strictPopulate: false }
@@ -171,6 +186,11 @@ export const getDepartmentBudget = async (req, res) => {
         departmentId: new mongoose.Types.ObjectId(departmentId)
       })
         .sort({ createdAt: -1 }) // Get the latest budget
+        .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
         .populate({
           path: 'createdBy',
           select: 'fullName email',
@@ -950,9 +970,38 @@ export const completeReview = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    if (budget.status !== 'submitted') {
-      return res.status(400).json({ message: 'Only submitted budgets can be reviewed' });
+    // Allow review for submitted budgets or changes_requested budgets (if resubmitted)
+    // Note: changes_requested budgets can be reviewed again if HoD has made changes and resubmitted
+    if (budget.status !== 'submitted' && budget.status !== 'changes_requested') {
+      console.log('completeReview: Invalid budget status', {
+        budgetId: budget._id,
+        currentStatus: budget.status,
+        allowedStatuses: ['submitted', 'changes_requested']
+      });
+      return res.status(400).json({ 
+        message: `Only submitted or changes_requested budgets can be reviewed. Current status: ${budget.status}` 
+      });
     }
+
+    // Validate items array
+    if (!items || !Array.isArray(items)) {
+      console.log('completeReview: Invalid items format', {
+        budgetId: budget._id,
+        itemsType: typeof items,
+        isArray: Array.isArray(items)
+      });
+      return res.status(400).json({ 
+        message: 'Items must be an array' 
+      });
+    }
+
+    // Log for debugging
+    console.log('completeReview: Processing review', {
+      budgetId: budget._id,
+      status: budget.status,
+      itemsCount: items.length,
+      budgetItemsCount: budget.items?.length
+    });
 
     // Update items with review status and feedback
     if (items && Array.isArray(items)) {
@@ -1479,22 +1528,44 @@ export const getBudgetStatistics = async (req, res) => {
       filter.departmentId = new mongoose.Types.ObjectId(effectiveDepartmentId);
     }
 
-    // Chỉ lấy budgets đã nộp (không lấy draft)
+    // Lấy tất cả budgets (không lấy draft) để đếm số lượng
+    // Nhưng chỉ tính tiền cho budgets đã được duyệt (approved, sent_to_members, locked)
     filter.status = { $in: ['submitted', 'approved', 'changes_requested', 'sent_to_members', 'locked'] };
     
-    const budgets = await EventBudgetPlan.find(filter)
+    const allBudgets = await EventBudgetPlan.find(filter)
       .populate('departmentId', 'name')
       .lean();
 
-    const expensesByBudget = await fetchExpensesForBudgets(budgets.map(b => b._id));
+    // Đếm số lượng budgets theo từng trạng thái
+    const budgetCounts = {
+      submitted: 0,
+      approved: 0,
+      changes_requested: 0,
+      sent_to_members: 0,
+      locked: 0,
+      total: allBudgets.length
+    };
+    
+    allBudgets.forEach(budget => {
+      const status = budget.status || 'draft';
+      if (budgetCounts.hasOwnProperty(status)) {
+        budgetCounts[status]++;
+      }
+    });
 
-    // Tính toán thống kê
+    // Chỉ lấy budgets đã được duyệt để tính tiền
+    const approvedBudgets = allBudgets.filter(b => 
+      ['approved', 'sent_to_members', 'locked'].includes(b.status)
+    );
+
+    const expensesByBudget = await fetchExpensesForBudgets(approvedBudgets.map(b => b._id));
+
+    // Tính toán thống kê - chỉ tính tiền cho budgets đã được duyệt
     let totalEstimated = 0;
     let totalActual = 0;
-    let totalPaid = 0;
     const departmentStats = [];
 
-    for (const budget of budgets) {
+    for (const budget of approvedBudgets) {
       const deptEstimated = budget.items?.reduce(
         (sum, item) => sum + (parseFloat(item.total?.toString() || 0)),
         0
@@ -1507,33 +1578,101 @@ export const getBudgetStatistics = async (req, res) => {
         0
       );
 
-      const deptPaid = expenseValues.reduce(
-        (sum, expense) => expense.isPaid ? sum + decimalToNumber(expense.actualAmount) : sum,
-        0
-      );
-
       totalEstimated += deptEstimated;
       totalActual += deptActual;
-      totalPaid += deptPaid;
 
       departmentStats.push({
         departmentId: budget.departmentId?._id || budget.departmentId,
         departmentName: budget.departmentId?.name || 'Unknown',
         estimated: deptEstimated,
         actual: deptActual,
-        paid: deptPaid,
         difference: deptActual - deptEstimated,
         status: budget.status
       });
     }
 
+    // Thêm thống kê cho tất cả departments (kể cả chưa duyệt/từ chối) để hiển thị số lượng
+    const allDepartmentStats = [];
+    const deptMap = new Map();
+    
+    // Nhóm budgets theo department
+    allBudgets.forEach(budget => {
+      const deptId = budget.departmentId?._id?.toString() || budget.departmentId?.toString() || budget.departmentId;
+      const deptName = budget.departmentId?.name || 'Unknown';
+      
+      if (!deptMap.has(deptId)) {
+        deptMap.set(deptId, {
+          departmentId: budget.departmentId?._id || budget.departmentId,
+          departmentName: deptName,
+          budgets: [],
+          approvedCount: 0,
+          submittedCount: 0,
+          rejectedCount: 0
+        });
+      }
+      
+      const deptStat = deptMap.get(deptId);
+      deptStat.budgets.push(budget);
+      
+      if (['approved', 'sent_to_members', 'locked'].includes(budget.status)) {
+        deptStat.approvedCount++;
+      } else if (budget.status === 'submitted') {
+        deptStat.submittedCount++;
+      } else if (budget.status === 'changes_requested') {
+        deptStat.rejectedCount++;
+      }
+    });
+
+    // Tính tiền cho từng department (chỉ từ budgets đã duyệt)
+    const approvedDeptMap = new Map();
+    approvedBudgets.forEach(budget => {
+      const deptId = budget.departmentId?._id?.toString() || budget.departmentId?.toString() || budget.departmentId;
+      if (!approvedDeptMap.has(deptId)) {
+        approvedDeptMap.set(deptId, {
+          estimated: 0,
+          actual: 0
+        });
+      }
+      
+      const deptStat = approvedDeptMap.get(deptId);
+      const deptEstimated = budget.items?.reduce(
+        (sum, item) => sum + (parseFloat(item.total?.toString() || 0)),
+        0
+      ) || 0;
+      const planExpenses = expensesByBudget.get(budget._id.toString()) || new Map();
+      const expenseValues = Array.from(planExpenses.values());
+      const deptActual = expenseValues.reduce(
+        (sum, expense) => sum + decimalToNumber(expense.actualAmount),
+        0
+      );
+      
+      deptStat.estimated += deptEstimated;
+      deptStat.actual += deptActual;
+    });
+
+    // Tạo departmentStats với đầy đủ thông tin
+    deptMap.forEach((deptStat, deptId) => {
+      const approvedData = approvedDeptMap.get(deptId) || { estimated: 0, actual: 0 };
+      allDepartmentStats.push({
+        departmentId: deptStat.departmentId,
+        departmentName: deptStat.departmentName,
+        estimated: approvedData.estimated,
+        actual: approvedData.actual,
+        difference: approvedData.actual - approvedData.estimated,
+        approvedCount: deptStat.approvedCount,
+        submittedCount: deptStat.submittedCount,
+        rejectedCount: deptStat.rejectedCount,
+        totalCount: deptStat.budgets.length
+      });
+    });
+
     return res.status(200).json({
       data: {
         totalEstimated,
         totalActual,
-        totalPaid,
         totalDifference: totalActual - totalEstimated,
-        departmentStats
+        budgetCounts,
+        departmentStats: allDepartmentStats
       }
     });
   } catch (error) {

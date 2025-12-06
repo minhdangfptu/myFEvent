@@ -7,11 +7,11 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
-import { ArrowLeft, Check, CheckCircle, Info, RotateCcw, Save, Search, X } from "lucide-react";
+import { ArrowLeft, CheckCircle, Info, RotateCcw, Save, Search } from "lucide-react";
 
 
 const ViewDeptBudgetDetailHoOC = () => {
-  const { eventId, departmentId } = useParams();
+  const { eventId, departmentId, budgetId } = useParams();
   const navigate = useNavigate();
   const { fetchEventRole } = useEvents();
   const [loading, setLoading] = useState(true);
@@ -26,6 +26,7 @@ const ViewDeptBudgetDetailHoOC = () => {
   const [tempFeedback, setTempFeedback] = useState("");
   const [eventRole, setEventRole] = useState("");
   const [checkingRole, setCheckingRole] = useState(true);
+  const [feedbackDebounceTimers, setFeedbackDebounceTimers] = useState({});
 
   // Kiểm tra role khi component mount
   useEffect(() => {
@@ -59,7 +60,16 @@ const ViewDeptBudgetDetailHoOC = () => {
     if (eventRole === 'HoOC') {
       fetchData();
     }
-  }, [eventId, departmentId, eventRole]);
+  }, [eventId, departmentId, budgetId, eventRole]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(feedbackDebounceTimers).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
 
   const fetchData = async () => {
     if (!departmentId || departmentId === "current" || departmentId === "") {
@@ -69,8 +79,14 @@ const ViewDeptBudgetDetailHoOC = () => {
 
     try {
       setLoading(true);
+      // Nếu có budgetId, dùng getDepartmentBudgetById để lấy đúng budget
+      // Nếu không có budgetId, dùng getDepartmentBudget (backward compatibility)
+      const budgetPromise = budgetId 
+        ? budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetId)
+        : budgetApi.getDepartmentBudget(eventId, departmentId, true);
+      
       const [budgetData, deptData] = await Promise.all([
-        budgetApi.getDepartmentBudget(eventId, departmentId, true), // Pass forReview=true
+        budgetPromise,
         departmentService.getDepartmentDetail(eventId, departmentId),
       ]);
 
@@ -91,25 +107,31 @@ const ViewDeptBudgetDetailHoOC = () => {
       setDepartment(deptData);
 
       // Initialize item statuses and feedbacks
-      // Nếu budget chưa được review (status là draft hoặc submitted), các items mặc định là pending
-      // Chỉ giữ status approved/rejected nếu budget đã được approved
+      // Nếu budget đã rejected (changes_requested), giữ nguyên status và feedback, không cho phép chỉnh sửa
+      // Nếu budget đã approved, giữ nguyên status của item
+      // Nếu budget chưa được review (status là submitted), các items mặc định là pending
       const initialStatuses = {};
       const initialFeedbacks = {};
       const budgetStatus = budgetData.status || "draft";
       const isBudgetApproved = budgetStatus === "approved";
+      const isBudgetRejected = budgetStatus === "changes_requested";
       
       if (budgetData.items && Array.isArray(budgetData.items)) {
         budgetData.items.forEach((item) => {
           const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-          // Nếu budget đã approved, giữ nguyên status của item
-          // Nếu budget chưa approved (draft/submitted), mặc định là pending
-          if (isBudgetApproved) {
+          // Nếu budget đã rejected, giữ nguyên status và feedback (read-only)
+          if (isBudgetRejected) {
             initialStatuses[itemId] = item.status || "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
+          } else if (isBudgetApproved) {
+            // Nếu budget đã approved, giữ nguyên status của item
+            initialStatuses[itemId] = item.status || "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
           } else {
-            // Budget chưa được review, reset về pending
+            // Budget chưa được review (submitted), mặc định là pending
             initialStatuses[itemId] = "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
           }
-          initialFeedbacks[itemId] = item.feedback || "";
         });
       }
       setItemStatuses(initialStatuses);
@@ -228,16 +250,68 @@ const ViewDeptBudgetDetailHoOC = () => {
     setTempFeedback(currentFeedback);
   };
 
-  const handleSaveFeedback = (itemId) => {
+  const handleSaveFeedback = async (itemId) => {
     setItemFeedbacks((prev) => ({ ...prev, [itemId]: tempFeedback }));
     setHasChanges(true);
     setEditingFeedbackItemId(null);
     setTempFeedback("");
+    
+    // Auto-save to backend
+    try {
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = itemStatuses[id] || item.status || "pending";
+        const currentFeedback = id === itemId ? tempFeedback : (itemFeedbacks[id] || item.feedback || "");
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+    } catch (error) {
+      console.error("Error auto-saving feedback:", error);
+      // Don't show error toast for auto-save, just log it
+    }
   };
 
   const handleCancelEditFeedback = () => {
     setEditingFeedbackItemId(null);
     setTempFeedback("");
+  };
+
+  // Auto-save feedback when changed (with debounce)
+  const handleFeedbackChangeAutoSave = (itemId, value) => {
+    // Update local state immediately
+    setItemFeedbacks((prev) => ({ ...prev, [itemId]: value }));
+    setHasChanges(true);
+    
+    // Clear existing timer for this item
+    if (feedbackDebounceTimers[itemId]) {
+      clearTimeout(feedbackDebounceTimers[itemId]);
+    }
+    
+    // Set new timer to auto-save after 1 second of no typing
+    const timer = setTimeout(async () => {
+      try {
+        const items = budget.items.map((item) => {
+          const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+          const currentStatus = itemStatuses[id] || item.status || "pending";
+          const currentFeedback = id === itemId ? value : (itemFeedbacks[id] || item.feedback || "");
+          return {
+            itemId: item.itemId || item._id || item.itemId?._id,
+            status: currentStatus,
+            feedback: currentFeedback,
+          };
+        });
+        await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      } catch (error) {
+        console.error("Error auto-saving feedback:", error);
+        // Don't show error toast for auto-save, just log it
+      }
+    }, 1000); // 1 second debounce
+    
+    setFeedbackDebounceTimers((prev) => ({ ...prev, [itemId]: timer }));
   };
 
   const handleSaveDraft = async () => {
@@ -270,6 +344,8 @@ const ViewDeptBudgetDetailHoOC = () => {
   const handleCompleteReview = async () => {
     try {
       setLoading(true);
+      
+      // Validate: all items must be approved or rejected
       const items = budget.items.map((item) => {
         const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
         const currentStatus = itemStatuses[itemId] || item.status || "pending";
@@ -280,6 +356,18 @@ const ViewDeptBudgetDetailHoOC = () => {
           feedback: currentFeedback,
         };
       });
+      
+      // Check if all items are approved or rejected
+      const allReviewed = items.every(item => {
+        const status = item.status;
+        return status === 'approved' || status === 'rejected';
+      });
+      
+      if (!allReviewed) {
+        toast.error("Vui lòng duyệt hoặc từ chối tất cả các mục trước khi hoàn tất!");
+        setLoading(false);
+        return;
+      }
 
       await budgetApi.completeReview(eventId, departmentId, budget._id, { items });
       toast.success("Hoàn tất duyệt ngân sách thành công!");
@@ -390,71 +478,66 @@ const ViewDeptBudgetDetailHoOC = () => {
             Tổng Quan Ngân Sách
           </h5>
 
-          <div className="row g-4">
-            <div className="col-md-3">
-              <div>
-                <div
-                  className="fw-bold mb-1"
-                  style={{ fontSize: "32px", color: "#3B82F6" }}
-                >
-                  {formatCurrency(totalCost)}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Tổng Chi Phí Dự Kiến (VNĐ)
-                </p>
+          <div className="d-flex flex-wrap align-items-start gap-4" style={{ flexWrap: "nowrap" }}>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div
+                className="fw-bold mb-1"
+                style={{ fontSize: "32px", color: "#3B82F6" }}
+              >
+                {formatCurrency(totalCost)}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Tổng Chi Phí Dự Kiến (VNĐ)
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "24px", color: "#111827" }}>
-                  {budget.items?.length || 0}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Tổng Số Mục
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "24px", color: "#111827" }}>
+                {budget.items?.length || 0}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Tổng Số Mục
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {formatDate(budget.createdAt)}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Ngày Tạo
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
+                {formatDate(budget.createdAt)}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Ngày Tạo
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {budget.createdBy?.fullName || "Nguyễn Văn A"}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Người Tạo (Trưởng ban)
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
+                {budget.createdBy?.fullName || 
+                 budget.creatorName || 
+                 budget.createdByUser?.fullName ||
+                 department?.leader?.fullName ||
+                 department?.leaderId?.fullName ||
+                 "Chưa có thông tin"}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Người Tạo (Trưởng ban)
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    background: "#FEF3C7",
-                    color: "#F59E0B",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                  }}
-                >
-                  Chờ duyệt
-                </span>
-                <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
-                  Trạng thái budget
-                </p>
-              </div>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <span
+                className="badge px-3 py-2"
+                style={{
+                  background: "#FEF3C7",
+                  color: "#F59E0B",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                }}
+              >
+                Chờ duyệt
+              </span>
+              <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
+                Trạng thái budget
+              </p>
             </div>
           </div>
         </div>
@@ -541,6 +624,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                     const feedback = itemFeedbacks[itemId] !== undefined ? itemFeedbacks[itemId] : (item.feedback || "");
                     const isRejected = status === "rejected";
                     const isApproved = status === "approved";
+                    const isBudgetRejected = budget?.status === "changes_requested";
 
                     // CHỈ tô màu đỏ cho dòng bị từ chối, còn lại để màu trắng
                     const cellBgColor = isRejected ? "#FCA5A5" : "transparent";
@@ -622,56 +706,50 @@ const ViewDeptBudgetDetailHoOC = () => {
                           {getStatusBadge(status)}
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
-                          {editingFeedbackItemId === itemId ? (
-                            <div className="d-flex gap-2">
-                              <textarea
-                                className="form-control form-control-sm"
-                                value={tempFeedback}
-                                onChange={(e) => setTempFeedback(e.target.value)}
-                                rows="2"
-                                style={{ fontSize: "13px", minHeight: "60px" }}
-                                autoFocus
-                              />
-                              <div className="d-flex flex-column gap-1">
-                                <button
-                                  className="btn btn-success btn-sm"
-                                  onClick={() => handleSaveFeedback(itemId)}
-                                  style={{ fontSize: "11px", padding: "4px 8px" }}
-                                >
-                                  <Check size={18} />
-                                </button>
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={handleCancelEditFeedback}
-                                  style={{ fontSize: "11px", padding: "4px 8px" }}
-                                >
-                                  <X size={18} />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              onClick={() => handleStartEditFeedback(item)}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: "6px",
-                                border: isApproved ? "1px solid #10B981" : isRejected ? "1px solid #DC2626" : "1px solid #d1d5db",
-                                backgroundColor: isApproved ? "#F0FDF4" : isRejected ? "#FEF2F2" : "#f9fafb",
-                                color: "#111827",
-                                fontSize: "13px",
-                                minHeight: "32px",
-                                display: "flex",
-                                alignItems: "center",
-                                cursor: "pointer",
-                              }}
-                              title="Click để chỉnh sửa phản hồi"
-                            >
-                              {feedback || "—"}
-                            </div>
-                          )}
+                          <textarea
+                            className="form-control form-control-sm"
+                            value={feedback || ""}
+                            onChange={(e) => {
+                              if (!isBudgetRejected) {
+                                handleFeedbackChangeAutoSave(itemId, e.target.value);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // Save immediately on blur
+                              if (!isBudgetRejected && e.target.value !== feedback) {
+                                const items = budget.items.map((item) => {
+                                  const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+                                  const currentStatus = itemStatuses[id] || item.status || "pending";
+                                  const currentFeedback = id === itemId ? e.target.value : (itemFeedbacks[id] || item.feedback || "");
+                                  return {
+                                    itemId: item.itemId || item._id || item.itemId?._id,
+                                    status: currentStatus,
+                                    feedback: currentFeedback,
+                                  };
+                                });
+                                budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items }).catch(err => {
+                                  console.error("Error saving feedback on blur:", err);
+                                });
+                              }
+                            }}
+                            rows="2"
+                            style={{ 
+                              fontSize: "13px", 
+                              minHeight: "60px",
+                              border: isApproved ? "1px solid #10B981" : isRejected ? "1px solid #DC2626" : "1px solid #d1d5db",
+                              backgroundColor: isApproved ? "#F0FDF4" : isRejected ? "#FEF2F2" : "#f9fafb",
+                            }}
+                            disabled={isBudgetRejected}
+                            placeholder="Nhập phản hồi..."
+                            title={isBudgetRejected ? "Budget đã bị từ chối, không thể chỉnh sửa" : "Nhập phản hồi (tự động lưu)"}
+                          />
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
-                          {status === "pending" ? (
+                          {isBudgetRejected ? (
+                            <span className="text-muted" style={{ fontSize: "12px" }}>
+                              Budget đã bị từ chối
+                            </span>
+                          ) : status === "pending" ? (
                             <div className="d-flex gap-1">
                               <button
                                 className="btn btn-success btn-sm"

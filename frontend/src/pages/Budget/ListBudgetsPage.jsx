@@ -321,18 +321,29 @@ const ListBudgetsPage = () => {
     );
   };
 
-  const handleViewDetail = (departmentId, budgetStatus) => {
+  const handleViewDetail = (departmentId, budgetStatus, budgetId) => {
     // Nếu là HoD, điều hướng đến trang view budget của họ
     // Nếu là HoOC, điều hướng đến trang review (chỉ nếu budget không phải draft)
     if (eventRole === 'HoD') {
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      // HoD: nếu có budgetId, navigate với budgetId, nếu không thì dùng view
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      } else {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      }
     } else {
       // HoOC không được xem draft budgets
       if (budgetStatus === 'draft') {
         toast.error("Không thể xem budget nháp. Budget này chưa được gửi lên để duyệt.");
         return;
       }
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      // HoOC: luôn truyền budgetId để xem đúng budget
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}/review`);
+      } else {
+        // Fallback nếu không có budgetId (backward compatibility)
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      }
     }
   };
 
@@ -870,7 +881,7 @@ const ListBudgetsPage = () => {
                             </div>
                           </td>
                         )}
-                        {eventRole === 'HoOC' && (
+                        {eventRole === 'HoOC' && budget.status === 'approved' && (
                           <td style={{ padding: "12px" }}>
                             <button
                               className={`btn btn-sm ${budget.isPublic ? 'btn-success' : 'btn-outline-secondary'}`}
@@ -892,11 +903,20 @@ const ListBudgetsPage = () => {
                             </button>
                           </td>
                         )}
+                        {eventRole === 'HoOC' && budget.status !== 'approved' && (
+                          <td style={{ padding: "12px" }}>
+                            <span className="text-muted" style={{ fontSize: "13px" }}>—</span>
+                          </td>
+                        )}
                         <td style={{ padding: "12px" }}>
                           <div className="d-flex gap-2">
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => handleViewDetail(budget.departmentId || budget.department?._id || budget.departmentId, budget.status)}
+                              onClick={() => handleViewDetail(
+                                budget.departmentId || budget.department?._id || budget.departmentId, 
+                                budget.status,
+                                budget._id || budget.id || budget.budgetId
+                              )}
                               style={{ borderRadius: "8px" }}
                             >
                               Xem chi tiết
