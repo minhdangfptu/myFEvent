@@ -560,6 +560,9 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
     throw makeError('Chỉ người tạo công việc mới có thể xóa công việc này.', 403);
   }
 
+  // Kiểm tra xem task có phải là EPIC không
+  const isEpic = isEpicTask(task);
+
   // Nếu task có parentId (task con trong epic), cho phép xóa luôn, không kiểm tra gì
   if (task.parentId) {
     // Task con: Cho phép xóa luôn
@@ -570,7 +573,7 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
       Task.countDocuments({ eventId, parentId: task._id }),
     ]);
 
-    if (dependents || children) {
+    if (dependents > 0 || children > 0) {
       throw makeError('Không thể xóa vì công việc lớn đang có công việc', 409, {
         meta: { dependents, children },
       });

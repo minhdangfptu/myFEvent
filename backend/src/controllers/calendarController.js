@@ -809,9 +809,20 @@ export const getMyCalendarInEvent = async (req, res) => {
             // If user is a participant, include the calendar
             if (isParticipant) return true;
             
+            // For event-wide calendars (type = 'event'): all members of the event can see them
+            // This fixes the issue where new members joining after calendar creation can see event-wide meetings
+            const calendarType = calendar.type;
+            const hasDepartmentId = calendar.departmentId && 
+                (typeof calendar.departmentId === 'object' ? calendar.departmentId._id : calendar.departmentId);
+            
+            if (calendarType === 'event' || !hasDepartmentId) {
+                // Event-wide calendar: all members can see
+                return true;
+            }
+            
             // For department calendars: if user belongs to that department, show the meeting
             // This fixes the issue where members joining later can see department meetings
-            if (calendar.departmentId && userDepartmentId) {
+            if (hasDepartmentId && userDepartmentId) {
                 const calendarDepartmentId = (typeof calendar.departmentId === 'object' && calendar.departmentId._id)
                     ? calendar.departmentId._id.toString()
                     : calendar.departmentId.toString();
@@ -831,14 +842,78 @@ export const getMyCalendarInEvent = async (req, res) => {
 export const getCalendarDetail = async (req, res) => {
     try {
         const { calendarId } = req.params;
+        const userId = req.user?.id;
+        
         if (!calendarId) {
             return res.status(400).json({ message: 'calendarId is required' });
         }
+        
+        if (!userId) {
+            return res.status(403).json({ message: 'Authentication required' });
+        }
+        
         const calendar = await getCalendarById(calendarId);
         if (!calendar) {
             return res.status(404).json({ message: 'Calendar not found' });
         }
-        return res.status(200).json({ data: calendar });
+        
+        // Lấy eventId từ calendar
+        const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+        if (!calendarEventId) {
+            return res.status(400).json({ message: 'Calendar does not belong to any event' });
+        }
+        
+        // Kiểm tra user có phải là member active của event không
+        const membership = await getRequesterMembership(calendarEventId, userId);
+        if (!membership) {
+            return res.status(403).json({ message: 'You are not a member of this event' });
+        }
+        
+        // Kiểm tra member có status active không (không phải deactive)
+        if (membership.status === 'deactive') {
+            return res.status(403).json({ message: 'You do not have permission to view this calendar' });
+        }
+        
+        // Kiểm tra quyền xem calendar (tương tự logic trong getMyCalendarInEvent)
+        const membershipId = membership._id.toString();
+        const userDepartmentId = membership.departmentId?.toString();
+        
+        // Check if user is in participants list
+        const isParticipant = Array.isArray(calendar.participants) && calendar.participants.some(participant => {
+            const memberField = participant?.member;
+            const participantMemberId = (memberField && typeof memberField === 'object')
+                ? (memberField._id || memberField)?.toString()
+                : (memberField)?.toString();
+            return participantMemberId === membershipId;
+        });
+        
+        // If user is a participant, allow access
+        if (isParticipant) {
+            return res.status(200).json({ data: calendar });
+        }
+        
+        // For event-wide calendars (type = 'event'): all active members of the event can see them
+        const calendarType = calendar.type;
+        const hasDepartmentId = calendar.departmentId && 
+            (typeof calendar.departmentId === 'object' ? calendar.departmentId._id : calendar.departmentId);
+        
+        if (calendarType === 'event' || !hasDepartmentId) {
+            // Event-wide calendar: all active members can see
+            return res.status(200).json({ data: calendar });
+        }
+        
+        // For department calendars: if user belongs to that department, allow access
+        if (hasDepartmentId && userDepartmentId) {
+            const calendarDepartmentId = (typeof calendar.departmentId === 'object' && calendar.departmentId._id)
+                ? calendar.departmentId._id.toString()
+                : calendar.departmentId.toString();
+            if (calendarDepartmentId === userDepartmentId) {
+                return res.status(200).json({ data: calendar });
+            }
+        }
+        
+        // User does not have permission to view this calendar
+        return res.status(403).json({ message: 'You do not have permission to view this calendar' });
     } catch (error) {
         console.error('getCalendarDetail error:', error);
         return res.status(500).json({ message: 'Failed to load calendar detail' });

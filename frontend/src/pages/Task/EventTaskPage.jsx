@@ -17,7 +17,7 @@ import { useNotifications } from "~/contexts/NotificationsContext";
 import SuggestedTasksColumn from "~/components/SuggestedTasksColumn";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "~/components/Loading";
-import { RotateCw, Trash, AlertTriangle, X, Bot, FileCheck, ClipboardList } from "lucide-react";
+import { RotateCw, Trash, AlertTriangle, X, Bot, FileCheck, ClipboardList, Edit, Plus, ChevronUp, ChevronDown, Info, MousePointer } from "lucide-react";
 import { FileText, Users, User, Calendar, BarChart3 } from "lucide-react";
 
 const TASK_TYPE_LABELS = {
@@ -138,6 +138,9 @@ export default function EventTaskPage() {
   const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expiredEpicModal, setExpiredEpicModal] = useState({ show: false, epicName: "", epicDeadline: "", onConfirm: null, pendingParentId: null });
+  const [editEpicModal, setEditEpicModal] = useState({ show: false, epic: null });
+  const [epicEditForm, setEpicEditForm] = useState({ title: "", description: "", departmentId: "", milestoneId: "", startDate: "", dueDate: "" });
+  const [isUpdatingEpic, setIsUpdatingEpic] = useState(false);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -1302,27 +1305,46 @@ const closeAddTaskModal = () => {
                                         openAddTaskModal("normal", epic);
                                       }}
                                       title="Thêm công việc"
+                                      style={{ whiteSpace: 'nowrap', padding: '4px 8px', fontSize: '12px' }}
                                     >
-                                      <i className="bi bi-plus-lg" />
-                                      <span className="d-none d-xl-inline">Thêm công việc</span>
+                                      <Plus size={14} />
+                                      <span>Thêm công việc</span>
                                     </button>
                                   )}
                                   {eventRole !== "Member" && (
                                     <button
-                                      className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1"
+                                      className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDeleteEpic(epic);
+                                        // Mở modal chỉnh sửa EPIC
+                                        const epicStartDate = epic?.startDate ? new Date(epic.startDate).toISOString().slice(0, 16) : "";
+                                        const epicDueDate = epic?.dueDate || epic?.dueDateRaw ? new Date(epic.dueDate || epic.dueDateRaw).toISOString().slice(0, 16) : "";
+                                        const epicDepartmentId = epic?.departmentId?._id || epic?.departmentId || "";
+                                        const epicMilestoneId = epic?.milestoneId?._id || epic?.milestoneId || epic?.milestone?._id || epic?.milestone || "";
+                                        setEpicEditForm({ 
+                                          title: epic?.name || epic?.title || "",
+                                          description: epic?.description || "",
+                                          departmentId: epicDepartmentId,
+                                          milestoneId: epicMilestoneId,
+                                          startDate: epicStartDate,
+                                          dueDate: epicDueDate
+                                        });
+                                        setEditEpicModal({ show: true, epic });
                                       }}
-                                      title="Xóa công việc lớn"
+                                      title="Chỉnh sửa công việc lớn"
+                                      style={{ whiteSpace: 'nowrap', padding: '4px 8px', fontSize: '12px' }}
                                     >
-                                      <Trash size={16} />
-                                      <span className="d-none d-xl-inline">Xóa</span>
+                                      <Edit size={14} />
+                                      <span>Chỉnh sửa</span>
                                     </button>
                                   )}
                                 </>
                               )}
-                              <i className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"} text-muted`} />
+                              {isExpanded ? (
+                                <ChevronUp size={20} className="text-muted" />
+                              ) : (
+                                <ChevronDown size={20} className="text-muted" />
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1590,6 +1612,230 @@ const closeAddTaskModal = () => {
           </>
         )}
 
+        {/* Edit Epic Modal */}
+        {editEpicModal.show && editEpicModal.epic && (
+          <>
+            <div
+              className="modal-backdrop overlay"
+              style={{ position: "fixed", inset: 0, zIndex: 1050 }}
+              onClick={() => setEditEpicModal({ show: false, epic: null })}
+            />
+            <div
+              className="modal d-block"
+              tabIndex={-1}
+              style={{ zIndex: 1060 }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 800 }}>
+                <div className="modal-content" style={{ borderRadius: 16 }}>
+                  <div className="modal-header">
+                    <h5 className="modal-title d-flex align-items-center gap-2">
+                      <Edit size={20} />
+                      Chỉnh sửa công việc lớn
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      onClick={() => setEditEpicModal({ show: false, epic: null })}
+                    />
+                  </div>
+                  <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    <div className="mb-3">
+                      <label className="form-label">Tên công việc *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={epicEditForm.title}
+                        onChange={(e) =>
+                          setEpicEditForm((prev) => ({ ...prev, title: e.target.value }))
+                        }
+                        placeholder="Nhập tên công việc..."
+                        required
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Mô tả</label>
+                      <textarea
+                        className="form-control"
+                        value={epicEditForm.description}
+                        onChange={(e) =>
+                          setEpicEditForm((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        placeholder="Mô tả ngắn..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Loại công việc</label>
+                      <input
+                        className="form-control"
+                        value="Công việc lớn"
+                        disabled
+                      />
+                      <div className="form-text small text-muted">
+                        Công việc lớn giao cho ban, không chọn người phụ trách.
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Ban phụ trách *</label>
+                      <select
+                        className="form-select"
+                        value={epicEditForm.departmentId}
+                        onChange={(e) =>
+                          setEpicEditForm((prev) => ({ ...prev, departmentId: e.target.value }))
+                        }
+                        required
+                      >
+                        <option value="">Chọn ban</option>
+                        {departments.map((d) => (
+                          <option key={d._id} value={d._id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="row">
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">Thời gian bắt đầu</label>
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          value={epicEditForm.startDate}
+                          onChange={(e) =>
+                            setEpicEditForm((prev) => ({ ...prev, startDate: e.target.value }))
+                          }
+                          min={(() => {
+                            const now = new Date();
+                            now.setMinutes(now.getMinutes() + 1);
+                            return now.toISOString().slice(0, 16);
+                          })()}
+                          max={epicEditForm.dueDate || undefined}
+                        />
+                        <div className="form-text small text-muted">
+                          Lưu ý: Thời gian bắt đầu phải sau thời điểm hiện tại
+                        </div>
+                      </div>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">Deadline *</label>
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          value={epicEditForm.dueDate}
+                          onChange={(e) =>
+                            setEpicEditForm((prev) => ({ ...prev, dueDate: e.target.value }))
+                          }
+                          min={(() => {
+                            const minDate = epicEditForm.startDate || (() => {
+                              const now = new Date();
+                              now.setMinutes(now.getMinutes() + 1);
+                              return now.toISOString().slice(0, 16);
+                            })();
+                            return minDate;
+                          })()}
+                          required
+                        />
+                        <div className="form-text small text-muted">
+                          Lưu ý: Deadline phải sau thời điểm hiện tại
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Cột mốc *</label>
+                      <select
+                        className="form-select"
+                        value={epicEditForm.milestoneId}
+                        onChange={(e) =>
+                          setEpicEditForm((prev) => ({ ...prev, milestoneId: e.target.value }))
+                        }
+                        required
+                      >
+                        <option value="">Chọn cột mốc</option>
+                        {milestones.map((m) => (
+                          <option key={m._id} value={m._id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setEditEpicModal({ show: false, epic: null })}
+                      disabled={isUpdatingEpic}
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        if (!epicEditForm.title || !epicEditForm.title.trim()) {
+                          toast.error("Vui lòng nhập tên công việc");
+                          return;
+                        }
+                        if (!epicEditForm.departmentId) {
+                          toast.error("Vui lòng chọn ban phụ trách");
+                          return;
+                        }
+                        if (!epicEditForm.dueDate) {
+                          toast.error("Vui lòng nhập deadline");
+                          return;
+                        }
+                        if (!epicEditForm.milestoneId) {
+                          toast.error("Vui lòng chọn cột mốc");
+                          return;
+                        }
+                        if (epicEditForm.startDate && epicEditForm.dueDate && 
+                            new Date(epicEditForm.startDate) >= new Date(epicEditForm.dueDate)) {
+                          toast.error("Deadline phải sau thời gian bắt đầu");
+                          return;
+                        }
+                        // Validate startDate và dueDate phải sau thời điểm hiện tại
+                        const now = new Date();
+                        if (epicEditForm.startDate && new Date(epicEditForm.startDate) <= now) {
+                          toast.error("Thời gian bắt đầu phải sau thời điểm hiện tại");
+                          return;
+                        }
+                        if (epicEditForm.dueDate && new Date(epicEditForm.dueDate) <= now) {
+                          toast.error("Deadline phải sau thời điểm hiện tại");
+                          return;
+                        }
+
+                        setIsUpdatingEpic(true);
+                        try {
+                          const epicId = editEpicModal.epic?.id || editEpicModal.epic?._id;
+                          const updateData = {
+                            title: epicEditForm.title.trim(),
+                            description: epicEditForm.description || "",
+                            departmentId: epicEditForm.departmentId,
+                            milestoneId: epicEditForm.milestoneId,
+                            startDate: epicEditForm.startDate || null,
+                            dueDate: epicEditForm.dueDate,
+                          };
+                          
+                          await taskApi.editTask(eventId, epicId, updateData);
+                          toast.success("Cập nhật công việc lớn thành công!");
+                          setEditEpicModal({ show: false, epic: null });
+                          fetchTasks();
+                        } catch (err) {
+                          const errorMessage = err?.response?.data?.message || "Cập nhật công việc lớn thất bại!";
+                          toast.error(errorMessage);
+                        } finally {
+                          setIsUpdatingEpic(false);
+                        }
+                      }}
+                      disabled={isUpdatingEpic}
+                    >
+                      {isUpdatingEpic ? "Đang cập nhật..." : "Lưu"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Add Task Modal - giữ nguyên phần modal */}
         {showAddModal && (
           <>
@@ -1606,8 +1852,9 @@ const closeAddTaskModal = () => {
               <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: 900, width: '90%' }}>
                 <div className="modal-content" style={{ borderRadius: 16 }}>
                   <div className="modal-header">
-                    <h5 className="modal-title">
-                      {addTaskMode === "epic" ? "➕ Thêm công việc lớn" : "➕ Thêm công việc"}
+                    <h5 className="modal-title d-flex align-items-center gap-2">
+                      <Plus size={20} />
+                      {addTaskMode === "epic" ? "Thêm công việc lớn" : "Thêm công việc"}
                     </h5>
                     <button
                       type="button"
@@ -1623,7 +1870,7 @@ const closeAddTaskModal = () => {
                     )}
                     {addTaskMode === "normal" && epicContext && (
                       <div className="alert alert-info d-flex align-items-center gap-2 mb-3">
-                        <i className="bi bi-info-circle-fill" />
+                        <Info size={18} />
                         <div>
                           Thêm công việc cho <strong>{epicContext.name}</strong> • Ban: {epicContext.department || "----"}
                         </div>
@@ -1985,12 +2232,12 @@ const closeAddTaskModal = () => {
                     >
                       {isCreatingTask ? (
                         <>
-                          <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
+                          <RotateCw size={18} className="me-2 spin-animation" />
                           Đang thêm...
                         </>
                       ) : (
                         <>
-                          <i className="bi bi-plus-lg me-2"></i>
+                          <Plus size={18} className="me-2" />
                           Thêm công việc
                         </>
                       )}
@@ -2051,7 +2298,7 @@ const closeAddTaskModal = () => {
                   onClick={() => handleSelectAll()}
                   style={{ display: "flex", alignItems: "center", gap: 6 }}
                 >
-                  <i className="bi bi-cursor"></i>
+                  <MousePointer size={18} />
                   Chọn tất cả
                 </button>
               )}
@@ -2063,7 +2310,7 @@ const closeAddTaskModal = () => {
                   disabled={isDeletingTasks}
                 >
                   {isDeletingTasks ? (
-                    <i className="bi bi-arrow-clockwise spin-animation"></i>
+                    <RotateCw size={18} className="spin-animation" />
                   ) : (
                     <Trash size={18} />
                   )}
