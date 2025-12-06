@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./DataTemplatePage.css";
 import UserLayout from "~/components/UserLayout";
 import { useNavigate, useParams } from "react-router-dom";
 import DataExportPreviewModal from "~/components/DataExportPreviewModal";
+import { useEvents } from "~/contexts/EventContext";
+import { toast } from "react-toastify";
+import Loading from "~/components/Loading";
 import {
   Eye,
   RotateCw,
@@ -27,8 +30,38 @@ export default function DataTemplatePage() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewType, setPreviewType] = useState("data");
   const [downloadingItems, setDownloadingItems] = useState(new Set());
+  const [eventRole, setEventRole] = useState('');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const { fetchEventRole } = useEvents();
+
+  // Check user role - only HoOC can access this page
+  useEffect(() => {
+    const loadEventRole = async () => {
+      try {
+        const role = await fetchEventRole(eventId);
+        setEventRole(role);
+        if (role !== 'HoOC') {
+          toast.error('Bạn không có quyền truy cập trang này');
+          navigate('/home-page');
+          return;
+        }
+      } catch (error) {
+        console.error('Error loading role:', error);
+        toast.error('Không thể xác thực quyền truy cập');
+        navigate('/home-page');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (eventId) {
+      loadEventRole();
+    } else {
+      setLoading(false);
+    }
+  }, [eventId, fetchEventRole, navigate]);
 
   const templatesExcel = [
     {
@@ -232,6 +265,27 @@ export default function DataTemplatePage() {
       template.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
+
+  // Show loading while checking role
+  if (loading) {
+    return (
+      <UserLayout
+        sidebarType="hooc"
+        title="Tài liệu dữ liệu mẫu"
+        activePage="export-example"
+        eventId={eventId}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <Loading size={100} />
+        </div>
+      </UserLayout>
+    );
+  }
+
+  // Don't render content if not HoOC (will be redirected)
+  if (eventRole !== 'HoOC') {
+    return null;
+  }
 
   return (
     <UserLayout

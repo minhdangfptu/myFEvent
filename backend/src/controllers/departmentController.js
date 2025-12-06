@@ -244,13 +244,10 @@ export const deleteDepartment = async (req, res) => {
     }
 
     const department = await ensureDepartmentInEvent(eventId, departmentId);
-    if (!department) {
-      return res.status(404).json({ message: 'Department không tồn tại' });
-    }
-
+    if (!department) return res.status(404).json({ message: 'Ban không tồn tại' });
     const requesterMembership = await getRequesterMembership(eventId, req.user?.id);
     if (!requesterMembership || requesterMembership.role !== 'HoOC') {
-      return res.status(403).json({ message: 'Chỉ HooC mới được xoá Department' });
+      return res.status(403).json({ message: 'Chỉ HoOC mới được xóa ban' });
     }
 
     const members = await getMembersByDepartmentRaw(departmentId);
@@ -280,12 +277,10 @@ export const deleteDepartment = async (req, res) => {
     }
 
     await deleteDepartmentDoc(departmentId);
-
-    return res.status(200).json({ message: 'Xoá department thành công' });
-
+    return res.status(200).json({ message: 'Xóa ban thành công' });
   } catch (error) {
     console.error('deleteDepartment error:', error);
-    return res.status(500).json({ message: 'Xoá department thất bại' });
+    return res.status(500).json({ message: 'Xóa ban thất bại' });
   }
 };
 

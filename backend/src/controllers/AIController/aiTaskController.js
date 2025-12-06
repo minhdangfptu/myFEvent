@@ -32,11 +32,15 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
       return res.status(400).json({ message: 'tasks must be a non-empty array' });
     }
 
-    // 1) Quyền: chỉ HoOC được dùng AI để sinh task
-    const membership = await ensureEventRole(req.user.id, eventId, ['HoOC']);
+    // 1) Quyền: HoOC hoặc HoD (nhưng HoD chỉ được tạo TASK trong EPIC của ban mình)
+    const membership = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
     if (!membership) {
-      return res.status(403).json({ message: 'Chỉ HoOC mới được sinh task bằng AI' });
+      return res.status(403).json({ message: 'Chỉ HoOC và HoD mới được sinh task bằng AI' });
     }
+
+    const isHoOC = membership.role === 'HoOC';
+    const isHoD = membership.role === 'HoD';
+    const userDepartmentId = membership.departmentId ? String(membership.departmentId) : null;
 
     // 2) Check Event
     const event = await Event.findById(eventId)
@@ -61,6 +65,16 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
       return res.status(400).json({
         message: 'Epic không gắn với ban nào (departmentId bị thiếu)',
       });
+    }
+
+    // 4) Nếu là HoD, kiểm tra EPIC phải thuộc ban của HoD
+    if (isHoD && userDepartmentId) {
+      const epicDepartmentId = String(epic.departmentId);
+      if (epicDepartmentId !== userDepartmentId) {
+        return res.status(403).json({ 
+          message: 'HoD chỉ được tạo TASK trong EPIC của ban mình. EPIC này thuộc ban khác.' 
+        });
+      }
     }
 
     // 4) Xác định baseDate dùng cho offset_days_from_event

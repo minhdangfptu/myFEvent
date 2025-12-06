@@ -221,23 +221,29 @@ const [newDateInput, setNewDateInput] = useState("");
   };
 
   // Validation functions
-  const validateTime = (startTime, endTime) => {
+  const validateTime = (startTime, endTime, allowOvernight = true) => {
     if (!startTime || !endTime) {
       return { valid: false, message: "Vui lòng nhập đầy đủ thời gian bắt đầu và kết thúc" };
     }
 
     const start = new Date(`2000-01-01T${startTime}:00`);
-    const end = new Date(`2000-01-01T${endTime}:00`);
+    let end = new Date(`2000-01-01T${endTime}:00`);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       return { valid: false, message: "Định dạng thời gian không hợp lệ" };
     }
 
-    if (start >= end) {
+    // Handle overnight schedule (e.g., 23:30 to 6:00 next day)
+    if (allowOvernight && end <= start) {
+      // If end time is before or equal to start time, assume it's next day
+      end = new Date(`2000-01-02T${endTime}:00`);
+    }
+
+    if (end <= start) {
       return { valid: false, message: "Thời gian kết thúc phải sau thời gian bắt đầu" };
     }
 
-    return { valid: true };
+    return { valid: true, isOvernight: end > new Date(`2000-01-02T00:00:00`) };
   };
 
 const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
@@ -350,18 +356,29 @@ const validateDate = (dateString) => {
       debugLog("Adding schedule", { selectedDate, selectedRawDate, newSchedule });
       const dateOnly = selectedRawDate.split("T")[0]; // Get YYYY-MM-DD part
 
+      // Handle overnight schedule (e.g., 23:30 to 6:00 next day)
       const startTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.startTime);
-      const endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
+      let endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
 
-      if (!startTimeISO || !endTimeISO) {
-        toast.error("Định dạng thời gian không hợp lệ");
+      if (!startTimeISO) {
+        toast.error("Định dạng thời gian bắt đầu không hợp lệ");
         return;
       }
 
       const startTime = new Date(startTimeISO);
-      const endTime = new Date(endTimeISO);
+      let endTime = new Date(endTimeISO || combineDateAndTimeToISO(dateOnly, newSchedule.endTime));
 
-      if (endTime - startTime <= 0) {
+      // Check if schedule spans to next day
+      if (endTime <= startTime) {
+        // Calculate next day
+        const nextDay = new Date(startTime);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDayISO = nextDay.toISOString().split('T')[0];
+        endTimeISO = combineDateAndTimeToISO(nextDayISO, newSchedule.endTime);
+        endTime = new Date(endTimeISO);
+      }
+
+      if (!endTimeISO || !endTime || endTime <= startTime) {
         toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
         return;
       }
@@ -560,11 +577,21 @@ const validateDate = (dateString) => {
   };
 
   const handleConfirmAddDate = async () => {
+    // Validate date input
+    if (!newDateInput || !newDateInput.trim()) {
+      toast.error("Vui lòng chọn ngày");
+      return;
+    }
+
+    const dateValidation = validateDate(newDateInput);
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
     setNewDate(newDateInput);
     setShowAddDateModal(false);
-    if (newDateInput) {
       await handleAddDate(newDateInput);
-    }
   };
 
   const handleStartEditing = (schedule) => {
@@ -624,18 +651,28 @@ const validateDate = (dateString) => {
       const dateOnly = selectedRawDate.split("T")[0]; // Get YYYY-MM-DD part
 
       const startTimeISO = combineDateAndTimeToISO(dateOnly, editingSchedule.startTime);
-      const endTimeISO = combineDateAndTimeToISO(dateOnly, editingSchedule.endTime);
+      let endTimeISO = combineDateAndTimeToISO(dateOnly, editingSchedule.endTime);
 
-      if (!startTimeISO || !endTimeISO) {
+      if (!startTimeISO) {
         debugLog("Invalid time detected on save", { dateOnly, editingSchedule });
-        toast.error("Định dạng thời gian không hợp lệ");
+        toast.error("Định dạng thời gian bắt đầu không hợp lệ");
         return;
       }
 
       const startTime = new Date(startTimeISO);
-      const endTime = new Date(endTimeISO);
+      let endTime = new Date(endTimeISO || combineDateAndTimeToISO(dateOnly, editingSchedule.endTime));
 
-      if (endTime - startTime <= 0) {
+      // Check if schedule spans to next day
+      if (endTime <= startTime) {
+        // Calculate next day
+        const nextDay = new Date(startTime);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDayISO = nextDay.toISOString().split('T')[0];
+        endTimeISO = combineDateAndTimeToISO(nextDayISO, editingSchedule.endTime);
+        endTime = new Date(endTimeISO);
+      }
+
+      if (!endTimeISO || !endTime || endTime <= startTime) {
         toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
         return;
       }

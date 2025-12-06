@@ -409,31 +409,45 @@ export default function CreateFeedbackForm() {
       return;
     }
 
+    // Parse dates properly to avoid timezone issues
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const openTimeDate = new Date(formData.openTime);
-    openTimeDate.setHours(0, 0, 0, 0);
-    const closeTimeDate = new Date(formData.closeTime);
-    closeTimeDate.setHours(23, 59, 59, 999); // Set to end of day
+    
+    // Parse date string (YYYY-MM-DD) in local timezone
+    const parseLocalDate = (dateString) => {
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+    
+    const openTimeDate = parseLocalDate(formData.openTime);
+    const closeTimeDate = parseLocalDate(formData.closeTime);
 
-    if (openTimeDate >= closeTimeDate) {
+    // So sánh ngày (không so sánh giờ)
+    if (openTimeDate.getTime() >= closeTimeDate.getTime()) {
       toast.error('Ngày đóng phải sau ngày mở');
       return;
     }
 
-    // Cho phép chọn ngày hôm nay (so sánh chỉ theo ngày, không theo giờ phút)
-    if (openTimeDate < now) {
+    // Cho phép chọn ngày hôm nay cho ngày mở
+    if (openTimeDate.getTime() < now.getTime()) {
       toast.error('Ngày mở phải ở hiện tại hoặc tương lai');
       return;
     }
 
-    // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-    if (closeTimeDate <= todayEnd) {
-      toast.error('Ngày đóng phải ở tương lai');
-      return;
+    // Ngày đóng phải sau ngày mở
+    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+    if (openTimeDate.getTime() === now.getTime()) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (closeTimeDate.getTime() <= tomorrow.getTime()) {
+        toast.error('Ngày đóng phải sau ngày mở (ít nhất 1 ngày)');
+        return;
+      }
     }
+    // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở (đã kiểm tra ở trên)
 
     if (formData.questions.length === 0) {
       toast.error('Vui lòng thêm ít nhất một câu hỏi');
@@ -473,8 +487,10 @@ export default function CreateFeedbackForm() {
       
       // If updating only closeTime for published form
       if (canEditCloseTime) {
+        const closeTimeEnd = new Date(closeTimeDate);
+        closeTimeEnd.setHours(23, 59, 59, 999);
         const submitData = {
-          closeTime: closeTimeDate.toISOString()
+          closeTime: closeTimeEnd.toISOString()
         };
         await feedbackApi.updateForm(eventId, formId, submitData);
         toast.success('Cập nhật thời gian đóng thành công');

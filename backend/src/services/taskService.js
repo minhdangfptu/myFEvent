@@ -204,6 +204,9 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
   }
 
   // Kiểm tra tồn tại & cùng event
+  // milestoneId có thể là undefined/null/empty string - chỉ validate nếu có giá trị thực sự
+  const hasMilestoneId = milestoneId && String(milestoneId).trim() !== '';
+  
   const [departmentDoc, assigneeDoc, milestoneOk, parentDoc, depFound] =
     await Promise.all([
       departmentId ? Department.findOne({ _id: departmentId, eventId }).lean() : null,
@@ -216,7 +219,7 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
             .select('departmentId')
             .lean()
         : null,
-      milestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
+      hasMilestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
       parentId ? Task.findOne({ _id: parentId, eventId }).lean() : null,
       dependencyIds.length
         ? Task.find({ _id: { $in: dependencyIds }, eventId })
@@ -227,7 +230,8 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
 
   if (departmentId && !departmentDoc) errors.push('departmentId không tồn tại trong event này');
   if (assigneeId && !assigneeDoc) errors.push('assigneeId không tồn tại trong event này');
-  if (!milestoneOk) errors.push('milestoneId không tồn tại trong event này');
+  // Chỉ validate milestone nếu có giá trị thực sự (không phải empty string hoặc undefined)
+  if (hasMilestoneId && !milestoneOk) errors.push('milestoneId không tồn tại trong event này');
   if (parentId && !parentDoc) errors.push('parentId không tồn tại trong event này');
 
   // Tự động lấy department và milestone từ parent nếu tạo task con
@@ -240,15 +244,7 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
       finalDepartmentId = parentDoc.departmentId;
     }
     // Với milestone:
-    // - Nếu không truyền milestoneId → tự động dùng milestone của Epic
-    // - Nếu truyền milestoneId khác milestone của Epic → không cho phép
-    if (parentDoc.milestoneId) {
-      if (!finalMilestoneId) {
-        finalMilestoneId = parentDoc.milestoneId;
-      } else if (String(finalMilestoneId) !== String(parentDoc.milestoneId)) {
-        errors.push('Task thường phải thuộc cùng cột mốc (milestone) với Epic task cha');
-      }
-    }
+   
   }
 
   if (assigneeDoc && assigneeDoc.departmentId && finalDepartmentId) {
@@ -285,6 +281,7 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
     eventId,
     departmentId: finalDepartmentId,
     taskType: normalizedTaskType,
+    status: TASK_STATUSES.NOT_STARTED, // Luôn bắt đầu với trạng thái "Chưa bắt đầu"
     assigneeId: isEpic ? undefined : assigneeId || undefined,
     startDate: startDate || undefined,
     dueDate,
@@ -528,23 +525,43 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
     throw makeError('Task không tồn tại', 404);
   }
 
-  const isEpic = isEpicTask(task);
-  const isNormal = isNormalTask(task);
-  const isTaskCreator = task.createdBy && String(task.createdBy) === String(userId);
+  // Member không có quyền xóa task
+  if (member?.role === 'Member') {
+    throw makeError('Member không có quyền xóa công việc.', 403);
+  }
 
   // Không cho phép xóa task đang ở trạng thái "đang làm"
   if (task.status === TASK_STATUSES.IN_PROGRESS) {
     throw makeError('Không thể xóa task khi đang ở trạng thái "Đang làm".', 403);
   }
 
-  if (isEpic && member?.role !== 'HoOC') {
-    throw makeError('Chỉ HoOC được xóa Epic task.', 403);
+  // Kiểm tra quyền xóa: chỉ người tạo task mới có thể xóa
+  // createdBy là ObjectId reference, cần so sánh đúng cách
+  let isTaskCreator = false;
+  
+  if (task.createdBy && userId) {
+    // Xử lý cả trường hợp createdBy là ObjectId hoặc đã được populate
+    const taskCreatorId = task.createdBy._id 
+      ? String(task.createdBy._id) 
+      : String(task.createdBy);
+    const currentUserId = String(userId);
+    
+    // So sánh string sau khi convert
+    isTaskCreator = taskCreatorId === currentUserId;
+    
+    // Nếu so sánh string không match, thử so sánh ObjectId trực tiếp (nếu cả hai đều là ObjectId)
+    if (!isTaskCreator && task.createdBy.toString && userId.toString) {
+      isTaskCreator = task.createdBy.toString() === userId.toString();
+    }
   }
 
-  // Normal task: Chỉ HoD hoặc người tạo task được xóa (HoOC không thể xóa task thường)
-  if (isNormal && member?.role !== 'HoD' && !isTaskCreator) {
-    throw makeError('Chỉ HoD hoặc người tạo task được xóa task thường.', 403);
+  // Chỉ người tạo task mới có thể xóa (áp dụng cho cả HoOC và HoD)
+  if (!isTaskCreator) {
+    throw makeError('Chỉ người tạo công việc mới có thể xóa công việc này.', 403);
   }
+
+  // Kiểm tra xem task có phải là EPIC không
+  const isEpic = isEpicTask(task);
 
   // Nếu task có parentId (task con trong epic), cho phép xóa luôn, không kiểm tra gì
   if (task.parentId) {
@@ -556,7 +573,7 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
       Task.countDocuments({ eventId, parentId: task._id }),
     ]);
 
-    if (dependents || children) {
+    if (dependents > 0 || children > 0) {
       throw makeError('Không thể xóa vì công việc lớn đang có công việc', 409, {
         meta: { dependents, children },
       });
