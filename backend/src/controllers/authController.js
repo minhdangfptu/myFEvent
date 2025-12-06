@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -63,6 +64,7 @@ const saveRefreshToken = async (userId, token, req) => {
 };
 
 // Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
+// eslint-disable-next-line no-unused-vars
 export const sendVerificationEmail = async (email, fullName, req) => {
   const { code } = setEmailVerificationCode(email);
 
@@ -135,7 +137,6 @@ export const login = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
-    const DUMMY_HASH = '$2b$10$A1B2C3D4E5F6G7H8I9J0KlmnopqrstuvwxYZabcdefghi12JK';
 
     if (!user) {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });

@@ -76,4 +76,63 @@ describe('riskController.getRiskCategoryStatistics', () => {
     expect(RiskService.getRiskStatistics).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
   });
+
+  it('[Abnormal] TC03 - should return 400 when validation fails', async () => {
+    const { validationResult } = await import('express-validator');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+    const RiskService = await import('../../../services/riskService.js');
+
+    const mockErrors = [{ msg: 'eventId is required', param: 'eventId' }];
+    validationResult.mockReturnValue({
+      isEmpty: () => false,
+      array: () => mockErrors,
+    });
+
+    const req = {
+      params: {},
+      user: { id: 'user1' },
+    };
+    const res = mockRes();
+
+    await riskController.getRiskCategoryStatistics(req, res);
+
+    expect(ensureEventRole).not.toHaveBeenCalled();
+    expect(RiskService.getRiskStatistics).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Validation failed',
+      errors: mockErrors,
+    });
+  });
+
+  it('[Abnormal] TC04 - should return 400 when service returns error', async () => {
+    const { validationResult } = await import('express-validator');
+    const RiskService = await import('../../../services/riskService.js');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+
+    validationResult.mockReturnValue({
+      isEmpty: () => true,
+      array: () => [],
+    });
+    ensureEventRole.mockResolvedValue({ _id: 'mem1', role: 'Member' });
+
+    const errorResult = {
+      success: false,
+      message: 'Failed to retrieve risk statistics',
+    };
+    RiskService.getRiskStatistics.mockResolvedValue(errorResult);
+
+    const req = {
+      params: { eventId: 'event1' },
+      user: { id: 'user1' },
+    };
+    const res = mockRes();
+
+    await riskController.getRiskCategoryStatistics(req, res);
+
+    expect(RiskService.getRiskStatistics).toHaveBeenCalledWith('event1');
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(errorResult);
+  });
 });

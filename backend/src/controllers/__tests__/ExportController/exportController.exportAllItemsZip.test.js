@@ -46,7 +46,6 @@ vi.mock('archiver', () => ({
   default: archiverMock,
 }));
 
-// ====== Service mocks (đơn giản, dữ liệu rỗng) ======
 vi.mock('../../../services/departmentService.js', () => ({
   findDepartmentsByEvent: vi.fn().mockResolvedValue({ items: [] }),
 }));
@@ -92,7 +91,6 @@ vi.mock('../../../services/feedbackService.js', () => ({
   }),
 }));
 
-// Helper res cho zip (cần cả on)
 const mockResZip = () => {
   const res = {};
   res.setHeader = vi.fn();

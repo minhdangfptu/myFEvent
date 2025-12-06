@@ -100,4 +100,37 @@ describe('riskController.updateRisk', () => {
     expect(RiskService.getRiskById).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
   });
+
+  it('[Abnormal] TC03 - should return 404 when risk not found', async () => {
+    const { validationResult } = await import('express-validator');
+    const RiskService = await import('../../../services/riskService.js');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+
+    validationResult.mockReturnValue({
+      isEmpty: () => true,
+      array: () => [],
+    });
+    ensureEventRole.mockResolvedValue({ _id: 'mem1', role: 'HoOC' });
+
+    RiskService.getRiskById.mockResolvedValue({
+      success: false,
+      message: 'Risk not found',
+    });
+
+    const req = {
+      params: { eventId: 'event1', riskId: 'r1' },
+      user: { id: 'user1' },
+      body: { title: 'Updated' },
+    };
+    const res = mockRes();
+
+    await riskController.updateRisk(req, res);
+
+    expect(RiskService.updateRisk).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Risk not found',
+    });
+  });
 });

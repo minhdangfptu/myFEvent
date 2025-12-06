@@ -1,7 +1,6 @@
 // src/controllers/__tests__/ExportController/exportController.cleanupOldFiles.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock fs trước khi import controller
 vi.mock('fs', () => {
   const existsSync = vi.fn();
   const readdirSync = vi.fn();
@@ -22,7 +21,6 @@ vi.mock('fs', () => {
   };
 });
 
-// Helper response giả
 const mockRes = () => {
   const res = {};
   res.status = vi.fn().mockReturnValue(res);
@@ -46,7 +44,7 @@ describe('exportController.cleanupOldFiles', () => {
     vi.useRealTimers();
   });
 
-  it('[Normal] TC01 – Không có thư mục exports -> trả về deleted = 0', async () => {
+  it('[Normal] TC01 – should return deleted = 0 when export folder does not exist', async () => {
     const fsMock = await getFsMock();
     fsMock.existsSync.mockReturnValue(false);
 
@@ -68,7 +66,7 @@ describe('exportController.cleanupOldFiles', () => {
     });
   });
 
-  it('[Normal] TC02 – Xóa đúng số file cũ hơn 24h', async () => {
+  it('[Normal] TC02 – should delete the correct number of files older than 24h', async () => {
     const fsMock = await getFsMock();
 
     // Có thư mục
@@ -104,7 +102,7 @@ describe('exportController.cleanupOldFiles', () => {
     });
   });
 
-  it('[Abnormal] TC03 – Lỗi FS -> trả về 500 "Cleanup failed"', async () => {
+  it('[Normal] TC03 – should return 500 with message "Cleanup failed" when file system error occurs', async () => {
     const fsMock = await getFsMock();
 
     fsMock.existsSync.mockReturnValue(true);
