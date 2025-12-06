@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -82,24 +82,36 @@ export default function HoDTaskPage() {
   // Load event role and departmentId
   useEffect(() => {
     if (!eventId) return;
+    mountedRef.current = true;
     userApi
       .getUserRoleByEvent(eventId)
       .then((roleResponse) => {
-        const role = roleResponse?.role || "";
-        setEventRole(role);
-        
-        // Get departmentId from response if HoD
-        if (role === "HoD" && roleResponse?.departmentId) {
-          const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
-          if (deptId) {
-            setDepartmentId(deptId);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          const role = roleResponse?.role || "";
+          setEventRole(role);
+          
+          // Get departmentId from response if HoD
+          if (role === "HoD" && roleResponse?.departmentId) {
+            const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
+            if (deptId) {
+              setDepartmentId(deptId);
+            }
           }
         }
       })
       .catch(() => {
-        setEventRole("");
-        setDepartmentId(null);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          setEventRole("");
+          setDepartmentId(null);
+        }
       });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   const initialTasks = useMemo(() => [], []);
@@ -122,6 +134,7 @@ export default function HoDTaskPage() {
   const [editingTask, setEditingTask] = useState(null);
   const [newAssigneeId, setNewAssigneeId] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -135,30 +148,55 @@ export default function HoDTaskPage() {
   // Load department info
   useEffect(() => {
     if (!eventId || !departmentId) return;
+    mountedRef.current = true;
     departmentService
       .getDepartmentDetail(eventId, departmentId)
-      .then((dept) => setDepartment(dept || null))
-      .catch(() => setDepartment(null));
+      .then((dept) => {
+        if (mountedRef.current) {
+          setDepartment(dept || null);
+        }
+      })
+      .catch(() => {
+        if (mountedRef.current) {
+          setDepartment(null);
+        }
+      });
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, departmentId]);
 
   useEffect(() => {
     if (!eventId) return;
+    mountedRef.current = true;
     
     // Lấy thông tin sự kiện để validate deadline
     eventApi.getById(eventId)
       .then((res) => {
-        const event = res?.data?.event || res?.data;
-        if (event) {
-          setEventInfo({
-            createdAt: event.createdAt,
-            eventStartDate: event.eventStartDate,
-            eventEndDate: event.eventEndDate,
-          });
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          const event = res?.data?.event || res?.data;
+          if (event) {
+            setEventInfo({
+              createdAt: event.createdAt,
+              eventStartDate: event.eventStartDate,
+              eventEndDate: event.eventEndDate,
+            });
+          }
         }
       })
       .catch(() => {
-        setEventInfo(null);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          setEventInfo(null);
+        }
       });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   useEffect(() => {

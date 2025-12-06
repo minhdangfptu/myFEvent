@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
@@ -98,6 +98,7 @@ export default function EventTaskDetailPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [pendingStatus, setPendingStatus] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const mountedRef = useRef(true);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
@@ -169,30 +170,48 @@ const getRoleLabel = (role) => {
   };
 
   useEffect(() => {
-    fetchEventRole(eventId).then(setEventRole);
+    mountedRef.current = true;
+    
+    fetchEventRole(eventId).then((role) => {
+      if (mountedRef.current) {
+        setEventRole(role);
+      }
+    });
 
     // Lấy thông tin sự kiện để validate deadline
     if (eventId) {
       eventApi
         .getById(eventId)
         .then((res) => {
-          const event = res?.data?.event || res?.data;
-          if (event) {
-            setEventInfo({
-              eventStartDate: event.eventStartDate,
-              eventEndDate: event.eventEndDate,
-              createdAt: event.createdAt,
-            });
+          // Chỉ cập nhật state nếu component vẫn còn mounted
+          if (mountedRef.current) {
+            const event = res?.data?.event || res?.data;
+            if (event) {
+              setEventInfo({
+                eventStartDate: event.eventStartDate,
+                eventEndDate: event.eventEndDate,
+                createdAt: event.createdAt,
+              });
+            }
           }
         })
         .catch(() => {
-          setEventInfo(null);
+          // Chỉ cập nhật state nếu component vẫn còn mounted
+          if (mountedRef.current) {
+            setEventInfo(null);
+          }
         });
     }
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   useEffect(() => {
     if (!eventId || !taskId) return;
+    mountedRef.current = true;
     setLoading(true);
     Promise.all([
       taskApi.getTaskDetail(eventId, taskId),
@@ -200,6 +219,9 @@ const getRoleLabel = (role) => {
       milestoneApi.listMilestonesByEvent(eventId),
     ])
       .then(async ([taskRes, depts, ms]) => {
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (!mountedRef.current) return;
+        
         const task = taskRes?.data;
         setOriginalTask(task); // Lưu task gốc để so sánh khi validate
         setDepartments(depts || []);
@@ -209,111 +231,148 @@ const getRoleLabel = (role) => {
             eventId,
             task.departmentId._id
           );
-          setAssignees(mems || []);
+          if (mountedRef.current) {
+            setAssignees(mems || []);
+          }
         } else {
-          setAssignees([]);
+          if (mountedRef.current) {
+            setAssignees([]);
+          }
         }
-        setAssigneeFallbackName(
-          task?.assigneeId?.userId?.fullName || task?.assigneeId?.fullName || ""
-        );
-        setAssigneeFallbackAvatar(
-          task?.assigneeId?.userId?.avatarUrl ||
-            task?.assigneeId?.avatarUrl ||
-            ""
-        );
-        const parentId = toId(task?.parentId);
-        const dependencies = Array.isArray(task?.dependencies)
-          ? task.dependencies.map(toId).filter(Boolean)
-          : [];
+        if (mountedRef.current) {
+          setAssigneeFallbackName(
+            task?.assigneeId?.userId?.fullName || task?.assigneeId?.fullName || ""
+          );
+          setAssigneeFallbackAvatar(
+            task?.assigneeId?.userId?.avatarUrl ||
+              task?.assigneeId?.avatarUrl ||
+              ""
+          );
+          const parentId = toId(task?.parentId);
+          const dependencies = Array.isArray(task?.dependencies)
+            ? task.dependencies.map(toId).filter(Boolean)
+            : [];
 
-        setForm({
-          title: task?.title || "",
-          description: task?.description || "",
-          departmentId: toId(task?.departmentId),
-          assigneeId: toId(task?.assigneeId),
-          milestoneId: toId(task?.milestoneId),
-          startDate: toLocalDateString(task?.startDate),
-          dueDate: toLocalDateTimeString(task?.dueDate),
-          status: task?.status || STATUS.NOT_STARTED,
-          progressPct:
-            typeof task?.progressPct === "number" ? task.progressPct : 0,
-          estimate: task?.estimate ?? "",
-          estimateUnit: task?.estimateUnit || "h",
-          parentId: parentId,
-          dependenciesText: dependencies.join(","),
-          taskType: task?.taskType || "normal",
-        });
-        setMeta({
-          createdAt: task?.createdAt || "",
-          updatedAt: task?.updatedAt || "",
-        });
-        const creatorInfo = getTaskCreatorInfo(task);
-        setTaskCreatorId(creatorInfo.id);
-        setTaskCreatorName(creatorInfo.name);
-        setTaskCreatorRole(creatorInfo.role);
-
-        // Fetch thông tin parent task và dependencies tasks
-        const fetchRelatedTasks = async () => {
-          const tasksToFetch = [];
-          if (parentId) tasksToFetch.push({ id: parentId, type: "parent" });
-          dependencies.forEach((depId) => {
-            if (depId) tasksToFetch.push({ id: depId, type: "dependency" });
+          setForm({
+            title: task?.title || "",
+            description: task?.description || "",
+            departmentId: toId(task?.departmentId),
+            assigneeId: toId(task?.assigneeId),
+            milestoneId: toId(task?.milestoneId),
+            startDate: toLocalDateString(task?.startDate),
+            dueDate: toLocalDateTimeString(task?.dueDate),
+            status: task?.status || STATUS.NOT_STARTED,
+            progressPct:
+              typeof task?.progressPct === "number" ? task.progressPct : 0,
+            estimate: task?.estimate ?? "",
+            estimateUnit: task?.estimateUnit || "h",
+            parentId: parentId,
+            dependenciesText: dependencies.join(","),
+            taskType: task?.taskType || "normal",
           });
+          setMeta({
+            createdAt: task?.createdAt || "",
+            updatedAt: task?.updatedAt || "",
+          });
+          const creatorInfo = getTaskCreatorInfo(task);
+          setTaskCreatorId(creatorInfo.id);
+          setTaskCreatorName(creatorInfo.name);
+          setTaskCreatorRole(creatorInfo.role);
 
-          if (tasksToFetch.length === 0) {
-            setRelatedTasks({ parent: null, dependencies: [] });
-            return;
-          }
+          // Fetch thông tin parent task và dependencies tasks
+          const fetchRelatedTasks = async () => {
+            const tasksToFetch = [];
+            if (parentId) tasksToFetch.push({ id: parentId, type: "parent" });
+            dependencies.forEach((depId) => {
+              if (depId) tasksToFetch.push({ id: depId, type: "dependency" });
+            });
 
-          try {
-            const taskPromises = tasksToFetch.map(({ id }) =>
-              taskApi.getTaskDetail(eventId, id).catch(() => null)
-            );
-            const results = await Promise.all(taskPromises);
-
-            let parentTask = null;
-            const dependencyTasks = [];
-
-            results.forEach((result, index) => {
-              if (!result?.data) return;
-              const taskData = result.data;
-              const taskInfo = {
-                id: taskData._id || taskData.id,
-                title: taskData.title || "—",
-              };
-
-              if (tasksToFetch[index].type === "parent") {
-                parentTask = taskInfo;
-              } else {
-                dependencyTasks.push(taskInfo);
+            if (tasksToFetch.length === 0) {
+              if (mountedRef.current) {
+                setRelatedTasks({ parent: null, dependencies: [] });
               }
-            });
+              return;
+            }
 
-            setRelatedTasks({
-              parent: parentTask,
-              dependencies: dependencyTasks,
-            });
-          } catch (error) {
-            console.error("Error fetching related tasks:", error);
-            setRelatedTasks({ parent: null, dependencies: [] });
-          }
-        };
+            try {
+              const taskPromises = tasksToFetch.map(({ id }) =>
+                taskApi.getTaskDetail(eventId, id).catch(() => null)
+              );
+              const results = await Promise.all(taskPromises);
 
-        fetchRelatedTasks();
+              // Chỉ cập nhật state nếu component vẫn còn mounted
+              if (!mountedRef.current) return;
+
+              let parentTask = null;
+              const dependencyTasks = [];
+
+              results.forEach((result, index) => {
+                if (!result?.data) return;
+                const taskData = result.data;
+                const taskInfo = {
+                  id: taskData._id || taskData.id,
+                  title: taskData.title || "—",
+                };
+
+                if (tasksToFetch[index].type === "parent") {
+                  parentTask = taskInfo;
+                } else {
+                  dependencyTasks.push(taskInfo);
+                }
+              });
+
+              if (mountedRef.current) {
+                setRelatedTasks({
+                  parent: parentTask,
+                  dependencies: dependencyTasks,
+                });
+              }
+            } catch (error) {
+              console.error("Error fetching related tasks:", error);
+              if (mountedRef.current) {
+                setRelatedTasks({ parent: null, dependencies: [] });
+              }
+            }
+          };
+
+          fetchRelatedTasks();
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, taskId]);
 
   useEffect(() => {
-    if (!form.departmentId || !eventId) return setAssignees([]);
+    if (!form.departmentId || !eventId) {
+      if (mountedRef.current) {
+        setAssignees([]);
+      }
+      return;
+    }
     departmentService
       .getMembersByDepartment(eventId, form.departmentId)
-      .then((members) => setAssignees(members || []));
+      .then((members) => {
+        if (mountedRef.current) {
+          setAssignees(members || []);
+        }
+      });
   }, [form.departmentId, eventId]);
 
   useEffect(() => {
     if (!eventId) return;
-    taskApi.getTaskByEvent(eventId).then(res => setTasksAll(res?.data || []));
+    taskApi.getTaskByEvent(eventId).then(res => {
+      if (mountedRef.current) {
+        setTasksAll(res?.data || []);
+      }
+    });
   }, [eventId, isEditing]);
 
   useEffect(() => {

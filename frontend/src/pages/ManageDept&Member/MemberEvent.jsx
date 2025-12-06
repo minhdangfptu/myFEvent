@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import { useEvents } from "~/contexts/EventContext";
+import { currentEventStorage } from "~/utils/currentEventStorage";
 
 function MemberCard({
   name = "Thành viên",
@@ -72,26 +73,84 @@ export default function MemberPage() {
   const [search, setSearch] = useState("");
   const [eventRole, setEventRole] = useState('');
   const { fetchEventRole } = useEvents();
+  const mountedRef = useRef(true);
 
   // Load members once when component mounts
   useEffect(() => {
+    mountedRef.current = true;
+    
     const loadMembers = async () => {
       if (!eventId) return;
 
-      setLoading(true);
-      setError("");
+      if (mountedRef.current) {
+        setLoading(true);
+        setError("");
+      }
       try {
-        const response = await eventApi.getMembersByEvent(eventId);
-        setAllMembersByDepartment(response.data || {});
-        setEvent(response.event);
+        // Fetch members and event data in parallel
+        const [membersResponse, eventResponse] = await Promise.all([
+          eventApi.getMembersByEvent(eventId),
+          eventApi.getById(eventId).catch((err) => {
+            console.warn("Failed to fetch event separately, will try from members response:", err);
+            return null;
+          })
+        ]);
+        
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          // Handle members data - check multiple possible response structures
+          const membersData = membersResponse?.data || membersResponse || {};
+          setAllMembersByDepartment(membersData);
+          
+          // Handle event data - check multiple possible response structures
+          let eventData = eventResponse?.data?.event || 
+                         eventResponse?.data || 
+                         eventResponse?.event || 
+                         eventResponse ||
+                         membersResponse?.event || 
+                         null;
+          
+          // Nếu vẫn chưa có event data, thử lấy từ cache
+          if (!eventData && eventId) {
+            const cachedEvent = currentEventStorage.get();
+            if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+              eventData = cachedEvent;
+            }
+          }
+          
+          // CRITICAL: Lưu event vào currentEventStorage để sidebar có thể sử dụng
+          // Lưu ngay cả khi lấy từ cache để đảm bảo sidebar có data
+          if (eventData) {
+            currentEventStorage.set(eventData);
+            setEvent(eventData);
+          } else {
+            // Nếu không có event data, vẫn set null để tránh hiển thị undefined
+            setEvent(null);
+          }
+        }
       } catch (err) {
         console.error("Error loading members:", err.message);
-        setError("Không thể tải danh sách thành viên");
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          // Thử lấy event từ cache nếu có lỗi
+          const cachedEvent = currentEventStorage.get();
+          if (cachedEvent && eventId && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+            setEvent(cachedEvent);
+          }
+          setError("Không thể tải danh sách thành viên");
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
     loadMembers();
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   // Filter members based on search term
@@ -122,10 +181,20 @@ export default function MemberPage() {
   }, [search, allMembersByDepartment]);
 
   useEffect(() => {
-      fetchEventRole(eventId).then(role => {
+    mountedRef.current = true;
+    
+    fetchEventRole(eventId).then(role => {
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (mountedRef.current) {
         setEventRole(role);
-      });
-    }, [eventId]);
+      }
+    });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [eventId, fetchEventRole]);
     
   const getSidebarType = () => {
     if (eventRole === 'HoOC') return 'HoOC';
@@ -161,7 +230,7 @@ export default function MemberPage() {
 
   return (
     <UserLayout
-      title={`Thành viên - Sự kiện ${event?.name}`}
+      title={`Thành viên - Sự kiện ${event?.name || 'Đang tải...'}`}
       activePage="members"
       sidebarType={getSidebarType()}
       eventId={eventId}

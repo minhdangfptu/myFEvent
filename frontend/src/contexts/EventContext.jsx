@@ -269,6 +269,51 @@ export function EventProvider({ children }) {
     }
   }, [eventRoles]);
 
+  // Force check access without using cache - for critical access checks (e.g., notifications)
+  const forceCheckEventAccess = useCallback(async (eventId) => {
+    if (!eventId) return "";
+    try {
+      // Clear cache for this eventId first to force fresh check
+      setEventRoles((prev) => {
+        const newRoles = { ...prev };
+        delete newRoles[eventId];
+        return newRoles;
+      });
+      setEventMembers((prev) => {
+        const newMembers = { ...prev };
+        delete newMembers[eventId];
+        return newMembers;
+      });
+
+      // Now fetch fresh role - CRITICAL: Add skipGlobal404 and skipGlobal403 flags
+      // to prevent interceptor from redirecting before modal can show
+      const res = await userApi.getUserRoleByEvent(eventId, {
+        skipGlobal404: true,
+        skipGlobal403: true
+      });
+      const role = res?.role || res?.data?.role || "";
+      const departmentId = res?.departmentId || res?.data?.departmentId || null;
+
+      // Update cache with fresh data
+      setEventRoles((prev) => ({ ...prev, [eventId]: role }));
+      setEventMembers((prev) => ({
+        ...prev,
+        [eventId]: {
+          role,
+          departmentId,
+          eventMemberId: res?.eventMemberId || res?._id || null
+        }
+      }));
+
+      return role;
+    } catch (e) {
+      // Cache the error as empty string
+      setEventRoles((prev) => ({ ...prev, [eventId]: "" }));
+      setEventMembers((prev) => ({ ...prev, [eventId]: { role: "", departmentId: null } }));
+      return "";
+    }
+  }, []);
+
   // Utility to get role synchronously from cache (may be empty string if not fetched yet)
   const getEventRole = useCallback((eventId) => {
     return eventRoles[eventId] || "";
@@ -294,6 +339,7 @@ export function EventProvider({ children }) {
       eventRoles,
       eventMembers,
       fetchEventRole,
+      forceCheckEventAccess,
       getEventRole,
       getEventMember,
       pagination,

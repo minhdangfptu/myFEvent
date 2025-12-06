@@ -1,8 +1,13 @@
 import axiosClient from './axiosClient';
 
 export const userApi = {
-  getUserRoleByEvent: async (eventId) => {
-    const response = await axiosClient.get(`/api/user/events/${eventId}/role`);
+  getUserRoleByEvent: async (eventId, config = {}) => {
+    const axiosConfig = {
+      ...config,
+      skipGlobal404: config.skipGlobal404 || false,
+      skipGlobal403: config.skipGlobal403 || false
+    };
+    const response = await axiosClient.get(`/api/user/events/${eventId}/role`, axiosConfig);
     return response.data;
   },
   checkPassword: async (password) => {

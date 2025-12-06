@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
@@ -24,6 +24,7 @@ export default function ListRiskPage() {
   const [eventRole, setEventRole] = useState("");
   const [memberInfo, setMemberInfo] = useState({ role: "", departmentId: null });
   const { fetchEventRole, getEventMember } = useEvents();
+  const mountedRef = useRef(true);
 
   // ====== Pagination States ======
   const [currentPage, setCurrentPage] = useState(1);
@@ -286,12 +287,17 @@ export default function ListRiskPage() {
 
   const fetchRisks = useCallback(async () => {
     try {
-      setLoading(true);
+      if (mountedRef.current) {
+        setLoading(true);
+      }
 
       const response = await riskApiWithErrorHandling.getAllRisksByEvent(
         eventId,
         {}
       );
+
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
 
       if (response.success) {
         const apiRisks = response.data || [];
@@ -306,6 +312,9 @@ export default function ListRiskPage() {
         setAllRisks([]);
       }
     } catch (error) {
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
+      
       console.error("Error fetching risks:", error);
       toast.error("Lỗi khi tải dữ liệu. Vui lòng kiểm tra kết nối.", {
         position: "top-right",
@@ -313,20 +322,30 @@ export default function ListRiskPage() {
       });
       setAllRisks([]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [eventId]);
 
   const fetchDepartments = useCallback(async () => {
     try {
-      setLoadingDepartments(true);
+      if (mountedRef.current) {
+        setLoadingDepartments(true);
+      }
       const response = await departmentApi.getDepartments(eventId);
+
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
 
       const departmentsList = response?.data || [];
       setDepartments(departmentsList);
 
       // Don't auto-select first department - let user choose manually
     } catch (error) {
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
+      
       console.error("Error fetching departments:", error);
       toast.error("Lỗi khi tải danh sách ban. Vui lòng thử lại.", {
         position: "top-right",
@@ -334,7 +353,9 @@ export default function ListRiskPage() {
       });
       setDepartments([]);
     } finally {
-      setLoadingDepartments(false);
+      if (mountedRef.current) {
+        setLoadingDepartments(false);
+      }
     }
   }, [eventId]);
 
@@ -538,10 +559,17 @@ export default function ListRiskPage() {
   // ====== Effects ======
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (eventId) {
       fetchDepartments();
       fetchRisks();
     }
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, fetchDepartments, fetchRisks]);
 
   useEffect(() => {
@@ -549,12 +577,22 @@ export default function ListRiskPage() {
   }, [search, filterLevel, filterCategory, filterDepartment, filterLikelihood]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     fetchEventRole(eventId).then((role) => {
-      setEventRole(role);
-      // Also get full member info including departmentId
-      const member = getEventMember(eventId);
-      setMemberInfo(member);
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (mountedRef.current) {
+        setEventRole(role);
+        // Also get full member info including departmentId
+        const member = getEventMember(eventId);
+        setMemberInfo(member);
+      }
     });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, fetchEventRole, getEventMember]);
 
   // ====== UI Logic ======

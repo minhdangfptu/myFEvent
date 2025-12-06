@@ -51,6 +51,12 @@ export default function EventCalendar() {
 
   const fetchCalendars = useCallback(async () => {
     if (!eventId) return;
+    
+    // Don't fetch if user doesn't have access
+    if (!eventRole || eventRole === '') {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -191,7 +197,7 @@ export default function EventCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, currentMonth, currentYear, user]);
+  }, [eventId, currentMonth, currentYear, user, eventRole]);
 
   // Role
   useEffect(() => {
@@ -203,21 +209,38 @@ export default function EventCalendar() {
       }
       try {
         const role = await fetchEventRole(eventId);
-        if (mounted) setEventRole(role);
+        if (mounted) {
+          setEventRole(role);
+          // If user doesn't have access, redirect to home page
+          if (!role || role === '') {
+            navigate('/home-page');
+            toast.error('Bạn không còn quyền truy cập sự kiện này');
+            return;
+          }
+        }
       } catch (_) {
-        if (mounted) setEventRole("");
+        if (mounted) {
+          setEventRole("");
+          navigate('/home-page');
+          toast.error('Bạn không còn quyền truy cập sự kiện này');
+        }
       }
     };
     loadRole();
     return () => {
       mounted = false;
     };
-  }, [eventId, fetchEventRole]);
+  }, [eventId, fetchEventRole, navigate]);
 
-  // Calendars
+  // Calendars - only fetch if user has access
   useEffect(() => {
-    fetchCalendars();
-  }, [fetchCalendars]);
+    if (eventRole && eventRole !== '') {
+      fetchCalendars();
+    } else if (eventRole === '' && eventId) {
+      // Role check completed but no access, don't fetch
+      setLoading(false);
+    }
+  }, [fetchCalendars, eventRole, eventId]);
 
   // HoD department
   useEffect(() => {

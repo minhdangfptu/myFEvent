@@ -1,11 +1,13 @@
 import { useAuth } from "../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { useEvents } from "../contexts/EventContext";
+import { eventService } from "../services/eventService";
 import { toast } from "react-toastify";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { timeAgo } from "../utils/timeAgo";
-import { Clock, Bell, User } from "lucide-react";
+import { Clock, Bell, User, Info } from "lucide-react";
 import loadingGif from "../assets/loading.gif";
 
 export default function UserHeader({
@@ -18,6 +20,7 @@ export default function UserHeader({
   const { user, logout, setUser } = useAuth();
   const { t } = useTranslation();
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const { fetchEventRole, forceCheckEventAccess } = useEvents();
   const navigate = useNavigate();
 
   
@@ -27,9 +30,14 @@ export default function UserHeader({
     return db - da;
   });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
+  const [accessDeniedEventName, setAccessDeniedEventName] = useState('');
   const [timeFormat, setTimeFormat] = useState(() => {
     return localStorage.getItem('timeFormat') || '24h';
   });
+  const isNavigatingRef = useRef(false);
+  const lastClickedNotificationRef = useRef({ key: null, timestamp: 0 });
+  
 
   useEffect(() => {
     localStorage.setItem('timeFormat', timeFormat);
@@ -169,12 +177,140 @@ export default function UserHeader({
     return "/notifications";
   };
 
-  const handleNotificationClick = (n) => {
+  // Helper function to extract eventId from URL
+  const extractEventIdFromUrl = (url) => {
+    if (!url) return null
+    // Match pattern: /events/{eventId}/... or /home-page/events/{eventId}
+    // Try multiple patterns to catch all cases
+    const patterns = [
+      /\/events\/([^/?]+)/,           // /events/{eventId}/...
+      /\/home-page\/events\/([^/?]+)/, // /home-page/events/{eventId}
+    ]
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match && match[1]) {
+        return match[1]
+      }
+    }
+    
+    return null
+  }
+
+  const handleNotificationClick = async (n) => {
+    // Prevent multiple clicks on the same notification
+    const notificationKey = `${n.id}-${n.eventId}-${n.category}`;
+    const now = Date.now();
+    
+    // If same notification clicked within 1 second, ignore
+    if (lastClickedNotificationRef.current === notificationKey && 
+        (now - (lastClickedNotificationRef.current.timestamp || 0)) < 1000) {
+      return;
+    }
+    
+    // If already navigating, ignore
+    if (isNavigatingRef.current) {
+      return;
+    }
+    
+    // Mark as clicked
+    lastClickedNotificationRef.current = {
+      key: notificationKey,
+      timestamp: now
+    };
+    
     if (n.id) {
       markRead(n.id);
     }
-    const url = getNotificationTargetUrl(n);
+    
+    // CRITICAL: Check access BEFORE navigating to avoid 403/404 errors
+    // Step 1: Get the target URL first (to extract eventId from it if needed)
+    const url = getNotificationTargetUrl(n)
+    
+    // Step 2: Extract eventId from multiple sources
+    let eventIdToCheck = n.eventId
+    
+    // If no eventId in notification, try to extract from targetUrl
+    if (!eventIdToCheck && n.targetUrl) {
+      eventIdToCheck = extractEventIdFromUrl(n.targetUrl)
+    }
+    
+    // If still no eventId, extract from the generated URL
+    if (!eventIdToCheck && url) {
+      eventIdToCheck = extractEventIdFromUrl(url)
+    }
+    
+    // Step 3: If we found an eventId, ALWAYS check access before navigating
+    if (eventIdToCheck) {
+      try {
+        // CRITICAL: Use forceCheckEventAccess to bypass cache and get fresh role
+        // This ensures we check the current access status, not cached old data
+        const role = await forceCheckEventAccess(eventIdToCheck)
+        
+        // Check if role is valid (not empty, not null, not undefined, and is a non-empty string)
+        // Any non-empty string role means user has access to the event
+        const hasAccess = role && typeof role === 'string' && role.trim() !== ''
+        
+        if (!hasAccess) {
+          // Set event name first (try to fetch, but don't wait if it fails)
+          setAccessDeniedEventName('sự kiện này') // Set default first
+          
+          // Use setTimeout to ensure state update happens before return
+          // This ensures React has time to render the modal
+          setTimeout(() => {
+            setShowAccessDeniedModal(true) // Show modal immediately
+          }, 0)
+          
+          // Try to fetch event name in background (non-blocking)
+          // CRITICAL: Add skipGlobal404 to prevent interceptor redirect
+          eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
+            .then(event => {
+              const eventName = event?.name || event?.title || 'sự kiện này'
+              setAccessDeniedEventName(eventName)
+            })
+            .catch(() => {
+              // Keep default name
+            })
+          
+          // CRITICAL: Return early to prevent navigation - this is the key fix
+          return
+        }
+        // User has access, continue to navigate below
+      } catch (error) {
+        // If role check fails, assume no access and show modal
+        setAccessDeniedEventName('sự kiện này')
+        setShowAccessDeniedModal(true)
+        
+        // Try to fetch event name in background (non-blocking)
+        // CRITICAL: Add skipGlobal404 to prevent interceptor redirect
+        eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
+          .then(event => {
+            const eventName = event?.name || event?.title || 'sự kiện này'
+            setAccessDeniedEventName(eventName)
+          })
+          .catch(() => {
+            // Keep default name
+          })
+        
+        // CRITICAL: Return early to prevent navigation
+        return
+      }
+    }
+    
+    // Only navigate if:
+    // 1. User has access (checked above), OR
+    // 2. Notification has no eventId in URL (safe to navigate)
+    
+    // Mark as navigating to prevent duplicate clicks
+    isNavigatingRef.current = true;
+    
+    // Navigate
     navigate(url);
+    
+    // Reset navigating flag after a short delay
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
   };
 
   const formatTime = () => {
@@ -422,7 +558,11 @@ export default function UserHeader({
                     key={n.id}
                     className="px-3 py-3 border-bottom d-flex align-items-start gap-2"
                     style={{ cursor: "pointer" }}
-                    onClick={() => handleNotificationClick(n)}
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      await handleNotificationClick(n)
+                    }}
                   >
                     <div className="mt-1">
                       <i className={n.icon} style={{ color: "#ef4444" }} />
@@ -509,6 +649,85 @@ export default function UserHeader({
           </div>
         </div>
       </header>
+
+      {/* Access Denied Modal */}
+      {showAccessDeniedModal && (
+        <div
+          className="modal show d-block"
+          style={{ 
+            backgroundColor: 'rgba(0,0,0,0.5)', 
+            zIndex: 99999, 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%'
+          }}
+          onClick={() => {
+            setShowAccessDeniedModal(false)
+          }}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title fw-bold" style={{ color: '#111827' }}>
+                  Không có quyền truy cập
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowAccessDeniedModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body" style={{ padding: '24px' }}>
+                <div className="d-flex align-items-start gap-3">
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Info size={24} style={{ color: '#EF4444' }} />
+                  </div>
+                  <div className="flex-grow-1">
+                    <p className="mb-0" style={{ fontSize: '16px', color: '#374151', lineHeight: '1.6' }}>
+                      Xin lỗi nhưng bạn hiện đang không ở trong sự kiện <strong>{accessDeniedEventName}</strong> nữa, vui lòng liên hệ đến trưởng ban tổ chức sự kiện để được tham gia.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowAccessDeniedModal(false)
+                    navigate('/home-page')
+                  }}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Về trang chủ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -25,9 +25,9 @@ export const eventService = {
             throw error;
         }
     },
-    fetchEventById: async (eventId) => {
+    fetchEventById: async (eventId, config = {}) => {
         try {
-            const response = await eventApi.getEventById(eventId);
+            const response = await eventApi.getEventById(eventId, config);
             return unwrapResponse(response);
         } catch (error) {
             throw error;
