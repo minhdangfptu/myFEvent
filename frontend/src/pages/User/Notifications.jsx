@@ -19,7 +19,6 @@ export default function NotificationsPage() {
   const [accessDeniedEventName, setAccessDeniedEventName] = useState('')
   const mountedRef = useRef(true)
 
-  // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -28,13 +27,9 @@ export default function NotificationsPage() {
   }, [])
 
   const getNotificationTargetUrl = (n) => {
-    // Backend can optionally send a direct URL (ưu tiên cao nhất)
     if (n.targetUrl) {
-      // Validate targetUrl - nếu không bắt đầu bằng / thì có thể là relative path
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
       
-      // Fix URL cũ có budgetId trong path review: /budget/{budgetId}/review -> /budget/review
-      // Pattern: /events/.../departments/.../budget/{budgetId}/review
       url = url.replace(
         /\/events\/([^/]+)\/departments\/([^/]+)\/budget\/([^/]+)\/review$/,
         '/events/$1/departments/$2/budget/review'
@@ -43,30 +38,21 @@ export default function NotificationsPage() {
       return url;
     }
 
-    // TÀI CHÍNH notifications
     if (n.eventId && n.category === 'TÀI CHÍNH') {
-      // Budget notifications - backend đã set targetUrl, nếu không có thì fallback về trang home
       if (n.relatedBudgetId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event để tránh 404
         return `/home-page/events/${n.eventId}`;
       }
-      // Expense notifications
       if (n.relatedExpenseId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event
         return `/home-page/events/${n.eventId}`;
       }
     }
 
-    // PHẢN HỒI notifications
     if (n.eventId && n.category === 'PHẢN HỒI') {
       if (n.relatedFeedbackId) {
         return `/events/${n.eventId}/feedback/member`;
       }
     }
 
-    // RỦI RO notifications
     if (n.eventId && n.category === 'RỦI RO') {
       if (n.relatedRiskId) {
         return `/events/${n.eventId}/risks/detail/${n.relatedRiskId}`;
@@ -74,7 +60,6 @@ export default function NotificationsPage() {
       return `/events/${n.eventId}/risks`;
     }
 
-    // LỊCH HỌP notifications
     if (n.eventId && n.category === 'LỊCH HỌP') {
       if (n.relatedCalendarId) {
         return `/events/${n.eventId}/my-calendar`;
@@ -85,27 +70,21 @@ export default function NotificationsPage() {
       return `/events/${n.eventId}/my-calendar`;
     }
 
-    // CÔNG VIỆC notifications - điều hướng đến trang task
     if (n.eventId && n.category === 'CÔNG VIỆC') {
-      // Nếu có relatedTaskId thì đi đến task detail
       if (n.relatedTaskId) {
         return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;
       }
-      // Nếu không có relatedTaskId thì đi đến trang danh sách tasks
       return `/events/${n.eventId}/tasks`;
     }
 
-    // THÀNH VIÊN notifications - điều hướng đến trang thành viên
     if (n.eventId && n.category === 'THÀNH VIÊN') {
       return `/events/${n.eventId}/members`;
     }
 
-    // Mặc định nếu có eventId thì đưa về trang chi tiết sự kiện
     if (n.eventId) {
       return `/home-page/events/${n.eventId}`;
     }
 
-    // Fallback: về trang danh sách thông báo
     return '/notifications';
   }
 
@@ -126,14 +105,11 @@ export default function NotificationsPage() {
     return ICON_BY_CATEGORY[n?.category] || Bell
   }
 
-  // Helper function to extract eventId from URL
   const extractEventIdFromUrl = (url) => {
     if (!url) return null
-    // Match pattern: /events/{eventId}/... or /home-page/events/{eventId}
-    // Try multiple patterns to catch all cases
     const patterns = [
-      /\/events\/([^/?]+)/,           // /events/{eventId}/...
-      /\/home-page\/events\/([^/?]+)/, // /home-page/events/{eventId}
+      /\/events\/([^/?]+)/,
+      /\/home-page\/events\/([^/?]+)/,
     ]
     
     for (const pattern of patterns) {
@@ -151,96 +127,66 @@ export default function NotificationsPage() {
       markRead(n.id)
     }
     
-    // CRITICAL: Check access BEFORE navigating to avoid 403/404 errors
-    // Step 1: Get the target URL first (to extract eventId from it if needed)
     const url = getNotificationTargetUrl(n)
     
-    // Step 2: Extract eventId from multiple sources
     let eventIdToCheck = n.eventId
     
-    // If no eventId in notification, try to extract from targetUrl
     if (!eventIdToCheck && n.targetUrl) {
       eventIdToCheck = extractEventIdFromUrl(n.targetUrl)
     }
     
-    // If still no eventId, extract from the generated URL
     if (!eventIdToCheck && url) {
       eventIdToCheck = extractEventIdFromUrl(url)
     }
     
-    // Step 3: If we found an eventId, ALWAYS check access before navigating
     if (eventIdToCheck) {
       try {
-        // CRITICAL: Use forceCheckEventAccess to bypass cache and get fresh role
-        // This ensures we check the current access status, not cached old data
         const role = await forceCheckEventAccess(eventIdToCheck)
         
-        // Check if role is valid (not empty, not null, not undefined, and is a non-empty string)
-        // Any non-empty string role means user has access to the event
         const hasAccess = role && typeof role === 'string' && role.trim() !== ''
         
         if (!hasAccess) {
-          // Set event name first (try to fetch, but don't wait if it fails)
-          setAccessDeniedEventName('sự kiện này') // Set default first
-          setShowAccessDeniedModal(true) // Show modal immediately
+          setAccessDeniedEventName('sự kiện này')
+          setShowAccessDeniedModal(true)
           
-          // Try to fetch event name in background (non-blocking)
-          // CRITICAL: Add skipGlobal404 to prevent interceptor redirect
           eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
             .then(event => {
-              // Chỉ cập nhật state nếu component vẫn còn mounted
               if (mountedRef.current) {
                 const eventName = event?.name || event?.title || 'sự kiện này'
                 setAccessDeniedEventName(eventName)
               }
             })
             .catch(() => {
-              // Keep default name
             })
           
-          // CRITICAL: Return early to prevent navigation - this is the key fix
           return
         }
-        // User has access, continue to navigate below
       } catch (error) {
-        // If role check fails, assume no access and show modal
         setAccessDeniedEventName('sự kiện này')
         setShowAccessDeniedModal(true)
         
-        // Try to fetch event name in background (non-blocking)
-        // CRITICAL: Add skipGlobal404 to prevent interceptor redirect
         eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
           .then(event => {
-            // Chỉ cập nhật state nếu component vẫn còn mounted
             if (mountedRef.current) {
               const eventName = event?.name || event?.title || 'sự kiện này'
               setAccessDeniedEventName(eventName)
             }
           })
           .catch(() => {
-            // Keep default name
           })
         
-        // CRITICAL: Return early to prevent navigation
         return
       }
     }
     
-    // Only navigate if:
-    // 1. User has access (checked above), OR
-    // 2. Notification has no eventId in URL (safe to navigate)
     navigate(url)
   }
 
-  // Lấy danh sách các category duy nhất
   const categories = ['all', ...new Set(notifications.map(n => n.category).filter(Boolean))]
 
-  // Lọc thông báo theo category và từ khóa tìm kiếm
   const filteredNotifications = notifications.filter(n => {
-    // Lọc theo category
     const categoryMatch = selectedCategory === 'all' || n.category === selectedCategory
 
-    // Lọc theo search term
     if (!searchTerm.trim()) return categoryMatch
 
     const term = searchTerm.toLowerCase()
@@ -253,7 +199,6 @@ export default function NotificationsPage() {
     return categoryMatch && searchMatch
   })
 
-  // Lấy danh sách thông báo hiển thị (pagination)
   const displayedNotifications = filteredNotifications.slice(0, displayCount)
   const hasMore = filteredNotifications.length > displayCount
 
@@ -277,7 +222,7 @@ export default function NotificationsPage() {
           value={selectedCategory}
           onChange={(e) => {
             setSelectedCategory(e.target.value)
-            setDisplayCount(10) // Reset về 10 khi đổi filter
+            setDisplayCount(10)
           }}
           style={{
             borderRadius: 8,
@@ -315,7 +260,7 @@ export default function NotificationsPage() {
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
-              setDisplayCount(10) // Reset về 10 khi search
+              setDisplayCount(10)
             }}
             style={{
               paddingLeft: 40,

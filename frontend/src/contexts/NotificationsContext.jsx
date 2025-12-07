@@ -11,7 +11,15 @@ export function NotificationsProvider({ children }) {
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
-    if (!enabled) return
+    // Check token before making request
+    const hasToken = authStorage.hasSession()
+    if (!hasToken) {
+      setEnabled(false)
+      setNotifications([])
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       const response = await notificationApi.getNotifications()
@@ -37,8 +45,15 @@ export function NotificationsProvider({ children }) {
       }))
       setNotifications(mapped)
     } catch (error) {
-      console.error('Error fetching notifications:', error)
-      setNotifications([])
+      // If 401, token is invalid - disable fetching
+      if (error?.response?.status === 401) {
+        console.warn('Unauthorized - disabling notifications fetching')
+        setEnabled(false)
+        setNotifications([])
+      } else {
+        console.error('Error fetching notifications:', error)
+        // Don't clear notifications on other errors, just log
+      }
     } finally {
       setLoading(false)
     }
@@ -66,16 +81,25 @@ export function NotificationsProvider({ children }) {
     window.addEventListener('auth:logout', onLogout)
 
     // Poll for new notifications every 30 seconds when enabled
-    const interval = setInterval(() => {
-      if (enabled) fetchNotifications()
-    }, 30000)
+    let interval = null
+    if (hasToken) {
+      interval = setInterval(() => {
+        const stillHasToken = authStorage.hasSession()
+        if (stillHasToken) {
+          fetchNotifications()
+        } else {
+          setEnabled(false)
+          setNotifications([])
+        }
+      }, 30000)
+    }
 
     return () => {
-      clearInterval(interval)
+      if (interval) clearInterval(interval)
       window.removeEventListener('auth:login', onLogin)
       window.removeEventListener('auth:logout', onLogout)
     }
-  }, [enabled])
+  }, []) // Empty dependency array - only run once on mount
 
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
 

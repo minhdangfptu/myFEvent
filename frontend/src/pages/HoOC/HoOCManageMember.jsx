@@ -362,6 +362,15 @@ export default function ManageMemberPage() {
 
   const canManageMember = (member) => {
     if (member.role === "HoOC") return false;
+    
+    // Prevent ANYONE from managing themselves (HoOC, HoD, Member)
+    const currentUserId = user?._id || user?.id || null;
+    const memberUserId = member.userId?._id || member.userId?.id || member.userId || null;
+    const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+    if (isViewingSelf) {
+      return false; // No one can manage/remove themselves
+    }
+    
     if (eventRole === "HoOC") return true;
     if (eventRole === "HoD") {
       if (!userDepartmentId) return false;
@@ -369,13 +378,6 @@ export default function ManageMemberPage() {
       const normalizedUserDeptId = String(userDepartmentId);
       const normalizedMemberDeptId = member.departmentId ? String(member.departmentId) : null;
       // HoD can only manage members in their own department
-      // But HoD cannot manage themselves
-      const currentUserId = user?._id || user?.id || null;
-      const memberUserId = member.userId?._id || member.userId?.id || member.userId || null;
-      const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
-      if (isViewingSelf && member.role === "HoD") {
-        return false; // HoD cannot manage themselves
-      }
       return normalizedMemberDeptId === normalizedUserDeptId;
     }
     return false;
