@@ -683,15 +683,21 @@ export const feedbackService = {
           distribution[answer] = (distribution[answer] || 0) + 1;
         });
 
+        // Tính percentage dựa trên tổng số responses (giống Google Form)
+        // Mỗi option được chọn bao nhiêu lần / tổng số responses
+        const totalResponses = questionResponses.length;
         const percentages = {};
         Object.keys(distribution).forEach(key => {
-          percentages[key] = ((distribution[key] / allAnswers.length) * 100).toFixed(1);
+          percentages[key] = totalResponses > 0 
+            ? ((distribution[key] / totalResponses) * 100).toFixed(1) 
+            : '0.0';
         });
 
         stats.statistics = {
           distribution,
           percentages,
-          totalSelections: allAnswers.length
+          totalSelections: allAnswers.length,
+          totalResponses: totalResponses
         };
       } else if (question.questionType === 'yes-no') {
         const yesCount = questionResponses.filter(r => r.answer === true).length;
