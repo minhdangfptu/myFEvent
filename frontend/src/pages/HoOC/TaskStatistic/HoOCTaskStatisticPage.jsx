@@ -817,11 +817,12 @@ export default function HoOCTaskStatisticPage() {
 
                 <div className="hooc-task-statistic-page__chart-content-wrapper">
                   {chartData.dataPoints.length > 0 ? (() => {
-                    const chartWidth = 520; // 580 - 60
-                    const chartHeight = 220; // 250 - 30
-                    const chartLeft = 60;
-                    const chartTop = 30;
-                    const chartBottom = 250;
+                    const chartWidth = 600;
+                    const chartHeight = 250;
+                    const chartLeft = 70;
+                    const chartTop = 20;
+                    const chartBottom = 280;
+                    const chartRight = chartLeft + chartWidth;
                     const dataPoints = chartData.dataPoints;
                     const maxValue = chartData.maxValue || 100;
                     const numPoints = dataPoints.length;
@@ -835,11 +836,19 @@ export default function HoOCTaskStatisticPage() {
                     };
 
                     return (
-                      <svg
-                        className="hooc-task-statistic-page__svg-chart"
-                        viewBox="0 0 600 300"
-                        preserveAspectRatio="xMidYMid meet"
-                      >
+                      <div style={{ 
+                        width: '100%', 
+                        overflowX: 'auto', 
+                        overflowY: 'visible',
+                        marginBottom: '20px',
+                        paddingBottom: '10px'
+                      }}>
+                        <svg
+                          className="hooc-task-statistic-page__svg-chart"
+                          viewBox={`0 0 ${chartRight + 20} ${chartBottom + 50}`}
+                          preserveAspectRatio="xMidYMid meet"
+                          style={{ width: '100%', height: '100%', minWidth: '700px' }}
+                        >
                         {/* Grid lines */}
                         {Array.from({ length: 5 }, (_, i) => {
                           const y = chartTop + (i * chartHeight / 4);
@@ -850,13 +859,13 @@ export default function HoOCTaskStatisticPage() {
                               <line
                                 x1={chartLeft}
                                 y1={y}
-                                x2={chartLeft + chartWidth}
+                                x2={chartRight}
                                 y2={y}
                                 stroke={isMainLine ? "#e0e0e0" : "#f5f5f5"}
                                 strokeWidth="1"
                               />
                               {i <= 3 && (
-                                <text x="35" y={y + 5} fontSize="12" textAnchor="end">
+                                <text x={chartLeft - 10} y={y + 5} fontSize="12" textAnchor="end" fill="#666">
                                   {value}
                                 </text>
                               )}
@@ -865,7 +874,7 @@ export default function HoOCTaskStatisticPage() {
                         })}
                         
                         {/* Y-axis label for 0 */}
-                        <text x="35" y={chartBottom + 5} fontSize="12" textAnchor="end">
+                        <text x={chartLeft - 10} y={chartBottom + 5} fontSize="12" textAnchor="end" fill="#666">
                           0
                         </text>
 
@@ -874,16 +883,16 @@ export default function HoOCTaskStatisticPage() {
                           x1={chartLeft}
                           y1={chartTop}
                           x2={chartLeft}
-                          y2={chartBottom + 10}
-                          stroke="#000"
+                          y2={chartBottom + 30}
+                          stroke="#333"
                           strokeWidth="2"
                         />
                         <line
                           x1={chartLeft - 10}
                           y1={chartBottom}
-                          x2={chartLeft + chartWidth}
+                          x2={chartRight}
                           y2={chartBottom}
-                          stroke="#000"
+                          stroke="#333"
                           strokeWidth="2"
                         />
 
@@ -972,16 +981,30 @@ export default function HoOCTaskStatisticPage() {
                           </>
                         )}
 
-                        {/* X-axis labels */}
+                        {/* X-axis labels - rotated to prevent overlapping */}
                         {dataPoints.map((dp, idx) => {
                           const x = chartLeft + idx * stepX;
+                          // Show every nth label to prevent crowding
+                          const showLabel = numPoints <= 10 || idx % Math.ceil(numPoints / 10) === 0 || idx === numPoints - 1;
+                          if (!showLabel) return null;
                           return (
-                            <text key={idx} x={x} y={chartBottom + 20} fontSize="12" textAnchor="middle">
-                              {dp.date}
-                            </text>
+                            <g key={idx}>
+                              <text 
+                                x={x} 
+                                y={chartBottom + 35} 
+                                fontSize="11" 
+                                textAnchor="middle"
+                                fill="#666"
+                                transform={`rotate(-45 ${x} ${chartBottom + 35})`}
+                                style={{ pointerEvents: 'none' }}
+                              >
+                                {dp.date}
+                              </text>
+                            </g>
                           );
                         })}
                       </svg>
+                      </div>
                     );
                   })() : (
                     <div style={{ 

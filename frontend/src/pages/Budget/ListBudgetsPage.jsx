@@ -257,6 +257,63 @@ const ListBudgetsPage = () => {
         // HoOC không được xem draft budgets từ HoD - filter out draft status
         if (eventRole === 'HoOC') {
           budgetsData = budgetsData.filter(b => b.status !== 'draft');
+          
+          // Đảm bảo departmentName được lấy đúng từ department object hoặc departmentId
+          budgetsData = budgetsData.map(budget => {
+            let departmentName = budget.departmentName;
+            
+            // Nếu không có departmentName, thử lấy từ department object
+            if (!departmentName && budget.department) {
+              departmentName = budget.department.name || budget.department?.name || null;
+            }
+            
+            // Nếu vẫn không có, thử lấy từ departmentId (sẽ fetch sau nếu cần)
+            if (!departmentName && budget.departmentId) {
+              // Giữ nguyên departmentId để có thể fetch sau
+              departmentName = null;
+            }
+            
+            return {
+              ...budget,
+              departmentName: departmentName || "—",
+              departmentId: budget.departmentId || budget.department?._id || budget.department?.id || null,
+            };
+          });
+          
+          // Nếu có budgets thiếu departmentName, fetch thông tin department
+          const budgetsNeedingDepartmentInfo = budgetsData.filter(b => !b.departmentName || b.departmentName === "—");
+          if (budgetsNeedingDepartmentInfo.length > 0) {
+            const departmentIds = [...new Set(budgetsNeedingDepartmentInfo.map(b => b.departmentId).filter(Boolean))];
+            
+            if (departmentIds.length > 0) {
+              try {
+                const departments = await departmentService.getDepartments(eventId);
+                const departmentsMap = new Map();
+                
+                if (Array.isArray(departments)) {
+                  departments.forEach(dept => {
+                    const deptId = dept._id || dept.id;
+                    if (deptId) {
+                      departmentsMap.set(deptId.toString(), dept.name || dept.title || "—");
+                    }
+                  });
+                }
+                
+                // Cập nhật departmentName cho các budgets
+                budgetsData = budgetsData.map(budget => {
+                  if ((!budget.departmentName || budget.departmentName === "—") && budget.departmentId) {
+                    const deptName = departmentsMap.get(budget.departmentId.toString());
+                    if (deptName) {
+                      return { ...budget, departmentName: deptName };
+                    }
+                  }
+                  return budget;
+                });
+              } catch (error) {
+                console.error("Error fetching departments for budget names:", error);
+              }
+            }
+          }
         }
         
         setBudgets(budgetsData);
@@ -321,18 +378,29 @@ const ListBudgetsPage = () => {
     );
   };
 
-  const handleViewDetail = (departmentId, budgetStatus) => {
+  const handleViewDetail = (departmentId, budgetStatus, budgetId) => {
     // Nếu là HoD, điều hướng đến trang view budget của họ
     // Nếu là HoOC, điều hướng đến trang review (chỉ nếu budget không phải draft)
     if (eventRole === 'HoD') {
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      // HoD: nếu có budgetId, navigate với budgetId, nếu không thì dùng view
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      } else {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      }
     } else {
       // HoOC không được xem draft budgets
       if (budgetStatus === 'draft') {
         toast.error("Không thể xem budget nháp. Budget này chưa được gửi lên để duyệt.");
         return;
       }
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      // HoOC: luôn truyền budgetId để xem đúng budget
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}/review`);
+      } else {
+        // Fallback nếu không có budgetId (backward compatibility)
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      }
     }
   };
 
@@ -870,7 +938,7 @@ const ListBudgetsPage = () => {
                             </div>
                           </td>
                         )}
-                        {eventRole === 'HoOC' && (
+                        {eventRole === 'HoOC' && budget.status === 'approved' && (
                           <td style={{ padding: "12px" }}>
                             <button
                               className={`btn btn-sm ${budget.isPublic ? 'btn-success' : 'btn-outline-secondary'}`}
@@ -892,11 +960,20 @@ const ListBudgetsPage = () => {
                             </button>
                           </td>
                         )}
+                        {eventRole === 'HoOC' && budget.status !== 'approved' && (
+                          <td style={{ padding: "12px" }}>
+                            <span className="text-muted" style={{ fontSize: "13px" }}>—</span>
+                          </td>
+                        )}
                         <td style={{ padding: "12px" }}>
                           <div className="d-flex gap-2">
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => handleViewDetail(budget.departmentId || budget.department?._id || budget.departmentId, budget.status)}
+                              onClick={() => handleViewDetail(
+                                budget.departmentId || budget.department?._id || budget.departmentId, 
+                                budget.status,
+                                budget._id || budget.id || budget.budgetId
+                              )}
                               style={{ borderRadius: "8px" }}
                             >
                               Xem chi tiết

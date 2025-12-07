@@ -467,10 +467,10 @@ export const removeMemberFromDepartment = async (req, res) => {
 		if (targetMembership.role === 'HoD') {
 			return res.status(409).json({ message: 'Unassign HoD before removing from department' });
 		}
-		// Prevent HoD from removing themselves from department
+		// Prevent ANYONE from removing themselves from department (HoOC, HoD, Member)
 		const requesterUserId = requesterMembership.userId?.toString() || requesterMembership.userId;
 		const targetUserId = targetMembership.userId?.toString() || targetMembership.userId;
-		if (requesterMembership.role === 'HoD' && requesterUserId === targetUserId) {
+		if (requesterUserId === targetUserId) {
 			return res.status(403).json({ message: 'Bạn không thể xóa chính mình khỏi ban' });
 		}
 

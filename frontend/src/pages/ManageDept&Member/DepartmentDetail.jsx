@@ -8,6 +8,7 @@ import { formatDate } from "~/utils/formatDate";
 import Loading from "~/components/Loading";
 import { departmentApi } from "../../apis/departmentApi";
 import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -62,6 +63,7 @@ const DepartmentDetail = () => {
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [isSavingChanges, setIsSavingChanges] = useState(false);
   const { fetchEventRole, getEventMember } = useEvents();
+  const { user } = useAuth();
 
   const getMemberDisplayName = (member) =>
     (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
@@ -733,31 +735,43 @@ const DepartmentDetail = () => {
                       <td style={{ padding: "15px", color: "#6b7280" }}>
                         {getMemberEmail(member)}
                       </td>
-                      {canManageThisDepartment() && (
-                        <td style={{ padding: "15px" }}>
-                          <div className="dropdown">
-                            <button
-                              className="btn btn-link text-decoration-none"
-                              data-bs-toggle="dropdown"
-                              style={{ color: "#6b7280" }}
-                            >
-                              ⋮
-                            </button>
-                            <ul className="dropdown-menu">
-                              <li>
-                                <button
-                                  className="dropdown-item"
-                                  onClick={() =>
-                                    handleMemberAction(member._id || member.id, "remove")
-                                  }
-                                >
-                                  Xoá thành viên khỏi ban
-                                </button>
-                              </li>
-                            </ul>
-                          </div>
-                        </td>
-                      )}
+                      {canManageThisDepartment() && (() => {
+                        // Check if this member is the current user
+                        const currentUserId = user?._id || user?.id;
+                        const memberUserId = member?.userId?._id || member?.userId?.id || member?.userId;
+                        const isSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+                        
+                        // Don't show remove button if it's the current user
+                        if (isSelf) {
+                          return null;
+                        }
+                        
+                        return (
+                          <td style={{ padding: "15px" }}>
+                            <div className="dropdown">
+                              <button
+                                className="btn btn-link text-decoration-none"
+                                data-bs-toggle="dropdown"
+                                style={{ color: "#6b7280" }}
+                              >
+                                ⋮
+                              </button>
+                              <ul className="dropdown-menu">
+                                <li>
+                                  <button
+                                    className="dropdown-item"
+                                    onClick={() =>
+                                      handleMemberAction(member._id || member.id, "remove")
+                                    }
+                                  >
+                                    Xoá thành viên khỏi ban
+                                  </button>
+                                </li>
+                              </ul>
+                            </div>
+                          </td>
+                        );
+                      })()}
                     </tr>
                   ))}
                 </tbody>
@@ -951,41 +965,43 @@ const DepartmentDetail = () => {
                   )}
                 </div>
 
-                {/* Delete Department */}
-                <div className="bg-light rounded-3 p-4">
-                  <h5
-                    style={{
-                      color: "#1f2937",
-                      fontWeight: "600",
-                      marginBottom: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8
-                    }}
-                  >
-                    <AlertTriangle size={18} className="text-danger" />
-                    Xoá ban
-                  </h5>
-                  <button
-                    className="btn btn-danger d-flex align-items-center mb-2"
-                    onClick={handleDeleteDepartment}
-                    style={{ backgroundColor: "#dc2626", border: "none", borderRadius: "8px", fontWeight: "400" }}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      <RotateCw size={16} className="me-2 spin-animation" />
-                    ) : (
-                      <Trash size={16} className="me-2" />
-                    )}
-                    {isDeleting ? "Đang xoá..." : "Xoá ban vĩnh viễn"}
-                  </button>
-                  <p
-                    style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}
-                  >
-                    Hành động này sẽ ảnh hưởng tới toàn bộ thành viên và không
-                    thể hoàn tác.
-                  </p>
-                </div>
+                {/* Delete Department - Only HoOC can see this */}
+                {eventRole === 'HoOC' && (
+                  <div className="bg-light rounded-3 p-4">
+                    <h5
+                      style={{
+                        color: "#1f2937",
+                        fontWeight: "600",
+                        marginBottom: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8
+                      }}
+                    >
+                      <AlertTriangle size={18} className="text-danger" />
+                      Xoá ban
+                    </h5>
+                    <button
+                      className="btn btn-danger d-flex align-items-center mb-2"
+                      onClick={handleDeleteDepartment}
+                      style={{ backgroundColor: "#dc2626", border: "none", borderRadius: "8px", fontWeight: "400" }}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <RotateCw size={16} className="me-2 spin-animation" />
+                      ) : (
+                        <Trash size={16} className="me-2" />
+                      )}
+                      {isDeleting ? "Đang xoá..." : "Xoá ban vĩnh viễn"}
+                    </button>
+                    <p
+                      style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}
+                    >
+                      Hành động này sẽ ảnh hưởng tới toàn bộ thành viên và không
+                      thể hoàn tác.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

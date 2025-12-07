@@ -1,58 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import UserLayout from '../../components/UserLayout'
 import { useNotifications } from '../../contexts/NotificationsContext'
 import { useNavigate } from 'react-router-dom'
+import { useEvents } from '../../contexts/EventContext'
+import { eventService } from '../../services/eventService'
+import { toast } from 'react-toastify'
 import { timeAgo } from '../../utils/timeAgo'
-import { Bell, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, Info, Search } from 'lucide-react'
+import { Bell, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, Info, Search, X } from 'lucide-react'
 
 export default function NotificationsPage() {
   const { notifications, markAllRead, markRead } = useNotifications()
   const navigate = useNavigate()
+  const { fetchEventRole, forceCheckEventAccess } = useEvents()
   const [searchTerm, setSearchTerm] = useState('')
   const [displayCount, setDisplayCount] = useState(10)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false)
+  const [accessDeniedEventName, setAccessDeniedEventName] = useState('')
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const getNotificationTargetUrl = (n) => {
-    // Backend can optionally send a direct URL (ưu tiên cao nhất)
     if (n.targetUrl) {
-      // Validate targetUrl - nếu không bắt đầu bằng / thì có thể là relative path
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
       
-      // Fix URL cũ có budgetId trong path review: /budget/{budgetId}/review -> /budget/review
-      // Pattern: /events/.../departments/.../budget/{budgetId}/review
       url = url.replace(
         /\/events\/([^/]+)\/departments\/([^/]+)\/budget\/([^/]+)\/review$/,
         '/events/$1/departments/$2/budget/review'
       );
       
-      console.log('Notification targetUrl:', url, 'Original:', n.targetUrl, 'Full notification:', n);
       return url;
     }
 
-    // TÀI CHÍNH notifications
     if (n.eventId && n.category === 'TÀI CHÍNH') {
-      // Budget notifications - backend đã set targetUrl, nếu không có thì fallback về trang home
       if (n.relatedBudgetId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event để tránh 404
         return `/home-page/events/${n.eventId}`;
       }
-      // Expense notifications
       if (n.relatedExpenseId) {
-        // Nếu có targetUrl từ backend thì dùng (đã được xử lý ở trên)
-        // Nếu không có targetUrl, fallback về trang home của event
         return `/home-page/events/${n.eventId}`;
       }
     }
 
-    // PHẢN HỒI notifications
     if (n.eventId && n.category === 'PHẢN HỒI') {
       if (n.relatedFeedbackId) {
         return `/events/${n.eventId}/feedback/member`;
       }
     }
 
-    // RỦI RO notifications
     if (n.eventId && n.category === 'RỦI RO') {
       if (n.relatedRiskId) {
         return `/events/${n.eventId}/risks/detail/${n.relatedRiskId}`;
@@ -60,7 +60,6 @@ export default function NotificationsPage() {
       return `/events/${n.eventId}/risks`;
     }
 
-    // LỊCH HỌP notifications
     if (n.eventId && n.category === 'LỊCH HỌP') {
       if (n.relatedCalendarId) {
         return `/events/${n.eventId}/my-calendar`;
@@ -71,27 +70,21 @@ export default function NotificationsPage() {
       return `/events/${n.eventId}/my-calendar`;
     }
 
-    // CÔNG VIỆC notifications - điều hướng đến trang task
     if (n.eventId && n.category === 'CÔNG VIỆC') {
-      // Nếu có relatedTaskId thì đi đến task detail
       if (n.relatedTaskId) {
         return `/events/${n.eventId}/tasks/${n.relatedTaskId}`;
       }
-      // Nếu không có relatedTaskId thì đi đến trang danh sách tasks
       return `/events/${n.eventId}/tasks`;
     }
 
-    // THÀNH VIÊN notifications - điều hướng đến trang thành viên
     if (n.eventId && n.category === 'THÀNH VIÊN') {
       return `/events/${n.eventId}/members`;
     }
 
-    // Mặc định nếu có eventId thì đưa về trang chi tiết sự kiện
     if (n.eventId) {
       return `/home-page/events/${n.eventId}`;
     }
 
-    // Fallback: về trang danh sách thông báo
     return '/notifications';
   }
 
@@ -112,23 +105,88 @@ export default function NotificationsPage() {
     return ICON_BY_CATEGORY[n?.category] || Bell
   }
 
-  const handleNotificationClick = (n) => {
+  const extractEventIdFromUrl = (url) => {
+    if (!url) return null
+    const patterns = [
+      /\/events\/([^/?]+)/,
+      /\/home-page\/events\/([^/?]+)/,
+    ]
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match && match[1]) {
+        return match[1]
+      }
+    }
+    
+    return null
+  }
+
+  const handleNotificationClick = async (n) => {
     if (n.id) {
       markRead(n.id)
     }
+    
     const url = getNotificationTargetUrl(n)
+    
+    let eventIdToCheck = n.eventId
+    
+    if (!eventIdToCheck && n.targetUrl) {
+      eventIdToCheck = extractEventIdFromUrl(n.targetUrl)
+    }
+    
+    if (!eventIdToCheck && url) {
+      eventIdToCheck = extractEventIdFromUrl(url)
+    }
+    
+    if (eventIdToCheck) {
+      try {
+        const role = await forceCheckEventAccess(eventIdToCheck)
+        
+        const hasAccess = role && typeof role === 'string' && role.trim() !== ''
+        
+        if (!hasAccess) {
+          setAccessDeniedEventName('sự kiện này')
+          setShowAccessDeniedModal(true)
+          
+          eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
+            .then(event => {
+              if (mountedRef.current) {
+                const eventName = event?.name || event?.title || 'sự kiện này'
+                setAccessDeniedEventName(eventName)
+              }
+            })
+            .catch(() => {
+            })
+          
+          return
+        }
+      } catch (error) {
+        setAccessDeniedEventName('sự kiện này')
+        setShowAccessDeniedModal(true)
+        
+        eventService.fetchEventById(eventIdToCheck, { skipGlobal404: true, skipGlobal403: true })
+          .then(event => {
+            if (mountedRef.current) {
+              const eventName = event?.name || event?.title || 'sự kiện này'
+              setAccessDeniedEventName(eventName)
+            }
+          })
+          .catch(() => {
+          })
+        
+        return
+      }
+    }
+    
     navigate(url)
   }
 
-  // Lấy danh sách các category duy nhất
   const categories = ['all', ...new Set(notifications.map(n => n.category).filter(Boolean))]
 
-  // Lọc thông báo theo category và từ khóa tìm kiếm
   const filteredNotifications = notifications.filter(n => {
-    // Lọc theo category
     const categoryMatch = selectedCategory === 'all' || n.category === selectedCategory
 
-    // Lọc theo search term
     if (!searchTerm.trim()) return categoryMatch
 
     const term = searchTerm.toLowerCase()
@@ -141,7 +199,6 @@ export default function NotificationsPage() {
     return categoryMatch && searchMatch
   })
 
-  // Lấy danh sách thông báo hiển thị (pagination)
   const displayedNotifications = filteredNotifications.slice(0, displayCount)
   const hasMore = filteredNotifications.length > displayCount
 
@@ -165,7 +222,7 @@ export default function NotificationsPage() {
           value={selectedCategory}
           onChange={(e) => {
             setSelectedCategory(e.target.value)
-            setDisplayCount(10) // Reset về 10 khi đổi filter
+            setDisplayCount(10)
           }}
           style={{
             borderRadius: 8,
@@ -203,7 +260,7 @@ export default function NotificationsPage() {
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
-              setDisplayCount(10) // Reset về 10 khi search
+              setDisplayCount(10)
             }}
             style={{
               paddingLeft: 40,
@@ -236,7 +293,11 @@ export default function NotificationsPage() {
         ) : (
           <>
             {displayedNotifications.map(n => (
-              <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={() => handleNotificationClick(n)}>
+              <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-3 border-bottom" style={{ cursor:'pointer' }} onClick={async (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                await handleNotificationClick(n)
+              }}>
                 <div className="d-flex align-items-center justify-content-center" style={{ width:32, height:32 }}>
                   {(() => {
                     const Icon = getIconComponent(n)
@@ -275,6 +336,83 @@ export default function NotificationsPage() {
           >
             Xem thêm ({filteredNotifications.length - displayCount} thông báo)
           </button>
+        </div>
+      )}
+
+      {/* Access Denied Modal */}
+      {showAccessDeniedModal && (
+        <div
+          className="modal show d-block"
+          style={{ 
+            backgroundColor: 'rgba(0,0,0,0.5)', 
+            zIndex: 99999, 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => {
+            setShowAccessDeniedModal(false)
+          }}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content" style={{ borderRadius: '12px' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <h5 className="modal-title fw-bold" style={{ color: '#111827' }}>
+                  Không có quyền truy cập
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowAccessDeniedModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body" style={{ padding: '24px' }}>
+                <div className="d-flex align-items-start gap-3">
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Info size={24} style={{ color: '#EF4444' }} />
+                  </div>
+                  <div className="flex-grow-1">
+                    <p className="mb-0" style={{ fontSize: '16px', color: '#374151', lineHeight: '1.6' }}>
+                      Xin lỗi nhưng bạn hiện đang không ở trong sự kiện <strong>{accessDeniedEventName}</strong> nữa, vui lòng liên hệ đến trưởng ban tổ chức sự kiện để được tham gia.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowAccessDeniedModal(false)
+                    navigate('/home-page')
+                  }}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Về trang chủ
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </UserLayout>

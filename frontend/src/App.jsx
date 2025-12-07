@@ -113,9 +113,16 @@ import SupportPage from "./pages/User/SupportPage";
 import SupportButton from "./components/SupportButton";
 import GlobalAIAssistant from "./components/chat/GlobalAIAssistant";
 
-// Component để redirect URL cũ có budgetId trong path review
+// Component để redirect URL cũ có budgetId trong path review (giữ lại để backward compatibility)
+// Nhưng giờ ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId, nên có thể dùng trực tiếp
 const BudgetReviewRedirect = () => {
-  const { eventId, departmentId } = useParams();
+  const { eventId, departmentId, budgetId } = useParams();
+  // Nếu có budgetId, giữ nguyên URL (không redirect)
+  // Nếu không có budgetId, redirect về review không có budgetId
+  if (budgetId) {
+    // Render ViewDeptBudgetDetailHoOC trực tiếp thay vì redirect
+    return <ViewDeptBudgetDetailHoOC />;
+  }
   return <Navigate to={`/events/${eventId}/departments/${departmentId}/budget/review`} replace />;
 };
 
@@ -755,15 +762,16 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          {/* Route redirect cho URL cũ có budgetId trong path (HoOC) - phải đặt trước route review */}
+          {/* Route với budgetId - ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId */}
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
             element={
               <ProtectedRoute requiredEventRoles={['HoOC']}>
-                <BudgetReviewRedirect />
+                <ViewDeptBudgetDetailHoOC />
               </ProtectedRoute>
             } 
           />
+          {/* Route không có budgetId - backward compatibility */}
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/review" 
             element={
@@ -889,15 +897,16 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          {/* Route redirect cho URL cũ có budgetId trong path (HoOC) - phải đặt trước route review */}
+          {/* Route với budgetId - ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId */}
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
             element={
               <ProtectedRoute requiredEventRoles={['HoOC']}>
-                <BudgetReviewRedirect />
+                <ViewDeptBudgetDetailHoOC />
               </ProtectedRoute>
             } 
           />
+          {/* Route không có budgetId - backward compatibility */}
           <Route 
             path="/events/:eventId/departments/:departmentId/budget/review" 
             element={

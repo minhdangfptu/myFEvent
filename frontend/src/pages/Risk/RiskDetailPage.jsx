@@ -1026,24 +1026,24 @@ export default function RiskDetailPage() {
               ) : (
                 <>
                   <button className="btn btn-secondary" onClick={() => navigate(`/events/${eventId}/risks`)}>
-                  <i class="bi bi-arrow-left"></i>  Quay lại danh sách rủi ro
+                  <i className="bi bi-arrow-left"></i>  Quay lại danh sách rủi ro
                   </button>
                   
                   {canEdit() && (
                     <button className="btn btn-primary" onClick={handleStartEditing}>
-                      <i class="bi bi-pencil"></i> Chỉnh sửa
+                      <i className="bi bi-pencil"></i> Chỉnh sửa
                     </button>
                   )}
-
+                  
                   {canManageOccurred() && (
                     <button className="btn btn-success" onClick={() => handleShowOccurredModal()}>
-                      <i class="bi bi-plus-circle"></i> Báo cáo sự cố
+                      <i className="bi bi-plus-circle"></i> Báo cáo sự cố
                     </button>
                   )}
-
+                  
                   {canDelete() && (
                     <button className="btn btn-danger" onClick={() => setShowDeleteModal(true)}>
-                      <i class="bi bi-archive"></i> Xóa rủi ro
+                      <i className="bi bi-archive"></i> Xóa rủi ro
                     </button>
                   )}
                 </>
@@ -1133,7 +1133,7 @@ export default function RiskDetailPage() {
                                 className="btn btn-sm btn-outline-primary me-2"
                                 onClick={() => handleShowOccurredModal(occurred)}
                               >
-                                <i class="bi bi-pencil"></i> Chỉnh sửa
+                                <i className="bi bi-pencil"></i> Chỉnh sửa
                               </button>
                               <button
                                 className="btn btn-sm btn-outline-danger"
@@ -1142,7 +1142,7 @@ export default function RiskDetailPage() {
                                   setShowDeleteOccurredModal(true);
                                 }}
                               >
-                                <i class="bi bi-archive"></i> Xóa
+                                <i className="bi bi-archive"></i> Xóa
                               </button>
                             </div>
                           )}

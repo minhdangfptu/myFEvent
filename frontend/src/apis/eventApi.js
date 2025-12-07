@@ -14,9 +14,14 @@ export const eventApi = {
       throw error;
     }
   },
-  getEventById: async (eventId) => {
+  getEventById: async (eventId, config = {}) => {
     try {
-      const response = await axiosClient.get(`/api/events/${eventId}`);
+      const axiosConfig = {
+        ...config,
+        skipGlobal404: config.skipGlobal404 || false,
+        skipGlobal403: config.skipGlobal403 || false
+      };
+      const response = await axiosClient.get(`/api/events/${eventId}`, axiosConfig);
       return response.data;
     } catch (error) {
       throw error;

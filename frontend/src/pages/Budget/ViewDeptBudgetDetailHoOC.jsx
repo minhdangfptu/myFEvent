@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
@@ -7,11 +8,11 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
-import { ArrowLeft, Check, CheckCircle, Info, RotateCcw, Save, Search, X } from "lucide-react";
+import { ArrowLeft, CheckCircle, Info, RotateCcw, Save, Search, AlertCircle, X } from "lucide-react";
 
 
 const ViewDeptBudgetDetailHoOC = () => {
-  const { eventId, departmentId } = useParams();
+  const { eventId, departmentId, budgetId } = useParams();
   const navigate = useNavigate();
   const { fetchEventRole } = useEvents();
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,10 @@ const ViewDeptBudgetDetailHoOC = () => {
   const [tempFeedback, setTempFeedback] = useState("");
   const [eventRole, setEventRole] = useState("");
   const [checkingRole, setCheckingRole] = useState(true);
+  const [feedbackDebounceTimers, setFeedbackDebounceTimers] = useState({});
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectItemId, setRejectItemId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   // Kiểm tra role khi component mount
   useEffect(() => {
@@ -59,7 +64,34 @@ const ViewDeptBudgetDetailHoOC = () => {
     if (eventRole === 'HoOC') {
       fetchData();
     }
-  }, [eventId, departmentId, eventRole]);
+  }, [eventId, departmentId, budgetId, eventRole]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(feedbackDebounceTimers).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
+
+  // Warn user before leaving page if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = 'Bạn có thay đổi chưa được lưu. Bạn có chắc chắn muốn rời khỏi trang này?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasChanges]);
+
 
   const fetchData = async () => {
     if (!departmentId || departmentId === "current" || departmentId === "") {
@@ -69,8 +101,14 @@ const ViewDeptBudgetDetailHoOC = () => {
 
     try {
       setLoading(true);
+      // Nếu có budgetId, dùng getDepartmentBudgetById để lấy đúng budget
+      // Nếu không có budgetId, dùng getDepartmentBudget (backward compatibility)
+      const budgetPromise = budgetId 
+        ? budgetApi.getDepartmentBudgetById(eventId, departmentId, budgetId)
+        : budgetApi.getDepartmentBudget(eventId, departmentId, true);
+      
       const [budgetData, deptData] = await Promise.all([
-        budgetApi.getDepartmentBudget(eventId, departmentId, true), // Pass forReview=true
+        budgetPromise,
         departmentService.getDepartmentDetail(eventId, departmentId),
       ]);
 
@@ -91,25 +129,31 @@ const ViewDeptBudgetDetailHoOC = () => {
       setDepartment(deptData);
 
       // Initialize item statuses and feedbacks
-      // Nếu budget chưa được review (status là draft hoặc submitted), các items mặc định là pending
-      // Chỉ giữ status approved/rejected nếu budget đã được approved
+      // Nếu budget đã rejected (changes_requested), giữ nguyên status và feedback, không cho phép chỉnh sửa
+      // Nếu budget đã approved, giữ nguyên status của item
+      // Nếu budget chưa được review (status là submitted), các items mặc định là pending
       const initialStatuses = {};
       const initialFeedbacks = {};
       const budgetStatus = budgetData.status || "draft";
       const isBudgetApproved = budgetStatus === "approved";
+      const isBudgetRejected = budgetStatus === "changes_requested";
       
       if (budgetData.items && Array.isArray(budgetData.items)) {
         budgetData.items.forEach((item) => {
           const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-          // Nếu budget đã approved, giữ nguyên status của item
-          // Nếu budget chưa approved (draft/submitted), mặc định là pending
-          if (isBudgetApproved) {
+          // Nếu budget đã rejected, giữ nguyên status và feedback (read-only)
+          if (isBudgetRejected) {
             initialStatuses[itemId] = item.status || "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
+          } else if (isBudgetApproved) {
+            // Nếu budget đã approved, giữ nguyên status của item
+            initialStatuses[itemId] = item.status || "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
           } else {
-            // Budget chưa được review, reset về pending
+            // Budget chưa được review (submitted), mặc định là pending
             initialStatuses[itemId] = "pending";
+            initialFeedbacks[itemId] = item.feedback || "";
           }
-          initialFeedbacks[itemId] = item.feedback || "";
         });
       }
       setItemStatuses(initialStatuses);
@@ -188,32 +232,151 @@ const ViewDeptBudgetDetailHoOC = () => {
     );
   };
 
-  const handleApproveItem = (itemId) => {
+  const handleApproveItem = async (itemId) => {
     setItemStatuses((prev) => ({ ...prev, [itemId]: "approved" }));
     setHasChanges(true);
+    
+    // Auto-save to backend
+    try {
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = id === itemId ? "approved" : (itemStatuses[id] || item.status || "pending");
+        const currentFeedback = itemFeedbacks[id] || item.feedback || "";
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      // Don't show toast for auto-save on approve to avoid spam
+    } catch (err) {
+      console.error("Error auto-saving approve:", err);
+      // Don't show error toast for auto-save, just log it
+    }
   };
 
   const handleRejectItem = (itemId) => {
+    // Get current feedback for this item
     const currentFeedback = itemFeedbacks[itemId] || "";
-    if (!currentFeedback || currentFeedback.trim() === "") {
-      toast.warning("Vui lòng nhập phản hồi trước khi từ chối!");
-      // Tự động mở edit feedback
-      const budgetItem = budget?.items?.find(item => {
-        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-        return id === itemId;
-      });
-      if (budgetItem) {
-        handleStartEditFeedback(budgetItem);
-      }
+    
+    // If feedback already exists, reject directly without showing modal
+    if (currentFeedback && currentFeedback.trim() !== "") {
+      handleDirectReject(itemId, currentFeedback);
       return;
     }
-    setItemStatuses((prev) => ({ ...prev, [itemId]: "rejected" }));
-    setHasChanges(true);
+    
+    // If no feedback, show modal to require user to enter reason
+    setRejectItemId(itemId);
+    setRejectReason("");
+    setShowRejectModal(true);
   };
 
-  const handleUndoStatus = (itemId) => {
+  const handleDirectReject = async (itemId, feedback) => {
+    try {
+      // Update status to rejected
+      setItemStatuses((prev) => ({ ...prev, [itemId]: "rejected" }));
+      setHasChanges(true);
+      
+      // Build items array with current statuses and feedbacks
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = id === itemId ? "rejected" : (itemStatuses[id] || item.status || "pending");
+        const currentFeedback = id === itemId ? feedback : (itemFeedbacks[id] || item.feedback || "");
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      
+      // Save to backend
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      setHasChanges(false);
+      toast.success("Đã từ chối mục ngân sách!");
+    } catch (err) {
+      console.error("Error saving reject:", err);
+      toast.error("Lỗi khi lưu thay đổi. Vui lòng thử lại!");
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectReason || rejectReason.trim() === "") {
+      toast.warning("Bạn hãy vui lòng nhập lý do nếu từ chối!");
+      return;
+    }
+    
+    try {
+      // Get existing feedback if any
+      const existingFeedback = itemFeedbacks[rejectItemId] || "";
+      
+      // If there's existing feedback, append the new reason (or replace based on preference)
+      // Here we'll replace it with the new reason from modal
+      const finalFeedback = rejectReason.trim();
+      
+      // Update feedback with the reason
+      setItemFeedbacks((prev) => ({ ...prev, [rejectItemId]: finalFeedback }));
+      setItemStatuses((prev) => ({ ...prev, [rejectItemId]: "rejected" }));
+      setHasChanges(true);
+      
+      // Build items array with current statuses and feedbacks
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = id === rejectItemId ? "rejected" : (itemStatuses[id] || item.status || "pending");
+        const currentFeedback = id === rejectItemId ? finalFeedback : (itemFeedbacks[id] || item.feedback || "");
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      
+      // Save to backend and wait for completion
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      
+      // Only close modal and show success after save is complete
+      setShowRejectModal(false);
+      setRejectItemId(null);
+      setRejectReason("");
+      setHasChanges(false); // Mark as saved
+      toast.success("Đã từ chối mục ngân sách và lưu thành công!");
+    } catch (err) {
+      console.error("Error saving reject reason:", err);
+      toast.error("Lỗi khi lưu thay đổi. Vui lòng thử lại!");
+      // Don't close modal if save failed
+    }
+  };
+
+  const handleCancelReject = () => {
+    setShowRejectModal(false);
+    setRejectItemId(null);
+    setRejectReason("");
+  };
+
+  const handleUndoStatus = async (itemId) => {
     setItemStatuses((prev) => ({ ...prev, [itemId]: "pending" }));
     setHasChanges(true);
+    
+    // Auto-save to backend
+    try {
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = id === itemId ? "pending" : (itemStatuses[id] || item.status || "pending");
+        const currentFeedback = itemFeedbacks[id] || item.feedback || "";
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      // Don't show toast for auto-save on undo to avoid spam
+    } catch (err) {
+      console.error("Error auto-saving undo:", err);
+      // Don't show error toast for auto-save, just log it
+    }
   };
 
   const handleFeedbackChange = (itemId, value) => {
@@ -228,16 +391,68 @@ const ViewDeptBudgetDetailHoOC = () => {
     setTempFeedback(currentFeedback);
   };
 
-  const handleSaveFeedback = (itemId) => {
+  const handleSaveFeedback = async (itemId) => {
     setItemFeedbacks((prev) => ({ ...prev, [itemId]: tempFeedback }));
     setHasChanges(true);
     setEditingFeedbackItemId(null);
     setTempFeedback("");
+    
+    // Auto-save to backend
+    try {
+      const items = budget.items.map((item) => {
+        const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        const currentStatus = itemStatuses[id] || item.status || "pending";
+        const currentFeedback = id === itemId ? tempFeedback : (itemFeedbacks[id] || item.feedback || "");
+        return {
+          itemId: item.itemId || item._id || item.itemId?._id,
+          status: currentStatus,
+          feedback: currentFeedback,
+        };
+      });
+      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+    } catch (error) {
+      console.error("Error auto-saving feedback:", error);
+      // Don't show error toast for auto-save, just log it
+    }
   };
 
   const handleCancelEditFeedback = () => {
     setEditingFeedbackItemId(null);
     setTempFeedback("");
+  };
+
+  // Auto-save feedback when changed (with debounce)
+  const handleFeedbackChangeAutoSave = (itemId, value) => {
+    // Update local state immediately
+    setItemFeedbacks((prev) => ({ ...prev, [itemId]: value }));
+    setHasChanges(true);
+    
+    // Clear existing timer for this item
+    if (feedbackDebounceTimers[itemId]) {
+      clearTimeout(feedbackDebounceTimers[itemId]);
+    }
+    
+    // Set new timer to auto-save after 1 second of no typing
+    const timer = setTimeout(async () => {
+      try {
+        const items = budget.items.map((item) => {
+          const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+          const currentStatus = itemStatuses[id] || item.status || "pending";
+          const currentFeedback = id === itemId ? value : (itemFeedbacks[id] || item.feedback || "");
+          return {
+            itemId: item.itemId || item._id || item.itemId?._id,
+            status: currentStatus,
+            feedback: currentFeedback,
+          };
+        });
+        await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
+      } catch (error) {
+        console.error("Error auto-saving feedback:", error);
+        // Don't show error toast for auto-save, just log it
+      }
+    }, 1000); // 1 second debounce
+    
+    setFeedbackDebounceTimers((prev) => ({ ...prev, [itemId]: timer }));
   };
 
   const handleSaveDraft = async () => {
@@ -254,14 +469,32 @@ const ViewDeptBudgetDetailHoOC = () => {
         };
       });
 
-      await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
-      toast.success("Đã lưu nháp thành công!");
+      // Check if there are any rejected items
+      const rejectedItems = items.filter(item => item.status === 'rejected');
+      
+      // Determine expected status based on items
+      const expectedStatus = rejectedItems.length > 0 ? 'changes_requested' : 'approved';
+      
+      // Send both items and status to backend
+      // Backend should update status based on items, but we also send it explicitly
+      const saveData = { 
+        items,
+        status: expectedStatus  // Include status in saveReviewDraft data
+      };
+      
+      const response = await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, saveData);
+      
+      // Backend should handle status update in saveReviewDraft based on items status
+      // No need for fallback updateBudget call as it causes 400 errors for HoOC
+
+      toast.success("Đã lưu thành công!");
       setHasChanges(false);
-      // Refresh data để lấy feedback đã lưu
-      await fetchData();
+      
+      // Navigate to budgets list page
+      navigate(`/events/${eventId}/budgets`);
     } catch (error) {
       console.error("Error saving draft:", error);
-      toast.error(error?.response?.data?.message || "Lưu nháp thất bại!");
+      toast.error(error?.response?.data?.message || "Lưu thất bại!");
     } finally {
       setLoading(false);
     }
@@ -270,19 +503,110 @@ const ViewDeptBudgetDetailHoOC = () => {
   const handleCompleteReview = async () => {
     try {
       setLoading(true);
+      
+      // Validate: all items must be approved or rejected
+      // First, check if all items have been reviewed (approved or rejected)
+      const unreviewedItems = budget.items.filter((item) => {
+        const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+        // Get current status: prioritize itemStatuses (user's current changes) over item.status (from backend)
+        const currentStatus = itemStatuses[itemId] !== undefined 
+          ? itemStatuses[itemId] 
+          : (item.status || "pending");
+        
+        // Item is considered unreviewed if status is still "pending"
+        return currentStatus === "pending";
+      });
+      
+      if (unreviewedItems.length > 0) {
+        toast.error(`Vui lòng duyệt hoặc từ chối tất cả các mục trước khi hoàn tất! Còn ${unreviewedItems.length} mục chưa được duyệt.`);
+        setLoading(false);
+        return;
+      }
+      
+      // Build items array with current statuses and feedbacks
       const items = budget.items.map((item) => {
         const itemId = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
-        const currentStatus = itemStatuses[itemId] || item.status || "pending";
-        const currentFeedback = itemFeedbacks[itemId] || item.feedback || "";
+        // Prioritize itemStatuses (user's current changes) over item.status (from backend)
+        const currentStatus = itemStatuses[itemId] !== undefined 
+          ? itemStatuses[itemId] 
+          : (item.status || "pending");
+        const currentFeedback = itemFeedbacks[itemId] !== undefined 
+          ? itemFeedbacks[itemId] 
+          : (item.feedback || "");
+        
+        // Double check: status must be approved or rejected
+        if (currentStatus !== "approved" && currentStatus !== "rejected") {
+          console.error(`Item ${itemId} has invalid status: ${currentStatus}`);
+        }
+        
         return {
           itemId: item.itemId || item._id || item.itemId?._id,
           status: currentStatus,
           feedback: currentFeedback,
         };
       });
+      
+      // Final validation: ensure all items are approved or rejected
+      const allReviewed = items.every(item => {
+        const status = item.status;
+        return status === 'approved' || status === 'rejected';
+      });
+      
+      if (!allReviewed) {
+        toast.error("Vui lòng duyệt hoặc từ chối tất cả các mục trước khi hoàn tất!");
+        setLoading(false);
+        return;
+      }
 
-      await budgetApi.completeReview(eventId, departmentId, budget._id, { items });
-      toast.success("Hoàn tất duyệt ngân sách thành công!");
+      // Check if there are any rejected items
+      const rejectedItems = items.filter(item => item.status === 'rejected');
+      const approvedItems = items.filter(item => item.status === 'approved');
+      
+      // Log for debugging
+      console.log('Complete Review - Items Status:', {
+        total: items.length,
+        approved: approvedItems.length,
+        rejected: rejectedItems.length,
+        rejectedItemIds: rejectedItems.map(item => item.itemId),
+        expectedBudgetStatus: rejectedItems.length > 0 ? 'changes_requested' : 'approved'
+      });
+
+      // Important: Backend should set budget status based on items:
+      // - If ALL items are approved → budget status = "approved"
+      // - If ANY items are rejected → budget status = "changes_requested"
+      // If backend sets status incorrectly, this will help identify the issue
+      if (rejectedItems.length > 0) {
+        console.warn('⚠️ Budget has rejected items. Backend should set budget status to "changes_requested", not "approved"');
+      }
+
+      const response = await budgetApi.completeReview(eventId, departmentId, budget._id, { items });
+      
+      // Verify the response status matches expected status
+      // Backend should set budget status based on items:
+      // - If ALL items are approved → budget status = "approved"
+      // - If ANY items are rejected → budget status = "changes_requested"
+      const returnedBudget = response?.budget || response?.data || response;
+      const returnedStatus = returnedBudget?.status;
+      const expectedStatus = rejectedItems.length > 0 ? 'changes_requested' : 'approved';
+      
+      if (returnedStatus && returnedStatus !== expectedStatus) {
+        console.error('❌ Budget status mismatch!', {
+          expected: expectedStatus,
+          actual: returnedStatus,
+          hasRejectedItems: rejectedItems.length > 0,
+          rejectedCount: rejectedItems.length,
+          approvedCount: approvedItems.length
+        });
+        
+        // Show warning to user if status is incorrect
+        if (rejectedItems.length > 0 && returnedStatus === 'approved') {
+          toast.warning('Cảnh báo: Budget có items bị từ chối nhưng status hiển thị là "Đã duyệt". Vui lòng kiểm tra lại.');
+        }
+      } else if (rejectedItems.length > 0) {
+        console.log('✅ Budget status correctly set to "changes_requested"');
+      }
+      
+      toast.success("Đã gửi ngân sách cho trưởng ban thành công!");
       setShowCompleteModal(false);
       navigate(`/events/${eventId}/budgets`);
     } catch (error) {
@@ -390,71 +714,66 @@ const ViewDeptBudgetDetailHoOC = () => {
             Tổng Quan Ngân Sách
           </h5>
 
-          <div className="row g-4">
-            <div className="col-md-3">
-              <div>
-                <div
-                  className="fw-bold mb-1"
-                  style={{ fontSize: "32px", color: "#3B82F6" }}
-                >
-                  {formatCurrency(totalCost)}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Tổng Chi Phí Dự Kiến (VNĐ)
-                </p>
+          <div className="d-flex flex-wrap align-items-start gap-4" style={{ flexWrap: "nowrap" }}>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div
+                className="fw-bold mb-1"
+                style={{ fontSize: "32px", color: "#3B82F6" }}
+              >
+                {formatCurrency(totalCost)}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Tổng Chi Phí Dự Kiến (VNĐ)
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "24px", color: "#111827" }}>
-                  {budget.items?.length || 0}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Tổng Số Mục
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "24px", color: "#111827" }}>
+                {budget.items?.length || 0}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Tổng Số Mục
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {formatDate(budget.createdAt)}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Ngày Tạo
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
+                {formatDate(budget.createdAt)}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Ngày Tạo
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
-                  {budget.createdBy?.fullName || "Nguyễn Văn A"}
-                </div>
-                <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
-                  Người Tạo (Trưởng ban)
-                </p>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <div className="fw-bold mb-1" style={{ fontSize: "18px", color: "#111827" }}>
+                {budget.createdBy?.fullName || 
+                 budget.creatorName || 
+                 budget.createdByUser?.fullName ||
+                 department?.leader?.fullName ||
+                 department?.leaderId?.fullName ||
+                 "Chưa có thông tin"}
               </div>
+              <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                Người Tạo (Trưởng ban)
+              </p>
             </div>
 
-            <div className="col-md-3">
-              <div>
-                <span
-                  className="badge px-3 py-2"
-                  style={{
-                    background: "#FEF3C7",
-                    color: "#F59E0B",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                  }}
-                >
-                  Chờ duyệt
-                </span>
-                <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
-                  Trạng thái budget
-                </p>
-              </div>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <span
+                className="badge px-3 py-2"
+                style={{
+                  background: "#FEF3C7",
+                  color: "#F59E0B",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                }}
+              >
+                Chờ duyệt
+              </span>
+              <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
+                Trạng thái budget
+              </p>
             </div>
           </div>
         </div>
@@ -541,6 +860,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                     const feedback = itemFeedbacks[itemId] !== undefined ? itemFeedbacks[itemId] : (item.feedback || "");
                     const isRejected = status === "rejected";
                     const isApproved = status === "approved";
+                    const isBudgetRejected = budget?.status === "changes_requested";
 
                     // CHỈ tô màu đỏ cho dòng bị từ chối, còn lại để màu trắng
                     const cellBgColor = isRejected ? "#FCA5A5" : "transparent";
@@ -622,53 +942,50 @@ const ViewDeptBudgetDetailHoOC = () => {
                           {getStatusBadge(status)}
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
-                          {editingFeedbackItemId === itemId ? (
-                            <div className="d-flex gap-2">
-                              <textarea
-                                className="form-control form-control-sm"
-                                value={tempFeedback}
-                                onChange={(e) => setTempFeedback(e.target.value)}
-                                rows="2"
-                                style={{ fontSize: "13px", minHeight: "60px" }}
-                                autoFocus
-                              />
-                              <div className="d-flex flex-column gap-1">
-                                <button
-                                  className="btn btn-success btn-sm"
-                                  onClick={() => handleSaveFeedback(itemId)}
-                                  style={{ fontSize: "11px", padding: "4px 8px" }}
-                                >
-                                  <Check size={18} />
-                                </button>
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={handleCancelEditFeedback}
-                                  style={{ fontSize: "11px", padding: "4px 8px" }}
-                                >
-                                  <X size={18} />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              onClick={() => handleStartEditFeedback(item)}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: "6px",
-                                border: isApproved ? "1px solid #10B981" : isRejected ? "1px solid #DC2626" : "1px solid #d1d5db",
-                                backgroundColor: isApproved ? "#F0FDF4" : isRejected ? "#FEF2F2" : "#f9fafb",
-                                color: "#111827",
-                                fontSize: "13px",
-                                minHeight: "32px",
-                                display: "flex",
-                                alignItems: "center",
-                                cursor: "pointer",
-                              }}
-                              title="Click để chỉnh sửa phản hồi"
-                            >
-                              {feedback || "—"}
-                            </div>
-                          )}
+                          <textarea
+                            className="form-control form-control-sm"
+                            value={feedback || ""}
+                            onChange={(e) => {
+                              // Chỉ cho phép chỉnh sửa khi item đang pending và budget chưa bị từ chối
+                              if (!isBudgetRejected && status === "pending") {
+                                handleFeedbackChangeAutoSave(itemId, e.target.value);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // Save immediately on blur - chỉ khi item đang pending
+                              if (!isBudgetRejected && status === "pending" && e.target.value !== feedback) {
+                                const items = budget.items.map((item) => {
+                                  const id = item.itemId?.toString() || item._id?.toString() || item.itemId?._id?.toString();
+                                  const currentStatus = itemStatuses[id] || item.status || "pending";
+                                  const currentFeedback = id === itemId ? e.target.value : (itemFeedbacks[id] || item.feedback || "");
+                                  return {
+                                    itemId: item.itemId || item._id || item.itemId?._id,
+                                    status: currentStatus,
+                                    feedback: currentFeedback,
+                                  };
+                                });
+                                budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items }).catch(err => {
+                                  console.error("Error saving feedback on blur:", err);
+                                });
+                              }
+                            }}
+                            rows="2"
+                            style={{ 
+                              fontSize: "13px", 
+                              minHeight: "60px",
+                              border: isApproved ? "1px solid #10B981" : isRejected ? "1px solid #DC2626" : "1px solid #d1d5db",
+                              backgroundColor: isApproved ? "#F0FDF4" : isRejected ? "#FEF2F2" : "#f9fafb",
+                            }}
+                            disabled={isBudgetRejected || isApproved || isRejected}
+                            placeholder="Nhập phản hồi..."
+                            title={
+                              isBudgetRejected 
+                                ? "Budget đã bị từ chối, không thể chỉnh sửa" 
+                                : isApproved || isRejected
+                                ? "Item đã được duyệt/từ chối, không thể chỉnh sửa phản hồi"
+                                : "Nhập phản hồi (tự động lưu)"
+                            }
+                          />
                         </td>
                         <td style={{ padding: "12px", backgroundColor: cellBgColor }}>
                           {status === "pending" ? (
@@ -689,6 +1006,8 @@ const ViewDeptBudgetDetailHoOC = () => {
                               </button>
                             </div>
                           ) : (
+                            // Hiển thị nút "Hoàn tác" cho cả item đã duyệt và item bị từ chối
+                            // Sau khi hoàn tác, item sẽ về pending và có thể ấn lại "Duyệt" và "Từ chối"
                             <button
                               className="btn btn-outline-secondary btn-sm"
                               onClick={() => handleUndoStatus(itemId)}
@@ -726,15 +1045,7 @@ const ViewDeptBudgetDetailHoOC = () => {
         </div>
 
         {/* Bottom Action Bar */}
-        <div className="d-flex justify-content-between align-items-center mt-4">
-          <button
-            className="btn btn-link text-decoration-none p-0"
-            onClick={() => navigate(`/events/${eventId}/budgets`)}
-            style={{ color: "#6b7280" }}
-          >
-            <ArrowLeft className="me-2" size={18} />
-            Trở lại danh sách
-          </button>
+        <div className="d-flex justify-content-end align-items-center mt-4">
           <div className="d-flex gap-2">
             <button
               className="btn btn-outline-secondary"
@@ -746,11 +1057,11 @@ const ViewDeptBudgetDetailHoOC = () => {
             <button
               className="btn btn-primary"
               onClick={handleSaveDraft}
-              disabled={!hasChanges || loading}
+              disabled={loading}
               style={{ borderRadius: "8px" }}
             >
               <i className="bi bi-save me-2"></i>
-              Lưu Nháp
+              Lưu
             </button>
             <button
               className="btn btn-primary"
@@ -759,7 +1070,7 @@ const ViewDeptBudgetDetailHoOC = () => {
               style={{ borderRadius: "8px", background: "#1E40AF" }}
             >
               <i className="bi bi-check-circle me-2"></i>
-              Hoàn tất review budget
+              Gửi cho trưởng ban
             </button>
           </div>
         </div>
@@ -770,12 +1081,100 @@ const ViewDeptBudgetDetailHoOC = () => {
         show={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
         onConfirm={handleCompleteReview}
-        title="Xác nhận hoàn tất duyệt ngân sách?"
-        body="Sau khi xác nhận, bạn sẽ không thể thay đổi trạng thái hoặc phản hồi của các mục ngân sách. Hãy chắc chắn rằng bạn đã kiểm tra kỹ tất cả các mục."
-        confirmText="Xác nhận hoàn tất"
+        title="Xác nhận gửi ngân sách cho trưởng ban?"
+        body="Sau khi xác nhận, ngân sách sẽ được gửi cho trưởng ban và bạn sẽ không thể thay đổi trạng thái hoặc phản hồi của các mục ngân sách. Hãy chắc chắn rằng bạn đã kiểm tra kỹ tất cả các mục."
+        confirmText="Xác nhận gửi"
         cancelText="Hủy"
         confirmButtonStyle={{ background: "#3B82F6" }}
       />
+
+      {/* Reject Item Modal - Using Portal to render outside component tree */}
+      {showRejectModal && createPortal(
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={handleCancelReject}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              width: "500px",
+              maxWidth: "90vw",
+              padding: "24px",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div className="d-flex align-items-center gap-2">
+                <AlertCircle size={24} style={{ color: "#DC2626" }} />
+                <h5 className="mb-0 fw-bold" style={{ fontSize: "18px", color: "#111827" }}>
+                  Từ chối mục ngân sách
+                </h5>
+              </div>
+              <button
+                className="btn btn-link p-0"
+                onClick={handleCancelReject}
+                style={{ color: "#6B7280" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="mb-4">
+              <p className="mb-3" style={{ color: "#374151", fontSize: "14px" }}>
+                Bạn hãy vui lòng nhập lý do nếu từ chối
+              </p>
+              <textarea
+                className="form-control"
+                rows="4"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Nhập lý do từ chối..."
+                style={{
+                  fontSize: "14px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "8px",
+                  resize: "vertical",
+                }}
+                autoFocus
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="d-flex justify-content-end gap-2">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={handleCancelReject}
+                style={{ borderRadius: "8px", fontSize: "14px" }}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn-danger d-flex align-items-center"
+                onClick={handleConfirmReject}
+                style={{ borderRadius: "8px", fontSize: "14px" }}
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </UserLayout>
   );

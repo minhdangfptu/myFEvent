@@ -310,16 +310,11 @@ export const removeMemberFromEvent = async (req, res) => {
       return res.status(400).json({ message: 'Không thể xóa HoOC khỏi sự kiện' });
     }
 
-    // Prevent HoOC and HoD from deleting themselves
+    // Prevent ANYONE from deleting themselves (HoOC, HoD, Member)
     const requesterUserId = requesterMembership.userId?.toString() || requesterMembership.userId;
     const memberUserId = member.userId?._id?.toString() || member.userId?.toString();
     if (requesterUserId === memberUserId) {
-      if (requesterMembership.role === 'HoOC') {
-        return res.status(403).json({ message: 'Bạn không thể xóa chính mình khỏi sự kiện' });
-      }
-      if (requesterMembership.role === 'HoD') {
-        return res.status(403).json({ message: 'Bạn không thể xóa chính mình khỏi sự kiện' });
-      }
+      return res.status(403).json({ message: 'Bạn không thể xóa chính mình khỏi sự kiện' });
     }
 
     if (requesterMembership.role === 'HoD') {

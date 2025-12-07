@@ -6,14 +6,30 @@ import { getRequesterMembership } from './eventMemberService.js';
 
 // Helper: Normalize evidence array
 export const normalizeEvidenceArray = (evidence = []) => {
-  if (!Array.isArray(evidence)) return [];
+  if (!Array.isArray(evidence)) {
+    // Nếu không phải array, thử convert
+    if (evidence && typeof evidence === 'object') {
+      return [evidence].filter(ev => ev && (ev.url || ev.name)).map(ev => ({
+        type: ['image', 'pdf', 'doc', 'link'].includes(ev.type) ? ev.type : 'link',
+        url: ev.url || '',
+        name: ev.name || ev.url || 'Evidence'
+      }));
+    }
+    return [];
+  }
+  
   const allowedTypes = new Set(['image', 'pdf', 'doc', 'link']);
   return evidence
-    .filter(ev => ev && (ev.url || ev.name))
+    .filter(ev => {
+      // Chỉ filter nếu không có cả url và name
+      if (!ev) return false;
+      // Nếu có url hoặc name, giữ lại
+      return ev.url || ev.name;
+    })
     .map(ev => ({
       type: allowedTypes.has(ev.type) ? ev.type : 'link',
       url: ev.url || '',
-      name: ev.name || ''
+      name: ev.name || ev.url || 'Evidence'
     }));
 };
 
@@ -153,6 +169,23 @@ export const mergeItemWithExpense = (item, expense) => {
     };
   }
   
+  // Chỉ merge dữ liệu nếu expense đã được submit (submittedStatus === 'submitted')
+  // Nếu expense ở trạng thái draft, không hiển thị dữ liệu cho HoD
+  const submittedStatus = expense.submittedStatus || 'draft';
+  if (submittedStatus !== 'submitted') {
+    return {
+      ...item,
+      actualAmount: 0,
+      evidence: [],
+      memberNote: '',
+      isPaid: false,
+      comparison: null,
+      reportedBy: null,
+      reportedAt: null,
+      submittedStatus: submittedStatus
+    };
+  }
+  
   return {
     ...item,
     actualAmount: decimalToNumber(expense.actualAmount),
@@ -162,7 +195,7 @@ export const mergeItemWithExpense = (item, expense) => {
     comparison: expense.comparison || null,
     reportedBy: expense.reportedBy,
     reportedAt: expense.reportedAt,
-    submittedStatus: expense.submittedStatus || 'draft'
+    submittedStatus: submittedStatus
   };
 };
 
