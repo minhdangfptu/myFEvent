@@ -36,5 +36,9 @@ export const config = {
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
-    CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'myfevent'
+    CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'myfevent',
+
+    // AI Agent
+    AI_AGENT_BASE_URL: process.env.AI_AGENT_BASE_URL,
+    SELF_BASE_URL: process.env.SELF_BASE_URL,
 };

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
 import { useTranslation } from 'react-i18next';
 import { applyTheme, getSavedTheme } from '../../theme';
-import { authApi } from '../../apis/authApi';
+import { userApi } from '../../apis/userApi';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SystemSettingsPage() {
@@ -49,7 +49,7 @@ export default function SystemSettingsPage() {
     }
     try {
       setPwdLoading(true);
-      await authApi.changePassword({ currentPassword: pwdForm.currentPassword, newPassword: pwdForm.newPassword });
+      await userApi.changePassword({ currentPassword: pwdForm.currentPassword, newPassword: pwdForm.newPassword });
       setPwdSuccess('Đổi mật khẩu thành công');
       setPwdForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setIsEditingPassword(false);

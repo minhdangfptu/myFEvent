@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -82,24 +82,36 @@ export default function HoDTaskPage() {
   // Load event role and departmentId
   useEffect(() => {
     if (!eventId) return;
+    mountedRef.current = true;
     userApi
       .getUserRoleByEvent(eventId)
       .then((roleResponse) => {
-        const role = roleResponse?.role || "";
-        setEventRole(role);
-        
-        // Get departmentId from response if HoD
-        if (role === "HoD" && roleResponse?.departmentId) {
-          const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
-          if (deptId) {
-            setDepartmentId(deptId);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          const role = roleResponse?.role || "";
+          setEventRole(role);
+          
+          // Get departmentId from response if HoD
+          if (role === "HoD" && roleResponse?.departmentId) {
+            const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
+            if (deptId) {
+              setDepartmentId(deptId);
+            }
           }
         }
       })
       .catch(() => {
-        setEventRole("");
-        setDepartmentId(null);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          setEventRole("");
+          setDepartmentId(null);
+        }
       });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   const initialTasks = useMemo(() => [], []);
@@ -122,6 +134,7 @@ export default function HoDTaskPage() {
   const [editingTask, setEditingTask] = useState(null);
   const [newAssigneeId, setNewAssigneeId] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -135,30 +148,55 @@ export default function HoDTaskPage() {
   // Load department info
   useEffect(() => {
     if (!eventId || !departmentId) return;
+    mountedRef.current = true;
     departmentService
       .getDepartmentDetail(eventId, departmentId)
-      .then((dept) => setDepartment(dept || null))
-      .catch(() => setDepartment(null));
+      .then((dept) => {
+        if (mountedRef.current) {
+          setDepartment(dept || null);
+        }
+      })
+      .catch(() => {
+        if (mountedRef.current) {
+          setDepartment(null);
+        }
+      });
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, departmentId]);
 
   useEffect(() => {
     if (!eventId) return;
+    mountedRef.current = true;
     
     // Lấy thông tin sự kiện để validate deadline
     eventApi.getById(eventId)
       .then((res) => {
-        const event = res?.data?.event || res?.data;
-        if (event) {
-          setEventInfo({
-            createdAt: event.createdAt,
-            eventStartDate: event.eventStartDate,
-            eventEndDate: event.eventEndDate,
-          });
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          const event = res?.data?.event || res?.data;
+          if (event) {
+            setEventInfo({
+              createdAt: event.createdAt,
+              eventStartDate: event.eventStartDate,
+              eventEndDate: event.eventEndDate,
+            });
+          }
         }
       })
       .catch(() => {
-        setEventInfo(null);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          setEventInfo(null);
+        }
       });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   useEffect(() => {
@@ -627,21 +665,36 @@ export default function HoDTaskPage() {
     setAddTaskMode(mode);
     setEpicContext(epic);
     setAddTaskError("");
-    setAddTaskForm(() => {
+    
+    // Nếu tạo task con, cần lấy thông tin đầy đủ của epic để lấy milestoneId và departmentId
+    if (mode === "normal" && epic) {
+      const epicId = epic.id || epic._id;
+      // Tìm epic task từ tasks list hoặc parents list để lấy milestoneId và departmentId
+      const fullEpicTask = tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
+      const parentFromList = parents.find(p => String(p._id || p.id) === String(epicId));
+      const epicToUse = fullEpicTask || parentFromList || epic;
+      
+      // Lấy milestoneId từ epic task
+      const epicMilestoneId = epicToUse.milestoneId || epicToUse.milestone?._id || epicToUse.milestone;
+      // Lấy departmentId từ epic task
+      const epicDepartmentId = epicToUse.departmentId?._id || epicToUse.departmentId || epicToUse.department?._id || epicToUse.department;
+      
+      const baseDeptId = epicDepartmentId ? String(epicDepartmentId) : (departmentId || "");
+      setAddTaskForm(() => ({
+        ...createEmptyAddTaskForm(baseDeptId),
+        taskType: "normal",
+        departmentId: baseDeptId, // Tự động lấy department từ epic
+        milestoneId: epicMilestoneId ? String(epicMilestoneId) : "", // Tự động lấy milestone từ epic
+        parentId: epic?.id || epic?._id || "",
+      }));
+    } else {
       const baseDeptId = departmentId || epic?.departmentId || "";
-      const base = createEmptyAddTaskForm(baseDeptId);
-      if (mode === "normal") {
-        return {
-          ...base,
-          taskType: "normal",
-          parentId: epic?.id || "",
-        };
-      }
-      return {
-        ...base,
-        taskType: "epic",
-      };
-    });
+      setAddTaskForm(() => ({
+        ...createEmptyAddTaskForm(baseDeptId),
+        taskType: mode === "normal" ? "normal" : "epic",
+      }));
+    }
+    
     setShowAddModal(true);
   };
 
@@ -747,14 +800,21 @@ export default function HoDTaskPage() {
       setAddTaskError("Vui lòng nhập đầy đủ các trường * bắt buộc!");
       return;
     }
-    if (taskType === "normal" && !addTaskForm.parentId) {
+    if (!addTaskForm.milestoneId) {
+      setAddTaskError("Vui lòng chọn cột mốc!");
+      return;
+    }
+    // Nếu tạo task con, phải có parentId hoặc epicContext
+    if (taskType === "normal" && !addTaskForm.parentId && !epicContext) {
       setAddTaskError("Công việc phải thuộc một công việc lớn.");
       return;
     }
 
     // Validate deadline và startDate của sub task không được vượt quá deadline của epic task
-    if (taskType === "normal" && addTaskForm.parentId) {
-      const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
+    // Lấy parentId từ form hoặc epicContext
+    const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+    if (taskType === "normal" && effectiveParentId) {
+      const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId));
       if (parentTask && parentTask.dueDate) {
         const parentDeadline = new Date(parentTask.dueDate);
         
@@ -779,6 +839,9 @@ export default function HoDTaskPage() {
     const toISO = (d) => new Date(d).toISOString();
     const orUndef = (v) => (v ? v : undefined);
   
+    // Nếu có epicContext, lấy parentId từ epicContext
+    const finalParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+  
     const payload = {
       title: addTaskForm.title,
       description: orUndef(addTaskForm.description),
@@ -787,7 +850,7 @@ export default function HoDTaskPage() {
       startDate: addTaskForm.startDate ? toISO(addTaskForm.startDate) : undefined,
       dueDate: toISO(addTaskForm.dueDate),
       milestoneId: orUndef(addTaskForm.milestoneId),
-      parentId: taskType === "epic" ? undefined : orUndef(addTaskForm.parentId),
+      parentId: taskType === "epic" ? undefined : orUndef(finalParentId),
       taskType,
     };
   
@@ -1631,15 +1694,37 @@ export default function HoDTaskPage() {
                     <div className="row">
                       <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
                         <label className="form-label">Ban phụ trách *</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={department?.name || ""}
-                          disabled
-                          style={{ backgroundColor: "#F3F4F6", cursor: "not-allowed" }}
-                        />
+                        {addTaskMode === "normal" && epicContext ? (
+                          // Khi tạo task con từ epic, hiển thị department của epic (read-only)
+                          <div className="form-control" style={{ 
+                            backgroundColor: '#f8f9fa', 
+                            cursor: 'not-allowed',
+                            border: '1px solid #dee2e6',
+                            color: '#6c757d'
+                          }}>
+                            {(() => {
+                              const epicId = epicContext?.id || epicContext?._id || addTaskForm.parentId;
+                              // Tìm epic task từ parents list hoặc tasks list
+                              const epicTask = parents.find(p => String(p._id || p.id) === String(epicId)) ||
+                                             tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
+                              const departmentName = epicTask?.departmentId?.name || epicTask?.department || 
+                                                    epicContext?.department || department?.name || "Chưa xác định";
+                              return departmentName;
+                            })()}
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={department?.name || ""}
+                            disabled
+                            style={{ backgroundColor: "#F3F4F6", cursor: "not-allowed" }}
+                          />
+                        )}
                         <div className="form-text small text-muted">
-                          Ban đã được tự động cố định là {department?.name || "ban của bạn"}
+                          {addTaskMode === "normal" && epicContext 
+                            ? "Ban phụ trách đã được tự động lấy từ công việc lớn"
+                            : `Ban đã được tự động cố định là ${department?.name || "ban của bạn"}`}
                         </div>
                       </div>
                       {addTaskMode === "normal" && (
@@ -1688,10 +1773,14 @@ export default function HoDTaskPage() {
                           })()}
                           max={(() => {
                             // Nếu là sub task (normal task) và có parent, giới hạn startDate không vượt quá deadline của epic task
-                            if (addTaskMode === "normal" && addTaskForm.parentId) {
-                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
-                              if (parentTask && parentTask.dueDate) {
-                                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                            if (addTaskMode === "normal") {
+                              const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+                              if (effectiveParentId) {
+                                const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
+                                                 tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
+                                if (parentTask && parentTask.dueDate) {
+                                  return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                                }
                               }
                             }
                             return undefined;
@@ -1701,10 +1790,14 @@ export default function HoDTaskPage() {
                           <div className="form-text small text-muted">
                             Lưu ý: Thời gian bắt đầu phải sau thời điểm
                             {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
-                            {addTaskMode === "normal" && addTaskForm.parentId && (() => {
-                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
-                              if (parentTask && parentTask.dueDate) {
-                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                            {addTaskMode === "normal" && (() => {
+                              const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+                              if (effectiveParentId) {
+                                const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
+                                                 tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
+                                if (parentTask && parentTask.dueDate) {
+                                  return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                }
                               }
                               return "";
                             })()}
@@ -1746,10 +1839,14 @@ export default function HoDTaskPage() {
                           })()}
                           max={(() => {
                             // Nếu là sub task (normal task) và có parent, giới hạn deadline không vượt quá deadline của epic task
-                            if (addTaskMode === "normal" && addTaskForm.parentId) {
-                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
-                              if (parentTask && parentTask.dueDate) {
-                                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                            if (addTaskMode === "normal") {
+                              const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+                              if (effectiveParentId) {
+                                const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
+                                                 tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
+                                if (parentTask && parentTask.dueDate) {
+                                  return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                                }
                               }
                             }
                             return undefined;
@@ -1759,10 +1856,14 @@ export default function HoDTaskPage() {
                           <div className="form-text small text-muted">
                             Lưu ý: Deadline phải sau thời điểm {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
                             {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
-                            {addTaskMode === "normal" && addTaskForm.parentId && (() => {
-                              const parentTask = parents.find((p) => String(p._id || p.id) === String(addTaskForm.parentId));
-                              if (parentTask && parentTask.dueDate) {
-                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                            {addTaskMode === "normal" && (() => {
+                              const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
+                              if (effectiveParentId) {
+                                const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
+                                                 tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
+                                if (parentTask && parentTask.dueDate) {
+                                  return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                }
                               }
                               return "";
                             })()}
@@ -1772,39 +1873,72 @@ export default function HoDTaskPage() {
                     </div>
                     <div className="row">
                       <div className={`${addTaskMode === "normal" ? "col-md-6" : "col-12"} mb-3`}>
-                        <label className="form-label">Cột mốc</label>
-                        <select
-                          className="form-select"
-                          value={addTaskForm.milestoneId}
-                          onChange={(e) =>
-                            handleAddTaskInput("milestoneId", e.target.value)
-                          }
-                        >
-                          <option value="">Không liên kết</option>
-                          {milestones.map((m) => (
-                            <option value={m._id} key={m._id}>
-                              {m.name}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="form-label">Cột mốc *</label>
+                        {addTaskMode === "normal" && addTaskForm.parentId && epicContext ? (
+                          // Khi tạo task con từ epic, hiển thị milestone của epic (read-only)
+                          <div className="form-control" style={{ 
+                            backgroundColor: '#f8f9fa', 
+                            cursor: 'not-allowed',
+                            border: '1px solid #dee2e6',
+                            color: '#6c757d'
+                          }}>
+                            {(() => {
+                              const epicId = epicContext?.id || epicContext?._id || addTaskForm.parentId;
+                              // Tìm epic task từ parents list (có đầy đủ thông tin milestoneId)
+                              const epicTask = parents.find(p => String(p._id || p.id) === String(epicId)) ||
+                                             tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
+                              const epicMilestoneId = epicTask?.milestoneId || epicTask?.milestone?._id || epicTask?.milestone;
+                              const milestone = milestones.find(m => String(m._id) === String(epicMilestoneId));
+                              return milestone ? milestone.name : (addTaskForm.milestoneId ? "Đang tải..." : "Chưa có cột mốc");
+                            })()}
+                          </div>
+                        ) : (
+                          <select
+                            className="form-select"
+                            value={addTaskForm.milestoneId || ""}
+                            onChange={(e) =>
+                              handleAddTaskInput("milestoneId", e.target.value)
+                            }
+                            required
+                          >
+                            <option value="">Chọn cột mốc</option>
+                            {milestones.map((m) => (
+                              <option value={m._id} key={m._id}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                       {addTaskMode === "normal" && (
                         <div className="col-md-6 mb-3">
                           <label className="form-label">Thuộc Công việc lớn *</label>
-                          <select
-                            className="form-select"
-                            value={addTaskForm.parentId}
-                            onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
-                          >
-                            <option value="">Chọn công việc lớn</option>
-                            {filteredParents.map((p) => (
-                              <option key={p._id} value={p._id}>
-                                {p.title}
-                              </option>
-                            ))}
-                          </select>
+                          {epicContext ? (
+                            // Khi tạo task con từ epic, hiển thị tên epic (read-only)
+                            <div className="form-control" style={{ 
+                              backgroundColor: '#f8f9fa', 
+                              cursor: 'not-allowed',
+                              border: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
+                              {epicContext?.name || epicContext?.title || "Công việc lớn"}
+                            </div>
+                          ) : (
+                            <select
+                              className="form-select"
+                              value={addTaskForm.parentId}
+                              onChange={(e) => handleAddTaskInput("parentId", e.target.value)}
+                            >
+                              <option value="">Chọn công việc lớn</option>
+                              {filteredParents.map((p) => (
+                                <option key={p._id} value={p._id}>
+                                  {p.title}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <div className="form-text small text-muted">
-                            Chỉ hiển thị công việc lớn trong ban của bạn
+                            {epicContext ? "Công việc lớn đã được xác định từ epic được chọn" : "Chỉ hiển thị công việc lớn trong ban của bạn"}
                           </div>
                         </div>
                       )}

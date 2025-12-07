@@ -14,9 +14,14 @@ export const eventApi = {
       throw error;
     }
   },
-  getEventById: async (eventId) => {
+  getEventById: async (eventId, config = {}) => {
     try {
-      const response = await axiosClient.get(`/api/events/${eventId}`);
+      const axiosConfig = {
+        ...config,
+        skipGlobal404: config.skipGlobal404 || false,
+        skipGlobal403: config.skipGlobal403 || false
+      };
+      const response = await axiosClient.get(`/api/events/${eventId}`, axiosConfig);
       return response.data;
     } catch (error) {
       throw error;
@@ -57,11 +62,12 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
-  listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
+  listMyEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
     const params = new URLSearchParams();
     if (page) params.append('page', page);
     if (limit) params.append('limit', limit);
     if (search) params.append('search', search);
+    if (status) params.append('status', status);
     const res = await axiosClient.get(`/api/events/me/list?${params.toString()}`);
     return res.data;
   },
@@ -70,7 +76,7 @@ export const eventApi = {
     return res.data;
   },
   debugAuth: async () => {
-    const res = await axiosClient.get('/api/auth/profile');
+    const res = await axiosClient.get('/api/user/profile');
     return res.data;
   },
   getMembersByEvent: async (eventId) => {

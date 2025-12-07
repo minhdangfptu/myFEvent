@@ -1,3 +1,5 @@
+import { useLocation } from 'react-router-dom';
+
 /**
  * Utility function để lấy eventId từ URL
  * Hỗ trợ các pattern:

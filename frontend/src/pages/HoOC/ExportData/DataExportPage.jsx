@@ -6,6 +6,8 @@ import { getAgendaName } from "~/apis/agendaApi";
 import { feedbackApi } from "~/apis/feedbackApi";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useEvents } from "~/contexts/EventContext";
+import Loading from "~/components/Loading";
 import {
   exportItem,
   exportAllItemsZip,
@@ -136,11 +138,44 @@ export default function DataExportPage() {
   const [feedbackSubItems, setFeedbackSubItems] = useState([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(true);
   const [exportedFiles, setExportedFiles] = useState([]);
+  const [eventRole, setEventRole] = useState('');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const { fetchEventRole } = useEvents();
+
+  // Check user role - only HoOC can access this page
+  useEffect(() => {
+    const loadEventRole = async () => {
+      try {
+        const role = await fetchEventRole(eventId);
+        setEventRole(role);
+        if (role !== 'HoOC') {
+          toast.error('Bạn không có quyền truy cập trang này');
+          navigate('/home-page');
+          return;
+        }
+      } catch (error) {
+        console.error('Error loading role:', error);
+        toast.error('Không thể xác thực quyền truy cập');
+        navigate('/home-page');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (eventId) {
+      loadEventRole();
+    } else {
+      setLoading(false);
+    }
+  }, [eventId, fetchEventRole, navigate]);
 
   // Fetch agenda & feedback & exported files
   useEffect(() => {
+    // Only fetch data if user is HoOC
+    if (eventRole !== 'HoOC') return;
+
     const fetchAgendas = async () => {
       try {
         setLoadingAgendas(true);
@@ -210,7 +245,7 @@ export default function DataExportPage() {
       fetchFeedbackForms();
       fetchExportedFiles();
     }
-  }, [eventId]);
+  }, [eventId, eventRole]);
 
   const exportItems = [
     {
@@ -652,6 +687,27 @@ export default function DataExportPage() {
     return Object.keys(selectedItems).filter((key) => selectedItems[key])
       .length;
   };
+
+  // Show loading while checking role
+  if (loading) {
+    return (
+      <UserLayout
+        sidebarType="hooc"
+        title="Xuất dữ liệu báo cáo"
+        activePage="export-all"
+        eventId={eventId}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <Loading size={100} />
+        </div>
+      </UserLayout>
+    );
+  }
+
+  // Don't render content if not HoOC (will be redirected)
+  if (eventRole !== 'HoOC') {
+    return null;
+  }
 
   return (
     <UserLayout

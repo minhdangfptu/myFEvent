@@ -47,6 +47,11 @@ export const getDepartmentBudgetById = async (req, res) => {
       departmentId: new mongoose.Types.ObjectId(departmentId)
     })
       .populate({
+        path: 'departmentId',
+        select: 'name',
+        options: { strictPopulate: false }
+      })
+      .populate({
         path: 'createdBy',
         select: 'fullName email',
         options: { strictPopulate: false }
@@ -71,6 +76,11 @@ export const getDepartmentBudgetById = async (req, res) => {
     const membershipDeptId = getIdString(membership?.departmentId);
     const isHoOC = membership?.role === 'HoOC';
     const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
+
+    // HoOC không được xem draft budgets (budgets đã bị thu hồi)
+    if (isHoOC && budget.status === 'draft') {
+      return res.status(403).json({ message: 'Budget đã bị thu hồi và không thể xem' });
+    }
 
     // Check if user can view this budget
     if (!isHoOC && !isSameDepartment && !budget.isPublic) {
@@ -120,6 +130,11 @@ export const getDepartmentBudget = async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
+        .populate({
           path: 'createdBy',
           select: 'fullName email',
           options: { strictPopulate: false }
@@ -147,6 +162,11 @@ export const getDepartmentBudget = async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
+        .populate({
           path: 'createdBy',
           select: 'fullName email',
           options: { strictPopulate: false }
@@ -171,6 +191,11 @@ export const getDepartmentBudget = async (req, res) => {
         departmentId: new mongoose.Types.ObjectId(departmentId)
       })
         .sort({ createdAt: -1 }) // Get the latest budget
+        .populate({
+          path: 'departmentId',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
         .populate({
           path: 'createdBy',
           select: 'fullName email',
@@ -197,6 +222,11 @@ export const getDepartmentBudget = async (req, res) => {
     const membershipDeptId = getIdString(membership?.departmentId);
     const isHoOC = membership?.role === 'HoOC';
     const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
+
+    // HoOC không được xem draft budgets (budgets đã bị thu hồi)
+    if (isHoOC && budget.status === 'draft') {
+      return res.status(403).json({ message: 'Budget đã bị thu hồi và không thể xem' });
+    }
 
     // Check if user can view this budget
     if (!isHoOC && !isSameDepartment && !budget.isPublic) {
@@ -401,6 +431,37 @@ export const updateDepartmentBudget = async (req, res) => {
       budget.status = 'draft';
     }
 
+    // Helper function để convert sang Decimal128
+    const toDecimal128 = (value, defaultValue = '0') => {
+      if (value === null || value === undefined) {
+        return mongoose.Types.Decimal128.fromString(defaultValue);
+      }
+      if (typeof value === 'number') {
+        return mongoose.Types.Decimal128.fromString(String(value));
+      }
+      if (typeof value === 'string') {
+        if (!value || value.trim() === '') {
+          return mongoose.Types.Decimal128.fromString(defaultValue);
+        }
+        return mongoose.Types.Decimal128.fromString(value);
+      }
+      // Nếu đã là Decimal128, giữ nguyên
+      if (value && typeof value.toString === 'function') {
+        try {
+          if (value.constructor && (value.constructor.name === 'Decimal128' || value instanceof mongoose.Types.Decimal128)) {
+            return value;
+          }
+          const str = value.toString();
+          if (str && !isNaN(parseFloat(str))) {
+            return mongoose.Types.Decimal128.fromString(str);
+          }
+        } catch (e) {
+          // Ignore và fallback
+        }
+      }
+      return mongoose.Types.Decimal128.fromString(defaultValue);
+    };
+
     // Update items if provided
     if (items && Array.isArray(items)) {
       const formattedItems = items.map(item => {
@@ -419,18 +480,37 @@ export const updateDepartmentBudget = async (req, res) => {
           itemStatus = 'pending';
         }
         
+        // Xử lý evidence - đảm bảo lấy từ item mới hoặc giữ lại từ oldItem
+        const evidenceInput = item.evidence !== undefined ? item.evidence : (oldItem?.evidence || []);
+        const normalizedEvidence = normalizeEvidenceArray(evidenceInput);
+        
+        // Log để debug (chỉ trong development)
+        if (process.env.NODE_ENV === 'development' && evidenceInput && evidenceInput.length > 0) {
+          console.log('Evidence processing:', {
+            itemId: item.itemId,
+            inputEvidence: evidenceInput,
+            normalizedEvidence: normalizedEvidence,
+            inputLength: evidenceInput.length,
+            normalizedLength: normalizedEvidence.length
+          });
+        }
+        
+        const qty = parseFloat(item.qty) || 1;
+        const unitCost = parseFloat(item.unitCost) || 0;
+        const total = item.total ? parseFloat(item.total) : (qty * unitCost);
+        
         return {
           itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
           category: item.category || 'general',
           name: item.name,
           unit: item.unit?.trim() || 'cái',
-          qty: parseFloat(item.qty) || 1,
-          unitCost: parseFloat(item.unitCost) || 0,
-          total: parseFloat(item.total) || (parseFloat(item.qty) || 1) * (parseFloat(item.unitCost) || 0),
+          qty: toDecimal128(qty, '1'),
+          unitCost: toDecimal128(unitCost, '0'),
+          total: toDecimal128(total, '0'),
           note: item.note || '',
           feedback: item.feedback || oldItem?.feedback || '', // Giữ lại feedback cũ nếu không có feedback mới
           status: itemStatus, // Đảm bảo status hợp lệ
-          evidence: normalizeEvidenceArray(item.evidence || oldItem?.evidence || [])
+          evidence: normalizedEvidence
         };
       });
       budget.items = formattedItems;
@@ -909,6 +989,31 @@ export const saveReviewDraft = async (req, res) => {
       });
 
       budget.items = updatedItems;
+      
+      // Determine overall budget status based on items
+      // Nếu có ít nhất 1 item bị rejected → budget bị từ chối (changes_requested)
+      // Nếu tất cả items đều approved → budget được duyệt (approved)
+      // Nếu có items pending → giữ nguyên submitted (chưa duyệt hết)
+      const hasRejected = budget.items.some(item => item.status === 'rejected');
+      const allApproved = budget.items.every(item => item.status === 'approved');
+      const hasPending = budget.items.some(item => item.status === 'pending');
+      
+      // Update budget status based on items
+      // Priority: rejected > all approved > pending
+      if (hasRejected) {
+        // Có item bị từ chối → budget bị từ chối (luôn cập nhật, kể cả nếu đã approved trước đó)
+        budget.status = 'changes_requested';
+      } else if (allApproved) {
+        // Tất cả items đều được duyệt → budget được duyệt
+        budget.status = 'approved';
+      } else if (hasPending) {
+        // Còn items pending → set về submitted để HoOC tiếp tục duyệt
+        // Chỉ set về submitted nếu budget đang ở trạng thái có thể review
+        if (budget.status === 'submitted' || budget.status === 'changes_requested' || budget.status === 'draft') {
+          budget.status = 'submitted';
+        }
+        // Nếu đã approved và có pending items, giữ nguyên approved (không downgrade)
+      }
     }
 
     await budget.save();
@@ -953,10 +1058,40 @@ export const completeReview = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    if (budget.status !== 'submitted') {
-      return res.status(400).json({ message: 'Only submitted budgets can be reviewed' });
+    // Allow review for submitted budgets or changes_requested budgets (if resubmitted)
+    // Note: changes_requested budgets can be reviewed again if HoD has made changes and resubmitted
+    if (budget.status !== 'submitted' && budget.status !== 'changes_requested') {
+      console.log('completeReview: Invalid budget status', {
+        budgetId: budget._id,
+        currentStatus: budget.status,
+        allowedStatuses: ['submitted', 'changes_requested']
+      });
+      return res.status(400).json({ 
+        message: `Only submitted or changes_requested budgets can be reviewed. Current status: ${budget.status}` 
+      });
     }
 
+    // Validate items array
+    if (!items || !Array.isArray(items)) {
+      console.log('completeReview: Invalid items format', {
+        budgetId: budget._id,
+        itemsType: typeof items,
+        isArray: Array.isArray(items)
+      });
+      return res.status(400).json({ 
+        message: 'Items must be an array' 
+      });
+    }
+
+    // Log for debugging
+    console.log('completeReview: Processing review', {
+      budgetId: budget._id,
+      status: budget.status,
+      itemsCount: items.length,
+      budgetItemsCount: budget.items?.length
+    });
+
+    // Update items with review status and feedback
     if (items && Array.isArray(items)) {
       const updatedItems = budget.items.map(budgetItem => {
         const reviewItem = items.find(item => {
@@ -1161,7 +1296,7 @@ export const getAllBudgetsForEvent = async (req, res) => {
     const isHoOC = membership?.role === 'HoOC';
     const membershipDeptId = getIdString(membership?.departmentId);
 
-    // Build filter - HoOC xem tất cả budgets của tất cả departments (không filter draft)
+    // Build filter - HoOC xem tất cả budgets của tất cả departments (KHÔNG bao gồm draft - budgets đã bị thu hồi)
     const filter = {
       eventId: new mongoose.Types.ObjectId(eventId)
     };
@@ -1181,6 +1316,10 @@ export const getAllBudgetsForEvent = async (req, res) => {
       filter.status = 'sent_to_members';
     } else if (status) {
       filter.status = status;
+    } else if (isHoOC) {
+      // HoOC không được xem draft budgets (budgets đã bị thu hồi)
+      // Nếu không có status filter, loại bỏ draft
+      filter.status = { $ne: 'draft' };
     }
 
     // Tối ưu: Chỉ load những trường cần thiết cho danh sách, không load chi tiết items
@@ -1469,22 +1608,44 @@ export const getBudgetStatistics = async (req, res) => {
       filter.departmentId = new mongoose.Types.ObjectId(effectiveDepartmentId);
     }
 
-    // Chỉ lấy budgets đã nộp (không lấy draft)
+    // Lấy tất cả budgets (không lấy draft) để đếm số lượng
+    // Nhưng chỉ tính tiền cho budgets đã được duyệt (approved, sent_to_members, locked)
     filter.status = { $in: ['submitted', 'approved', 'changes_requested', 'sent_to_members', 'locked'] };
     
-    const budgets = await EventBudgetPlan.find(filter)
+    const allBudgets = await EventBudgetPlan.find(filter)
       .populate('departmentId', 'name')
       .lean();
 
-    const expensesByBudget = await fetchExpensesForBudgets(budgets.map(b => b._id));
+    // Đếm số lượng budgets theo từng trạng thái
+    const budgetCounts = {
+      submitted: 0,
+      approved: 0,
+      changes_requested: 0,
+      sent_to_members: 0,
+      locked: 0,
+      total: allBudgets.length
+    };
+    
+    allBudgets.forEach(budget => {
+      const status = budget.status || 'draft';
+      if (budgetCounts.hasOwnProperty(status)) {
+        budgetCounts[status]++;
+      }
+    });
 
-    // Tính toán thống kê
+    // Chỉ lấy budgets đã được duyệt để tính tiền
+    const approvedBudgets = allBudgets.filter(b => 
+      ['approved', 'sent_to_members', 'locked'].includes(b.status)
+    );
+
+    const expensesByBudget = await fetchExpensesForBudgets(approvedBudgets.map(b => b._id));
+
+    // Tính toán thống kê - chỉ tính tiền cho budgets đã được duyệt
     let totalEstimated = 0;
     let totalActual = 0;
-    let totalPaid = 0;
     const departmentStats = [];
 
-    for (const budget of budgets) {
+    for (const budget of approvedBudgets) {
       const deptEstimated = budget.items?.reduce(
         (sum, item) => sum + (parseFloat(item.total?.toString() || 0)),
         0
@@ -1497,33 +1658,101 @@ export const getBudgetStatistics = async (req, res) => {
         0
       );
 
-      const deptPaid = expenseValues.reduce(
-        (sum, expense) => expense.isPaid ? sum + decimalToNumber(expense.actualAmount) : sum,
-        0
-      );
-
       totalEstimated += deptEstimated;
       totalActual += deptActual;
-      totalPaid += deptPaid;
 
       departmentStats.push({
         departmentId: budget.departmentId?._id || budget.departmentId,
         departmentName: budget.departmentId?.name || 'Unknown',
         estimated: deptEstimated,
         actual: deptActual,
-        paid: deptPaid,
         difference: deptActual - deptEstimated,
         status: budget.status
       });
     }
 
+    // Thêm thống kê cho tất cả departments (kể cả chưa duyệt/từ chối) để hiển thị số lượng
+    const allDepartmentStats = [];
+    const deptMap = new Map();
+    
+    // Nhóm budgets theo department
+    allBudgets.forEach(budget => {
+      const deptId = budget.departmentId?._id?.toString() || budget.departmentId?.toString() || budget.departmentId;
+      const deptName = budget.departmentId?.name || 'Unknown';
+      
+      if (!deptMap.has(deptId)) {
+        deptMap.set(deptId, {
+          departmentId: budget.departmentId?._id || budget.departmentId,
+          departmentName: deptName,
+          budgets: [],
+          approvedCount: 0,
+          submittedCount: 0,
+          rejectedCount: 0
+        });
+      }
+      
+      const deptStat = deptMap.get(deptId);
+      deptStat.budgets.push(budget);
+      
+      if (['approved', 'sent_to_members', 'locked'].includes(budget.status)) {
+        deptStat.approvedCount++;
+      } else if (budget.status === 'submitted') {
+        deptStat.submittedCount++;
+      } else if (budget.status === 'changes_requested') {
+        deptStat.rejectedCount++;
+      }
+    });
+
+    // Tính tiền cho từng department (chỉ từ budgets đã duyệt)
+    const approvedDeptMap = new Map();
+    approvedBudgets.forEach(budget => {
+      const deptId = budget.departmentId?._id?.toString() || budget.departmentId?.toString() || budget.departmentId;
+      if (!approvedDeptMap.has(deptId)) {
+        approvedDeptMap.set(deptId, {
+          estimated: 0,
+          actual: 0
+        });
+      }
+      
+      const deptStat = approvedDeptMap.get(deptId);
+      const deptEstimated = budget.items?.reduce(
+        (sum, item) => sum + (parseFloat(item.total?.toString() || 0)),
+        0
+      ) || 0;
+      const planExpenses = expensesByBudget.get(budget._id.toString()) || new Map();
+      const expenseValues = Array.from(planExpenses.values());
+      const deptActual = expenseValues.reduce(
+        (sum, expense) => sum + decimalToNumber(expense.actualAmount),
+        0
+      );
+      
+      deptStat.estimated += deptEstimated;
+      deptStat.actual += deptActual;
+    });
+
+    // Tạo departmentStats với đầy đủ thông tin
+    deptMap.forEach((deptStat, deptId) => {
+      const approvedData = approvedDeptMap.get(deptId) || { estimated: 0, actual: 0 };
+      allDepartmentStats.push({
+        departmentId: deptStat.departmentId,
+        departmentName: deptStat.departmentName,
+        estimated: approvedData.estimated,
+        actual: approvedData.actual,
+        difference: approvedData.actual - approvedData.estimated,
+        approvedCount: deptStat.approvedCount,
+        submittedCount: deptStat.submittedCount,
+        rejectedCount: deptStat.rejectedCount,
+        totalCount: deptStat.budgets.length
+      });
+    });
+
     return res.status(200).json({
       data: {
         totalEstimated,
         totalActual,
-        totalPaid,
         totalDifference: totalActual - totalEstimated,
-        departmentStats
+        budgetCounts,
+        departmentStats: allDepartmentStats
       }
     });
   } catch (error) {

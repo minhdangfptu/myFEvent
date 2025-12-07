@@ -5,6 +5,7 @@ import ConfirmModal from "~/components/ConfirmModal"
 import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
+import { taskApi } from "../../apis/taskApi"
 import { useEvents } from "../../contexts/EventContext"
 import { CalendarX2 } from "lucide-react"
 import Loading from "~/components/Loading"
@@ -424,19 +425,39 @@ const Milestone = () => {
   const fetchMilestones = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true)
-      const response = await milestoneApi.listMilestonesByEvent(eventId)
-      const sorted = [...(response.data || [])].sort((a, b) => {
+      const [milestoneResponse, tasksResponse] = await Promise.all([
+        milestoneApi.listMilestonesByEvent(eventId),
+        taskApi.getTaskByEvent(eventId)
+      ])
+      
+      const milestones = milestoneResponse.data || []
+      const tasks = tasksResponse?.data || []
+      
+      // Count tasks per milestone
+      const taskCountMap = {}
+      tasks.forEach(task => {
+        const milestoneId = task.milestoneId?._id || task.milestoneId
+        if (milestoneId) {
+          const milestoneIdStr = String(milestoneId)
+          taskCountMap[milestoneIdStr] = (taskCountMap[milestoneIdStr] || 0) + 1
+        }
+      })
+      
+      const sorted = [...milestones].sort((a, b) => {
         const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000)
         const db = parseAnyDate(b?.targetDate) || new Date(8640000000000000)
         return da.getTime() - db.getTime()
       })
-      const mappedMilestones = sorted.map((ms, index) => ({
-        id: ms._id || ms.id,
-        name: ms.name,
-        date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
-        description: ms.description || "",
-        relatedTasks: ms.tasksCount || 0,
-      }))
+      const mappedMilestones = sorted.map((ms, index) => {
+        const milestoneIdStr = String(ms._id || ms.id)
+        return {
+          id: ms._id || ms.id,
+          name: ms.name,
+          date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
+          description: ms.description || "",
+          relatedTasks: taskCountMap[milestoneIdStr] || 0,
+        }
+      })
       setMilestones(mappedMilestones)
       if (mappedMilestones.length > 0 && !selectedMilestone) {
         setSelectedMilestone(mappedMilestones[0])
@@ -493,7 +514,15 @@ const Milestone = () => {
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
-      setError(err.response?.data?.message || "Tạo cột mốc thất bại")
+      const errorMessage = err.response?.data?.message || "Tạo cột mốc thất bại"
+      setError(errorMessage)
+      
+      // Show toast for duplicate error
+      if (err.response?.status === 409) {
+        toast.error(errorMessage)
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 

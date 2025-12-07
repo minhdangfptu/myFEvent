@@ -1,9 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import { departmentApi } from "../../apis/departmentApi";
 import { useLocation } from "react-router-dom";
 import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl";
 import ConfirmModal from "../../components/ConfirmModal";
 import { toast, ToastContainer } from "react-toastify";
@@ -137,6 +138,7 @@ export default function ManageMemberPage() {
 
   const location = useLocation();
   const { events: myEvents, fetchEventRole } = useEvents();
+  const { user } = useAuth();
 
   const prefetchedEvent = location.state?.event || null;
   const prefetchedMembersByDepartment =
@@ -360,10 +362,23 @@ export default function ManageMemberPage() {
 
   const canManageMember = (member) => {
     if (member.role === "HoOC") return false;
+    
+    // Prevent ANYONE from managing themselves (HoOC, HoD, Member)
+    const currentUserId = user?._id || user?.id || null;
+    const memberUserId = member.userId?._id || member.userId?.id || member.userId || null;
+    const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+    if (isViewingSelf) {
+      return false; // No one can manage/remove themselves
+    }
+    
     if (eventRole === "HoOC") return true;
     if (eventRole === "HoD") {
       if (!userDepartmentId) return false;
-      return member.departmentId === userDepartmentId;
+      // Normalize IDs for comparison
+      const normalizedUserDeptId = String(userDepartmentId);
+      const normalizedMemberDeptId = member.departmentId ? String(member.departmentId) : null;
+      // HoD can only manage members in their own department
+      return normalizedMemberDeptId === normalizedUserDeptId;
     }
     return false;
   };
@@ -739,7 +754,63 @@ export default function ManageMemberPage() {
               <nav>
                 <ul className="pagination pagination-sm mb-0">
                   {/* Prev */}
-                  
+                  <li className={`page-item ${pagination.page <= 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => {
+                        if (pagination.page > 1) {
+                          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                        }
+                      }}
+                      disabled={pagination.page <= 1}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                  </li>
+                  {/* Page numbers */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first page, last page, current page, and pages around current
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - pagination.page) <= 1) return true;
+                      return false;
+                    })
+                    .map((page, idx, arr) => {
+                      // Add ellipsis if needed
+                      const prevPage = arr[idx - 1];
+                      const showEllipsis = prevPage && page - prevPage > 1;
+                      return (
+                        <React.Fragment key={page}>
+                          {showEllipsis && (
+                            <li className="page-item disabled">
+                              <span className="page-link">...</span>
+                            </li>
+                          )}
+                          <li className={`page-item ${pagination.page === page ? 'active' : ''}`}>
+                            <button
+                              className="page-link"
+                              onClick={() => setPagination(prev => ({ ...prev, page }))}
+                            >
+                              {page}
+                            </button>
+                          </li>
+                        </React.Fragment>
+                      );
+                    })}
+                  {/* Next */}
+                  <li className={`page-item ${pagination.page >= totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => {
+                        if (pagination.page < totalPages) {
+                          setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                        }
+                      }}
+                      disabled={pagination.page >= totalPages}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </li>
                 </ul>
               </nav>
             </div>

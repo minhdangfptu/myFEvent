@@ -81,7 +81,7 @@ describe('riskController.updateOccurredRisk', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('[Abnormal] TC02 - should return 404 when service says not found', async () => {
+  it('[Abnormal] TC02 - should return 404 when occurred risk not found', async () => {
     const { validationResult } = await import('express-validator');
     const RiskService = await import('../../../services/riskService.js');
     const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
@@ -112,5 +112,69 @@ describe('riskController.updateOccurredRisk', () => {
     await riskController.updateOccurredRisk(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('[Abnormal] TC03 - should return 400 when validation fails', async () => {
+    const { validationResult } = await import('express-validator');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+    const RiskService = await import('../../../services/riskService.js');
+
+    const mockErrors = [{ msg: 'Invalid occurredRiskId', param: 'occurredRiskId' }];
+    validationResult.mockReturnValue({
+      isEmpty: () => false,
+      array: () => mockErrors,
+    });
+
+    const req = {
+      params: { eventId: 'event1', riskId: 'r1', occurredRiskId: 'invalid' },
+      user: { id: 'user1' },
+      body: { note: 'update' },
+    };
+    const res = mockRes();
+
+    await riskController.updateOccurredRisk(req, res);
+
+    expect(ensureEventRole).not.toHaveBeenCalled();
+    expect(RiskService.getRiskById).not.toHaveBeenCalled();
+    expect(RiskService.updateOccurredRisk).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Validation failed',
+      errors: mockErrors,
+    });
+  });
+
+  it('[Abnormal] TC04 - should return 404 when risk not found', async () => {
+    const { validationResult } = await import('express-validator');
+    const RiskService = await import('../../../services/riskService.js');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+
+    validationResult.mockReturnValue({
+      isEmpty: () => true,
+      array: () => [],
+    });
+    ensureEventRole.mockResolvedValue({ _id: 'mem1', role: 'HoOC' });
+
+    RiskService.getRiskById.mockResolvedValue({
+      success: false,
+      message: 'Risk not found',
+    });
+
+    const req = {
+      params: { eventId: 'event1', riskId: 'r1', occurredRiskId: 'occ1' },
+      user: { id: 'user1' },
+      body: { note: 'update' },
+    };
+    const res = mockRes();
+
+    await riskController.updateOccurredRisk(req, res);
+
+    expect(RiskService.updateOccurredRisk).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Risk not found',
+    });
   });
 });

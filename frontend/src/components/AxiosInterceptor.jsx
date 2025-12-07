@@ -50,9 +50,11 @@ const AxiosInterceptor = ({ children }) => {
               }
               break;
             case 404:
-              // Don't redirect to 404 page for auth endpoints (let component handle it)
+              // Don't redirect to 404 page for auth endpoints or join event endpoint (let component handle it)
               const isAuthEndpoint = error.config?.url?.includes('/auth/');
-              if (!isAuthEndpoint) {
+              const isJoinEventEndpoint = error.config?.url?.includes('/events/join');
+              const skip404Redirect = error.config?.skipGlobal404;
+              if (!isAuthEndpoint && !isJoinEventEndpoint && !skip404Redirect) {
                 navigate("/404");
               }
               break;

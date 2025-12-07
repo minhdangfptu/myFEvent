@@ -98,4 +98,62 @@ describe('riskController.removeOccurredRisk', () => {
     expect(RiskService.removeOccurredRisk).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(404);
   });
+
+  it('[Abnormal] TC03 - should return 400 when validation fails', async () => {
+    const { validationResult } = await import('express-validator');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+    const RiskService = await import('../../../services/riskService.js');
+
+    const mockErrors = [{ msg: 'riskId is required', param: 'riskId' }];
+    validationResult.mockReturnValue({
+      isEmpty: () => false,
+      array: () => mockErrors,
+    });
+
+    const req = {
+      params: { eventId: 'event1', occurredRiskId: 'occ1' },
+      user: { id: 'user1' },
+    };
+    const res = mockRes();
+
+    await riskController.removeOccurredRisk(req, res);
+
+    expect(ensureEventRole).not.toHaveBeenCalled();
+    expect(RiskService.getRiskById).not.toHaveBeenCalled();
+    expect(RiskService.removeOccurredRisk).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Validation failed',
+      errors: mockErrors,
+    });
+  });
+
+  it('[Abnormal] TC04 - should return 403 when not HoOC or HoD', async () => {
+    const { validationResult } = await import('express-validator');
+    const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;
+    const RiskService = await import('../../../services/riskService.js');
+
+    validationResult.mockReturnValue({
+      isEmpty: () => true,
+      array: () => [],
+    });
+    ensureEventRole.mockResolvedValue(null);
+
+    const req = {
+      params: { eventId: 'event1', riskId: 'r1', occurredRiskId: 'occ1' },
+      user: { id: 'user1' },
+    };
+    const res = mockRes();
+
+    await riskController.removeOccurredRisk(req, res);
+
+    expect(RiskService.getRiskById).not.toHaveBeenCalled();
+    expect(RiskService.removeOccurredRisk).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Chỉ HoOC hoặc HoD được xóa occurred risk',
+    });
+  });
 });

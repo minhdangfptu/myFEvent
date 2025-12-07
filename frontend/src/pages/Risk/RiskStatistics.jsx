@@ -222,6 +222,21 @@ export default function RiskStatisticsPage() {
               const startAngle = currentAngle;
               const endAngle = currentAngle + angle;
 
+              // Special case: when there's only one item, draw a full circle
+              if (data.length === 1) {
+                return (
+                  <circle
+                    key={index}
+                    cx="200"
+                    cy="200"
+                    r="100"
+                    fill={colors[index % colors.length]}
+                    stroke="#fff"
+                    strokeWidth="3"
+                  />
+                );
+              }
+
               const x1 =
                 200 + 100 * Math.cos(((startAngle - 90) * Math.PI) / 180);
               const y1 =
@@ -550,17 +565,26 @@ export default function RiskStatisticsPage() {
                   </div>
                 ) : (
                   <div className="bar-chart-container">
-                    {(statisticsData?.riskFrequency || [])
-                      .sort((a, b) => b.value - a.value) // Sort by value descending
-                      .slice(0, 5) // Take only top 5 items
-                      .map((item, idx) => {
+                    {(() => {
+                      const chartData = (statisticsData?.riskFrequency || [])
+                        .sort((a, b) => b.value - a.value) // Sort by value descending
+                        .slice(0, 5); // Take only top 5 items
+                      const dataCount = chartData.length;
+                      
+                      return chartData.map((item, idx) => {
                         const maxValue = Math.max(
                           ...(statisticsData?.riskFrequency || []).map(
                             (i) => i.value
                           )
                         );
-                        const percentage =
+                        let percentage =
                           maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                        
+                        // Limit bar width when there's only one data point
+                        if (dataCount === 1 && percentage > 80) {
+                          percentage = 80;
+                        }
+                        
                         const totalRisks = (
                           statisticsData?.riskFrequency || []
                         ).reduce((sum, r) => sum + r.value, 0);
@@ -598,7 +622,8 @@ export default function RiskStatisticsPage() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                     {(statisticsData?.riskFrequency || []).length > 5 && (
                       <div className="bar-chart-more">
                         <small
@@ -635,17 +660,26 @@ export default function RiskStatisticsPage() {
                   </div>
                 ) : (
                   <div className="bar-chart-container">
-                    {(statisticsData?.riskByDepartment || [])
-                      .sort((a, b) => b.value - a.value) // Sort by value descending
-                      .slice(0, 5) // Take only top 5 items
-                      .map((item, idx) => {
+                    {(() => {
+                      const chartData = (statisticsData?.riskByDepartment || [])
+                        .sort((a, b) => b.value - a.value) // Sort by value descending
+                        .slice(0, 5); // Take only top 5 items
+                      const dataCount = chartData.length;
+                      
+                      return chartData.map((item, idx) => {
                         const maxValue = Math.max(
                           ...(statisticsData?.riskByDepartment || []).map(
                             (i) => i.value
                           )
                         );
-                        const percentage =
+                        let percentage =
                           maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                        
+                        // Limit bar width when there's only one data point
+                        if (dataCount === 1 && percentage > 80) {
+                          percentage = 80;
+                        }
+                        
                         const totalIncidents = (
                           statisticsData?.riskByDepartment || []
                         ).reduce((sum, d) => sum + d.value, 0);
@@ -684,7 +718,8 @@ export default function RiskStatisticsPage() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                     {(statisticsData?.riskByDepartment || []).length > 5 && (
                       <div className="bar-chart-more">
                         <small

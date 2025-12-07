@@ -4,6 +4,7 @@ import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import { eventService } from '~/services/eventService';
 import { departmentService } from '~/services/departmentService';
@@ -38,6 +39,7 @@ export default function MemberProfilePage() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [userDepartmentId, setUserDepartmentId] = useState(null);
   const { fetchEventRole, getEventMember } = useEvents();
+  const { user } = useAuth();
 
   // Get member data from navigation state if available
   const memberFromState = location.state?.member;
@@ -333,23 +335,48 @@ export default function MemberProfilePage() {
   // Get member's department ID
   const memberDepartmentId = resolveMemberDepartmentId(member);
 
+  // Get current user ID and member user ID for comparison
+  const currentUserId = user?._id || user?.id || null;
+  const memberUserId = member?.userId?._id || member?.userId?.id || member?.userId || null;
+  const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+
   // Check if current user can manage this member
-  // HoOC can always manage
+  // HoOC can manage others, but NOT themselves
   // HoD can manage if:
-  //   - Member has no department yet, OR
-  //   - Member's department matches the HoD's department
+  //   - Member's department matches the HoD's department (HoD can only manage members in their own department)
   const canManage = (() => {
+    // Prevent self-management for HoOC (cannot change own role or delete self)
+    if (eventRole === 'HoOC' && isViewingSelf && memberRole === 'HoOC') {
+      return false;
+    }
+    // Prevent self-management for HoD (cannot change own department or delete self)
+    if (eventRole === 'HoD' && isViewingSelf && memberRole === 'HoD') {
+      return false;
+    }
     if (eventRole === 'HoOC') return true;
     if (eventRole === 'HoD') {
-      // If member has no department, HoD can manage
-      if (!memberDepartmentId) return true;
-      // If member has a department, only the HoD of that department can manage
-      return userDepartmentId === memberDepartmentId;
+      // HoD can only manage members in their own department
+      if (!userDepartmentId) return false;
+      // Normalize IDs for comparison
+      const normalizedUserDeptId = String(userDepartmentId);
+      const normalizedMemberDeptId = memberDepartmentId ? String(memberDepartmentId) : null;
+      // Only allow if member is in HoD's department
+      return normalizedMemberDeptId === normalizedUserDeptId;
     }
     return false;
   })();
 
-  const canChangeDepartment = canManage && memberRole !== 'HoOC';
+  // HoD can only change department for members in their own department
+  // HoOC cannot change department for themselves
+  // HoD cannot change department for themselves
+  const canChangeDepartment = canManage && memberRole !== 'HoOC' && !(isViewingSelf && eventRole === 'HoD');
+  
+  // HoOC can change role for others, but NOT for themselves
+  const canChangeRole = canManage && eventRole === 'HoOC' && !(isViewingSelf && memberRole === 'HoOC');
+  
+  // HoOC can remove others, but NOT themselves
+  // HoD can remove others in their department, but NOT themselves
+  const canRemoveMember = canManage && !(isViewingSelf && (memberRole === 'HoOC' || memberRole === 'HoD'));
   const shouldShowDepartmentInfo = memberRole !== 'HoOC';
   const roleOptions = [
     { value: 'HoD', label: 'Trưởng ban', description: 'Điều phối kế hoạch và nhiệm vụ trong ban' },
@@ -676,9 +703,81 @@ export default function MemberProfilePage() {
               </div>
             )}
 
-            {/* Tags */}
-            
+            {/* Ban đã tham gia - Show current department in this event */}
+            {shouldShowDepartmentInfo && memberDepartment && memberDepartment !== 'Chưa có ban' && (
+              <div className="profile-card">
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Tag className="me-2 text-danger" size={20} />
+                  Ban đã tham gia
+                </h5>
+                <div className="d-flex flex-wrap gap-2">
+                  <span className="badge bg-light text-dark px-3 py-2">
+                    {memberDepartment}
+                  </span>
+                </div>
+              </div>
+            )}
 
+            {/* Thông tin khác */}
+            <div className="profile-card">
+              <h5 className="fw-bold mb-3 d-flex align-items-center">
+                <Info className="me-2 text-danger" size={20} />
+                Thông tin khác
+              </h5>
+              
+              <div className="d-flex justify-content-between mb-2">
+                <span className="text-muted">Xác thực tài khoản</span>
+                <span className={`badge ${memberVerified ? 'bg-success' : 'bg-secondary'}`}>
+                  {memberVerified ? '✓ Đã xác thực' : '⏳ Chưa xác thực'}
+                </span>
+              </div>
+              
+              <div className="d-flex justify-content-between">
+                <span className="text-muted">Ngày tham gia</span>
+                <span className="fw-semibold text-success">{formatDate(memberJoinedAt)}</span>
+              </div>
+            </div>
+
+            {/* Actions (Only for HoOC/HoD) */}
+            {canManage && (
+              <div className="profile-card">
+                <h5 className="fw-bold mb-3 d-flex align-items-center">
+                  <Settings className="me-2 text-danger" size={20} />
+                  Hành động
+                </h5>
+                <div className="d-grid gap-2">
+                  {canChangeDepartment && (
+                    <button 
+                      className="action-btn action-btn-secondary"
+                      onClick={handleOpenDepartmentModal}
+                    >
+                      <ArrowLeftRight size={16} />
+                      Chuyển ban
+                    </button>
+                  )}
+                  
+                  {canChangeRole && (
+                    <button 
+                      className="action-btn action-btn-secondary"
+                      onClick={handleOpenRoleModal}
+                    >
+                      <Shield size={16} />
+                      Thay đổi vai trò
+                    </button>
+                  )}
+                  
+                  {canRemoveMember && (
+                    <button 
+                      className="action-btn action-btn-danger"
+                      onClick={handleRemoveMember}
+                    >
+                      <Trash size={18} />
+                      Xóa khỏi sự kiện
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

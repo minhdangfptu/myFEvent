@@ -1195,7 +1195,7 @@ const MemberExpensePage = () => {
                               <td style={{ padding: "12px" }}>
                                     {actualAmount > 0 ? (
                                   <span className="fw-semibold d-flex align-items-center gap-1" style={{
-                                    color: actualAmount > estimatedTotal ? "#10B981" : actualAmount < estimatedTotal ? "#EF4444" : "#111827"
+                                    color: actualAmount > estimatedTotal ? "#EF4444" : actualAmount < estimatedTotal ? "#10B981" : "#10B981"
                                   }}>
                                         {actualAmount > estimatedTotal && (
                                           <ArrowUpCircle size={18} />

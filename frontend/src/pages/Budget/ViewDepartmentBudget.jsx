@@ -253,6 +253,9 @@ const ViewDepartmentBudget = () => {
             navigate(`/events/${eventId}/budgets/member`);
             return;
           }
+          
+          // Set activeTable to "member" for members
+          setActiveTable("member");
         }
       }
       
@@ -518,6 +521,8 @@ const ViewDepartmentBudget = () => {
 
   const handleAddEvidenceLink = () => {
     setLinkInput("");
+    // Mở modal "Thêm link bằng chứng" với z-index cao hơn modal "Thêm/Sửa Bằng Chứng"
+    // Không đóng modal bằng chứng để người dùng có thể quay lại sau khi thêm link
     setShowLinkModal(true);
   };
 
@@ -773,25 +778,25 @@ const ViewDepartmentBudget = () => {
     }
     
     if (actual < estimated) {
-      // Thực tế < dự trù: màu đỏ + mũi tên xuống
+      // Thực tế < dự trù: màu xanh lá + mũi tên xuống
       return (
-        <span style={{ color: "#DC2626", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ color: "#10B981", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
           <ArrowDown size={16} />
           {formatCurrency(estimated - actual)}
         </span>
       );
     } else if (actual > estimated) {
-      // Thực tế > dự trù: màu xanh + mũi tên lên
+      // Thực tế > dự trù: màu đỏ + mũi tên lên
       return (
-        <span style={{ color: "#10B981", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ color: "#DC2626", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
           <ArrowUp size={16} />
           {formatCurrency(actual - estimated)}
         </span>
       );
     } else {
-      // Bằng nhau
+      // Bằng nhau: màu xanh lá
       return (
-        <span style={{ color: "#6B7280", fontWeight: "600" }}>
+        <span style={{ color: "#10B981", fontWeight: "600" }}>
           Bằng nhau
         </span>
       );
@@ -851,7 +856,23 @@ const ViewDepartmentBudget = () => {
             <div className="d-flex flex-wrap align-items-center gap-3 mb-2">
               <button
                 className="btn btn-outline-secondary"
-                onClick={() => navigate(`/events/${eventId}/budgets/departments`)}
+                onClick={() => {
+                  // Navigate back based on user role
+                  if (userRole === 'Member') {
+                    navigate(`/events/${eventId}/budgets/member`, { replace: true });
+                  } else if (userRole === 'HoD') {
+                    navigate(`/events/${eventId}/departments/${departmentId}/budget`, { replace: true });
+                  } else if (userRole === 'HoOC') {
+                    navigate(`/events/${eventId}/budgets`, { replace: true });
+                  } else {
+                    // Fallback: try to determine from isHoD
+                    if (isHoD) {
+                      navigate(`/events/${eventId}/departments/${departmentId}/budget`, { replace: true });
+                    } else {
+                      navigate(`/events/${eventId}/budgets/member`, { replace: true });
+                    }
+                  }
+                }}
                 style={{ borderRadius: "8px" }}
                 title="Quay lại danh sách budgets"
               >
@@ -1025,29 +1046,82 @@ const ViewDepartmentBudget = () => {
           </div>
 
           {/* Tab Selection */}
-          <div className="d-flex gap-2 mb-4">
-            <button
-              className={`btn ${activeTable === "hooc" ? "btn-primary" : "btn-outline-primary"}`}
-              onClick={() => setActiveTable("hooc")}
-              style={{ borderRadius: "8px" }}
-            >
-              <i className="bi bi-send me-2"></i>
-              Bảng gửi TBTC
-            </button>
-            {(isApproved || isSentToMembers) && (
-              <button
-                className={`btn ${activeTable === "member" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => setActiveTable("member")}
-                style={{ borderRadius: "8px" }}
+          <div 
+            className="d-flex gap-4 mb-4"
+            style={{
+              borderBottom: "1px solid #E5E7EB",
+              paddingBottom: "0"
+            }}
+          >
+            {/* Only show "Bảng gửi TBTC" tab for HoD and HoOC, not for Member */}
+            {(isHoD || userRole === 'HoD' || userRole === 'HoOC') && (
+              <div
+                onClick={() => setActiveTable("hooc")}
+                style={{
+                  padding: "12px 0",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  color: activeTable === "hooc" ? "#111827" : "#6B7280",
+                  fontWeight: activeTable === "hooc" ? "600" : "400",
+                  fontSize: "16px",
+                  borderBottom: activeTable === "hooc" ? "2px solid #3B82F6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTable !== "hooc") {
+                    e.currentTarget.style.color = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTable !== "hooc") {
+                    e.currentTarget.style.color = "#6B7280";
+                  }
+                }}
               >
-                <i className="bi bi-people me-2"></i>
+                <Send size={18} />
+                Bảng gửi TBTC
+              </div>
+            )}
+            {(isApproved || isSentToMembers) && (
+              <div
+                onClick={() => setActiveTable("member")}
+                style={{
+                  padding: "12px 0",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  color: activeTable === "member" ? "#111827" : "#6B7280",
+                  fontWeight: activeTable === "member" ? "600" : "400",
+                  fontSize: "16px",
+                  borderBottom: activeTable === "member" ? "2px solid #3B82F6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTable !== "member") {
+                    e.currentTarget.style.color = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTable !== "member") {
+                    e.currentTarget.style.color = "#6B7280";
+                  }
+                }}
+              >
+                <Users size={18} />
                 Bảng kiểm soát Member
-              </button>
+              </div>
             )}
           </div>
 
-          {/* Bảng 1: Gửi cho HoOC */}
-          {activeTable === "hooc" && (
+          {/* Bảng 1: Gửi cho HoOC - Only show for HoD and HoOC, not for Member */}
+          {activeTable === "hooc" && (isHoD || userRole === 'HoD' || userRole === 'HoOC') && (
             <div className="table-responsive" style={{ overflowX: "auto" }}>
               <table className="table" style={{ width: "100%", wordWrap: "break-word", tableLayout: "fixed" }}>
                 <thead>
@@ -2347,10 +2421,10 @@ const ViewDepartmentBudget = () => {
                                             alignItems: "center",
                                             gap: "4px",
                                             color: actualAmount < estimatedTotal 
-                                              ? "#DC2626"
-                                              : actualAmount > estimatedTotal 
                                               ? "#10B981"
-                                              : "#6B7280",
+                                              : actualAmount > estimatedTotal 
+                                              ? "#DC2626"
+                                              : "#10B981",
                                           }}
                                         >
                                           {actualAmount < estimatedTotal && <ArrowDown size={14} />}
@@ -2376,10 +2450,10 @@ const ViewDepartmentBudget = () => {
                                         alignItems: "center",
                                         gap: "4px",
                                         color: actualAmount < estimatedTotal 
-                                          ? "#DC2626"
-                                          : actualAmount > estimatedTotal 
                                           ? "#10B981"
-                                          : "#6B7280",
+                                          : actualAmount > estimatedTotal 
+                                          ? "#DC2626"
+                                          : "#10B981",
                                       }}
                                     >
                                       {actualAmount < estimatedTotal && <ArrowDown size={16} />}
@@ -2533,31 +2607,31 @@ const ViewDepartmentBudget = () => {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="d-flex justify-content-end gap-2 mt-4">
-          {isDraft && (
-            <>
-              <button
-                className="btn btn-danger"
-                onClick={() => setShowDeleteModal(true)}
-                style={{ borderRadius: "8px" }}
-              >
-                <i className="bi bi-trash me-2"></i>
-                Xoá Bản Nháp
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleEdit}
-                style={{ borderRadius: "8px" }}
-              >
-                <i className="bi bi-pencil me-2"></i>
-                Chỉnh Sửa
-              </button>
-            </>
-          )}
+        {/* Action Buttons - Only show for HoD */}
+        {(isHoD || userRole === 'HoD') && (
+          <div className="d-flex justify-content-end gap-2 mt-4">
+            {isDraft && !isSubmitted && (
+              <>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => setShowDeleteModal(true)}
+                  style={{ borderRadius: "8px" }}
+                >
+                  <i className="bi bi-trash me-2"></i>
+                  Xoá Bản Nháp
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleEdit}
+                  style={{ borderRadius: "8px" }}
+                >
+                  <i className="bi bi-pencil me-2"></i>
+                  Chỉnh Sửa
+                </button>
+              </>
+            )}
 
-          {isSubmitted && (
-            <>
+            {isSubmitted && (
               <button
                 className="btn btn-outline-primary"
                 onClick={() => setShowRecallModal(true)}
@@ -2566,30 +2640,22 @@ const ViewDepartmentBudget = () => {
                 <i className="bi bi-arrow-counterclockwise me-2"></i>
                 Thu hồi bản gửi
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleEdit}
-                style={{ borderRadius: "8px" }}
-              >
-                <i className="bi bi-pencil me-2"></i>
-                Chỉnh Sửa
-              </button>
-            </>
-          )}
+            )}
 
-          {isRejected && (
-            <>
-              <button
-                className="btn btn-primary"
-                onClick={handleEdit}
-                style={{ borderRadius: "8px" }}
-              >
-                <i className="bi bi-pencil me-2"></i>
-                Chỉnh Sửa
-              </button>
-            </>
-          )}
-        </div>
+            {isRejected && !isSubmitted && (
+              <>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleEdit}
+                  style={{ borderRadius: "8px" }}
+                >
+                  <i className="bi bi-pencil me-2"></i>
+                  Chỉnh Sửa
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -3055,7 +3121,7 @@ const ViewDepartmentBudget = () => {
       {showLinkModal && (
         <div
           className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10000 }}
           onClick={() => setShowLinkModal(false)}
         >
           <div

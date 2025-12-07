@@ -188,7 +188,7 @@ const ListBudgetsPage = () => {
           pagination: rawResponse?.pagination || { totalPages: 1, total: formattedBudgets.length } 
         };
       } else {
-        // HoOC: lấy tất cả budgets của tất cả departments
+        // HoOC: lấy tất cả budgets của tất cả departments (KHÔNG bao gồm draft)
         const rawResponse = await budgetApi.getAllBudgetsForEvent(eventId, {
           status: activeTab === 'all' ? undefined : activeTab, // Nếu 'all' thì không filter
           page: currentPage,
@@ -254,6 +254,68 @@ const ListBudgetsPage = () => {
           responseKeys: response && typeof response === 'object' ? Object.keys(response) : []
         });
         
+        // HoOC không được xem draft budgets từ HoD - filter out draft status
+        if (eventRole === 'HoOC') {
+          budgetsData = budgetsData.filter(b => b.status !== 'draft');
+          
+          // Đảm bảo departmentName được lấy đúng từ department object hoặc departmentId
+          budgetsData = budgetsData.map(budget => {
+            let departmentName = budget.departmentName;
+            
+            // Nếu không có departmentName, thử lấy từ department object
+            if (!departmentName && budget.department) {
+              departmentName = budget.department.name || budget.department?.name || null;
+            }
+            
+            // Nếu vẫn không có, thử lấy từ departmentId (sẽ fetch sau nếu cần)
+            if (!departmentName && budget.departmentId) {
+              // Giữ nguyên departmentId để có thể fetch sau
+              departmentName = null;
+            }
+            
+            return {
+              ...budget,
+              departmentName: departmentName || "—",
+              departmentId: budget.departmentId || budget.department?._id || budget.department?.id || null,
+            };
+          });
+          
+          // Nếu có budgets thiếu departmentName, fetch thông tin department
+          const budgetsNeedingDepartmentInfo = budgetsData.filter(b => !b.departmentName || b.departmentName === "—");
+          if (budgetsNeedingDepartmentInfo.length > 0) {
+            const departmentIds = [...new Set(budgetsNeedingDepartmentInfo.map(b => b.departmentId).filter(Boolean))];
+            
+            if (departmentIds.length > 0) {
+              try {
+                const departments = await departmentService.getDepartments(eventId);
+                const departmentsMap = new Map();
+                
+                if (Array.isArray(departments)) {
+                  departments.forEach(dept => {
+                    const deptId = dept._id || dept.id;
+                    if (deptId) {
+                      departmentsMap.set(deptId.toString(), dept.name || dept.title || "—");
+                    }
+                  });
+                }
+                
+                // Cập nhật departmentName cho các budgets
+                budgetsData = budgetsData.map(budget => {
+                  if ((!budget.departmentName || budget.departmentName === "—") && budget.departmentId) {
+                    const deptName = departmentsMap.get(budget.departmentId.toString());
+                    if (deptName) {
+                      return { ...budget, departmentName: deptName };
+                    }
+                  }
+                  return budget;
+                });
+              } catch (error) {
+                console.error("Error fetching departments for budget names:", error);
+              }
+            }
+          }
+        }
+        
         setBudgets(budgetsData);
         setTotalPages(paginationData.totalPages || Math.ceil(budgetsData.length / itemsPerPage) || 1);
       } else {
@@ -316,13 +378,29 @@ const ListBudgetsPage = () => {
     );
   };
 
-  const handleViewDetail = (departmentId) => {
+  const handleViewDetail = (departmentId, budgetStatus, budgetId) => {
     // Nếu là HoD, điều hướng đến trang view budget của họ
-    // Nếu là HoOC, điều hướng đến trang review
+    // Nếu là HoOC, điều hướng đến trang review (chỉ nếu budget không phải draft)
     if (eventRole === 'HoD') {
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      // HoD: nếu có budgetId, navigate với budgetId, nếu không thì dùng view
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}`);
+      } else {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/view`);
+      }
     } else {
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      // HoOC không được xem draft budgets
+      if (budgetStatus === 'draft') {
+        toast.error("Không thể xem budget nháp. Budget này chưa được gửi lên để duyệt.");
+        return;
+      }
+      // HoOC: luôn truyền budgetId để xem đúng budget
+      if (budgetId) {
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/${budgetId}/review`);
+      } else {
+        // Fallback nếu không có budgetId (backward compatibility)
+        navigate(`/events/${eventId}/departments/${departmentId}/budget/review`);
+      }
     }
   };
 
@@ -610,57 +688,152 @@ const ListBudgetsPage = () => {
             {/* Status Tabs - Chỉ hiển thị cho HoOC, HoD xem tất cả */}
             {eventRole === 'HoOC' && (
               <div className="d-flex gap-2 mb-4 flex-wrap">
-                <button
-                  className={`btn ${activeTab === "all" ? "btn-primary" : "btn-outline-primary"}`}
+                <div
+                  className={`d-inline-flex align-items-center justify-content-center px-3 py-2 ${activeTab === "all" ? "text-primary fw-semibold" : "text-muted"}`}
                   onClick={() => {
                     setActiveTab("all");
                     setCurrentPage(1);
                   }}
-                  style={{ borderRadius: "8px" }}
+                  style={{ 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: activeTab === "all" ? "2px solid #3B82F6" : "2px solid #E5E7EB",
+                    backgroundColor: activeTab === "all" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    userSelect: "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== "all") {
+                      e.currentTarget.style.backgroundColor = "#F9FAFB";
+                      e.currentTarget.style.borderColor = "#D1D5DB";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== "all") {
+                      e.currentTarget.style.backgroundColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#E5E7EB";
+                    }
+                  }}
                 >
                   Tất cả
-                </button>
-                <button
-                  className={`btn ${activeTab === "submitted" ? "btn-primary" : "btn-outline-primary"}`}
+                </div>
+                <div
+                  className={`d-inline-flex align-items-center justify-content-center px-3 py-2 ${activeTab === "submitted" ? "text-primary fw-semibold" : "text-muted"}`}
                   onClick={() => {
                     setActiveTab("submitted");
                     setCurrentPage(1);
                   }}
-                  style={{ borderRadius: "8px" }}
+                  style={{ 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: activeTab === "submitted" ? "2px solid #3B82F6" : "2px solid #E5E7EB",
+                    backgroundColor: activeTab === "submitted" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    userSelect: "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== "submitted") {
+                      e.currentTarget.style.backgroundColor = "#F9FAFB";
+                      e.currentTarget.style.borderColor = "#D1D5DB";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== "submitted") {
+                      e.currentTarget.style.backgroundColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#E5E7EB";
+                    }
+                  }}
                 >
                   Chờ duyệt
-                </button>
-                <button
-                  className={`btn ${activeTab === "approved" ? "btn-primary" : "btn-outline-primary"}`}
+                </div>
+                <div
+                  className={`d-inline-flex align-items-center justify-content-center px-3 py-2 ${activeTab === "approved" ? "text-primary fw-semibold" : "text-muted"}`}
                   onClick={() => {
                     setActiveTab("approved");
                     setCurrentPage(1);
                   }}
-                  style={{ borderRadius: "8px" }}
+                  style={{ 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: activeTab === "approved" ? "2px solid #3B82F6" : "2px solid #E5E7EB",
+                    backgroundColor: activeTab === "approved" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    userSelect: "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== "approved") {
+                      e.currentTarget.style.backgroundColor = "#F9FAFB";
+                      e.currentTarget.style.borderColor = "#D1D5DB";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== "approved") {
+                      e.currentTarget.style.backgroundColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#E5E7EB";
+                    }
+                  }}
                 >
                   Đã duyệt
-                </button>
-                <button
-                  className={`btn ${activeTab === "changes_requested" ? "btn-primary" : "btn-outline-primary"}`}
+                </div>
+                <div
+                  className={`d-inline-flex align-items-center justify-content-center px-3 py-2 ${activeTab === "changes_requested" ? "text-primary fw-semibold" : "text-muted"}`}
                   onClick={() => {
                     setActiveTab("changes_requested");
                     setCurrentPage(1);
                   }}
-                  style={{ borderRadius: "8px" }}
+                  style={{ 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: activeTab === "changes_requested" ? "2px solid #3B82F6" : "2px solid #E5E7EB",
+                    backgroundColor: activeTab === "changes_requested" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    userSelect: "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== "changes_requested") {
+                      e.currentTarget.style.backgroundColor = "#F9FAFB";
+                      e.currentTarget.style.borderColor = "#D1D5DB";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== "changes_requested") {
+                      e.currentTarget.style.backgroundColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#E5E7EB";
+                    }
+                  }}
                 >
                   Bị từ chối
-                </button>
-                <button
-                  className={`btn ${activeTab === "completed" ? "btn-primary" : "btn-outline-primary"}`}
+                </div>
+                <div
+                  className={`d-inline-flex align-items-center justify-content-center px-3 py-2 ${activeTab === "completed" ? "text-primary fw-semibold" : "text-muted"}`}
                   onClick={() => {
                     setActiveTab("completed");
                     setCurrentPage(1);
                   }}
-                  style={{ borderRadius: "8px" }}
+                  style={{ 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: activeTab === "completed" ? "2px solid #3B82F6" : "2px solid #E5E7EB",
+                    backgroundColor: activeTab === "completed" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    userSelect: "none"
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab !== "completed") {
+                      e.currentTarget.style.backgroundColor = "#F9FAFB";
+                      e.currentTarget.style.borderColor = "#D1D5DB";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== "completed") {
+                      e.currentTarget.style.backgroundColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#E5E7EB";
+                    }
+                  }}
                 >
                   <i className="bi bi-check-circle me-1"></i>
                   Đã hoàn thành
-                </button>
+                </div>
               </div>
             )}
 
@@ -765,7 +938,7 @@ const ListBudgetsPage = () => {
                             </div>
                           </td>
                         )}
-                        {eventRole === 'HoOC' && (
+                        {eventRole === 'HoOC' && budget.status === 'approved' && (
                           <td style={{ padding: "12px" }}>
                             <button
                               className={`btn btn-sm ${budget.isPublic ? 'btn-success' : 'btn-outline-secondary'}`}
@@ -787,11 +960,20 @@ const ListBudgetsPage = () => {
                             </button>
                           </td>
                         )}
+                        {eventRole === 'HoOC' && budget.status !== 'approved' && (
+                          <td style={{ padding: "12px" }}>
+                            <span className="text-muted" style={{ fontSize: "13px" }}>—</span>
+                          </td>
+                        )}
                         <td style={{ padding: "12px" }}>
                           <div className="d-flex gap-2">
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => handleViewDetail(budget.departmentId || budget.department?._id || budget.departmentId)}
+                              onClick={() => handleViewDetail(
+                                budget.departmentId || budget.department?._id || budget.departmentId, 
+                                budget.status,
+                                budget._id || budget.id || budget.budgetId
+                              )}
                               style={{ borderRadius: "8px" }}
                             >
                               Xem chi tiết

@@ -137,7 +137,8 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
     taskType = TASK_TYPES.NORMAL,
   } = body || {};
 
-  if (!departmentId) {
+  // Nếu tạo task con (có parentId), departmentId sẽ được lấy tự động từ parent nếu không được cung cấp
+  if (!departmentId && !parentId) {
     throw makeError('Thiếu departmentId', 400);
   }
 
@@ -203,9 +204,12 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
   }
 
   // Kiểm tra tồn tại & cùng event
+  // milestoneId có thể là undefined/null/empty string - chỉ validate nếu có giá trị thực sự
+  const hasMilestoneId = milestoneId && String(milestoneId).trim() !== '';
+  
   const [departmentDoc, assigneeDoc, milestoneOk, parentDoc, depFound] =
     await Promise.all([
-      Department.findOne({ _id: departmentId, eventId }).lean(),
+      departmentId ? Department.findOne({ _id: departmentId, eventId }).lean() : null,
       assigneeId
         ? EventMember.findOne({
             _id: assigneeId,
@@ -215,7 +219,7 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
             .select('departmentId')
             .lean()
         : null,
-      milestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
+      hasMilestoneId ? Milestone.exists({ _id: milestoneId, eventId }) : Promise.resolve(true),
       parentId ? Task.findOne({ _id: parentId, eventId }).lean() : null,
       dependencyIds.length
         ? Task.find({ _id: { $in: dependencyIds }, eventId })
@@ -224,13 +228,27 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
         : Promise.resolve([]),
     ]);
 
-  if (!departmentDoc) errors.push('departmentId không tồn tại trong event này');
+  if (departmentId && !departmentDoc) errors.push('departmentId không tồn tại trong event này');
   if (assigneeId && !assigneeDoc) errors.push('assigneeId không tồn tại trong event này');
-  if (!milestoneOk) errors.push('milestoneId không tồn tại trong event này');
+  // Chỉ validate milestone nếu có giá trị thực sự (không phải empty string hoặc undefined)
+  if (hasMilestoneId && !milestoneOk) errors.push('milestoneId không tồn tại trong event này');
   if (parentId && !parentDoc) errors.push('parentId không tồn tại trong event này');
 
-  if (assigneeDoc && assigneeDoc.departmentId) {
-    if (String(assigneeDoc.departmentId?._id || assigneeDoc.departmentId) !== String(departmentId)) {
+  // Tự động lấy department và milestone từ parent nếu tạo task con
+  let finalDepartmentId = departmentId;
+  let finalMilestoneId = milestoneId;
+
+  if (parentDoc && isNormal) {
+    // Tự động lấy department từ parent nếu không được cung cấp
+    if (!finalDepartmentId && parentDoc.departmentId) {
+      finalDepartmentId = parentDoc.departmentId;
+    }
+    // Với milestone:
+   
+  }
+
+  if (assigneeDoc && assigneeDoc.departmentId && finalDepartmentId) {
+    if (String(assigneeDoc.departmentId?._id || assigneeDoc.departmentId) !== String(finalDepartmentId)) {
       errors.push('Người được giao phải thuộc cùng ban với công việc');
     }
   }
@@ -239,7 +257,8 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
     if (!isEpicTask(parentDoc)) {
       errors.push('parentId phải là một Epic task');
     }
-    if (String(parentDoc.departmentId) !== String(departmentId)) {
+    // Kiểm tra department phải khớp với parent (nếu đã có departmentId)
+    if (finalDepartmentId && String(parentDoc.departmentId) !== String(finalDepartmentId)) {
       errors.push('Công việc lớn và và công việc phải thuộc cùng ban');
     }
   }
@@ -260,14 +279,15 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
     title,
     description,
     eventId,
-    departmentId,
+    departmentId: finalDepartmentId,
     taskType: normalizedTaskType,
+    status: TASK_STATUSES.NOT_STARTED, // Luôn bắt đầu với trạng thái "Chưa bắt đầu"
     assigneeId: isEpic ? undefined : assigneeId || undefined,
     startDate: startDate || undefined,
     dueDate,
     estimate,
     estimateUnit,
-    milestoneId: milestoneId || undefined,
+    milestoneId: finalMilestoneId || undefined,
     parentId: isEpic ? undefined : parentId || undefined,
     dependencies: dependencyIds,
     suggestedTeamSize: suggestedTeamSize || undefined,
@@ -306,8 +326,9 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
   if (isEpic && member?.role !== 'HoOC') {
     throw makeError('Chỉ HoOC có quyền chỉnh sửa Epic task.', 403);
   }
-  if (isNormal && !['HoOC', 'HoD'].includes(member?.role)) {
-    throw makeError('Chỉ HoOC hoặc HoD có quyền chỉnh sửa task thường.', 403);
+  // Normal task: Chỉ HoD có quyền chỉnh sửa (HoOC không thể chỉnh sửa task thường)
+  if (isNormal && member?.role !== 'HoD') {
+    throw makeError('Chỉ HoD có quyền chỉnh sửa task thường.', 403);
   }
 
   const update = { ...(body || {}) };
@@ -504,34 +525,61 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
     throw makeError('Task không tồn tại', 404);
   }
 
-  const isEpic = isEpicTask(task);
-  const isNormal = isNormalTask(task);
-  const isTaskCreator = task.createdBy && String(task.createdBy) === String(userId);
+  // Member không có quyền xóa task
+  if (member?.role === 'Member') {
+    throw makeError('Member không có quyền xóa công việc.', 403);
+  }
 
   // Không cho phép xóa task đang ở trạng thái "đang làm"
   if (task.status === TASK_STATUSES.IN_PROGRESS) {
     throw makeError('Không thể xóa task khi đang ở trạng thái "Đang làm".', 403);
   }
 
-  if (isEpic && member?.role !== 'HoOC') {
-    throw makeError('Chỉ HoOC được xóa Epic task.', 403);
+  // Kiểm tra quyền xóa: chỉ người tạo task mới có thể xóa
+  // createdBy là ObjectId reference, cần so sánh đúng cách
+  let isTaskCreator = false;
+  
+  if (task.createdBy && userId) {
+    // Xử lý cả trường hợp createdBy là ObjectId hoặc đã được populate
+    const taskCreatorId = task.createdBy._id 
+      ? String(task.createdBy._id) 
+      : String(task.createdBy);
+    const currentUserId = String(userId);
+    
+    // So sánh string sau khi convert
+    isTaskCreator = taskCreatorId === currentUserId;
+    
+    // Nếu so sánh string không match, thử so sánh ObjectId trực tiếp (nếu cả hai đều là ObjectId)
+    if (!isTaskCreator && task.createdBy.toString && userId.toString) {
+      isTaskCreator = task.createdBy.toString() === userId.toString();
+    }
   }
 
-  // Normal task: HoOC, HoD hoặc người tạo task được xóa
-  if (isNormal && !['HoOC', 'HoD'].includes(member?.role) && !isTaskCreator) {
-    throw makeError('Chỉ HoOC, HoD hoặc người tạo task được xóa task thường.', 403);
+  // Chỉ người tạo task mới có thể xóa (áp dụng cho cả HoOC và HoD)
+  if (!isTaskCreator) {
+    throw makeError('Chỉ người tạo công việc mới có thể xóa công việc này.', 403);
   }
 
-  const [dependents, children] = await Promise.all([
-    Task.countDocuments({ eventId, dependencies: task._id }),
-    Task.countDocuments({ eventId, parentId: task._id }),
-  ]);
+  // Kiểm tra xem task có phải là EPIC không
+  const isEpic = isEpicTask(task);
 
-  if (dependents || children) {
-    throw makeError('Không thể xóa vì công việc lớn đang có công việc', 409, {
-      meta: { dependents, children },
-    });
+  // Nếu task có parentId (task con trong epic), cho phép xóa luôn, không kiểm tra gì
+  if (task.parentId) {
+    // Task con: Cho phép xóa luôn
+  } else if (isEpic) {
+    // Epic task (không có parentId): Kiểm tra ràng buộc
+    const [dependents, children] = await Promise.all([
+      Task.countDocuments({ eventId, dependencies: task._id }),
+      Task.countDocuments({ eventId, parentId: task._id }),
+    ]);
+
+    if (dependents > 0 || children > 0) {
+      throw makeError('Không thể xóa vì công việc lớn đang có công việc', 409, {
+        meta: { dependents, children },
+      });
+    }
   }
+  // Normal task độc lập (không có parentId, không phải epic): Cho phép xóa luôn
 
   await Task.findOneAndDelete({ _id: taskId, eventId });
 
@@ -545,7 +593,7 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
 /**
  * 7. Cập nhật progress task
  */
-export const updateTaskProgressService = async ({ eventId, taskId, userId, body }) => {
+export const updateTaskProgressService = async ({ eventId, taskId, userId, body, member }) => {
   const { status, progressPct } = body || {};
   const ALLOWED = Object.values(TASK_STATUSES);
 
@@ -562,15 +610,26 @@ export const updateTaskProgressService = async ({ eventId, taskId, userId, body 
     );
   }
 
-  if (!task.assigneeId) {
-    throw makeError('Task chưa được giao cho thành viên nên không thể cập nhật trạng thái.', 403);
-  }
+  // Kiểm tra quyền: HoOC có thể hủy task (từ Chưa bắt đầu hoặc Đang làm, không được hủy nếu đã hoàn thành)
+  const isHoOC = member?.role === 'HoOC';
+  const isCancelling = status === TASK_STATUSES.CANCELLED;
+  const canHoOCCancel = isHoOC && isCancelling && 
+    (task.status === TASK_STATUSES.NOT_STARTED || task.status === TASK_STATUSES.IN_PROGRESS) &&
+    task.status !== TASK_STATUSES.DONE;
 
-  const memberships = await EventMember.find({ userId, eventId });
-  const isAssignee = memberships.some((m) => String(m._id) === String(task.assigneeId));
-  if (!isAssignee) {
-    throw makeError('Chỉ người được giao công việc mới được cập nhật trạng thái công việc đó', 403);
+  if (!canHoOCCancel) {
+    // Kiểm tra quyền thông thường: chỉ người được giao mới cập nhật được
+    if (!task.assigneeId) {
+      throw makeError('Task chưa được giao cho thành viên nên không thể cập nhật trạng thái.', 403);
+    }
+
+    const memberships = await EventMember.find({ userId, eventId });
+    const isAssignee = memberships.some((m) => String(m._id) === String(task.assigneeId));
+    if (!isAssignee) {
+      throw makeError('Chỉ người được giao công việc mới được cập nhật trạng thái công việc đó', 403);
+    }
   }
+  // HoOC có thể hủy task từ Chưa bắt đầu hoặc Đang làm (đã được kiểm tra trong canHoOCCancel)
 
   if (status && !ALLOWED.includes(status)) {
     throw makeError('Trạng thái không hợp lệ.', 400);
@@ -604,7 +663,11 @@ export const updateTaskProgressService = async ({ eventId, taskId, userId, body 
     throw makeError('Chưa thể thực hiện: còn task phụ thuộc chưa hoàn thành.', 409);
   }
 
-  if (status && !STATUS_TRANSITIONS[task.status]?.includes(status)) {
+  // Cho phép HoOC hủy task từ Chưa bắt đầu hoặc Đang làm (không được hủy nếu đã hoàn thành)
+  const isHoOCCancelling = isHoOC && isCancelling && 
+    (task.status === TASK_STATUSES.NOT_STARTED || task.status === TASK_STATUSES.IN_PROGRESS);
+
+  if (status && !isHoOCCancelling && !STATUS_TRANSITIONS[task.status]?.includes(status)) {
     throw makeError(
       `Không thể chuyển từ ${task.status} → ${status} với vai trò hiện tại.`,
       409

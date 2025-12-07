@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Loading from "~/components/Loading";
 import UserLayout from "~/components/UserLayout";
@@ -23,41 +23,61 @@ function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     const loadDetail = async () => {
       if (!eventId) {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
         return;
       }
-      setLoading(true);
-      setError(null);
+      if (mountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const res = await eventService.fetchEventById(eventId);
-        const payload = res?.data ?? res;
-        setEvent(payload);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          const payload = res?.data ?? res;
+          setEvent(payload);
+          setLoading(false);
+        }
       } catch (err) {
-        console.error("fetch event detail error", err);
-        setError("Không thể tải chi tiết sự kiện");
-      } finally {
-        setLoading(false);
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (mountedRef.current) {
+          setError("Không thể tải chi tiết sự kiện");
+          setLoading(false);
+        }
       }
     };
     loadDetail();
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   const defaultImg = "/default-events.jpg";
   const imageUrl = getEventImage(event ?? {}, defaultImg);
   const title = event?.name || "Sự kiện";
-  const dateText = event?.eventStartDate && event?.eventEndDate
-    ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
-    : event?.eventDate ? formatDate(event?.eventDate) : "Chưa cập nhật";
-  const address = event?.location || "Chưa cập nhật";
-  const statusInfo = deriveEventStatus(event);
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("Đã sao chép đường dẫn sự kiện!");
+  const dateText =
+    formatDate(event?.eventStartDate) + " - " + formatDate(event?.eventEndDate);
+  const address = event?.location || "";
+  const statusText = deriveEventStatus(event).text;
+  const copyJoinCode = async () => {
+    if (!event?.joinCode) return;
+    try {
+      await navigator.clipboard.writeText(event.joinCode);
+      toast.success("Đã sao chép mã tham gia!");
+    } catch (err) {
+      toast.error("Không thể copy mã, vui lòng thử lại.");
+    }
   };
 
   if (loading) {

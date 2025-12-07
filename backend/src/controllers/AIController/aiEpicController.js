@@ -87,8 +87,9 @@ export const aiBulkCreateEpics = async (req, res) => {
         departmentId: deptDoc._id,
         parentId: null,
         assigneeId: null,
-        status: 'suggested',   // theo Task model mới
-        taskType: 'epic',      // giữ taskType để phân biệt
+        status: 'chua_bat_dau',  // task do AI sinh ra → trạng thái "chưa bắt đầu" (thay vì 'suggested' vì không có trong enum)
+        taskType: 'epic',         // giữ taskType để phân biệt
+        createdBy: req.user.id,   // Người apply plan sẽ là người tạo EPIC
       });
 
       createdEpics.push(taskDoc);

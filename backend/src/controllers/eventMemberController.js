@@ -127,6 +127,13 @@ export const updateMemberRole = async (req, res) => {
       return res.status(200).json({ message: 'Vai trò không thay đổi', data: currentMember });
     }
 
+    // Prevent HoOC from changing their own role
+    const requesterUserId = requesterMembership.userId?.toString() || requesterMembership.userId;
+    const memberUserId = currentMember.userId?._id?.toString() || currentMember.userId?.toString();
+    if (requesterUserId === memberUserId && currentMember.role === 'HoOC') {
+      return res.status(403).json({ message: 'Bạn không thể thay đổi vai trò của chính mình' });
+    }
+
     const set = { role: normalizedRole };
     if (normalizedRole === 'HoOC') {
       set.departmentId = null;
@@ -196,6 +203,12 @@ export const changeMemberDepartment = async (req, res) => {
 
       if (!requesterDeptId || requesterDeptId !== memberDeptId) {
         return res.status(403).json({ message: 'HoD chỉ được chuyển thành viên trong ban của mình' });
+      }
+      // Prevent HoD from changing their own department
+      const requesterUserId = requesterMembership.userId?.toString() || requesterMembership.userId;
+      const memberUserId = member.userId?._id?.toString() || member.userId?.toString();
+      if (requesterUserId === memberUserId) {
+        return res.status(403).json({ message: 'Bạn không thể thay đổi ban của chính mình' });
       }
     }
 
@@ -295,6 +308,13 @@ export const removeMemberFromEvent = async (req, res) => {
 
     if (member.role === 'HoOC') {
       return res.status(400).json({ message: 'Không thể xóa HoOC khỏi sự kiện' });
+    }
+
+    // Prevent ANYONE from deleting themselves (HoOC, HoD, Member)
+    const requesterUserId = requesterMembership.userId?.toString() || requesterMembership.userId;
+    const memberUserId = member.userId?._id?.toString() || member.userId?.toString();
+    if (requesterUserId === memberUserId) {
+      return res.status(403).json({ message: 'Bạn không thể xóa chính mình khỏi sự kiện' });
     }
 
     if (requesterMembership.role === 'HoD') {

@@ -15,6 +15,7 @@ export default function HoOCTaskStatisticPage() {
   const [milestones, setMilestones] = useState([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
   const [statistics, setStatistics] = useState(null);
+  const [burnupData, setBurnupData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
@@ -42,12 +43,10 @@ export default function HoOCTaskStatisticPage() {
             setSelectedMilestoneId(firstMilestoneId);
           }
         } else {
-          console.log("⚠️ No milestones found in event");
           setSelectedMilestoneId("");
           setLoading(false); // ✅ Set loading false khi không có milestone
         }
       } catch (error) {
-        console.error("Error fetching milestones:", error);
         setLoading(false); // ✅ Set loading false khi có lỗi
       }
     };
@@ -61,29 +60,65 @@ export default function HoOCTaskStatisticPage() {
     const fetchStatistics = async () => {
       try {
         setLoading(true);
-        const response = await taskApi.getTaskStatisticsByMilestone(
-          eventId,
-          selectedMilestoneId
-        );
+        const [statsResponse, burnupResponse] = await Promise.all([
+          taskApi.getTaskStatisticsByMilestone(eventId, selectedMilestoneId),
+          taskApi.getBurnupData(eventId, selectedMilestoneId).catch(() => {
+            return null;
+          })
+        ]);
 
         let finalData = null;
 
         // ✅ Handle different response structures
-        if (response?.data?.summary) {
+        if (statsResponse?.data?.summary) {
           // Case: { data: { summary, milestone, departmentProgress } }
-          finalData = response.data;
-        } else if (response?.summary) {
+          finalData = statsResponse.data;
+        } else if (statsResponse?.summary) {
           // Case: { summary, milestone, departmentProgress }
-          finalData = response;
+          finalData = statsResponse;
         } else {
           setStatistics(null);
           return;
         }
 
         setStatistics(finalData);
+        
+        // Set burnup data - handle different response structures
+        // Try to find burnupData in various locations
+        let foundBurnupData = null;
+        
+        // First check for burnupData (the correct field name from backend)
+        if (burnupResponse?.data?.burnupData && Array.isArray(burnupResponse.data.burnupData)) {
+          foundBurnupData = burnupResponse.data.burnupData;
+        } else if (burnupResponse?.burnupData && Array.isArray(burnupResponse.burnupData)) {
+          foundBurnupData = burnupResponse.burnupData;
+        } else if (burnupResponse?.data?.dataPoints && Array.isArray(burnupResponse.data.dataPoints)) {
+          foundBurnupData = burnupResponse.data.dataPoints;
+        } else if (burnupResponse?.dataPoints && Array.isArray(burnupResponse.dataPoints)) {
+          foundBurnupData = burnupResponse.dataPoints;
+        } else if (burnupResponse?.data && Array.isArray(burnupResponse.data)) {
+          foundBurnupData = burnupResponse.data;
+        } else if (Array.isArray(burnupResponse)) {
+          foundBurnupData = burnupResponse;
+        } else if (burnupResponse?.data) {
+          // Check if data has any array property
+          const dataKeys = Object.keys(burnupResponse.data);
+          for (const key of dataKeys) {
+            if (Array.isArray(burnupResponse.data[key]) && burnupResponse.data[key].length > 0) {
+              foundBurnupData = burnupResponse.data[key];
+              break;
+            }
+          }
+        }
+        
+        if (foundBurnupData && Array.isArray(foundBurnupData) && foundBurnupData.length > 0) {
+          setBurnupData({ dataPoints: foundBurnupData });
+        } else {
+          setBurnupData(null);
+        }
       } catch (error) {
-        console.error("💥 API Error:", error);
         setStatistics(null);
+        setBurnupData(null);
       } finally {
         setLoading(false);
       }
@@ -108,8 +143,6 @@ export default function HoOCTaskStatisticPage() {
   );
 
   const handleRowClick = (dept) => {
-    console.log("Raw dept data:", dept);
-
     // ✅ Map API data to modal expected format
     const mappedDept = {
       id: dept.departmentId,
@@ -164,27 +197,136 @@ export default function HoOCTaskStatisticPage() {
       originalData: dept,
     };
 
-    console.log("✅ Mapped dept data for modal:", mappedDept);
     setSelectedDept(mappedDept);
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
-    console.log("Closing modal");
     setShowModal(false);
     setSelectedDept(null); // ✅ Clear selected data
   };
 
-  const chartData = [
-    { date: "11/30", planned: 2, actual: 2, ideal: 0 },
-    { date: "12/03", planned: 5, actual: 5, ideal: 5 },
-    { date: "12/06", planned: 15, actual: 15, ideal: 15 },
-    { date: "12/09", planned: 25, actual: 28, ideal: 30 },
-    { date: "12/12", planned: 40, actual: 45, ideal: 45 },
-    { date: "12/15", planned: 48, actual: 50, ideal: 50 },
-    { date: "12/18", planned: 52, actual: 51, ideal: 52 },
-    { date: "12/21", planned: 56, actual: 56, ideal: 56 },
-  ];
+  // Calculate chart data from burnupData or generate from statistics
+  const calculateChartData = () => {
+    // First, try to get dataPoints from burnupData
+    let dataPoints = [];
+    
+    if (burnupData) {
+      // Handle different data structures
+    if (Array.isArray(burnupData.dataPoints)) {
+      dataPoints = burnupData.dataPoints;
+    } else if (Array.isArray(burnupData)) {
+      dataPoints = burnupData;
+    } else if (burnupData.data && Array.isArray(burnupData.data)) {
+      dataPoints = burnupData.data;
+    } else if (burnupData.timeline && Array.isArray(burnupData.timeline)) {
+      dataPoints = burnupData.timeline;
+    } else if (burnupData.history && Array.isArray(burnupData.history)) {
+      dataPoints = burnupData.history;
+    } else {
+      // Try to find any array property
+      const keys = Object.keys(burnupData);
+      for (const key of keys) {
+        if (Array.isArray(burnupData[key]) && burnupData[key].length > 0) {
+          dataPoints = burnupData[key];
+          break;
+        }
+      }
+    }
+    }
+
+    // If no dataPoints from API, generate from statistics
+    if (dataPoints.length === 0 && statistics) {
+      const summary = statistics.summary || {};
+      const totalTasks = (summary.majorTasksTotal || 0) + (summary.assignedTasksTotal || 0);
+      const completedTasks = (summary.majorTasksCompleted || 0) + (summary.assignedTasksCompleted || 0);
+      
+      if (totalTasks > 0) {
+        // Generate simple burnup data points from current statistics
+        const milestone = statistics.milestone || {};
+        const startDate = milestone.startDate ? new Date(milestone.startDate) : new Date();
+        const endDate = milestone.endDate ? new Date(milestone.endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days from now
+        const today = new Date();
+        
+        // Create data points: start, today, end
+        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        const daysFromStart = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+        const progressRatio = Math.min(1, daysFromStart / Math.max(1, daysDiff));
+        
+        dataPoints = [
+          {
+            date: startDate.toISOString().split('T')[0],
+            scope: totalTasks,
+            actual: 0,
+            ideal: 0
+          },
+          {
+            date: today.toISOString().split('T')[0],
+            scope: totalTasks,
+            actual: completedTasks,
+            ideal: Math.round(totalTasks * progressRatio)
+          },
+          {
+            date: endDate.toISOString().split('T')[0],
+            scope: totalTasks,
+            actual: completedTasks,
+            ideal: totalTasks
+          }
+        ];
+      }
+    }
+
+    if (dataPoints.length === 0) {
+      return {
+        dataPoints: [],
+        maxValue: 0,
+        dateRange: { start: null, end: null }
+      };
+    }
+
+    // Sort dataPoints by date to ensure correct order
+    const sortedDataPoints = [...dataPoints].sort((a, b) => {
+      const dateA = new Date(a.date || a.dateString || a.timestamp || 0);
+      const dateB = new Date(b.date || b.dateString || b.timestamp || 0);
+      return dateA - dateB;
+    });
+
+    // Map and extract values
+    const mappedDataPoints = sortedDataPoints.map(dp => {
+      const scope = dp.totalMajorTasks || dp.scope || dp.totalTasks || dp.planned || 0;
+      const actual = dp.completedMajorTasks || dp.actual || dp.completed || dp.completedTasks || 0;
+      const ideal = dp.idealMajorTasks || dp.ideal || dp.expected || dp.expectedTasks || 0;
+      
+      return {
+        date: formatDate(dp.date || dp.dateString || dp.timestamp),
+        dateObj: new Date(dp.date || dp.dateString || dp.timestamp),
+        // Use backend field names: totalMajorTasks, completedMajorTasks, idealMajorTasks
+        scope: scope,
+        actual: actual,
+        ideal: ideal
+      };
+    });
+
+    const maxValue = Math.max(
+      ...mappedDataPoints.flatMap(dp => [dp.scope, dp.actual, dp.ideal]),
+      100 // Minimum max value
+    );
+
+    return {
+      dataPoints: mappedDataPoints,
+      maxValue,
+      dateRange: {
+        start: sortedDataPoints[0]?.date || sortedDataPoints[0]?.dateString || sortedDataPoints[0]?.timestamp 
+          ? new Date(sortedDataPoints[0].date || sortedDataPoints[0].dateString || sortedDataPoints[0].timestamp) 
+          : null,
+        end: sortedDataPoints[sortedDataPoints.length - 1]?.date || sortedDataPoints[sortedDataPoints.length - 1]?.dateString || sortedDataPoints[sortedDataPoints.length - 1]?.timestamp
+          ? new Date(sortedDataPoints[sortedDataPoints.length - 1].date || sortedDataPoints[sortedDataPoints.length - 1].dateString || sortedDataPoints[sortedDataPoints.length - 1].timestamp)
+          : null
+      }
+    };
+  };
+
+  const chartData = calculateChartData();
 
   // ✅ EARLY RETURNS: Handle loading states
   if (milestones.length === 0 && !loading) {
@@ -638,10 +780,6 @@ export default function HoOCTaskStatisticPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation(); // ✅ Prevent event bubbling
-                                console.log(
-                                  "Button clicked for dept:",
-                                  dept.departmentName
-                                );
                                 handleRowClick(dept); // ✅ Pass dept object with proper mapping
                               }}
                               className="hooc-task-statistic-page__detail-btn"
@@ -678,136 +816,206 @@ export default function HoOCTaskStatisticPage() {
                 </p>
 
                 <div className="hooc-task-statistic-page__chart-content-wrapper">
-                  <svg
-                    className="hooc-task-statistic-page__svg-chart"
-                    viewBox="0 0 600 300"
-                    preserveAspectRatio="xMidYMid meet"
-                  >
-                    {/* Grid lines */}
-                    <line
-                      x1="60"
-                      y1="250"
-                      x2="580"
-                      y2="250"
-                      stroke="#e0e0e0"
-                      strokeWidth="1"
-                    />
-                    <line
-                      x1="60"
-                      y1="200"
-                      x2="580"
-                      y2="200"
-                      stroke="#f5f5f5"
-                      strokeWidth="1"
-                    />
-                    <line
-                      x1="60"
-                      y1="150"
-                      x2="580"
-                      y2="150"
-                      stroke="#f5f5f5"
-                      strokeWidth="1"
-                    />
-                    <line
-                      x1="60"
-                      y1="100"
-                      x2="580"
-                      y2="100"
-                      stroke="#f5f5f5"
-                      strokeWidth="1"
-                    />
-                    <line
-                      x1="60"
-                      y1="50"
-                      x2="580"
-                      y2="50"
-                      stroke="#f5f5f5"
-                      strokeWidth="1"
-                    />
+                  {chartData.dataPoints.length > 0 ? (() => {
+                    const chartWidth = 600;
+                    const chartHeight = 250;
+                    const chartLeft = 70;
+                    const chartTop = 20;
+                    const chartBottom = 280;
+                    const chartRight = chartLeft + chartWidth;
+                    const dataPoints = chartData.dataPoints;
+                    const maxValue = chartData.maxValue || 100;
+                    const numPoints = dataPoints.length;
+                    const stepX = numPoints > 1 ? chartWidth / (numPoints - 1) : 0;
 
-                    {/* Axes */}
-                    <line
-                      x1="60"
-                      y1="30"
-                      x2="60"
-                      y2="260"
-                      stroke="#000"
-                      strokeWidth="2"
-                    />
-                    <line
-                      x1="50"
-                      y1="250"
-                      x2="580"
-                      y2="250"
-                      stroke="#000"
-                      strokeWidth="2"
-                    />
+                    // Calculate Y position (inverted: higher value = lower Y)
+                    const getY = (value) => {
+                      const ratio = maxValue > 0 ? value / maxValue : 0;
+                      const yPos = chartBottom - (ratio * chartHeight);
+                      return yPos;
+                    };
 
-                    {/* Y-axis labels */}
-                    <text x="35" y="255" fontSize="12" textAnchor="end">
-                      0
-                    </text>
-                    <text x="35" y="205" fontSize="12" textAnchor="end">
-                      20
-                    </text>
-                    <text x="35" y="155" fontSize="12" textAnchor="end">
-                      40
-                    </text>
-                    <text x="35" y="105" fontSize="12" textAnchor="end">
-                      60
-                    </text>
+                    return (
+                      <div style={{ 
+                        width: '100%', 
+                        overflowX: 'auto', 
+                        overflowY: 'visible',
+                        marginBottom: '20px',
+                        paddingBottom: '10px'
+                      }}>
+                        <svg
+                          className="hooc-task-statistic-page__svg-chart"
+                          viewBox={`0 0 ${chartRight + 20} ${chartBottom + 50}`}
+                          preserveAspectRatio="xMidYMid meet"
+                          style={{ width: '100%', height: '100%', minWidth: '700px' }}
+                        >
+                        {/* Grid lines */}
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const y = chartTop + (i * chartHeight / 4);
+                          const value = Math.round(maxValue * (1 - i / 4));
+                          const isMainLine = i === 4;
+                          return (
+                            <React.Fragment key={`grid-${i}`}>
+                              <line
+                                x1={chartLeft}
+                                y1={y}
+                                x2={chartRight}
+                                y2={y}
+                                stroke={isMainLine ? "#e0e0e0" : "#f5f5f5"}
+                                strokeWidth="1"
+                              />
+                              {i <= 3 && (
+                                <text x={chartLeft - 10} y={y + 5} fontSize="12" textAnchor="end" fill="#666">
+                                  {value}
+                                </text>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                        
+                        {/* Y-axis label for 0 */}
+                        <text x={chartLeft - 10} y={chartBottom + 5} fontSize="12" textAnchor="end" fill="#666">
+                          0
+                        </text>
 
-                    {/* Ideal line (dashed) */}
-                    <polyline
-                      points="60,240 113,238 166,210 219,180 272,128 325,80 378,52 431,50 484,50 537,50"
-                      fill="none"
-                      stroke="#00d4aa"
-                      strokeWidth="2"
-                      strokeDasharray="5,5"
-                    />
+                        {/* Axes */}
+                        <line
+                          x1={chartLeft}
+                          y1={chartTop}
+                          x2={chartLeft}
+                          y2={chartBottom + 30}
+                          stroke="#333"
+                          strokeWidth="2"
+                        />
+                        <line
+                          x1={chartLeft - 10}
+                          y1={chartBottom}
+                          x2={chartRight}
+                          y2={chartBottom}
+                          stroke="#333"
+                          strokeWidth="2"
+                        />
 
-                    {/* Actual line (blue) */}
-                    <polyline
-                      points="60,240 113,235 166,208 219,175 272,120 325,70 378,45 431,42 484,40 537,40"
-                      fill="none"
-                      stroke="#1e90ff"
-                      strokeWidth="2"
-                    />
+                        {/* Total epic tasks line (blue) - Đường tổng số epic task */}
+                        {numPoints > 0 && (
+                          <>
+                            <polyline
+                              points={dataPoints.map((dp, idx) => 
+                                `${chartLeft + idx * stepX},${getY(dp.scope)}`
+                              ).join(' ')}
+                              fill="none"
+                              stroke="#3B82F6"
+                              strokeWidth="2"
+                            />
+                            {/* Data points for scope line */}
+                            {dataPoints.map((dp, idx) => {
+                              const x = chartLeft + idx * stepX;
+                              const y = getY(dp.scope);
+                              return (
+                                <circle
+                                  key={`scope-${idx}`}
+                                  cx={x}
+                                  cy={y}
+                                  r="3"
+                                  fill="#3B82F6"
+                                />
+                              );
+                            })}
+                          </>
+                        )}
 
-                    {/* Planned line (blue lighter) */}
-                    <polyline
-                      points="60,240 113,236 166,225 219,205 272,165 325,95 378,55 431,50 484,45 537,42"
-                      fill="none"
-                      stroke="#4da6ff"
-                      strokeWidth="2"
-                    />
+                        {/* Actual completed epic tasks line (green) - Đường thực tế các epic task đã hoàn thiện */}
+                        {numPoints > 0 && (
+                          <>
+                            <polyline
+                              points={dataPoints.map((dp, idx) => 
+                                `${chartLeft + idx * stepX},${getY(dp.actual)}`
+                              ).join(' ')}
+                              fill="none"
+                              stroke="#10B981"
+                              strokeWidth="2"
+                            />
+                            {/* Data points for actual line */}
+                            {dataPoints.map((dp, idx) => {
+                              const x = chartLeft + idx * stepX;
+                              const y = getY(dp.actual);
+                              return (
+                                <circle
+                                  key={`actual-${idx}`}
+                                  cx={x}
+                                  cy={y}
+                                  r="3"
+                                  fill="#10B981"
+                                />
+                              );
+                            })}
+                          </>
+                        )}
 
-                    {/* X-axis labels */}
-                    <text x="60" y="275" fontSize="12" textAnchor="middle">
-                      11/30
-                    </text>
-                    <text x="113" y="275" fontSize="12" textAnchor="middle">
-                      12/03
-                    </text>
-                    <text x="166" y="275" fontSize="12" textAnchor="middle">
-                      12/06
-                    </text>
-                    <text x="219" y="275" fontSize="12" textAnchor="middle">
-                      12/09
-                    </text>
-                    <text x="272" y="275" fontSize="12" textAnchor="middle">
-                      12/12
-                    </text>
-                    <text x="325" y="275" fontSize="12" textAnchor="middle">
-                      12/15
-                    </text>
-                    <text x="378" y="275" fontSize="12" textAnchor="middle">
-                      12/18
-                    </text>
-                    <text x="431" y="275" fontSize="12" textAnchor="middle">
-                      12/21
-                    </text>
-                  </svg>
+                        {/* Ideal/Estimated line (gray dashed) - Đường ước tính */}
+                        {numPoints > 0 && (
+                          <>
+                            <polyline
+                              points={dataPoints.map((dp, idx) => 
+                                `${chartLeft + idx * stepX},${getY(dp.ideal)}`
+                              ).join(' ')}
+                              fill="none"
+                              stroke="#9CA3AF"
+                              strokeWidth="2"
+                              strokeDasharray="5,5"
+                            />
+                            {/* Data points for ideal line */}
+                            {dataPoints.map((dp, idx) => {
+                              const x = chartLeft + idx * stepX;
+                              const y = getY(dp.ideal);
+                              return (
+                                <circle
+                                  key={`ideal-${idx}`}
+                                  cx={x}
+                                  cy={y}
+                                  r="3"
+                                  fill="#9CA3AF"
+                                />
+                              );
+                            })}
+                          </>
+                        )}
+
+                        {/* X-axis labels - rotated to prevent overlapping */}
+                        {dataPoints.map((dp, idx) => {
+                          const x = chartLeft + idx * stepX;
+                          // Show every nth label to prevent crowding
+                          const showLabel = numPoints <= 10 || idx % Math.ceil(numPoints / 10) === 0 || idx === numPoints - 1;
+                          if (!showLabel) return null;
+                          return (
+                            <g key={idx}>
+                              <text 
+                                x={x} 
+                                y={chartBottom + 35} 
+                                fontSize="11" 
+                                textAnchor="middle"
+                                fill="#666"
+                                transform={`rotate(-45 ${x} ${chartBottom + 35})`}
+                                style={{ pointerEvents: 'none' }}
+                              >
+                                {dp.date}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                      </div>
+                    );
+                  })() : (
+                    <div style={{ 
+                      padding: "60px 20px", 
+                      textAlign: "center", 
+                      color: "#6B7280",
+                      fontSize: "14px"
+                    }}>
+                      {burnupData === null ? "Đang tải dữ liệu biểu đồ..." : "Chưa có dữ liệu biểu đồ burnup"}
+                    </div>
+                  )}
 
                   {/* Chart Legend */}
                   <div className="hooc-task-statistic-page__chart-legend">
@@ -822,10 +1030,6 @@ export default function HoOCTaskStatisticPage() {
                     <div className="hooc-task-statistic-page__legend-item">
                       <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--ideal"></span>
                       <span>Đường Ước tính – Tốc độ dự kiến</span>
-                    </div>
-                    <div className="hooc-task-statistic-page__legend-item">
-                      <span className="hooc-task-statistic-page__legend-color hooc-task-statistic-page__legend-color--milestone"></span>
-                      <span>Mốc Milestone</span>
                     </div>
                   </div>
                 </div>
@@ -874,18 +1078,6 @@ export default function HoOCTaskStatisticPage() {
                       </div>
                     </div>
                   </div>
-
-                  <div className="hooc-task-statistic-page__legend-explanation-item hooc-task-statistic-page__legend-explanation-item--milestone">
-                    <span className="hooc-task-statistic-page__legend-dot hooc-task-statistic-page__legend-dot--milestone"></span>
-                    <div>
-                      <div className="hooc-task-statistic-page__legend-explanation-title">
-                        Mốc Milestone
-                      </div>
-                      <div className="hooc-task-statistic-page__legend-explanation-text">
-                        Đánh dấu ngày deadline.
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="hooc-task-statistic-page__milestone-note">
@@ -898,14 +1090,14 @@ export default function HoOCTaskStatisticPage() {
             </div>
           </>
         )}
+        {showModal && selectedDept && (
+          <HoOCTaskStatisticModal
+            show={showModal}
+            dept={selectedDept} 
+            onClose={handleCloseModal}
+          />
+        )}
       </div>
-      {showModal && selectedDept && (
-        <HoOCTaskStatisticModal
-          show={showModal}
-          dept={selectedDept} // ✅ Pass mapped data
-          onClose={handleCloseModal}
-        />
-      )}
     </UserLayout>
   );
 }

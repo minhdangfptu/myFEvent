@@ -74,8 +74,16 @@ const DepartmentBudgetsListPage = () => {
           setDepartments([]);
         }
       } else {
-        // Nếu không phải HoD, không hiển thị gì
-        setDepartments([]);
+        // Nếu không phải HoD, redirect về trang phù hợp
+        if (role === 'Member') {
+          navigate(`/events/${eventId}/budgets/member`, { replace: true });
+        } else if (role === 'HoOC') {
+          navigate(`/events/${eventId}/budgets`, { replace: true });
+        } else {
+          // Fallback: redirect về trang budgets chung
+          navigate(`/events/${eventId}/budgets`, { replace: true });
+        }
+        return;
       }
     } catch (error) {
       console.error("Error fetching data:", error);

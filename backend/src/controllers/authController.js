@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -63,6 +64,7 @@ const saveRefreshToken = async (userId, token, req) => {
 };
 
 // Helper: generate and send 6-digit verification code (ephemeral, 1 minute)
+// eslint-disable-next-line no-unused-vars
 export const sendVerificationEmail = async (email, fullName, req) => {
   const { code } = setEmailVerificationCode(email);
 
@@ -135,7 +137,6 @@ export const login = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
-    const DUMMY_HASH = '$2b$10$A1B2C3D4E5F6G7H8I9J0KlmnopqrstuvwxYZabcdefghi12JK';
 
     if (!user) {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
@@ -531,60 +532,6 @@ export const resetPassword = async (req, res) => {
   }
 };
 
-export const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Current and new password are required' });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    // Check if user registered with Google (no password to change)
-    if (!user.passwordHash) {
-      return res.status(400).json({
-        message: 'Tài khoản Google không có mật khẩu. Không thể đổi mật khẩu.',
-        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
-      });
-    }
-
-    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng, vui lòng kiểm tra lại' });
-
-    const salt = await bcrypt.genSalt(config.BCRYPT_SALT_ROUNDS);
-    user.passwordHash = await bcrypt.hash(newPassword, salt);
-    await user.save();
-
-    return res.status(200).json({ message: 'Đổi mật khẩu thành công' });
-  } catch (error) {
-    console.error('Change password error:', error);
-    return res.status(500).json({ message: 'Failed to change password' });
-  }
-};
-
-export const checkPassWord = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    // Check if user registered with Google (no password)
-    if (!user.passwordHash) {
-      return res.status(400).json({
-        message: 'Tài khoản Google không có mật khẩu.',
-        code: 'GOOGLE_ACCOUNT_NO_PASSWORD'
-      });
-    }
-
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(400).json({ message: 'Incorrect information' });
-    return res.status(200).json({ message: 'Correct information' });
-  } catch (error) {
-    console.error('Check password error:', error);
-    return res.status(500).json({ message: 'Failed to check information' });
-  }
-};
 // Thêm vào đầu file:
 
 

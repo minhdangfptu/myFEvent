@@ -37,7 +37,7 @@ const mockRes = () => {
 beforeEach(() => vi.clearAllMocks());
 
 describe('riskController.addOccurredRisk', () => {
-  it('[Normal] TC01 - HoOC add occurred risk successfully', async () => {
+  it('[Normal] TC01 - Add occurred risk successfully', async () => {
     const { validationResult } = await import('express-validator');
     const RiskService = await import('../../../services/riskService.js');
     const ensureEventRole = (await import('../../../utils/ensureEventRole.js')).default;

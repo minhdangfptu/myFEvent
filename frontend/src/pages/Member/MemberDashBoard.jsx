@@ -172,20 +172,40 @@ export default function MemberDashBoard() {
       }
       try {
         const role = await fetchEventRole(eventId)
-        if (mounted) setEventRole(role)
+        if (mounted) {
+          setEventRole(role)
+          // If user doesn't have access, redirect to home page
+          if (!role || role === '') {
+            navigate('/home-page')
+            return
+          }
+        }
       } catch (_) {
-        if (mounted) setEventRole("")
+        if (mounted) {
+          setEventRole("")
+          navigate('/home-page')
+        }
       }
     }
     loadRole()
     return () => {
       mounted = false
     }
-  }, [eventId, fetchEventRole])
+  }, [eventId, fetchEventRole, navigate])
 
-  // Fetch all data
+  // Fetch all data - only fetch if user has access
   useEffect(() => {
     if (!eventId || !user) {
+      setLoading(false)
+      return
+    }
+
+    // Don't fetch if user doesn't have access
+    if (eventRole === '' && eventId) {
+      // Still checking role, wait
+      return
+    }
+    if (!eventRole || eventRole === '') {
       setLoading(false)
       return
     }
@@ -304,7 +324,7 @@ export default function MemberDashBoard() {
     return () => {
       cancelled = true
     }
-  }, [eventId, user])
+  }, [eventId, user, eventRole])
 
   // Calculate stats
   const totalTasks = tasks.length
