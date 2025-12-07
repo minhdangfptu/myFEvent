@@ -19,48 +19,7 @@ describe('taskController.getBurnupChartData', () => {
     resetAllMocks();
   });
 
-  it('trả về 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValueOnce(null);
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: 'event123', milestoneId: 'm1' },
-    });
-
-    await getBurnupChartData(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được xem chart.',
-    });
-    expect(getBurnupChartDataService).not.toHaveBeenCalled();
-  });
-
-  it('trả về 404 nếu milestone notFound từ service', async () => {
-    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
-
-    getBurnupChartDataService.mockResolvedValueOnce({
-      notFound: true,
-    });
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: 'event123', milestoneId: 'm1' },
-    });
-
-    await getBurnupChartData(req, res);
-
-    expect(getBurnupChartDataService).toHaveBeenCalledWith({
-      eventId: 'event123',
-      milestoneId: 'm1',
-    });
-
-    expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: 'Milestone not found',
-    });
-  });
-
-  it('trả về 200 với data burnup', async () => {
+  it('[Normal] TC01 - should return 200 with burnup chart data when successful', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const mockResult = {
@@ -92,7 +51,48 @@ describe('taskController.getBurnupChartData', () => {
     });
   });
 
-  it('handle lỗi 500 từ service', async () => {
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValueOnce(null);
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: 'event123', milestoneId: 'm1' },
+    });
+
+    await getBurnupChartData(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được xem chart.',
+    });
+    expect(getBurnupChartDataService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC03 - should return 404 when milestone is not found', async () => {
+    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
+
+    getBurnupChartDataService.mockResolvedValueOnce({
+      notFound: true,
+    });
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: 'event123', milestoneId: 'm1' },
+    });
+
+    await getBurnupChartData(req, res);
+
+    expect(getBurnupChartDataService).toHaveBeenCalledWith({
+      eventId: 'event123',
+      milestoneId: 'm1',
+    });
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Milestone not found',
+    });
+  });
+
+  it('[Abnormal] TC04 - should return 500 when service throws error', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const err = new Error('Server explosion');

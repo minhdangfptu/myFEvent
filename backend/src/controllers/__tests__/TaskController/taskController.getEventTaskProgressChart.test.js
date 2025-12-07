@@ -19,24 +19,7 @@ describe('taskController.getEventTaskProgressChart', () => {
     resetAllMocks();
   });
 
-  it('trả về 403 nếu user không có quyền', async () => {
-    ensureEventRole.mockResolvedValueOnce(null);
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: 'event123' },
-    });
-
-    await getEventTaskProgressChart(req, res);
-
-    expect(ensureEventRole).toHaveBeenCalledWith('user1', 'event123', ['HoOC', 'HoD']);
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được xem chart.',
-    });
-    expect(getEventTaskProgressChartService).not.toHaveBeenCalled();
-  });
-
-  it('gọi service và trả về 200 với data', async () => {
+  it('[Normal] TC01 - should return 200 with chart data when successful', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const mockStats = [{ _id: 'hoan_thanh', count: 3 }];
@@ -53,7 +36,24 @@ describe('taskController.getEventTaskProgressChart', () => {
     expect(res.json).toHaveBeenCalledWith({ data: mockStats });
   });
 
-  it('handle lỗi từ service với statusCode custom', async () => {
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValueOnce(null);
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: 'event123' },
+    });
+
+    await getEventTaskProgressChart(req, res);
+
+    expect(ensureEventRole).toHaveBeenCalledWith('user1', 'event123', ['HoOC', 'HoD']);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được xem chart.',
+    });
+    expect(getEventTaskProgressChartService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC03 - should return 400 when service throws error with custom statusCode', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const err = new Error('Bad request');
@@ -72,7 +72,7 @@ describe('taskController.getEventTaskProgressChart', () => {
     });
   });
 
-  it('handle lỗi 500 từ service', async () => {
+  it('[Abnormal] TC04 - should return 500 when service throws generic error', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const err = new Error('DB error');

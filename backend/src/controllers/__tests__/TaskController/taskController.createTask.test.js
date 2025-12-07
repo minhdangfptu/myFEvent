@@ -7,7 +7,7 @@ vi.mock('../../../utils/ensureEventRole.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../src/services/notificationService.js', () => ({
+vi.mock('../../../services/notificationService.js', () => ({
   __esModule: true,
   notifyTaskAssigned: vi.fn(),
   notifyTaskCompleted: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock('../../../services/taskService.js', () => ({
 }));
 
 import ensureEventRole from '../../../utils/ensureEventRole.js';
-import { notifyTaskAssigned } from '../../src/services/notificationService.js';
+import { notifyTaskAssigned } from '../../../services/notificationService.js';
 import { createTaskService } from '../../../services/taskService.js';
 import { createTask } from '../../taskController.js';
 
@@ -43,25 +43,7 @@ describe('TaskController.createTask', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValue(null);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1' },
-      body: { title: 'Task 1' },
-    });
-    const res = createMockRes();
-
-    await createTask(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được tạo task.',
-    });
-    expect(createTaskService).not.toHaveBeenCalled();
-  });
-
-  it('gọi notifyTaskAssigned nếu service yêu cầu notify', async () => {
+  it('[Normal] TC01 - should create task successfully and send notification when assignee is provided', async () => {
     ensureEventRole.mockResolvedValue({ role: 'HoOC' });
 
     const mockTask = { _id: 'task-1' };
@@ -92,5 +74,23 @@ describe('TaskController.createTask', () => {
     );
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({ data: mockTask });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValue(null);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1' },
+      body: { title: 'Task 1' },
+    });
+    const res = createMockRes();
+
+    await createTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được tạo task.',
+    });
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 });

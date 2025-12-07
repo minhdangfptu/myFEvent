@@ -14,7 +14,7 @@ describe('taskController.getEpicTasksForExport (wrapper)', () => {
     resetAllMocks();
   });
 
-  it('gọi đúng service với eventId và trả về data', async () => {
+  it('[Normal] TC01 - should call service and return epic tasks when successful', async () => {
     const eventId = 'event123';
     const mockTasks = [
       { id: 't1', title: 'Epic 1' },
@@ -29,7 +29,7 @@ describe('taskController.getEpicTasksForExport (wrapper)', () => {
     expect(result).toEqual(mockTasks);
   });
 
-  it('propagate lỗi từ service', async () => {
+  it('[Abnormal] TC02 - should propagate error from service when it fails', async () => {
     const eventId = 'event123';
     const err = new Error('DB error');
     getEpicTasksForExportService.mockRejectedValueOnce(err);

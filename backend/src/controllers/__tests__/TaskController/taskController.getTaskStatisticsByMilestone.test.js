@@ -20,85 +20,7 @@ describe('taskController.getTaskStatisticsByMilestone', () => {
     resetAllMocks();
   });
 
-  it('trả về 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValueOnce(null);
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: 'event123', milestoneId: 'm1' },
-    });
-
-    await getTaskStatisticsByMilestone(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được xem thống kê.',
-    });
-    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
-  });
-
-  it('trả về 400 nếu eventId không hợp lệ', async () => {
-    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: 'invalid_id', milestoneId: '65f123456789012345678901' },
-    });
-
-    await getTaskStatisticsByMilestone(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'eventId không hợp lệ',
-    });
-    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
-  });
-
-  it('trả về 400 nếu milestoneId không hợp lệ', async () => {
-    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
-
-    // eventId hợp lệ (24 hex), milestoneId không hợp lệ
-    const validEventId = '65f123456789012345678901';
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: validEventId, milestoneId: 'invalid_milestone' },
-    });
-
-    await getTaskStatisticsByMilestone(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'milestoneId không hợp lệ',
-    });
-    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
-  });
-
-  it('trả về 404 nếu milestone không tồn tại trong event', async () => {
-    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
-
-    const validEventId = new mongoose.Types.ObjectId().toString();
-    const validMilestoneId = new mongoose.Types.ObjectId().toString();
-
-    getTaskStatisticsByMilestoneService.mockResolvedValueOnce({
-      notFound: true,
-    });
-
-    const { req, res } = createMockReqRes({
-      params: { eventId: validEventId, milestoneId: validMilestoneId },
-    });
-
-    await getTaskStatisticsByMilestone(req, res);
-
-    expect(getTaskStatisticsByMilestoneService).toHaveBeenCalledWith({
-      eventId: validEventId,
-      milestoneId: validMilestoneId,
-    });
-
-    expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Milestone không tồn tại trong event này.',
-    });
-  });
-
-  it('trả về 200 với summary, milestone và departmentProgress', async () => {
+  it('[Normal] TC01 - should return 200 with statistics when successful', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const validEventId = new mongoose.Types.ObjectId().toString();
@@ -128,7 +50,85 @@ describe('taskController.getTaskStatisticsByMilestone', () => {
     });
   });
 
-  it('handle lỗi 500 từ service', async () => {
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValueOnce(null);
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: 'event123', milestoneId: 'm1' },
+    });
+
+    await getTaskStatisticsByMilestone(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được xem thống kê.',
+    });
+    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC03 - should return 400 when eventId is invalid', async () => {
+    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: 'invalid_id', milestoneId: '65f123456789012345678901' },
+    });
+
+    await getTaskStatisticsByMilestone(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'eventId không hợp lệ',
+    });
+    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC04 - should return 400 when milestoneId is invalid', async () => {
+    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
+
+    // eventId hợp lệ (24 hex), milestoneId không hợp lệ
+    const validEventId = '65f123456789012345678901';
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: validEventId, milestoneId: 'invalid_milestone' },
+    });
+
+    await getTaskStatisticsByMilestone(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'milestoneId không hợp lệ',
+    });
+    expect(getTaskStatisticsByMilestoneService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC05 - should return 404 when milestone does not exist in event', async () => {
+    ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
+
+    const validEventId = new mongoose.Types.ObjectId().toString();
+    const validMilestoneId = new mongoose.Types.ObjectId().toString();
+
+    getTaskStatisticsByMilestoneService.mockResolvedValueOnce({
+      notFound: true,
+    });
+
+    const { req, res } = createMockReqRes({
+      params: { eventId: validEventId, milestoneId: validMilestoneId },
+    });
+
+    await getTaskStatisticsByMilestone(req, res);
+
+    expect(getTaskStatisticsByMilestoneService).toHaveBeenCalledWith({
+      eventId: validEventId,
+      milestoneId: validMilestoneId,
+    });
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Milestone không tồn tại trong event này.',
+    });
+  });
+
+  it('[Abnormal] TC06 - should return 500 when service throws error', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const validEventId = new mongoose.Types.ObjectId().toString();

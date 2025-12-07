@@ -35,7 +35,30 @@ describe('TaskController.getTaskByDepartment', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 404 nếu department không tồn tại trong sự kiện', async () => {
+  it('[Normal] TC01 - should return 200 with task data when department and task exist', async () => {
+    ensureEventRole.mockResolvedValue({ role: 'HoOC' });
+    const mockTask = { _id: 'task-1' };
+    getTaskByDepartmentService.mockResolvedValue({
+      departmentExists: true,
+      task: mockTask,
+    });
+
+    const req = createMockReq({
+      params: {
+        eventId: 'event-1',
+        taskId: 'task-1',
+        departmentId: 'dep-1',
+      },
+    });
+    const res = createMockRes();
+
+    await getTaskByDepartment(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: mockTask });
+  });
+
+  it('[Abnormal] TC02 - should return 404 when department does not exist in event', async () => {
     ensureEventRole.mockResolvedValue({ role: 'HoOC' });
     getTaskByDepartmentService.mockResolvedValue({
       departmentExists: false,
@@ -59,7 +82,7 @@ describe('TaskController.getTaskByDepartment', () => {
     });
   });
 
-  it('trả 404 nếu task không tồn tại', async () => {
+  it('[Abnormal] TC03 - should return 404 when task does not exist', async () => {
     ensureEventRole.mockResolvedValue({ role: 'HoOC' });
     getTaskByDepartmentService.mockResolvedValue({
       departmentExists: true,
@@ -81,28 +104,5 @@ describe('TaskController.getTaskByDepartment', () => {
     expect(res.json).toHaveBeenCalledWith({
       message: 'Task không tồn tại',
     });
-  });
-
-  it('trả 200 với data nếu thành công', async () => {
-    ensureEventRole.mockResolvedValue({ role: 'HoOC' });
-    const mockTask = { _id: 'task-1' };
-    getTaskByDepartmentService.mockResolvedValue({
-      departmentExists: true,
-      task: mockTask,
-    });
-
-    const req = createMockReq({
-      params: {
-        eventId: 'event-1',
-        taskId: 'task-1',
-        departmentId: 'dep-1',
-      },
-    });
-    const res = createMockRes();
-
-    await getTaskByDepartment(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ data: mockTask });
   });
 });

@@ -35,46 +35,7 @@ describe('TaskController.deleteTask', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValue(null);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1', taskId: 'task-1' },
-    });
-    const res = createMockRes();
-
-    await deleteTask(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được xoá task.',
-    });
-    expect(deleteTaskService).not.toHaveBeenCalled();
-  });
-
-  it('trả 409 nếu service ném lỗi conflict', async () => {
-    ensureEventRole.mockResolvedValue({ role: 'HoD' });
-
-    const err = new Error('Không xóa được vì đang có task phụ thuộc');
-    err.statusCode = 409;
-    err.meta = { dependents: 2, children: 1 };
-    deleteTaskService.mockRejectedValue(err);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1', taskId: 'task-1' },
-    });
-    const res = createMockRes();
-
-    await deleteTask(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Không xóa được vì đang có task phụ thuộc',
-      meta: { dependents: 2, children: 1 },
-    });
-  });
-
-  it('trả 200 nếu xoá thành công', async () => {
+  it('[Normal] TC01 - should delete task successfully and return 200', async () => {
     ensureEventRole.mockResolvedValue({ role: 'HoD' });
     deleteTaskService.mockResolvedValue(undefined);
 
@@ -94,6 +55,45 @@ describe('TaskController.deleteTask', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       message: 'Đã xoá task thành công.',
+    });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValue(null);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1', taskId: 'task-1' },
+    });
+    const res = createMockRes();
+
+    await deleteTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được xoá task.',
+    });
+    expect(deleteTaskService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC03 - should return 409 when task has dependencies', async () => {
+    ensureEventRole.mockResolvedValue({ role: 'HoD' });
+
+    const err = new Error('Không xóa được vì đang có task phụ thuộc');
+    err.statusCode = 409;
+    err.meta = { dependents: 2, children: 1 };
+    deleteTaskService.mockRejectedValue(err);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1', taskId: 'task-1' },
+    });
+    const res = createMockRes();
+
+    await deleteTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Không xóa được vì đang có task phụ thuộc',
+      meta: { dependents: 2, children: 1 },
     });
   });
 });

@@ -7,7 +7,7 @@ vi.mock('../../../utils/ensureEventRole.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../src/services/notificationService.js', () => ({
+vi.mock('../../../services/notificationService.js', () => ({
   __esModule: true,
   notifyTaskAssigned: vi.fn(),
   notifyTaskCompleted: vi.fn(),
@@ -37,7 +37,7 @@ import ensureEventRole from '../../../utils/ensureEventRole.js';
 import {
   notifyTaskCompleted,
   notifyMajorTaskStatus,
-} from '../../src/services/notificationService.js';
+} from '../../../services/notificationService.js';
 import { updateTaskProgressService } from '../../../services/taskService.js';
 import { updateTaskProgress } from '../../taskController.js';
 
@@ -46,25 +46,7 @@ describe('TaskController.updateTaskProgress', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValue(null);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1', taskId: 'task-1' },
-      body: { status: 'hoan_thanh' },
-    });
-    const res = createMockRes();
-
-    await updateTaskProgress(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Không có quyền cập nhật tiến độ.',
-    });
-    expect(updateTaskProgressService).not.toHaveBeenCalled();
-  });
-
-  it('gửi notifyTaskCompleted & notifyMajorTaskStatus nếu justDone & major', async () => {
+  it('[Normal] TC01 - should update task progress and send notifications when task is completed', async () => {
     ensureEventRole.mockResolvedValue({ role: 'Member' });
 
     const mockTask = { _id: 'task-1', status: 'hoan_thanh' };
@@ -87,6 +69,7 @@ describe('TaskController.updateTaskProgress', () => {
       taskId: 'task-1',
       userId: 'user-id-1',
       body: { status: 'hoan_thanh' },
+      member: { role: 'Member' },
     });
     expect(notifyTaskCompleted).toHaveBeenCalledWith('event-1', 'task-1');
     expect(notifyMajorTaskStatus).toHaveBeenCalledWith(
@@ -99,5 +82,23 @@ describe('TaskController.updateTaskProgress', () => {
       message: 'Update Task progress successfully',
       data: mockTask,
     });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValue(null);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1', taskId: 'task-1' },
+      body: { status: 'hoan_thanh' },
+    });
+    const res = createMockRes();
+
+    await updateTaskProgress(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Không có quyền cập nhật tiến độ.',
+    });
+    expect(updateTaskProgressService).not.toHaveBeenCalled();
   });
 });

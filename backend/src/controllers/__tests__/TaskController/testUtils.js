@@ -19,3 +19,18 @@ export const createMockReq = ({
   body,
   user,
 });
+
+export const createMockReqRes = ({
+  params = {},
+  query = {},
+  body = {},
+  user = { id: 'user1' },
+} = {}) => {
+  const req = { params, query, body, user };
+  const res = createMockRes();
+  return { req, res };
+};
+
+export const resetAllMocks = () => {
+  vi.clearAllMocks();
+};

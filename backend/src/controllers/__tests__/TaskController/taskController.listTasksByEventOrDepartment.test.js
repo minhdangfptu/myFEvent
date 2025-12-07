@@ -35,7 +35,28 @@ describe('TaskController.listTasksByEventOrDepartment', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu user không có quyền', async () => {
+  it('[Normal] TC01 - should return 200 with data when successful', async () => {
+    ensureEventRole.mockResolvedValue({ role: 'HoOC' });
+    const tasks = [{ _id: 't1' }];
+    listTasksByEventOrDepartmentService.mockResolvedValue(tasks);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1' },
+      query: { departmentId: 'dep-1' },
+    });
+    const res = createMockRes();
+
+    await listTasksByEventOrDepartment(req, res);
+
+    expect(listTasksByEventOrDepartmentService).toHaveBeenCalledWith({
+      eventId: 'event-1',
+      query: { departmentId: 'dep-1' },
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: tasks });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
     ensureEventRole.mockResolvedValue(null);
 
     const req = createMockReq({
@@ -55,26 +76,5 @@ describe('TaskController.listTasksByEventOrDepartment', () => {
       message: 'Không có quyền xem task',
     });
     expect(listTasksByEventOrDepartmentService).not.toHaveBeenCalled();
-  });
-
-  it('trả 200 với data khi thành công', async () => {
-    ensureEventRole.mockResolvedValue({ role: 'HoOC' });
-    const tasks = [{ _id: 't1' }];
-    listTasksByEventOrDepartmentService.mockResolvedValue(tasks);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1' },
-      query: { departmentId: 'dep-1' },
-    });
-    const res = createMockRes();
-
-    await listTasksByEventOrDepartment(req, res);
-
-    expect(listTasksByEventOrDepartmentService).toHaveBeenCalledWith({
-      eventId: 'event-1',
-      query: { departmentId: 'dep-1' },
-    });
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ data: tasks });
   });
 });

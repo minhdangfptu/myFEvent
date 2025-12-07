@@ -19,27 +19,7 @@ describe('taskController.getDepartmentBurnupTasks', () => {
     resetAllMocks();
   });
 
-  it('trả về 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValueOnce(null);
-
-    const { req, res } = createMockReqRes({
-      params: {
-        eventId: 'event123',
-        milestoneId: 'm1',
-        departmentId: 'd1',
-      },
-    });
-
-    await getDepartmentBurnupTasks(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được xem chart.',
-    });
-    expect(getDepartmentBurnupTasksService).not.toHaveBeenCalled();
-  });
-
-  it('trả về 200 với data từ service', async () => {
+  it('[Normal] TC01 - should return 200 with department burnup tasks when successful', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const mockData = {
@@ -73,7 +53,27 @@ describe('taskController.getDepartmentBurnupTasks', () => {
     });
   });
 
-  it('handle lỗi 500 từ service', async () => {
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValueOnce(null);
+
+    const { req, res } = createMockReqRes({
+      params: {
+        eventId: 'event123',
+        milestoneId: 'm1',
+        departmentId: 'd1',
+      },
+    });
+
+    await getDepartmentBurnupTasks(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được xem chart.',
+    });
+    expect(getDepartmentBurnupTasksService).not.toHaveBeenCalled();
+  });
+
+  it('[Abnormal] TC03 - should return 500 when service throws error', async () => {
     ensureEventRole.mockResolvedValueOnce({ role: 'HoOC' });
 
     const err = new Error('Server error');

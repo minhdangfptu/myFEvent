@@ -35,7 +35,23 @@ describe('TaskController.getTaskDetail', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu không có quyền', async () => {
+  it('[Normal] TC01 - should return 200 with task data when successful', async () => {
+    ensureEventRole.mockResolvedValue({ role: 'Member' });
+    const mockTask = { _id: 'task-1' };
+    getTaskDetailService.mockResolvedValue(mockTask);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1', taskId: 'task-1' },
+    });
+    const res = createMockRes();
+
+    await getTaskDetail(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: mockTask });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
     ensureEventRole.mockResolvedValue(null);
 
     const req = createMockReq({
@@ -52,7 +68,7 @@ describe('TaskController.getTaskDetail', () => {
     expect(getTaskDetailService).not.toHaveBeenCalled();
   });
 
-  it('trả 404 nếu task không tồn tại', async () => {
+  it('[Abnormal] TC03 - should return 404 when task does not exist', async () => {
     ensureEventRole.mockResolvedValue({ role: 'Member' });
     getTaskDetailService.mockResolvedValue(null);
 
@@ -71,21 +87,5 @@ describe('TaskController.getTaskDetail', () => {
     expect(res.json).toHaveBeenCalledWith({
       message: 'Task không tồn tại',
     });
-  });
-
-  it('trả 200 với data nếu thành công', async () => {
-    ensureEventRole.mockResolvedValue({ role: 'Member' });
-    const mockTask = { _id: 'task-1' };
-    getTaskDetailService.mockResolvedValue(mockTask);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1', taskId: 'task-1' },
-    });
-    const res = createMockRes();
-
-    await getTaskDetail(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ data: mockTask });
   });
 });

@@ -35,24 +35,7 @@ describe('TaskController.unassignTask', () => {
     vi.clearAllMocks();
   });
 
-  it('trả 403 nếu không có quyền', async () => {
-    ensureEventRole.mockResolvedValue(null);
-
-    const req = createMockReq({
-      params: { eventId: 'event-1', taskId: 'task-1' },
-    });
-    const res = createMockRes();
-
-    await unassignTask(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Chỉ HoOC hoặc HoD được huỷ gán task.',
-    });
-    expect(unassignTaskService).not.toHaveBeenCalled();
-  });
-
-  it('trả 200 với data khi huỷ gán thành công', async () => {
+  it('[Normal] TC01 - should unassign task successfully when user has permission', async () => {
     ensureEventRole.mockResolvedValue({ role: 'HoOC' });
 
     const mockTask = { _id: 'task-1', assigneeId: null };
@@ -71,5 +54,22 @@ describe('TaskController.unassignTask', () => {
     });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ data: mockTask });
+  });
+
+  it('[Abnormal] TC02 - should return 403 when user does not have permission', async () => {
+    ensureEventRole.mockResolvedValue(null);
+
+    const req = createMockReq({
+      params: { eventId: 'event-1', taskId: 'task-1' },
+    });
+    const res = createMockRes();
+
+    await unassignTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Chỉ HoOC hoặc HoD được huỷ gán task.',
+    });
+    expect(unassignTaskService).not.toHaveBeenCalled();
   });
 });
