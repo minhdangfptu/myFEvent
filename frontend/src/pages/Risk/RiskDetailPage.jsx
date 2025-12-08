@@ -31,6 +31,7 @@ export default function RiskDetailPage() {
     scope: "department",
     departmentId: "",
     risk_category: "others",
+    custom_category: "",
     impact: "medium",
     likelihood: "medium",
     risk_mitigation_plan: "",
@@ -207,6 +208,7 @@ export default function RiskDetailPage() {
           scope: originalData.scope || "department",
           departmentId: originalData.departmentId?._id || "",
           risk_category: originalData.risk_category || "others",
+          custom_category: originalData.custom_category || "",
           impact: originalData.impact || "medium",
           likelihood: originalData.likelihood || "medium",
           risk_mitigation_plan: originalData.risk_mitigation_plan || "",
@@ -233,6 +235,10 @@ export default function RiskDetailPage() {
     // Only require departmentId when scope is "department"
     if (editForm.scope === "department" && !editForm.departmentId) {
       errors.departmentId = "Vui lòng chọn ban phụ trách";
+    }
+    // Require custom category when "others" is selected
+    if (editForm.risk_category === "others" && !editForm.custom_category?.trim()) {
+      errors.custom_category = "Danh mục tùy chỉnh không được để trống";
     }
     if (!editForm.risk_mitigation_plan?.trim()) {
       errors.risk_mitigation_plan = "Kế hoạch giảm thiểu không được để trống";
@@ -266,6 +272,11 @@ export default function RiskDetailPage() {
       // Only include departmentId when scope is "department"
       if (editForm.scope === "department") {
         updateData.departmentId = editForm.departmentId;
+      }
+
+      // If "others" is selected, use custom_category as risk_category
+      if (editForm.risk_category === "others" && editForm.custom_category) {
+        updateData.risk_category = editForm.custom_category.trim();
       }
 
       const response = await riskApiWithErrorHandling.updateRisk(eventId, riskId, updateData);
@@ -407,6 +418,7 @@ export default function RiskDetailPage() {
         scope: originalData.scope || "department",
         departmentId: originalData.departmentId?._id || "",
         risk_category: originalData.risk_category || "others",
+        custom_category: originalData.custom_category || "",
         impact: originalData.impact || "medium",
         likelihood: originalData.likelihood || "medium",
         risk_mitigation_plan: originalData.risk_mitigation_plan || "",
@@ -834,7 +846,11 @@ export default function RiskDetailPage() {
                       <select
                         className="form-select"
                         value={editForm.risk_category || "others"}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, risk_category: e.target.value }))}
+                        onChange={(e) => setEditForm(prev => ({
+                          ...prev,
+                          risk_category: e.target.value,
+                          custom_category: e.target.value !== "others" ? "" : prev.custom_category,
+                        }))}
                       >
                         {Object.entries(categoryLabels).map(([value, label]) => (
                           <option key={value} value={value}>
@@ -844,6 +860,27 @@ export default function RiskDetailPage() {
                       </select>
                     </div>
                   </div>
+                  {editForm.risk_category === "others" && (
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>Danh mục tùy chỉnh *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${editErrors.custom_category ? 'is-invalid' : ''}`}
+                          value={editForm.custom_category || ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              custom_category: e.target.value,
+                            })
+                          }
+                          placeholder="Nhập tên danh mục tùy chỉnh..."
+                        />
+                        <small className="text-muted">Ví dụ: Âm thanh, Ánh sáng, An ninh, ...</small>
+                        {editErrors.custom_category && <div className="invalid-feedback">{editErrors.custom_category}</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 3: Mức độ tác động & Khả năng xảy ra */}

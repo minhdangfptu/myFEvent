@@ -812,8 +812,10 @@ export const getMyCalendarInEvent = async (req, res) => {
             }
         }
         const membershipId = membership._id.toString();
-        const userDepartmentId = membership.departmentId?.toString();
-        
+        const userDepartmentId = (typeof membership.departmentId === 'object' && membership.departmentId !== null)
+            ? (membership.departmentId._id || membership.departmentId.id)?.toString()
+            : membership.departmentId?.toString();
+
         const myCalendars = calendars.filter(calendar => {
             // Check if user is in participants list
             const isParticipant = Array.isArray(calendar.participants) && calendar.participants.some(participant => {
@@ -823,21 +825,21 @@ export const getMyCalendarInEvent = async (req, res) => {
                     : (memberField)?.toString();
                 return participantMemberId === membershipId;
             });
-            
+
             // If user is a participant, include the calendar
             if (isParticipant) return true;
-            
+
             // For event-wide calendars (type = 'event'): all members of the event can see them
             // This fixes the issue where new members joining after calendar creation can see event-wide meetings
             const calendarType = calendar.type;
-            const hasDepartmentId = calendar.departmentId && 
+            const hasDepartmentId = calendar.departmentId &&
                 (typeof calendar.departmentId === 'object' ? calendar.departmentId._id : calendar.departmentId);
-            
+
             if (calendarType === 'event' || !hasDepartmentId) {
                 // Event-wide calendar: all members can see
                 return true;
             }
-            
+
             // For department calendars: if user belongs to that department, show the meeting
             // This fixes the issue where members joining later can see department meetings
             if (hasDepartmentId && userDepartmentId) {
@@ -848,7 +850,7 @@ export const getMyCalendarInEvent = async (req, res) => {
                     return true;
                 }
             }
-            
+
             return false;
         });
         return res.status(200).json({ data: myCalendars });

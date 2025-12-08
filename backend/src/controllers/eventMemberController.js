@@ -115,7 +115,7 @@ export const updateMemberRole = async (req, res) => {
       eventId,
       status: { $ne: 'deactive' }
     })
-      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+      .populate('userId', 'fullName email avatarUrl') // Cloudinary URL, không còn base64
       .populate('departmentId', 'name')
       .lean();
 
@@ -144,7 +144,7 @@ export const updateMemberRole = async (req, res) => {
       { $set: set },
       { new: true }
     )
-      .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+      .populate('userId', 'fullName email avatarUrl') // Cloudinary URL, không còn base64
       .populate('departmentId', 'name')
       .lean();
 
