@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, User, Bot, X } from 'lucide-react';
 import { aiAgentApi } from '../../apis/aiAgentApi.js';
 
-const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là AI Assistant của myFEvent.
+const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là Trợ lý feAI của myFEvent.
 
 Tôi có thể giúp bạn:
 • Lên ý tưởng và mô tả sự kiện
@@ -317,7 +317,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
           }}
         >
           <div>
-            <div style={{ fontWeight: 700 }}>AI Assistant</div>
+            <div style={{ fontWeight: 700 }}>Trợ lý feAI</div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Đồng hành lập kế hoạch sự kiện
             </div>
