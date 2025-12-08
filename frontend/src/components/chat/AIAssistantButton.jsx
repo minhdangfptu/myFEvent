@@ -28,11 +28,11 @@ export default function FeAI({ onClick }) {
         gap: 8,
         fontWeight: 600,
       }}
-      aria-label="AI Assistant"
+      aria-label="Trợ lý feAI"
       type="button"
     >
       <Bot size={20} />
-      <span>AI Assistant</span>
+      <span>Trợ lý feAI</span>
     </button>
   );
 }
