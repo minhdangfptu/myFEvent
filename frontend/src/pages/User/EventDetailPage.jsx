@@ -69,7 +69,9 @@ function EventDetailPage() {
   const dateText =
     formatDate(event?.eventStartDate) + " - " + formatDate(event?.eventEndDate);
   const address = event?.location || "";
-  const statusText = deriveEventStatus(event).text;
+  const statusInfo = deriveEventStatus(event);
+  const statusText = statusInfo.text;
+
   const copyJoinCode = async () => {
     if (!event?.joinCode) return;
     try {
@@ -77,6 +79,15 @@ function EventDetailPage() {
       toast.success("Đã sao chép mã tham gia!");
     } catch (err) {
       toast.error("Không thể copy mã, vui lòng thử lại.");
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Đã sao chép đường dẫn sự kiện!");
+    } catch (err) {
+      toast.error("Không thể copy link, vui lòng thử lại.");
     }
   };
 
