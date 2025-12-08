@@ -27,6 +27,7 @@ import {
   Loader2,
   RotateCcw,
 } from "lucide-react";
+import Loading from "~/components/Loading";
 
 export default function EventCalendar() {
   const navigate = useNavigate();
@@ -552,13 +553,7 @@ export default function EventCalendar() {
                   gap: "12px",
                 }}
               >
-                <Loader2
-                  size={40}
-                  style={{
-                    color: "#4285f4",
-                    animation: "spin 1s linear infinite",
-                  }}
-                />
+                <Loading/>
                 <div
                   style={{
                     fontSize: "14px",

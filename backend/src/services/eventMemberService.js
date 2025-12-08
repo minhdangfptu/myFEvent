@@ -28,8 +28,8 @@ export const getMembersByEventRaw = async (eventId) => {
 
   console.time('[getMembersByEventRaw] Query Users & Departments');
   const [users, departments] = await Promise.all([
-    // KHÔNG select avatarUrl vì chứa base64 images (rất lớn, gây timeout!)
-    User.find({ _id: { $in: userIds } }).select('fullName email').lean(),
+    // Cloudinary URL (ngắn gọn) thay vì base64, không còn gây timeout
+    User.find({ _id: { $in: userIds } }).select('fullName email avatarUrl').lean(),
     Department.find({ _id: { $in: deptIds } }).select('name').lean()
   ]);
   console.timeEnd('[getMembersByEventRaw] Query Users & Departments');
@@ -68,8 +68,8 @@ export const groupMembersByDepartment = (members) => {
       userId: member.userId?._id,
       name: member.userId?.fullName || 'Unknown',
       email: member.userId?.email || '',
-      // Không dùng avatarUrl (base64 quá lớn) → dùng UI Avatars API
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
+      // Sử dụng Cloudinary avatarUrl nếu có, fallback về UI Avatars
+      avatar: member.userId?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
       role: member.role,
       department: deptName
     });
@@ -86,14 +86,14 @@ export const getUnassignedMembersRaw = async (eventId) => {
     role: { $ne: 'HoOC' }, // Loại trừ HoOC, lấy tất cả role khác (Member, HoD chưa có ban)
     status: { $ne: 'deactive' }
   })
-    .populate('userId', 'fullName email verified') // Include verified field
+    .populate('userId', 'fullName email verified avatarUrl') // Include avatarUrl from Cloudinary
     .lean();
 };
 
 
 export const getMembersByDepartmentRaw = async (departmentId) => {
   const members = await EventMember.find({ departmentId, status: { $ne: 'deactive' } })
-    .populate('userId', 'fullName email verified') // Include verified field
+    .populate('userId', 'fullName email verified avatarUrl') // Include avatarUrl from Cloudinary
     .lean();
 
   return members.map(member => ({
@@ -103,8 +103,8 @@ export const getMembersByDepartmentRaw = async (departmentId) => {
     name: member.userId?.fullName || 'Unknown',
     email: member.userId?.email || '',
     verified: member.userId?.verified || false,
-    // Use UI Avatars API instead of base64 from DB
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
+    // Sử dụng Cloudinary avatarUrl nếu có, fallback về UI Avatars
+    avatar: member.userId?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.fullName || 'User')}&background=random&size=128`,
     role: member.role,
     departmentId: member.departmentId,
     createdAt: member.createdAt,

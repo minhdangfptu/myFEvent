@@ -44,7 +44,7 @@ export const getCalendarsInEventScope = async (eventId, startDate = null, endDat
     }
 
     return await Calendar.find(query)
-        .select('name startAt endAt location locationType type participants createdBy')
+        .select('name startAt endAt location locationType type participants createdBy eventId departmentId')
         .populate({
             path: 'participants.member',
             model: 'EventMember',

@@ -737,7 +737,7 @@ const validateDate = (dateString) => {
     if (eventId) {
       fetchEventRole(eventId).then((role) => {
         setEventRole(role);
-        setHasPermission(role === "HoD" || role === "HoOC");
+        setHasPermission( role === "HoOC");
       });
     }
   }, [eventId, fetchEventRole]);
@@ -1147,9 +1147,6 @@ const validateDate = (dateString) => {
               style={{ fontSize: "3rem", color: "#6c757d" }}
             ></i>
             <h4 className="text-muted mt-3">Chưa có agenda nào</h4>
-            <p className="text-muted">
-              Hãy thêm ngày sự kiện đầu tiên để bắt đầu!
-            </p>
           </div>
         )}
 
