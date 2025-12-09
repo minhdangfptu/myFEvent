@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
+import ConfirmModal from "../../components/ConfirmModal";
 
 const DepartmentBudgetsListPage = () => {
   const { eventId } = useParams();
@@ -16,6 +17,9 @@ const DepartmentBudgetsListPage = () => {
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [hodDepartmentId, setHodDepartmentId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -313,16 +317,9 @@ const DepartmentBudgetsListPage = () => {
                             {budget.budgetStatus === 'draft' && (
                               <button
                                 className="btn btn-danger btn-sm"
-                                onClick={async () => {
-                                  if (window.confirm(`Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác.`)) {
-                                    try {
-                                      await budgetApi.deleteDraft(eventId, budget.departmentId, budget.budgetId);
-                                      toast.success("Xóa budget thành công!");
-                                      fetchData(); // Refresh danh sách
-                                    } catch (error) {
-                                      toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
-                                    }
-                                  }
+                                onClick={() => {
+                                  setBudgetToDelete(budget);
+                                  setShowDeleteModal(true);
                                 }}
                                 style={{ borderRadius: "8px" }}
                               >
@@ -341,6 +338,33 @@ const DepartmentBudgetsListPage = () => {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setBudgetToDelete(null);
+        }}
+        onConfirm={async () => {
+          if (!budgetToDelete) return;
+          
+          setIsDeleting(true);
+          try {
+            await budgetApi.deleteDraft(eventId, budgetToDelete.departmentId, budgetToDelete.budgetId);
+            toast.success("Xóa budget thành công!");
+            setShowDeleteModal(false);
+            setBudgetToDelete(null);
+            fetchData(); // Refresh danh sách
+          } catch (error) {
+            toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        message="Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác."
+        isLoading={isDeleting}
+      />
     </UserLayout>
   );
 };

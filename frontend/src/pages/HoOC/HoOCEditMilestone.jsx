@@ -124,7 +124,7 @@ const HoOCEditMilestone = () => {
 
   if (loading) {
     return (
-      <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
+      <UserLayout title="Chỉnh sửa cột mốc" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
           <Loading />
           <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thông tin cột mốc...</div>
@@ -134,7 +134,7 @@ const HoOCEditMilestone = () => {
   }
 
   return (
-    <UserLayout title="Edit Milestone" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
+    <UserLayout title="Chỉnh sửa cột mốc" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
       <ToastContainer position="top-right" autoClose={3000} />
 
       {/* Main Content */}

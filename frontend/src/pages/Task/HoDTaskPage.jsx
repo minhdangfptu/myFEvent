@@ -12,7 +12,6 @@ import { userApi } from "~/apis/userApi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
-import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
 import { Trash, AlertTriangle, X } from "lucide-react";
@@ -272,6 +271,23 @@ export default function HoDTaskPage() {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  // Listen to AI plan applied event to refresh tasks
+  useEffect(() => {
+    const handlePlanApplied = (event) => {
+      const { eventId: appliedEventId } = event.detail || {};
+      // Only refresh if the event matches current event
+      if (appliedEventId && String(appliedEventId) === String(eventId)) {
+        console.log('[HoDTaskPage] AI plan applied, refreshing tasks...');
+        fetchTasks();
+      }
+    };
+
+    window.addEventListener('ai:plan-applied', handlePlanApplied);
+    return () => {
+      window.removeEventListener('ai:plan-applied', handlePlanApplied);
+    };
+  }, [eventId, fetchTasks]);
 
   // Cập nhật thời gian mỗi giây
   useEffect(() => {
@@ -951,7 +967,7 @@ export default function HoDTaskPage() {
       )}
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
-        title={t("taskPage.title")}
+        title="Công việc"
         activePage="work-board"
         sidebarType="HoD"
         eventId={eventId}
@@ -1100,12 +1116,6 @@ export default function HoDTaskPage() {
                 onClick={() => setActiveTab("list")}
               >
                 Danh sách công việc
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "assignment" ? "active" : ""}`}
-                onClick={() => setActiveTab("assignment")}
-              >
-                Phân chia công việc
               </button>
               <button
                 className={`tab-btn ${activeTab === "board" ? "active" : ""}`}
@@ -1469,28 +1479,6 @@ export default function HoDTaskPage() {
                 </div>
               )}
             </>
-          )}
-
-          {activeTab === "assignment" && (
-            <div className="soft-card p-4">
-              <div className="mb-3 text-muted small">
-                Kéo công việc từ cột bên trái vào thành viên bên phải để giao việc
-              </div>
-              {membersForAssignment.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  Đang tải danh sách thành viên...
-                </div>
-              ) : (
-                <TaskAssignmentBoard
-                  tasks={tasks}
-                  members={membersForAssignment}
-                  eventId={eventId}
-                  departmentId={departmentId}
-                  onTaskAssigned={fetchTasks}
-                  currentUserId={user?._id}
-                />
-              )}
-            </div>
           )}
 
           {activeTab === "board" && (

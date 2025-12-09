@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SupportButton() {
   const [hover, setHover] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  // Hide on admin pages
+  if (location.pathname.startsWith('/admin')) {
     return null;
   }
 
