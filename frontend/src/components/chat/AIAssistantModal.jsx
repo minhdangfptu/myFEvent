@@ -532,6 +532,15 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                               )
                             );
                             setPlans([]);
+                            
+                            // Emit event để các trang task list biết cần refresh
+                            if (eventId) {
+                              window.dispatchEvent(
+                                new CustomEvent('ai:plan-applied', {
+                                  detail: { eventId },
+                                })
+                              );
+                            }
                           } catch (e) {
                             const detail =
                               e?.response?.data?.message || e.message || '';
@@ -650,6 +659,15 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                           },
                         ]);
                         setPlans([]);
+                        
+                        // Emit event để các trang task list biết cần refresh
+                        if (eventId) {
+                          window.dispatchEvent(
+                            new CustomEvent('ai:plan-applied', {
+                              detail: { eventId },
+                            })
+                          );
+                        }
                       } catch (e) {
                         const detail =
                           e?.response?.data?.message || e.message || '';

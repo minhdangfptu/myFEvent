@@ -47,6 +47,8 @@ export default function LoginPage() {
     setIsLoggingIn(true);
     try {
       const { user: loggedInUser } = await login(email, password);
+      // Wait a bit to ensure user state is updated in AuthContext
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (loggedInUser?.role === "admin") {
         navigate("/admin/dashboard", { replace: true });
       } else {
@@ -117,13 +119,15 @@ export default function LoginPage() {
         );
       }
 
+      // Wait a bit to ensure user state is updated in AuthContext
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Navigate based on user role
-      // if (userData?.role === 'HoOC') {
-      //   navigate('/hooc-landing-page', { replace: true });
-      // } else {
-      //   navigate('/user-landing-page', { replace: true });
-      // }
-      navigate("/home-page", { replace: true, state: { loginSuccess: true } });
+      if (userData?.role === "admin") {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/home-page", { replace: true, state: { loginSuccess: true } });
+      }
     } catch (err) {
       console.error("Google login error:", err);
       const errorCode = err?.response?.data?.code;
