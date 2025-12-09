@@ -1,12 +1,14 @@
 import * as React from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import img from "/aboutus_event.jpg"
+import img from "/aboutus_event.jpg";
 import { useNavigate } from "react-router-dom";
+
 function MaxContainer({ children }) {
   return <div className="container-xl px-2">{children}</div>;
 }
 
+/* ---------- Illustration (giữ nguyên) ---------- */
 function Illustration() {
   return (
     <div
@@ -76,6 +78,150 @@ function Illustration() {
   );
 }
 
+/* ---------- New: Partners carousel section ---------- */
+/* Replace the previous PartnersSection with this component */
+function PartnersSection() {
+  const partners = [
+    "/Patners/1.png",
+    "/Patners/2.png",
+    "/Patners/3.png",
+    "/Patners/4.jpg",
+    "/Patners/5.PNG",
+    "/Patners/6.png",
+    "/Patners/7.png",
+    "/Patners/8.jpg",
+    "/Patners/9.jpg",
+    "/Patners/10.PNG",
+    "/Patners/11.png",
+    "/Patners/12.png",
+    "/Patners/13.png",
+    "/Patners/14.jpeg",
+    "/Patners/16.png",
+    "/Patners/17.PNG",
+    "/Patners/18.png",
+    "/Patners/19.jpeg",
+    "/Patners/20.jpg",
+    "/Patners/21.png",
+    "/Patners/22.jpg",
+    "/Patners/23.jpg",
+    "/Patners/24.jpg",
+    "/Patners/25.png",
+    "/Patners/26.png",
+    "/Patners/27.png",
+    "/Patners/28.png",
+    "/Patners/29.png",
+    "/Patners/30.png",
+    "/Patners/31.png",
+    "/Patners/32.png",
+  ];
+
+  // chỉnh nhanh: nhỏ hơn = nhanh hơn
+  const ANIMATION_DURATION = 40;
+
+  // duplicate for seamless loop
+  const loopItems = [...partners, ...partners];
+
+  return (
+    <section className="py-5 bg-white">
+      <MaxContainer>
+        <div className="text-center mb-3">
+          <h4 className="fw-bold" style={{ color: "#111827" }}>
+            Đối tác của chúng tôi
+          </h4>
+          <p className="text-secondary mx-auto" style={{ maxWidth: 760 }}>
+            Chúng tôi tự hào hợp tác cùng các đối tác hàng đầu — cùng nhau tạo nên
+            nhiều sự kiện ý nghĩa.
+          </p>
+        </div>
+
+        <div className="partners-marquee-wrapper overflow-hidden">
+          <div
+            className="partners-marquee__inner d-flex"
+            style={{
+              animation: `partners-scroll ${ANIMATION_DURATION}s linear infinite`,
+            }}
+          >
+            {loopItems.map((src, idx) => (
+              <div
+                key={idx}
+                className="partners-item d-flex align-items-center justify-content-center"
+              >
+                <img
+                  src={src}
+                  alt={`partner-${idx}`}
+                  style={{
+                    border: "solid 1px #d4d4d4ff",
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <style>{`
+          /* container wrapper */
+          .partners-marquee-wrapper {
+            width: 100%;
+            overflow: hidden;
+          }
+
+          /* the moving track: ensure nowrap and keep content in one line */
+          .partners-marquee__inner {
+            display: flex;
+            flex-wrap: nowrap; /* important */
+            align-items: center;
+            min-width: max-content; /* important so duplicated halves have identical width */
+            will-change: transform;
+          }
+
+          /* each item: fixed width so halves are equal.
+             adjust width/height to taste. */
+          .partners-item {
+            flex: 0 0 160px; /* fixed box width */
+            height: 120px;
+            box-sizing: border-box;
+            padding: 8px; /* internal padding only */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          /* prevent any margins that would introduce asymmetry */
+          .partners-item + .partners-item { /* optional small gap visually via padding above */
+            /* no extra margin here to keep perfect symmetry */
+          }
+
+          /* animation: translate full half (we duplicated array so -50% moves exactly one original length) */
+          @keyframes partners-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+
+          /* responsive */
+          @media (max-width: 992px) {
+            .partners-item { flex: 0 0 140px; height: 100px; }
+          }
+          @media (max-width: 576px) {
+            .partners-item { flex: 0 0 110px; height: 80px; }
+          }
+
+          /* Optional: remove hover pause to avoid resume glitches — if you want pause, re-enable */
+          /* .partners-marquee-wrapper:hover .partners-marquee__inner {
+               animation-play-state: paused;
+          } */
+        `}</style>
+      </MaxContainer>
+    </section>
+  );
+}
+
+
+
+/* ---------- Main AboutUs component (cập nhật: chèn PartnersSection) ---------- */
 export default function AboutUs() {
   const navigate = useNavigate();
   return (
@@ -212,7 +358,7 @@ export default function AboutUs() {
               <div className="col-12 col-md-6">
                 <div className="rounded-3 overflow-hidden shadow">
                   <img
-                  src = {img}
+                    src={img}
                     alt="Team working"
                     className="w-100"
                     style={{ objectFit: "cover" }}
@@ -254,6 +400,9 @@ export default function AboutUs() {
             </div>
           </MaxContainer>
         </section>
+
+        {/* Chèn phần đối tác ở đây */}
+        <PartnersSection />
       </div>
       <Footer />
     </>
