@@ -237,7 +237,7 @@ const EventManagement = () => {
           {/* Date Input */}
           <input
             type="date"
-            placeholder="mm/dd/yyyy"
+            placeholder="dd/mm/yyyy"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
             style={{
