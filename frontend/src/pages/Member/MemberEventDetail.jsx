@@ -4,6 +4,7 @@ import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import { useAuth } from "../../contexts/AuthContext";
 import Loading from "../../components/Loading";
+import ConfirmModal from "../../components/ConfirmModal";
 import { useEvents } from "../../contexts/EventContext";
 import { toast } from "react-toastify";
 import { formatDate } from "../../utils/formatDate";
@@ -22,6 +23,8 @@ export default function MemberEventDetail() {
   const [eventRole, setEventRole] = useState('');
   const { fetchEventRole, refetchEvents } = useEvents();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // Thêm eventId vào URL query để sidebar đồng bộ
   useEffect(() => {
@@ -87,23 +90,27 @@ export default function MemberEventDetail() {
     }
   };
 
-  const handleLeaveEvent = async () => {
+  const handleLeaveEvent = () => {
     if (!eventId) return;
-    const confirmed = window.confirm('Bạn có chắc chắn muốn rời sự kiện này? Bạn sẽ mất quyền truy cập vào các chức năng của sự kiện.');
-    if (!confirmed) return;
+    setShowLeaveModal(true);
+  };
+
+  const confirmLeaveEvent = async () => {
+    if (!eventId) return;
 
     try {
-      setLoading(true);
+      setIsLeaving(true);
       await eventApi.leaveEvent(eventId);
       await refetchEvents?.();
       toast.success('Bạn đã rời sự kiện thành công');
+      setShowLeaveModal(false);
       navigate('/home-page');
     } catch (error) {
       console.error('Error leaving event:', error);
       const msg = error?.response?.data?.message || 'Không thể rời sự kiện';
       toast.error(msg);
     } finally {
-      setLoading(false);
+      setIsLeaving(false);
     }
   };
 
@@ -702,6 +709,14 @@ export default function MemberEventDetail() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        show={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={confirmLeaveEvent}
+        message="Bạn có chắc chắn muốn rời sự kiện này? Bạn sẽ mất quyền truy cập vào các chức năng của sự kiện."
+        isLoading={isLeaving}
+      />
     </UserLayout>
   );
 }

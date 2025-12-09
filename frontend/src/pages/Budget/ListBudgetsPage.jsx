@@ -26,6 +26,9 @@ const ListBudgetsPage = () => {
   const [eventRole, setEventRole] = useState("");
   const [checkingRole, setCheckingRole] = useState(true);
   const [hodDepartmentId, setHodDepartmentId] = useState(null); // Department ID nếu user là HoD
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 5;
 
   // Kiểm tra role khi component mount

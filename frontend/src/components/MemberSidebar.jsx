@@ -79,7 +79,7 @@ export default function MemberSidebar({
   }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen]);
 
   // Sử dụng eventId từ props thay vì lấy từ URL
-  const { events, loading } = useEvents();
+  const { events, loading, error: eventError } = useEvents();
   const event = useMemo(() => {
     // Tìm event từ context
     const foundEvent = events.find(e => (e._id || e.id) === eventId);
@@ -98,8 +98,10 @@ export default function MemberSidebar({
   const isEventCompleted = hasEvents && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
   const navigate = useNavigate();
 
-  // Chỉ show loading khi chưa có events VÀ đang loading
-  const showLoading = loading && events.length === 0;
+  // Show loading when:
+  // 1. Currently loading AND (no events yet OR first load)
+  // 2. Loading auth state (events.length could be from cache)
+  const showLoading = loading || (loading && events.length === 0);
 
   // Nếu cần chọn event ưu tiên theo eventId url: giữ lại block ưu tiên hoặc tính toán selectedEvent dựa vào events context vừa lấy được. Không fetch độc lập nữa.
 
@@ -400,6 +402,41 @@ export default function MemberSidebar({
           >
             <Loading size={60} />
             <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : eventError ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+              padding: "20px",
+            }}
+          >
+            <div style={{ color: "#ef4444", fontSize: 16, fontWeight: 600 }}>Lỗi tải dữ liệu</div>
+            <span style={{ color: "#6b7280", fontSize: 14, textAlign: "center" }}>{eventError}</span>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: 8,
+                padding: "8px 16px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Tải lại
+            </button>
           </div>
         ) : (
         <>
