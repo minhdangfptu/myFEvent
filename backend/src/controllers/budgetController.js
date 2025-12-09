@@ -56,16 +56,6 @@ export const getDepartmentBudgetById = async (req, res) => {
         select: 'fullName email',
         options: { strictPopulate: false }
       })
-      .populate({
-        path: 'reviewedBy',
-        select: 'fullName email',
-        options: { strictPopulate: false }
-      })
-      .populate({
-        path: 'sentToMembersBy',
-        select: 'fullName email',
-        options: { strictPopulate: false }
-      })
       .lean();
 
     if (!budget) {
@@ -139,16 +129,6 @@ export const getDepartmentBudget = async (req, res) => {
           select: 'fullName email',
           options: { strictPopulate: false }
         })
-        .populate({
-          path: 'reviewedBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
-        .populate({
-          path: 'sentToMembersBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
         .lean();
     }
 
@@ -171,16 +151,6 @@ export const getDepartmentBudget = async (req, res) => {
           select: 'fullName email',
           options: { strictPopulate: false }
         })
-        .populate({
-          path: 'reviewedBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
-        .populate({
-          path: 'sentToMembersBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
         .lean();
     }
     
@@ -198,16 +168,6 @@ export const getDepartmentBudget = async (req, res) => {
         })
         .populate({
           path: 'createdBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
-        .populate({
-          path: 'reviewedBy',
-          select: 'fullName email',
-          options: { strictPopulate: false }
-        })
-        .populate({
-          path: 'sentToMembersBy',
           select: 'fullName email',
           options: { strictPopulate: false }
         })
@@ -1147,11 +1107,6 @@ export const completeReview = async (req, res) => {
     }
 
     budget.status = newStatus;
-    
-    if (userId) {
-      budget.reviewedBy = new mongoose.Types.ObjectId(userId);
-    }
-    budget.reviewedAt = new Date();
 
     budget.audit = budget.audit || [];
     budget.audit.push({
@@ -1324,7 +1279,7 @@ export const getAllBudgetsForEvent = async (req, res) => {
 
     // Tối ưu: Chỉ load những trường cần thiết cho danh sách, không load chi tiết items
     // Select chỉ những trường cần thiết để giảm dữ liệu transfer
-    const selectFields = '_id name status submittedAt createdAt isPublic publicAt publicBy departmentId createdBy reviewedBy';
+    const selectFields = '_id name status submittedAt createdAt isPublic departmentId createdBy';
     
     // Find budgets with pagination - chỉ select những trường cần thiết
     const [budgets, total] = await Promise.all([
@@ -1332,7 +1287,6 @@ export const getAllBudgetsForEvent = async (req, res) => {
         .select(selectFields)
         .populate('departmentId', 'name leaderId')
         .populate('createdBy', 'fullName email')
-        .populate('reviewedBy', 'fullName email')
         .sort({ submittedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -1438,8 +1392,6 @@ export const getAllBudgetsForEvent = async (req, res) => {
         totalItems: totalItems,
         // Không trả về items chi tiết cho danh sách - chỉ trả về khi xem chi tiết
         isPublic: budget.isPublic,
-        publicAt: budget.publicAt,
-        publicBy: budget.publicBy,
       };
 
       return formatted;
@@ -1799,8 +1751,6 @@ export const sendBudgetToMembers = async (req, res) => {
     }
 
     budget.status = 'sent_to_members';
-    budget.sentToMembersAt = new Date();
-    budget.sentToMembersBy = new mongoose.Types.ObjectId(userId);
 
     budget.audit = budget.audit || [];
     budget.audit.push({
@@ -1867,13 +1817,6 @@ export const updateBudgetVisibility = async (req, res) => {
     }
 
     budget.isPublic = isPublic;
-    if (isPublic) {
-      budget.publicAt = new Date();
-      budget.publicBy = actorId;
-    } else {
-      budget.publicAt = null;
-      budget.publicBy = null;
-    }
 
     budget.audit = budget.audit || [];
     budget.audit.push({

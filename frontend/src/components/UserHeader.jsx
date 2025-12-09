@@ -627,19 +627,23 @@ export default function UserHeader({
               </span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end dropdown-menu-red">
-              <li>
-                <a className="dropdown-item" href="/user-profile">
-                  {t("nav.profile")}
-                </a>
-              </li>
-              <li>
-                <a className="dropdown-item" href="/setting">
-                  {t("nav.settings")}
-                </a>
-              </li>
-              <li>
-                <hr className="dropdown-divider" />
-              </li>
+              {!location.pathname.startsWith('/admin') && (
+                <>
+                  <li>
+                    <a className="dropdown-item" href="/user-profile">
+                      {t("nav.profile")}
+                    </a>
+                  </li>
+                  <li>
+                    <a className="dropdown-item" href="/setting">
+                      {t("nav.settings")}
+                    </a>
+                  </li>
+                  <li>
+                    <hr className="dropdown-divider" />
+                  </li>
+                </>
+              )}
               <li>
                 <button className="dropdown-item" onClick={handleLogout}>
                   {t("actions.logout")}

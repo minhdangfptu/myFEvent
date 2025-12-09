@@ -607,13 +607,11 @@ export const feedbackService = {
       await notifyResponseSubmitted(eventId, formId, member._id);
     } catch (notifError) {
       console.error('Error sending response submitted notification:', notifError);
-      // Don't fail the request if notification fails
     }
     
     return { message: 'Gửi phản hồi thành công', data: feedbackResponse };
   },
 
-  // Get summary/statistics for a form (HoOC only)
   async getFormSummary({ userId, eventId, formId }) {
     const membership = await ensureEventRole(userId, eventId, ['HoOC']);
     if (!membership) {
@@ -642,7 +640,6 @@ export const feedbackService = {
 
     const completionRate = totalInvited > 0 ? ((totalResponses / totalInvited) * 100).toFixed(1) : 0;
 
-    // Calculate statistics for each question
     const questionStats = form.questions.map((question, index) => {
       const questionResponses = responses
         .map(r => r.responses.find(resp => resp.questionId === index.toString()))
@@ -683,8 +680,7 @@ export const feedbackService = {
           distribution[answer] = (distribution[answer] || 0) + 1;
         });
 
-        // Tính percentage dựa trên tổng số responses (giống Google Form)
-        // Mỗi option được chọn bao nhiêu lần / tổng số responses
+       
         const totalResponses = questionResponses.length;
         const percentages = {};
         Object.keys(distribution).forEach(key => {

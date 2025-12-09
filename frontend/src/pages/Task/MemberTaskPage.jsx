@@ -11,6 +11,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
 import { useAuth } from "~/contexts/AuthContext";
+import { ClipboardList, FileText, Users, User, Calendar, BarChart3 } from "lucide-react";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -681,15 +682,21 @@ export default function MemberTaskPage() {
                     <label className="text-muted small mb-2">
                       Tên công việc
                     </label>
-                    <div className="fw-semibold fs-5">{selectedTask.name}</div>
+                    <div className="d-flex align-items-center gap-2">
+                      <ClipboardList size={20} />
+                      <span className="fw-semibold fs-5">{selectedTask.name}</span>
+                    </div>
                   </div>
 
                   <div className="mb-4">
                     <label className="text-muted small mb-2">
                       Mô tả
                     </label>
-                    <div className="text-muted">
-                      {selectedTask.description || "Chưa có mô tả"}
+                    <div className="d-flex align-items-center gap-2">
+                      <FileText size={20} />
+                      <span className="text-muted">
+                        {selectedTask.description || "Chưa có mô tả"}
+                      </span>
                     </div>
                   </div>
 
@@ -698,7 +705,7 @@ export default function MemberTaskPage() {
                       Ban phụ trách
                     </label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>👤</span>
+                      <Users size={20} />
                       <span>{selectedTask.department}</span>
                     </div>
                   </div>
@@ -706,7 +713,7 @@ export default function MemberTaskPage() {
                   <div className="mb-4">
                     <label className="text-muted small mb-2">Deadline</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📅</span>
+                      <Calendar size={20} />
                       <span>{selectedTask.due}</span>
                     </div>
                   </div>
@@ -716,7 +723,7 @@ export default function MemberTaskPage() {
                       Thời gian giao
                     </label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>🕒</span>
+                      <Calendar size={20} />
                       <span>{selectedTask.assignedAt || "Chưa xác định"}</span>
                     </div>
                   </div>
@@ -724,7 +731,7 @@ export default function MemberTaskPage() {
                   <div className="mb-4">
                     <label className="text-muted small mb-2">Trạng thái</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📈 </span>
+                      <BarChart3 size={20} />
                       <span>{selectedTask.status}</span>
                     </div>
                   </div>
@@ -734,7 +741,7 @@ export default function MemberTaskPage() {
                       Ước tính thời gian thực hiện
                     </label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>⌛ </span>
+                      <Calendar size={20} />
                       <span>{selectedTask.estimate}</span>
                     </div>
                   </div>

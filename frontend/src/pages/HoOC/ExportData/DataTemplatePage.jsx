@@ -42,7 +42,7 @@ export default function DataTemplatePage() {
       try {
         const role = await fetchEventRole(eventId);
         setEventRole(role);
-        if (role !== 'HoOC') {
+        if (role !== 'HoOC' || role !== "HoD") {
           toast.error('Bạn không có quyền truy cập trang này');
           navigate('/home-page');
           return;

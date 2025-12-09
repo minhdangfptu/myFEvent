@@ -8,6 +8,7 @@ import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { departmentService } from "../../services/departmentService";
 import { Bell, CheckCircle, ChevronLeft, ChevronRight, Clock, FileText, RotateCw, Search, Send, Trash } from "lucide-react";
+import ConfirmModal from "../../components/ConfirmModal";
 
 
 const ListBudgetsPage = () => {
@@ -25,6 +26,9 @@ const ListBudgetsPage = () => {
   const [eventRole, setEventRole] = useState("");
   const [checkingRole, setCheckingRole] = useState(true);
   const [hodDepartmentId, setHodDepartmentId] = useState(null); // Department ID nếu user là HoD
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 5;
 
   // Kiểm tra role khi component mount
@@ -1003,18 +1007,9 @@ const ListBudgetsPage = () => {
                             {eventRole === 'HoD' && budget.status === 'draft' && (
                               <button
                                 className="btn btn-danger btn-sm"
-                                onClick={async () => {
-                                  if (window.confirm(`Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác.`)) {
-                                    try {
-                                      const budgetId = budget._id || budget.id || budget.budgetId;
-                                      const deptId = budget.departmentId || budget.department?._id || hodDepartmentId;
-                                      await budgetApi.deleteDraft(eventId, deptId, budgetId);
-                                      toast.success("Xóa budget thành công!");
-                                      fetchBudgets(); // Refresh danh sách
-                                    } catch (error) {
-                                      toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
-                                    }
-                                  }
+                                onClick={() => {
+                                  setBudgetToDelete(budget);
+                                  setShowDeleteModal(true);
                                 }}
                                 style={{ borderRadius: "8px" }}
                               >
@@ -1074,6 +1069,35 @@ const ListBudgetsPage = () => {
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setBudgetToDelete(null);
+        }}
+        onConfirm={async () => {
+          if (!budgetToDelete) return;
+          
+          setIsDeleting(true);
+          try {
+            const budgetId = budgetToDelete._id || budgetToDelete.id || budgetToDelete.budgetId;
+            const deptId = budgetToDelete.departmentId || budgetToDelete.department?._id || hodDepartmentId;
+            await budgetApi.deleteDraft(eventId, deptId, budgetId);
+            toast.success("Xóa budget thành công!");
+            setShowDeleteModal(false);
+            setBudgetToDelete(null);
+            fetchBudgets(); // Refresh danh sách
+          } catch (error) {
+            toast.error(error?.response?.data?.message || "Xóa budget thất bại!");
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        message="Bạn có chắc chắn muốn xóa budget này? Hành động này không thể hoàn tác."
+        isLoading={isDeleting}
+      />
     </UserLayout>
   );
 };

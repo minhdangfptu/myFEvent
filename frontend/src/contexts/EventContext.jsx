@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { eventService } from "../services/eventService";
 import { useAuth } from "./AuthContext";
 import { userApi } from "../apis/userApi";
+import { clearOldCacheFormat } from "../utils/cacheMigration";
+import { currentEventStorage } from "../utils/currentEventStorage";
 
 const EventContext = createContext();
 
@@ -9,30 +11,79 @@ export function useEvents() {
   return useContext(EventContext);
 }
 
+// Cache TTL: 1 hour (in milliseconds) - Reduced from 24h to ensure role changes are reflected faster
+const CACHE_TTL = 1 * 60 * 60 * 1000;
+
+// Helper to get user-scoped cache key
+const getCacheKey = (baseKey, userId) => {
+  return userId ? `${baseKey}_${userId}` : baseKey;
+};
+
+// Helper to check if cache entry is expired
+const isCacheExpired = (timestamp) => {
+  if (!timestamp) return true;
+  return Date.now() - timestamp > CACHE_TTL;
+};
+
+// Helper to load cache with TTL check
+const loadCacheWithTTL = (cacheKey) => {
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return {};
+
+    const parsed = JSON.parse(cached);
+
+    // Check if cache has timestamp (new format)
+    if (parsed._timestamp) {
+      if (isCacheExpired(parsed._timestamp)) {
+        // Cache expired, remove it
+        localStorage.removeItem(cacheKey);
+        return {};
+      }
+      // Remove timestamp from returned data
+      const { _timestamp, ...data } = parsed;
+      return data;
+    }
+
+    // Old format without timestamp, treat as expired
+    localStorage.removeItem(cacheKey);
+    return {};
+  } catch {
+    return {};
+  }
+};
+
 export function EventProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Initialize eventRoles from localStorage
+  // Get current userId for cache keys
+  const currentUserId = user?._id || user?.id;
+
+  // Initialize eventRoles from user-scoped localStorage with TTL
   const [eventRoles, setEventRoles] = useState(() => {
-    try {
-      const cached = localStorage.getItem('eventRoles');
-      return cached ? JSON.parse(cached) : {};
-    } catch {
+    if (!currentUserId) {
+      console.log('[EventContext Init] No userId, starting with empty eventRoles');
       return {};
     }
+    const cacheKey = getCacheKey('eventRoles', currentUserId);
+    const cached = loadCacheWithTTL(cacheKey);
+    console.log(`[EventContext Init] 📦 Loaded eventRoles cache for user ${currentUserId}:`, cached);
+    return cached;
   });
 
   // Store full member info (role + departmentId) for each event
   const [eventMembers, setEventMembers] = useState(() => {
-    try {
-      const cached = localStorage.getItem('eventMembers');
-      return cached ? JSON.parse(cached) : {};
-    } catch {
+    if (!currentUserId) {
+      console.log('[EventContext Init] No userId, starting with empty eventMembers');
       return {};
     }
+    const cacheKey = getCacheKey('eventMembers', currentUserId);
+    const cached = loadCacheWithTTL(cacheKey);
+    console.log(`[EventContext Init] 📦 Loaded eventMembers cache for user ${currentUserId}:`, cached);
+    return cached;
   });
 
   const [pagination, setPagination] = useState({
@@ -43,58 +94,171 @@ export function EventProvider({ children }) {
   });
   const fetchingRef = useRef(false); // Track if we're currently fetching
   const hasFetchedRef = useRef(false); // Track if we've fetched at least once
+  const userIdRef = useRef(null); // Track current user ID
 
-  // Persist eventRoles to localStorage when it changes
-  useEffect(() => {
+  // Function to clear ALL user data on logout (comprehensive cleanup)
+  // Defined early so it can be used in useEffect hooks
+  const clearAllUserData = useCallback((userId) => {
+    console.log('[EventContext] Clearing all user data for logout...');
+
     try {
-      localStorage.setItem('eventRoles', JSON.stringify(eventRoles));
+      // 1. Clear state
+      setEventRoles({});
+      setEventMembers({});
+      setEvents([]);
+      setError("");
+      setLoading(false);
+
+      // 2. Clear refs
+      fetchingRef.current = { fetching: false, lastUserId: null };
+      hasFetchedRef.current = false;
+      userIdRef.current = null;
+
+      // 3. Clear localStorage - Event cache
+      if (userId) {
+        const rolesKey = getCacheKey('eventRoles', userId);
+        const membersKey = getCacheKey('eventMembers', userId);
+        localStorage.removeItem(rolesKey);
+        localStorage.removeItem(membersKey);
+      }
+
+      // 4. Clear old format cache
+      localStorage.removeItem('eventRoles');
+      localStorage.removeItem('eventMembers');
+
+      // 5. Clear current event cache
+      currentEventStorage.clear();
+
+      // 6. Clear sidebar states
+      localStorage.removeItem('sidebar_state_member');
+      localStorage.removeItem('sidebar_state_hooc');
+      localStorage.removeItem('sidebar_state_hod');
+
+      // 7. Clear any other event-related cache
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        // Remove any key that might contain event data
+        if (key && (
+          key.includes('eventRoles') ||
+          key.includes('eventMembers') ||
+          key.includes('sidebar_state')
+        )) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      console.log(`[EventContext] ✅ All user data cleared (${keysToRemove.length + 6} items)`);
+    } catch (err) {
+      console.error('[EventContext] ❌ Error clearing user data:', err);
+    }
+  }, []);
+
+  // One-time cleanup of old cache format on mount
+  useEffect(() => {
+    clearOldCacheFormat();
+  }, []);
+
+  // Listen for auth:logout event to clear all user data immediately
+  useEffect(() => {
+    const handleLogout = () => {
+      const userId = userIdRef.current;
+      console.log('[EventContext] Logout event detected, clearing all data...');
+      clearAllUserData(userId);
+    };
+
+    window.addEventListener('auth:logout', handleLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+    };
+  }, [clearAllUserData]);
+
+  // Persist eventRoles to user-scoped localStorage with TTL
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    try {
+      const cacheKey = getCacheKey('eventRoles', currentUserId);
+      // Add timestamp to cache for TTL checking
+      const cacheData = {
+        ...eventRoles,
+        _timestamp: Date.now()
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
       // Broadcast change to other tabs
       window.dispatchEvent(new StorageEvent('storage', {
-        key: 'eventRoles',
-        newValue: JSON.stringify(eventRoles),
+        key: cacheKey,
+        newValue: JSON.stringify(cacheData),
         storageArea: localStorage
       }));
     } catch (err) {
       console.error('Failed to persist eventRoles:', err);
     }
-  }, [eventRoles]);
+  }, [eventRoles, currentUserId]);
 
-  // Persist eventMembers to localStorage when it changes
+  // Persist eventMembers to user-scoped localStorage with TTL
   useEffect(() => {
+    if (!currentUserId) return;
+
     try {
-      localStorage.setItem('eventMembers', JSON.stringify(eventMembers));
+      const cacheKey = getCacheKey('eventMembers', currentUserId);
+      // Add timestamp to cache for TTL checking
+      const cacheData = {
+        ...eventMembers,
+        _timestamp: Date.now()
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
       // Broadcast change to other tabs
       window.dispatchEvent(new StorageEvent('storage', {
-        key: 'eventMembers',
-        newValue: JSON.stringify(eventMembers),
+        key: cacheKey,
+        newValue: JSON.stringify(cacheData),
         storageArea: localStorage
       }));
     } catch (err) {
       console.error('Failed to persist eventMembers:', err);
     }
-  }, [eventMembers]);
+  }, [eventMembers, currentUserId]);
 
-  // Listen for storage changes from other tabs to sync roles
+  // Listen for storage changes from other tabs to sync roles (user-scoped)
   useEffect(() => {
+    if (!currentUserId) return;
+
+    const rolesKey = getCacheKey('eventRoles', currentUserId);
+    const membersKey = getCacheKey('eventMembers', currentUserId);
+
     const handleStorageChange = (e) => {
-      if (e.key === 'eventRoles' && e.newValue) {
+      // Check for user-scoped eventRoles changes
+      if (e.key === rolesKey && e.newValue) {
         try {
-          const newRoles = JSON.parse(e.newValue);
+          const parsed = JSON.parse(e.newValue);
+          // Remove timestamp before comparing/setting
+          const { _timestamp, ...newRoles } = parsed;
+
           // Only update if the data is actually different to avoid infinite loops
           const currentRolesStr = JSON.stringify(eventRoles);
-          if (currentRolesStr !== e.newValue) {
+          const newRolesStr = JSON.stringify(newRoles);
+          if (currentRolesStr !== newRolesStr) {
             setEventRoles(newRoles);
           }
         } catch (err) {
           console.error('Failed to parse eventRoles from storage event:', err);
         }
       }
-      if (e.key === 'eventMembers' && e.newValue) {
+
+      // Check for user-scoped eventMembers changes
+      if (e.key === membersKey && e.newValue) {
         try {
-          const newMembers = JSON.parse(e.newValue);
+          const parsed = JSON.parse(e.newValue);
+          // Remove timestamp before comparing/setting
+          const { _timestamp, ...newMembers } = parsed;
+
           // Only update if the data is actually different to avoid infinite loops
           const currentMembersStr = JSON.stringify(eventMembers);
-          if (currentMembersStr !== e.newValue) {
+          const newMembersStr = JSON.stringify(newMembers);
+          if (currentMembersStr !== newMembersStr) {
             setEventMembers(newMembers);
           }
         } catch (err) {
@@ -107,34 +271,36 @@ export function EventProvider({ children }) {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [eventRoles, eventMembers]);
+  }, [eventRoles, eventMembers, currentUserId]);
 
   // Clear eventRoles and eventMembers cache when user logs out or changes
-  const userIdRef = useRef(null);
   useEffect(() => {
     const currentUserId = user?._id || user?.id;
 
     if (!authLoading) {
       if (!user) {
-        // User logged out, clear the cache
-        setEventRoles({});
-        setEventMembers({});
-        userIdRef.current = null;
-        try {
-          localStorage.removeItem('eventRoles');
-          localStorage.removeItem('eventMembers');
-        } catch (err) {
-          console.error('Failed to clear cache:', err);
+        // User logged out - clear ALL user data (comprehensive cleanup)
+        // Note: This also happens via 'auth:logout' event listener, but we double-check here
+        if (userIdRef.current) {
+          clearAllUserData(userIdRef.current);
         }
       } else if (userIdRef.current && userIdRef.current !== currentUserId) {
-        // Different user logged in, clear old cache
-        setEventRoles({});
-        setEventMembers({});
+        // Different user logged in, clear old user's cache and load new user's cache
+        console.log('[EventContext] User switch detected, clearing old cache...');
+
+        // Clear old user's data
+        clearAllUserData(userIdRef.current);
+
         try {
-          localStorage.removeItem('eventRoles');
-          localStorage.removeItem('eventMembers');
+          // Load new user's cache
+          const newRolesKey = getCacheKey('eventRoles', currentUserId);
+          const newMembersKey = getCacheKey('eventMembers', currentUserId);
+          setEventRoles(loadCacheWithTTL(newRolesKey));
+          setEventMembers(loadCacheWithTTL(newMembersKey));
+
+          console.log('[EventContext] New user cache loaded');
         } catch (err) {
-          console.error('Failed to clear cache:', err);
+          console.error('[EventContext] Failed to load new user cache:', err);
         }
       }
 
@@ -143,7 +309,7 @@ export function EventProvider({ children }) {
         userIdRef.current = currentUserId;
       }
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, clearAllUserData]);
 
   const extractEventArray = useCallback((payload) => {
     if (!payload) return [];
@@ -161,9 +327,9 @@ export function EventProvider({ children }) {
   }, []);
 
   const fetchEvents = useCallback(async (page = 1, _limit = 8, search = '', status = '') => {
-    // Skip if auth is still loading
+    // Skip if auth is still loading - DON'T set loading state here
+    // It will be set by the useEffect that triggers this
     if (authLoading) {
-      setLoading(true);
       return;
     }
 
@@ -171,18 +337,23 @@ export function EventProvider({ children }) {
     if (!user) {
       setEvents([]);
       setLoading(false);
-      fetchingRef.current = false;
+      setError("");
+      fetchingRef.current = { fetching: false, lastUserId: null };
       return;
     }
 
     // Skip if already fetching to prevent duplicate requests
-    if (fetchingRef.current?.fetching) {
+    const currentFetchState = fetchingRef.current;
+    if (currentFetchState?.fetching) {
+      console.warn('[EventContext] Already fetching events, skipping duplicate request');
       return;
     }
 
-    fetchingRef.current = { fetching: true, lastUserId: user?._id || user?.id };
+    const userId = user?._id || user?.id;
+    fetchingRef.current = { fetching: true, lastUserId: userId };
     setLoading(true);
     setError("");
+
     try {
       // Ép backend luôn trả về 8 sự kiện mỗi trang
       const res = await eventService.listMyEvents({ page, limit: 8, search, status });
@@ -203,11 +374,12 @@ export function EventProvider({ children }) {
         }));
       }
     } catch (err) {
+      console.error('[EventContext] Error fetching events:', err);
       setEvents([]);
-      setError("Lỗi lấy dữ liệu sự kiện");
+      setError(err?.response?.data?.message || err?.message || "Lỗi lấy dữ liệu sự kiện");
     } finally {
       setLoading(false);
-      fetchingRef.current = { fetching: false, lastUserId: user?._id || user?.id };
+      fetchingRef.current = { fetching: false, lastUserId: userId };
     }
   }, [user, authLoading, extractEventArray]);
 
@@ -215,17 +387,25 @@ export function EventProvider({ children }) {
   useEffect(() => {
     // Wait for auth to complete before fetching
     if (authLoading) {
+      setLoading(true); // Show loading while auth is loading
       return; // Still loading auth, don't do anything yet
     }
 
     // Auth is done loading
     if (user) {
       // User is authenticated, fetch their events
-      // Only fetch if we haven't fetched yet, or if user changed
       const currentUserId = user._id || user.id;
       const lastUserId = fetchingRef.current?.lastUserId;
-      
-      if (!hasFetchedRef.current || lastUserId !== currentUserId) {
+
+      // Fetch if:
+      // 1. Haven't fetched yet (hasFetchedRef.current = false)
+      // 2. User changed (lastUserId !== currentUserId)
+      // 3. No events and no error (possible failed state that needs retry)
+      const shouldFetch = !hasFetchedRef.current ||
+                         lastUserId !== currentUserId ||
+                         (events.length === 0 && !error && !fetchingRef.current?.fetching);
+
+      if (shouldFetch) {
         hasFetchedRef.current = true;
         fetchEvents();
       }
@@ -233,6 +413,7 @@ export function EventProvider({ children }) {
       // No user after auth loads, clear events
       setEvents([]);
       setLoading(false);
+      setError("");
       fetchingRef.current = { fetching: false, lastUserId: null };
       hasFetchedRef.current = false;
     }
@@ -241,13 +422,28 @@ export function EventProvider({ children }) {
 
   // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {
-    if (!eventId) return "";
+    if (!eventId) {
+      console.log('[fetchEventRole] No eventId provided');
+      return "";
+    }
+
     // Return cached role if available (check with 'in' to handle empty string)
-    if (eventId in eventRoles) return eventRoles[eventId];
+    if (eventId in eventRoles) {
+      const cachedRole = eventRoles[eventId];
+      console.log(`[fetchEventRole] 📦 Cache HIT for event ${eventId}: role="${cachedRole}"`);
+      return cachedRole;
+    }
+
+    console.log(`[fetchEventRole] 🌐 Cache MISS for event ${eventId}, calling API...`);
+
     try {
       const res = await userApi.getUserRoleByEvent(eventId);
+      console.log(`[fetchEventRole] API response for event ${eventId}:`, res);
+
       const role = res?.role || res?.data?.role || "";
       const departmentId = res?.departmentId || res?.data?.departmentId || null;
+
+      console.log(`[fetchEventRole] ✅ Parsed role="${role}", departmentId="${departmentId}" for event ${eventId}`);
 
       // Cache both role and full member info
       setEventRoles((prev) => ({ ...prev, [eventId]: role }));
@@ -260,8 +456,10 @@ export function EventProvider({ children }) {
         }
       }));
 
+      console.log(`[fetchEventRole] 💾 Cached role for event ${eventId}`);
       return role;
     } catch (e) {
+      console.error(`[fetchEventRole] ❌ Error fetching role for event ${eventId}:`, e);
       // Cache the error as empty string to prevent repeated API calls
       setEventRoles((prev) => ({ ...prev, [eventId]: "" }));
       setEventMembers((prev) => ({ ...prev, [eventId]: { role: "", departmentId: null } }));
@@ -316,13 +514,62 @@ export function EventProvider({ children }) {
 
   // Utility to get role synchronously from cache (may be empty string if not fetched yet)
   const getEventRole = useCallback((eventId) => {
-    return eventRoles[eventId] || "";
+    if (!eventId) {
+      console.log('[getEventRole] No eventId provided');
+      return "";
+    }
+    const role = eventRoles[eventId] || "";
+    console.log(`[getEventRole] 🔍 Reading role for event ${eventId}: "${role}" (from cache)`);
+    return role;
   }, [eventRoles]);
 
   // Utility to get member info synchronously from cache
   const getEventMember = useCallback((eventId) => {
     return eventMembers[eventId] || { role: "", departmentId: null };
   }, [eventMembers]);
+
+  // Function to manually invalidate cache for specific event (useful when role changes)
+  const invalidateEventCache = useCallback((eventId) => {
+    if (!eventId) return;
+
+    // Remove from state
+    setEventRoles((prev) => {
+      const newRoles = { ...prev };
+      delete newRoles[eventId];
+      return newRoles;
+    });
+    setEventMembers((prev) => {
+      const newMembers = { ...prev };
+      delete newMembers[eventId];
+      return newMembers;
+    });
+
+    console.log(`[EventContext] Cache invalidated for event: ${eventId}`);
+  }, []);
+
+  // Function to clear all cache (useful for debugging or force refresh)
+  const clearAllCache = useCallback(() => {
+    setEventRoles({});
+    setEventMembers({});
+
+    try {
+      // Clear all possible cache keys
+      const userId = user?._id || user?.id;
+      if (userId) {
+        const rolesKey = getCacheKey('eventRoles', userId);
+        const membersKey = getCacheKey('eventMembers', userId);
+        localStorage.removeItem(rolesKey);
+        localStorage.removeItem(membersKey);
+      }
+      // Also clear old format keys
+      localStorage.removeItem('eventRoles');
+      localStorage.removeItem('eventMembers');
+
+      console.log('[EventContext] All cache cleared');
+    } catch (err) {
+      console.error('Failed to clear all cache:', err);
+    }
+  }, [user]);
 
   // Function to change page with search & status
   const changePage = useCallback((newPage, search = '', status = '') => {
@@ -342,6 +589,9 @@ export function EventProvider({ children }) {
       forceCheckEventAccess,
       getEventRole,
       getEventMember,
+      invalidateEventCache,
+      clearAllCache,
+      clearAllUserData,
       pagination,
       changePage
     }}>

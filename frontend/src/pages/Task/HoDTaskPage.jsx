@@ -12,10 +12,9 @@ import { userApi } from "~/apis/userApi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
-import TaskAssignmentBoard from "~/components/TaskAssignmentBoard";
 import { useAuth } from "~/contexts/AuthContext";
 import ConfirmModal from "../../components/ConfirmModal";
-import { Trash, AlertTriangle, X } from "lucide-react";
+import { Trash, AlertTriangle, X, ClipboardList, FileText, Users, User, Calendar, BarChart3 } from "lucide-react";
 import authStorage from "~/utils/authStorage";
 
 
@@ -272,6 +271,23 @@ export default function HoDTaskPage() {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  // Listen to AI plan applied event to refresh tasks
+  useEffect(() => {
+    const handlePlanApplied = (event) => {
+      const { eventId: appliedEventId } = event.detail || {};
+      // Only refresh if the event matches current event
+      if (appliedEventId && String(appliedEventId) === String(eventId)) {
+        console.log('[HoDTaskPage] AI plan applied, refreshing tasks...');
+        fetchTasks();
+      }
+    };
+
+    window.addEventListener('ai:plan-applied', handlePlanApplied);
+    return () => {
+      window.removeEventListener('ai:plan-applied', handlePlanApplied);
+    };
+  }, [eventId, fetchTasks]);
 
   // Cập nhật thời gian mỗi giây
   useEffect(() => {
@@ -951,7 +967,7 @@ export default function HoDTaskPage() {
       )}
       <ToastContainer position="top-right" autoClose={3000} />
       <UserLayout
-        title={t("taskPage.title")}
+        title="Công việc"
         activePage="work-board"
         sidebarType="HoD"
         eventId={eventId}
@@ -1100,12 +1116,6 @@ export default function HoDTaskPage() {
                 onClick={() => setActiveTab("list")}
               >
                 Danh sách công việc
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "assignment" ? "active" : ""}`}
-                onClick={() => setActiveTab("assignment")}
-              >
-                Phân chia công việc
               </button>
               <button
                 className={`tab-btn ${activeTab === "board" ? "active" : ""}`}
@@ -1471,28 +1481,6 @@ export default function HoDTaskPage() {
             </>
           )}
 
-          {activeTab === "assignment" && (
-            <div className="soft-card p-4">
-              <div className="mb-3 text-muted small">
-                Kéo công việc từ cột bên trái vào thành viên bên phải để giao việc
-              </div>
-              {membersForAssignment.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  Đang tải danh sách thành viên...
-                </div>
-              ) : (
-                <TaskAssignmentBoard
-                  tasks={tasks}
-                  members={membersForAssignment}
-                  eventId={eventId}
-                  departmentId={departmentId}
-                  onTaskAssigned={fetchTasks}
-                  currentUserId={user?._id}
-                />
-              )}
-            </div>
-          )}
-
           {activeTab === "board" && (
             <div className="soft-card p-4 text-muted">
               <KanbanBoardTask 
@@ -1532,15 +1520,21 @@ export default function HoDTaskPage() {
                     <label className="text-muted small mb-2">
                       Tên công việc
                     </label>
-                    <div className="fw-semibold fs-5">{selectedTask.name}</div>
+                    <div className="d-flex align-items-center gap-2">
+                      <ClipboardList size={20} />
+                      <span className="fw-semibold fs-5">{selectedTask.name}</span>
+                    </div>
                   </div>
 
                   <div className="mb-4">
                     <label className="text-muted small mb-2">
                       Mô tả
                     </label>
-                    <div className="text-muted">
-                      {selectedTask.description || "Chưa có mô tả"}
+                    <div className="d-flex align-items-center gap-2">
+                      <FileText size={20} />
+                      <span className="text-muted">
+                        {selectedTask.description || "Chưa có mô tả"}
+                      </span>
                     </div>
                   </div>
 
@@ -1549,7 +1543,7 @@ export default function HoDTaskPage() {
                       Ban phụ trách
                     </label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>👤</span>
+                      <Users size={20} />
                       <span>{selectedTask.department}</span>
                     </div>
                   </div>
@@ -1559,7 +1553,7 @@ export default function HoDTaskPage() {
                     </label>
                     <div className="d-flex align-items-center justify-content-between">
                       <div className="d-flex align-items-center gap-2">
-                        <span style={{ fontSize: 20 }}>👤</span>
+                        <User size={20} />
                         <span>{selectedTask.assignee === "----" ? "Chưa phân công" : selectedTask.assignee}</span>
                       </div>
                       <button
@@ -1579,7 +1573,7 @@ export default function HoDTaskPage() {
                   <div className="mb-4">
                     <label className="text-muted small mb-2">Deadline</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📅</span>
+                      <Calendar size={20} />
                       <span>{selectedTask.due}</span>
                     </div>
                   </div>
@@ -1587,7 +1581,7 @@ export default function HoDTaskPage() {
                   <div className="mb-4">
                     <label className="text-muted small mb-2">Trạng thái</label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>📈 </span>
+                      <BarChart3 size={20} />
                       <span>{selectedTask.status || STATUS_LABEL_MAP[selectedTask.statusCode] || "Không xác định"}</span>
                     </div>
                   </div>
@@ -1597,7 +1591,7 @@ export default function HoDTaskPage() {
                       Ước tính thời gian thực hiện
                     </label>
                     <div className="d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 20 }}>⌛ </span>
+                      <Calendar size={20} />
                       <span>{selectedTask.estimate}</span>
                     </div>
                   </div>

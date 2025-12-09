@@ -5,12 +5,13 @@ import { dashboardApi } from "../../apis/dashboardApi"
 import calendarService from "../../services/calendarService"
 import { taskApi } from "../../apis/taskApi"
 import { budgetApi } from "../../apis/budgetApi"
+import { milestoneService } from "../../services/milestoneService"
 import Loading from "../../components/Loading"
 import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
-import { Calendar, Sparkles, Goal, CircleCheckBig, Users, Coins } from "lucide-react";
+import { Calendar, Sparkles, Goal, CircleCheckBig, Users, Coins, DollarSignIcon, PinOff, LayoutList, ClipboardList } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -187,16 +188,6 @@ export default function HoOCDashBoard() {
         const memberCount = data?.stats?.members?.total || 0
         setMembers(Array(memberCount).fill({ _id: 'placeholder' }))
 
-        // Map milestones
-        if (data?.highlights?.nextMilestones) {
-          setMilestones(data.highlights.nextMilestones.map(m => ({
-            _id: m._id,
-            name: m.name,
-            status: m.status,
-            targetDate: m.targetDate
-          })))
-        }
-
         // Map departments (use topDepartments + stats)
         if (data?.highlights?.topDepartments) {
           const depts = data.highlights.topDepartments.map(d => ({
@@ -213,8 +204,34 @@ export default function HoOCDashBoard() {
         // Show dashboard immediately
         setLoading(false)
 
-        // Lazy load calendar events and epic tasks (non-critical)
+        // Lazy load calendar events, milestones, epic tasks, and budget (non-critical)
         if (!cancelled) {
+          // Fetch milestones (critical for timeline)
+          milestoneService.listMilestones(eventId, {
+            sortBy: "targetDate",
+            sortDir: "asc"
+          })
+            .then(milestonesResponse => {
+              if (!cancelled) {
+                const milestoneList = Array.isArray(milestonesResponse)
+                  ? milestonesResponse
+                  : (milestonesResponse?.data || milestonesResponse?.milestones || [])
+                const sortedMilestones = milestoneList
+                  .slice()
+                  .sort((a, b) => {
+                    const da = parseDate(a?.targetDate) || new Date(8640000000000000)
+                    const db = parseDate(b?.targetDate) || new Date(8640000000000000)
+                    return da.getTime() - db.getTime()
+                  })
+                setMilestones(sortedMilestones)
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading milestones:", err)
+              }
+            })
+
           calendarService.getCalendarsByEventId(eventId)
             .then(calendarsResponse => {
               if (!cancelled) {
@@ -228,17 +245,17 @@ export default function HoOCDashBoard() {
             })
 
           // Fetch all tasks for progress display (epic tasks and major tasks)
-            taskApi.getTaskByEvent(eventId)
+          taskApi.getTaskByEvent(eventId)
             .then(tasksResponse => {
               if (!cancelled) {
                 const tasksData = unwrapApiData(tasksResponse)
                 const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.data || tasksData?.tasks || [])
-                
+
                 // Store all tasks
                 if (!cancelled) {
                   setAllTasks(tasksArray)
                 }
-                
+
                 // Filter epic tasks (taskType === 'epic') with progressPct
                 const epics = tasksArray
                   .filter(task => task?.taskType === 'epic' || task?.taskType === 'Epic')
@@ -246,7 +263,7 @@ export default function HoOCDashBoard() {
                     ...epic,
                     progressPct: typeof epic.progressPct === "number" ? epic.progressPct : (epic.progress || 0)
                   }))
-                
+
                 if (!cancelled) {
                   setEpicTasks(epics)
                 }
@@ -267,28 +284,7 @@ export default function HoOCDashBoard() {
                 // totalActual = tiền thực tế member nộp
                 const planned = Number(stats?.totalEstimated || stats?.data?.totalEstimated || 0)
                 const actual = Number(stats?.totalActual || stats?.data?.totalActual || 0)
-                
-                if (!cancelled) {
-                  setBudgetData({ planned, actual })
-                }
-              }
-            })
-            .catch(err => {
-              if (!cancelled) {
-                console.error("Error loading budget statistics:", err)
-              }
-            })
 
-          // Fetch budget statistics: planned (HoD) vs actual (Member paid)
-          budgetApi.getBudgetStatistics(eventId)
-            .then(statsResponse => {
-              if (!cancelled) {
-                const stats = unwrapApiData(statsResponse)
-                // totalEstimated = tiền dự trù kinh phí từ budget mà HoD nộp
-                // totalActual = tiền thực tế member nộp
-                const planned = Number(stats?.totalEstimated || stats?.data?.totalEstimated || 0)
-                const actual = Number(stats?.totalActual || stats?.data?.totalActual || 0)
-                
                 if (!cancelled) {
                   setBudgetData({ planned, actual })
                 }
@@ -340,10 +336,16 @@ export default function HoOCDashBoard() {
 
   // Calculate stats
   const totalMilestones = milestones.length
+  
   const completedMilestones = useMemo(
-    () => milestones.filter((m) => isCompletedStatus(m?.status)).length,
+    () => milestones.filter((m) => {
+      const targetDate = parseDate(m?.targetDate || m?.dueDate)
+      const isPast = targetDate && targetDate < new Date() // Đã quá hạn
+      return isCompletedStatus(m?.status) || isPast
+    }).length,
     [milestones]
   )
+
   const milestoneCompletionPercent = totalMilestones > 0
     ? Math.round((completedMilestones / totalMilestones) * 100)
     : 0
@@ -435,11 +437,16 @@ export default function HoOCDashBoard() {
   // Prepare timeline data from milestones (max 5)
   const eventTimeline = useMemo(
     () =>
-      milestones.slice(0, 5).map((milestone) => ({
-        name: milestone?.name || "Cột mốc",
-        date: formatDate(milestone?.targetDate || milestone?.dueDate),
-        completed: isCompletedStatus(milestone?.status)
-      })),
+      milestones.slice(0, 5).map((milestone) => {
+        const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+        const isPast = targetDate && targetDate < new Date() // Check ngày quá khứ
+        
+        return {
+          name: milestone?.name || "Cột mốc",
+          date: formatDate(milestone?.targetDate || milestone?.dueDate),
+          completed: isCompletedStatus(milestone?.status) || isPast 
+        }
+      }),
     [milestones]
   )
 
@@ -684,16 +691,16 @@ export default function HoOCDashBoard() {
                   </h6>
 
                   {epicTasks.length > 0 ? (
-                    <div style={{ 
-                      flex: 1, 
-                      overflowY: "auto", 
+                    <div style={{
+                      flex: 1,
+                      overflowY: "auto",
                       maxHeight: "240px",
                       paddingRight: "8px"
                     }}>
                       {epicTasks.map((epic, index) => {
                         const progress = typeof epic.progressPct === "number" ? epic.progressPct : (epic.progress || 0)
                         const normalizedProgress = Math.max(0, Math.min(100, Math.round(progress)))
-                        
+
                         return (
                           <div key={epic._id || epic.id || index} className={index !== epicTasks.length - 1 ? "mb-4" : ""}>
                             <div className="d-flex justify-content-between align-items-center mb-2">
@@ -730,8 +737,9 @@ export default function HoOCDashBoard() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center text-muted py-4">
-                      Chưa có dữ liệu epic
+                    <div className="text-center align-items-center text-muted py-5">
+                      <div><LayoutList style={{ width: "40px", height: "40px", marginBottom: "10px" }} color="#9ca3af" /></div>
+                       Chưa có dữ liệu công việc lớn
                     </div>
                   )}
                 </div>
@@ -751,23 +759,23 @@ export default function HoOCDashBoard() {
                     const departmentProgress = departments.map(dept => {
                       const deptId = dept?._id || dept?.id
                       if (!deptId) return null
-                      
+
                       // Get epic tasks for this department
                       const deptEpicTasks = epicTasks.filter(epic => {
                         const epicDeptId = epic?.departmentId?._id || epic?.departmentId || epic?.departmentId?.id
                         return String(epicDeptId) === String(deptId)
                       })
-                      
+
                       const totalEpicTasks = deptEpicTasks.length
                       const completedEpicTasks = deptEpicTasks.filter(epic => {
                         const status = epic?.status || ""
                         return isCompletedStatus(status)
                       }).length
-                      
+
                       const progressPercent = totalEpicTasks > 0
                         ? Math.round((completedEpicTasks / totalEpicTasks) * 100)
                         : 0
-                      
+
                       return {
                         departmentId: deptId,
                         name: dept?.name || "Ban chưa đặt tên",
@@ -776,7 +784,7 @@ export default function HoOCDashBoard() {
                         total: totalEpicTasks
                       }
                     }).filter(Boolean)
-                    
+
                     if (departmentProgress.length > 0) {
                       return departmentProgress.slice(0, 2).map((dept, index) => (
                         <div key={dept.departmentId || index} className={index !== departmentProgress.length - 1 ? "mb-4" : ""}>
@@ -818,9 +826,10 @@ export default function HoOCDashBoard() {
                       ))
                     } else {
                       return (
-                        <div className="text-center text-muted py-4">
+                        <div className="text-center align-items-center text-muted py-5">
+                          <div><ClipboardList style={{ width: "40px", height: "40px", marginBottom: "10px" }} color="#9ca3af" /></div>
                           Chưa có dữ liệu công việc
-                        </div>
+                      </div>
                       )
                     }
                   })()}
@@ -828,124 +837,172 @@ export default function HoOCDashBoard() {
               </div>
             </div>
 
-            {/* Chart Section */}
-            <div className="col-12 col-lg-6">
+            {/* Milestone Timeline - Full Width */}
+            <div className="col-12">
               <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
                 <div className="card-body p-4" style={{ minHeight: "320px" }}>
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
-                      Ngân sách vs Chi tiêu
-                    </h6>
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="d-flex gap-3">
-                        <div className="d-flex align-items-center gap-1">
-                          <span
-                            className="rounded-circle"
-                            style={{
-                              width: "8px",
-                              height: "8px",
-                              backgroundColor: "#3b82f6",
-                            }}
-                          ></span>
-                          <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền dự trù (HoD)
-                          </span>
-                        </div>
-                        <div className="d-flex align-items-center gap-1">
-                          <span
-                            className="rounded-circle"
-                            style={{
-                              width: "8px",
-                              height: "8px",
-                              backgroundColor: "#10b981",
-                            }}
-                          ></span>
-                          <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền thực tế (Member)
-                          </span>
-                        </div>
-                      </div>
+                  {/* Event Header */}
+                  <div className="d-flex align-items-center gap-3 mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle"
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: "#fff4d6",
+                        fontSize: "20px",
+                      }}
+                    >
+                      <Goal style={{ color: "#f59e0b" }} />
                     </div>
+                    <h6 className="fw-bold mb-0 flex-grow-1" style={{ fontSize: "18px", color: "#1f2937" }}>
+                      {eventData.name}
+                    </h6>
+                    <button className="btn btn-danger btn-sm d-flex align-items-center gap-1" style={{ fontSize: "13px" }}>
+                      Xem chi tiết →
+                    </button>
                   </div>
 
-                  {totalPlanned > 0 || totalActual > 0 ? (
-                    <div style={{ marginTop: "20px" }}>
-                      {/* Comparison bars */}
-                      <div className="d-flex align-items-end justify-content-center gap-4" style={{ minHeight: "200px", marginBottom: "30px", position: "relative" }}>
-                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
-                          <div
-                            className="chart-bar rounded-top"
-                            style={{
-                              width: "60px",
-                              height: `${Math.max(4, Math.min(160, Math.round(totalPlanned * budgetChartScale)))}px`,
-                              backgroundColor: "#3b82f6",
-                              transition: "height 0.5s ease",
-                              marginBottom: "12px",
-                              flexShrink: 0
-                            }}
-                          ></div>
-                          <div className="text-center" style={{ marginTop: "8px" }}>
-                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
-                              {totalPlanned.toLocaleString("vi-VN")} VNĐ
-                            </div>
-                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
-                              Tiền dự trù
-                            </div>
-                          </div>
+                  {/* Progress Dots and Status */}
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <div style={{ fontSize: "13px", color: "#6b7280" }}>Tiến độ</div>
+                    <div className="d-flex gap-1">
+                      {eventTimeline.map((_, index) => (
+                        <span
+                          key={index}
+                          className="rounded-circle"
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            backgroundColor: eventTimeline[index]?.completed ? "#dc2626" : "#e5e7eb",
+                          }}
+                        ></span>
+                      ))}
+                    </div>
+                    <span className="fw-semibold" style={{ fontSize: "13px", color: "#dc2626" }}>
+                      {completedMilestones}/{totalMilestones} hoàn thành
+                    </span>
+                  </div>
+
+                  {/* Next Milestone */}
+                  {(() => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+
+                    const nextMilestone = milestones.find(m => {
+                      const targetDate = parseDate(m?.targetDate || m?.dueDate)
+                      if (!targetDate) return false
+                      const milestoneDay = new Date(targetDate)
+                      milestoneDay.setHours(0, 0, 0, 0)
+                      return !isCompletedStatus(m?.status) && milestoneDay >= today
+                    })
+
+                    if (nextMilestone) {
+                      return (
+                        <div
+                          className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
+                          style={{ backgroundColor: "#fef2f2" }}
+                        >
+                          <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                          <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
+                            Tiếp theo: {nextMilestone.name}
+                          </span>
+                          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                            ({formatDate(nextMilestone.targetDate || nextMilestone.dueDate)})
+                          </span>
                         </div>
-                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
-                          <div
-                            className="chart-bar rounded-top"
-                            style={{
-                              width: "60px",
-                              height: `${Math.max(4, Math.min(160, Math.round(totalActual * budgetChartScale)))}px`,
-                              backgroundColor: "#10b981",
-                              transition: "height 0.5s ease",
-                              marginBottom: "12px",
-                              flexShrink: 0
-                            }}
-                          ></div>
-                          <div className="text-center" style={{ marginTop: "8px" }}>
-                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
-                              {totalActual.toLocaleString("vi-VN")} VNĐ
-                            </div>
-                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
-                              Tiền thực tế
-                            </div>
-                          </div>
+                      )
+                    }
+
+                    // Show completion message if no future milestones
+                    if (milestones.length > 0) {
+                      return (
+                        <div
+                          className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
+                          style={{ backgroundColor: "#d4f4dd" }}
+                        >
+                          <CircleCheckBig style={{ color: "#10b981" }} />
+                          <span className="flex-grow-1" style={{ fontSize: "14px", color: "#166534", fontWeight: 500 }}>
+                            Đã hoàn thành tất cả cột mốc
+                          </span>
                         </div>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  {/* Horizontal Timeline */}
+                  {eventTimeline.length > 0 ? (
+                    <div style={{ position: "relative", padding: "20px 0" }}>
+                      {/* Timeline Line */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "28px",
+                          left: "0",
+                          right: "0",
+                          height: "3px",
+                          backgroundColor: "#e5e7eb",
+                        }}
+                      >
+                        {/* Progress Line */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "0",
+                            left: "0",
+                            height: "100%",
+                            width: `${milestoneProgressRatio}%`,
+                            backgroundColor: "#dc2626",
+                            transition: "width 0.5s ease",
+                          }}
+                        ></div>
                       </div>
-                      
-                      {/* Summary info */}
-                      <div className="d-flex justify-content-center align-items-start gap-4 pt-3" style={{ borderTop: "1px solid #e5e7eb", marginTop: "20px" }}>
-                        <div className="text-center" style={{ minWidth: "120px" }}>
-                          <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
-                            Tỷ lệ sử dụng
-                          </div>
-                          <div className="fw-semibold" style={{ fontSize: "16px", color: "#1f2937" }}>
-                            {budgetUsageDisplay}
-                          </div>
-                        </div>
-                        {totalPlanned > 0 && (
-                          <div className="text-center" style={{ minWidth: "120px" }}>
-                            <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
-                              Chênh lệch
+
+                      {/* Timeline Steps */}
+                      <div className="d-flex justify-content-between" style={{ position: "relative", zIndex: 1 }}>
+                        {eventTimeline.map((step, index) => (
+                          <div key={index} className="d-flex flex-column align-items-center" style={{ gap: "8px" }}>
+                            {/* Step Dot */}
+                            <div
+                              className="rounded-circle"
+                              style={{
+                                width: "16px",
+                                height: "16px",
+                                backgroundColor: step.completed ? "#dc2626" : "white",
+                                border: `3px solid ${step.completed ? "#dc2626" : "#e5e7eb"}`,
+                                transition: "all 0.3s ease",
+                              }}
+                            ></div>
+                            {/* Step Label */}
+                            <div
+                              className="text-center"
+                              style={{
+                                fontSize: "12px",
+                                color: "#374151",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {step.name}
                             </div>
-                            <div className="fw-semibold" style={{ 
-                              fontSize: "16px", 
-                              color: totalActual > totalPlanned ? "#ef4444" : totalActual < totalPlanned ? "#10b981" : "#6b7280"
-                            }}>
-                              {(totalActual - totalPlanned).toLocaleString("vi-VN")} VNĐ
+                            {/* Step Date */}
+                            <div
+                              className="text-center"
+                              style={{
+                                fontSize: "11px",
+                                color: "#9ca3af",
+                              }}
+                            >
+                              {step.date}
                             </div>
                           </div>
-                        )}
+                        ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center text-muted py-4">
-                      Chưa có dữ liệu ngân sách
-                    </div>
-                  )}
+                  <div className="text-center text-muted py-4">
+                    <div><PinOff style={{ width: "40px", height: "40px", marginBottom: "10px" }} color="#9ca3af" /></div>
+                    Chưa có dữ liệu cột mốc
+                  </div>)}
                 </div>
               </div>
             </div>
@@ -1283,7 +1340,7 @@ export default function HoOCDashBoard() {
                     return (
                       <div className="mt-4 pt-3 border-top" style={{minHeight:80}}>
                         <div className="text-muted text-center" style={{ fontSize: "14px", fontStyle: "italic" }}>
-                          Chọn một ngày trên lịch để xem chi tiết lịch họp hoặc cột mốc.
+                          Di chuột vào một ngày trên lịch để xem chi tiết lịch họp hoặc cột mốc.
                         </div>
                       </div>
                     )
@@ -1291,136 +1348,124 @@ export default function HoOCDashBoard() {
                 </div>
               </div>
             </div>
-
-            {/* Event Card with Horizontal Timeline */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
-                <div className="card-body p-4" style={{ minHeight: "458px" }}>
-                  {/* Event Header */}
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle"
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        backgroundColor: "#fff4d6",
-                        fontSize: "20px",
-                      }}
-                    >
-                      <Goal style={{ color: "#f59e0b" }} />
-                    </div>
-                    <h6 className="fw-bold mb-0 flex-grow-1" style={{ fontSize: "18px", color: "#1f2937" }}>
-                      {eventData.name}
-                    </h6>
-                    <button className="btn btn-danger btn-sm d-flex align-items-center gap-1" style={{ fontSize: "13px" }}>
-                      Xem chi tiết →
-                    </button>
-                  </div>
-
-                  {/* Progress Dots and Status */}
+                <div className="card-body p-4" style={{ minHeight: "320px" }}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div style={{ fontSize: "13px", color: "#6b7280" }}>Tiến độ</div>
-                    <div className="d-flex gap-1">
-                      {eventTimeline.map((_, index) => (
-                        <span
-                          key={index}
-                          className="rounded-circle"
-                          style={{
-                            width: "10px",
-                            height: "10px",
-                            backgroundColor: eventTimeline[index]?.completed ? "#dc2626" : "#e5e7eb",
-                          }}
-                        ></span>
-                      ))}
+                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
+                      Ngân sách vs Chi tiêu
+                    </h6>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="d-flex gap-3">
+                        <div className="d-flex align-items-center gap-1">
+                          <span
+                            className="rounded-circle"
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              backgroundColor: "#3b82f6",
+                            }}
+                          ></span>
+                          <span className="text-muted" style={{ fontSize: "13px" }}>
+                            Tiền dự trù (HoD)
+                          </span>
+                        </div>
+                        <div className="d-flex align-items-center gap-1">
+                          <span
+                            className="rounded-circle"
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              backgroundColor: "#10b981",
+                            }}
+                          ></span>
+                          <span className="text-muted" style={{ fontSize: "13px" }}>
+                            Tiền thực tế (Member)
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="fw-semibold" style={{ fontSize: "13px", color: "#dc2626" }}>
-                      {completedMilestones}/{totalMilestones} hoàn thành
-                    </span>
                   </div>
 
-                  {/* Next Milestone */}
-                  {eventTimeline.length > 0 && (
-                    <div
-                      className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
-                      style={{ backgroundColor: "#fef2f2" }}
-                    >
-                      <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
-                      <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
-                        Tiếp theo: {eventTimeline.find(m => !m.completed)?.name || eventTimeline[0]?.name}
-                      </span>
-                      <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                        ({eventTimeline.find(m => !m.completed)?.date || eventTimeline[0]?.date})
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Horizontal Timeline */}
-                  {eventTimeline.length > 0 && (
-                    <div style={{ position: "relative", padding: "20px 0" }}>
-                      {/* Timeline Line */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "28px",
-                          left: "0",
-                          right: "0",
-                          height: "3px",
-                          backgroundColor: "#e5e7eb",
-                        }}
-                      >
-                        {/* Progress Line */}
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "0",
-                            left: "0",
-                            height: "100%",
-                            width: `${milestoneProgressRatio}%`,
-                            backgroundColor: "#dc2626",
-                            transition: "width 0.5s ease",
-                          }}
-                        ></div>
-                      </div>
-
-                      {/* Timeline Steps */}
-                      <div className="d-flex justify-content-between" style={{ position: "relative", zIndex: 1 }}>
-                        {eventTimeline.map((step, index) => (
-                          <div key={index} className="d-flex flex-column align-items-center" style={{ gap: "8px" }}>
-                            {/* Step Dot */}
-                            <div
-                              className="rounded-circle"
-                              style={{
-                                width: "16px",
-                                height: "16px",
-                                backgroundColor: step.completed ? "#dc2626" : "white",
-                                border: `3px solid ${step.completed ? "#dc2626" : "#e5e7eb"}`,
-                                transition: "all 0.3s ease",
-                              }}
-                            ></div>
-                            {/* Step Label */}
-                            <div
-                              className="text-center"
-                              style={{
-                                fontSize: "12px",
-                                color: "#374151",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {step.name}
+                  {totalPlanned > 0 || totalActual > 0 ? (
+                    <div style={{ marginTop: "20px" }}>
+                      {/* Comparison bars */}
+                      <div className="d-flex align-items-end justify-content-center gap-4" style={{ minHeight: "200px", marginBottom: "30px", position: "relative" }}>
+                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
+                          <div
+                            className="chart-bar rounded-top"
+                            style={{
+                              width: "60px",
+                              height: `${Math.max(4, Math.min(160, Math.round(totalPlanned * budgetChartScale)))}px`,
+                              backgroundColor: "#3b82f6",
+                              transition: "height 0.5s ease",
+                              marginBottom: "12px",
+                              flexShrink: 0
+                            }}
+                          ></div>
+                          <div className="text-center" style={{ marginTop: "8px" }}>
+                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
+                              {totalPlanned.toLocaleString("vi-VN")} VNĐ
                             </div>
-                            {/* Step Date */}
-                            <div
-                              className="text-center"
-                              style={{
-                                fontSize: "11px",
-                                color: "#9ca3af",
-                              }}
-                            >
-                              {step.date}
+                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
+                              Tiền dự trù
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <div className="d-flex flex-column align-items-center justify-content-end" style={{ flex: 1, maxWidth: "200px", height: "100%" }}>
+                          <div
+                            className="chart-bar rounded-top"
+                            style={{
+                              width: "60px",
+                              height: `${Math.max(4, Math.min(160, Math.round(totalActual * budgetChartScale)))}px`,
+                              backgroundColor: "#10b981",
+                              transition: "height 0.5s ease",
+                              marginBottom: "12px",
+                              flexShrink: 0
+                            }}
+                          ></div>
+                          <div className="text-center" style={{ marginTop: "8px" }}>
+                            <div className="fw-semibold" style={{ fontSize: "14px", color: "#1f2937", lineHeight: "1.4" }}>
+                              {totalActual.toLocaleString("vi-VN")} VNĐ
+                            </div>
+                            <div className="text-muted" style={{ fontSize: "12px", marginTop: "4px" }}>
+                              Tiền thực tế
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                      
+                      {/* Summary info */}
+                      <div className="d-flex justify-content-center align-items-start gap-4 pt-3" style={{ borderTop: "1px solid #e5e7eb", marginTop: "20px" }}>
+                        <div className="text-center" style={{ minWidth: "120px" }}>
+                          <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                            Tỷ lệ sử dụng
+                          </div>
+                          <div className="fw-semibold" style={{ fontSize: "16px", color: "#1f2937" }}>
+                            {budgetUsageDisplay}
+                          </div>
+                        </div>
+                        {totalPlanned > 0 && (
+                          <div className="text-center" style={{ minWidth: "120px" }}>
+                            <div className="text-muted" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                              Chênh lệch
+                            </div>
+                            <div className="fw-semibold" style={{ 
+                              fontSize: "16px", 
+                              color: totalActual > totalPlanned ? "#ef4444" : totalActual < totalPlanned ? "#10b981" : "#6b7280"
+                            }}>
+                              {(totalActual - totalPlanned).toLocaleString("vi-VN")} VNĐ
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted py-4">
+                      <div className="mb-3 mt-5 d-flex justify-content-center">
+                        <DollarSignIcon size= "50px" color="#9ca3af"/>
+                      </div>
+                      Chưa có dữ liệu ngân sách
                     </div>
                   )}
                 </div>

@@ -93,7 +93,7 @@ export default function HoDSideBar({
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
   // get context events (if needed) and loading flag
-  const { events: ctxEvents, loading: ctxLoading } = useEvents();
+  const { events: ctxEvents, loading: ctxLoading, error: eventError } = useEvents();
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -303,8 +303,8 @@ export default function HoDSideBar({
   const hasEvent = !!currentEvent;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((currentEvent?.status || '').toLowerCase());
 
-  // Chỉ show loading khi chưa có events VÀ đang loading
-  const showLoading = ctxLoading && ctxEvents.length === 0;
+  // Show loading when currently loading or when first loading with no events
+  const showLoading = ctxLoading || (ctxLoading && ctxEvents.length === 0);
 
   return (
     <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
@@ -509,6 +509,41 @@ export default function HoDSideBar({
           >
             <Loading size={60} />
             <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : eventError ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+              padding: "20px",
+            }}
+          >
+            <div style={{ color: "#ef4444", fontSize: 16, fontWeight: 600 }}>Lỗi tải dữ liệu</div>
+            <span style={{ color: "#6b7280", fontSize: 14, textAlign: "center" }}>{eventError}</span>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: 8,
+                padding: "8px 16px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Tải lại
+            </button>
           </div>
         ) : (
           <>

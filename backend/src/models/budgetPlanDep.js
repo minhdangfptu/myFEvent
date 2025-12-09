@@ -62,20 +62,12 @@ const EventBudgetPlanSchema = new Schema({
   categories: [{ type: String }], // Danh sách hạng mục để chọn trong dropdown
 
   submittedAt: Date,
-  reviewedBy:  { type: Types.ObjectId, ref: 'User' },  // trưởng BTC
-  reviewedAt:  Date,
-  sentToMembersAt: Date,
-  sentToMembersBy: { type: Types.ObjectId, ref: 'User' },
-  notes:       String,
   createdBy:   { type: Types.ObjectId, ref: 'User' },
 
   items:       { type: [PlanItemSchema], validate: v => Array.isArray(v) && v.length > 0 },
-  attachments: [{ name: String, url: String }],
   
   // Public/Private visibility
   isPublic: { type: Boolean, default: false },
-  publicAt: Date,
-  publicBy: { type: Types.ObjectId, ref: 'User' },
   
   audit: [{
     at: { type: Date, required: true },
@@ -96,9 +88,7 @@ EventBudgetPlanSchema.pre('save', function () {
     try {
       const qty  = Number(it.qty?.toString() || 0);
       const unit = Number(it.unitCost?.toString() || 0);
-      const tax  = Number(it.taxRate || 0);
-      const disc = Number(it.discount || 0);
-      const calculatedTotal = Math.max(0, (qty * unit - disc) * (1 + tax));
+      const calculatedTotal = Math.max(0, qty * unit);
       
       // Chỉ set total nếu chưa có hoặc bằng 0
       const currentTotal = Number(it.total?.toString() || 0);

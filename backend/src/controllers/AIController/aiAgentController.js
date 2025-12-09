@@ -480,10 +480,12 @@ const formatEventContextForAI = (eventData) => {
 
   lines.push(
     `=== HƯỚNG DẪN ===`,
+    `- QUAN TRỌNG: eventId của sự kiện hiện tại là: ${event._id}`,
     `- Khi người dùng nói "sự kiện này" thì hiểu là eventId = ${event._id}`,
-    `- Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId này`,
-    `- Khi tạo task/epic, luôn gắn với eventId này (qua các tool tương ứng)`,
-    `- Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết hơn nếu cần`,
+    `- Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId = ${event._id}`,
+    `- Khi tạo task/epic, luôn gắn với eventId = ${event._id} (qua các tool tương ứng)`,
+    `- TRƯỚC KHI tạo task/epic, BẮT BUỘC phải gọi tool get_event_detail_for_ai với eventId = "${event._id}" để lấy thông tin chi tiết`,
+    `- Nếu bạn chưa gọi get_event_detail_for_ai, HÃY GỌI NGAY với eventId = "${event._id}"`,
     ``,
     `=== QUYỀN TẠO EPIC VÀ TASK ===`,
     `- Chỉ HoOC mới có quyền tạo EPIC mới`,
@@ -606,20 +608,25 @@ export const runEventPlannerAgent = async (req, res) => {
           }
         } else {
           // Fallback: nếu không lấy được thông tin đầy đủ, dùng thông tin cơ bản
-        const event = await Event.findById(eventId).lean();
-        if (event) {
-          const contextLines = [
+          console.warn(`[aiAgentController] getFullEventContext returned null for eventId=${eventId}, userId=${userId}, using fallback`);
+          const event = await Event.findById(eventId).lean();
+          if (event) {
+            const contextLines = [
             `Bạn đang hỗ trợ lập kế hoạch cho một sự kiện trong hệ thống myFEvent.`,
-            `Nếu người dùng nói "sự kiện này" thì hiểu là eventId = ${eventId}.`,
+            `QUAN TRỌNG: eventId của sự kiện hiện tại là: ${eventId}`,
             `EVENT_CONTEXT_JSON: {"eventId": "${eventId}"}`,
-            `Thông tin sự kiện:`,
+            `Thông tin sự kiện cơ bản:`,
             `- Tên: ${event.name}`,
             `- Loại: ${event.type}`,
             `- Địa điểm: ${event.location || 'N/A'}`,
             `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
-            `Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId này.`,
-            `Khi tạo task/epic, luôn gắn với eventId này (qua các tool tương ứng).`,
-              `Lưu ý: Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết đầy đủ về sự kiện.`,
+            ``,
+            `HƯỚNG DẪN QUAN TRỌNG:`,
+            `- Khi người dùng nói "sự kiện này" thì hiểu là eventId = ${eventId}`,
+            `- Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId = ${eventId}`,
+            `- TRƯỚC KHI tạo task/epic, BẮT BUỘC phải gọi tool get_event_detail_for_ai với eventId = "${eventId}" để lấy thông tin chi tiết`,
+            `- Nếu bạn chưa gọi get_event_detail_for_ai, HÃY GỌI NGAY với eventId = "${eventId}"`,
+            `- Khi tạo task/epic, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
           ].join('\n');
 
             const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -643,13 +650,18 @@ export const runEventPlannerAgent = async (req, res) => {
         if (event) {
           const contextLines = [
             `Bạn đang hỗ trợ lập kế hoạch cho một sự kiện trong hệ thống myFEvent.`,
+            `QUAN TRỌNG: eventId của sự kiện hiện tại là: ${eventId}`,
             `EVENT_CONTEXT_JSON: {"eventId": "${eventId}"}`,
-            `Thông tin sự kiện:`,
+            `Thông tin sự kiện cơ bản:`,
             `- Tên: ${event.name}`,
             `- Loại: ${event.type}`,
             `- Địa điểm: ${event.location || 'N/A'}`,
             `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
-            `Lưu ý: Bạn có thể sử dụng tool get_event_detail_for_ai để lấy thông tin chi tiết đầy đủ về sự kiện.`,
+            ``,
+            `HƯỚNG DẪN QUAN TRỌNG:`,
+            `- TRƯỚC KHI tạo task/epic, BẮT BUỘC phải gọi tool get_event_detail_for_ai với eventId = "${eventId}" để lấy thông tin chi tiết`,
+            `- Nếu bạn chưa gọi get_event_detail_for_ai, HÃY GỌI NGAY với eventId = "${eventId}"`,
+            `- Khi tạo task/epic, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
           ].join('\n');
 
           const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -755,12 +767,18 @@ export const runEventPlannerAgent = async (req, res) => {
           });
         }
 
-        // Gán title nếu chưa có
-        if (!conversation.title) {
-          const firstUser =
-            conversation.messages.find((m) => m.role === 'user') || lastUser;
-          if (firstUser) {
-            conversation.title = generateTitleFromText(firstUser.content);
+        // Gán title nếu chưa có hoặc cập nhật nếu title rỗng/không hợp lệ
+        const firstUser =
+          conversation.messages.find((m) => m.role === 'user') || lastUser;
+        if (firstUser && firstUser.content) {
+          const newTitle = generateTitleFromText(firstUser.content);
+          // Cập nhật title nếu chưa có hoặc nếu title hiện tại không hợp lệ
+          if (!conversation.title || 
+              conversation.title.trim() === '' || 
+              conversation.title === 'Cuộc trò chuyện mới' ||
+              conversation.title.length < 3) {
+            conversation.title = newTitle;
+            console.log(`[aiAgentController] Set conversation title: "${newTitle}" for sessionId=${sessionId}`);
           }
         }
 

@@ -5,6 +5,7 @@ import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
+import ConfirmModal from '../../components/ConfirmModal';
 import { useEvents } from '../../contexts/EventContext';
 import { Calendar, Inbox, RotateCw } from "lucide-react";
 
@@ -20,6 +21,9 @@ export default function ManageFeedbackEventPage() {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [currentPage, setCurrentPage] = useState(1);
   const [actionState, setActionState] = useState({ id: null, type: '' });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [formToDelete, setFormToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -93,17 +97,26 @@ export default function ManageFeedbackEventPage() {
     }
   };
 
-  const handleDeleteForm = async (formId) => {
-    const confirm = window.confirm('Bạn chắc chắn muốn xoá biểu mẫu này? Hành động không thể hoàn tác.');
-    if (!confirm) return;
+  const handleDeleteForm = (formId) => {
+    setFormToDelete(formId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteForm = async () => {
+    if (!formToDelete) return;
+
     try {
-      setActionState({ id: formId, type: 'delete' });
-      await feedbackApi.deleteForm(eventId, formId);
+      setIsDeleting(true);
+      setActionState({ id: formToDelete, type: 'delete' });
+      await feedbackApi.deleteForm(eventId, formToDelete);
       toast.success('Đã xoá biểu mẫu');
       loadForms();
+      setShowDeleteModal(false);
+      setFormToDelete(null);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể xoá biểu mẫu');
     } finally {
+      setIsDeleting(false);
       setActionState({ id: null, type: '' });
     }
   };
@@ -433,6 +446,17 @@ export default function ManageFeedbackEventPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        show={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setFormToDelete(null);
+        }}
+        onConfirm={confirmDeleteForm}
+        message="Bạn chắc chắn muốn xoá biểu mẫu này? Hành động không thể hoàn tác."
+        isLoading={isDeleting}
+      />
     </UserLayout>
   );
 }

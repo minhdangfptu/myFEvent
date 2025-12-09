@@ -277,6 +277,23 @@ export default function EventTaskPage() {
     fetchTasks();
   }, [fetchTasks]);
 
+  // Listen to AI plan applied event to refresh tasks
+  useEffect(() => {
+    const handlePlanApplied = (event) => {
+      const { eventId: appliedEventId } = event.detail || {};
+      // Only refresh if the event matches current event
+      if (appliedEventId && String(appliedEventId) === String(eventId)) {
+        console.log('[EventTaskPage] AI plan applied, refreshing tasks...');
+        fetchTasks();
+      }
+    };
+
+    window.addEventListener('ai:plan-applied', handlePlanApplied);
+    return () => {
+      window.removeEventListener('ai:plan-applied', handlePlanApplied);
+    };
+  }, [eventId, fetchTasks]);
+
 
   const filteredTasks = tasks
     .filter((task) => task.name.toLowerCase().includes(search.toLowerCase()))

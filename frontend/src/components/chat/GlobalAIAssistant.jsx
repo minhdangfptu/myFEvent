@@ -15,6 +15,11 @@ export default function GlobalAIAssistant() {
     return null;
   }
 
+  // Hide on admin pages
+  if (location.pathname.startsWith('/admin')) {
+    return null;
+  }
+
   // Lấy eventId từ URL (hỗ trợ cả query param và path param)
   const eventId = getEventIdFromUrl(location.pathname, location.search);
 

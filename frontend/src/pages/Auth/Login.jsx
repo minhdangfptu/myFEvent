@@ -54,10 +54,8 @@ export default function LoginPage() {
     setIsLoggingIn(true);
     try {
       const { user: loggedInUser } = await login(email, password);
-      console.log('Login handleSubmit: User logged in', {
-        userRole: loggedInUser?.role,
-        isAdmin: loggedInUser?.role === "admin"
-      });
+      // Wait a bit to ensure user state is updated in AuthContext
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (loggedInUser?.role === "admin") {
         console.log('Redirecting admin to /admin/dashboard');
         navigate("/admin/dashboard", { replace: true });
@@ -130,16 +128,13 @@ export default function LoginPage() {
         );
       }
 
+      // Wait a bit to ensure user state is updated in AuthContext
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Navigate based on user role
-      console.log('Google login handleGoogleSuccess: User logged in', {
-        userRole: userData?.role,
-        isAdmin: userData?.role === "admin"
-      });
       if (userData?.role === "admin") {
-        console.log('Redirecting admin to /admin/dashboard');
-        navigate("/admin/dashboard", { replace: true, state: { loginSuccess: true } });
+        navigate("/admin/dashboard", { replace: true });
       } else {
-        console.log('Redirecting user to /home-page');
         navigate("/home-page", { replace: true, state: { loginSuccess: true } });
       }
     } catch (err) {

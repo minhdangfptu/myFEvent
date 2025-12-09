@@ -84,7 +84,7 @@ export default function HoOCSidebar({
   }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
 
   // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
-  const { events, loading } = useEvents();
+  const { events, loading, error: eventError } = useEvents();
   const event = useMemo(() => {
     // Tìm event từ context
     const foundEvent = events.find(e => (e._id || e.id) === eventId);
@@ -102,8 +102,8 @@ export default function HoOCSidebar({
   const hasEvent = !!event;
   const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
 
-  // Chỉ show loading khi chưa có events VÀ đang loading
-  const showLoading = loading && events.length === 0;
+  // Show loading when currently loading or when first loading with no events
+  const showLoading = loading || (loading && events.length === 0);
   const navigate = useNavigate();
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
@@ -350,6 +350,41 @@ export default function HoOCSidebar({
           >
             <Loading size={60} />
             <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : eventError ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+              padding: "20px",
+            }}
+          >
+            <div style={{ color: "#ef4444", fontSize: 16, fontWeight: 600 }}>Lỗi tải dữ liệu</div>
+            <span style={{ color: "#6b7280", fontSize: 14, textAlign: "center" }}>{eventError}</span>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: 8,
+                padding: "8px 16px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Tải lại
+            </button>
           </div>
         ) : (
           <>
