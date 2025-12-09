@@ -78,8 +78,6 @@ function Illustration() {
   );
 }
 
-/* ---------- New: Partners carousel section ---------- */
-/* Replace the previous PartnersSection with this component */
 function PartnersSection() {
   const partners = [
     "/Patners/1.png",
@@ -113,28 +111,51 @@ function PartnersSection() {
     "/Patners/30.png",
     "/Patners/31.png",
     "/Patners/32.png",
-  ];
+  ]
 
-  // chỉnh nhanh: nhỏ hơn = nhanh hơn
-  const ANIMATION_DURATION = 40;
-
-  // duplicate for seamless loop
-  const loopItems = [...partners, ...partners];
+  const ANIMATION_DURATION = 36
+  const loopItems = [...partners, ...partners]
 
   return (
-    <section className="py-5 bg-white">
+    <section
+      className="py-5 position-relative"
+      style={{ background: "#0b0520", overflow: "hidden", minHeight: "400px" }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          overflow: "hidden",
+        }}
+      >
+        {/* Base gradient layer with rainbow animation */}
+        <div className="flashy-bg-layer-1" />
+
+        {/* Secondary moving orbs */}
+        <div className="flashy-orb flashy-orb-1" />
+        <div className="flashy-orb flashy-orb-2" />
+        <div className="flashy-orb flashy-orb-3" />
+        <div className="flashy-orb flashy-orb-4" />
+
+        {/* Rotating grid overlay */}
+        <div className="grid-overlay" />
+      </div>
+
       <MaxContainer>
-        <div className="text-center mb-3">
-          <h4 className="fw-bold" style={{ color: "#111827" }}>
-            Đối tác của chúng tôi
-          </h4>
-          <p className="text-secondary mx-auto" style={{ maxWidth: 760 }}>
-            Chúng tôi tự hào hợp tác cùng các đối tác hàng đầu — cùng nhau tạo nên
-            nhiều sự kiện ý nghĩa.
+        <div className="text-center mb-5 position-relative" style={{ zIndex: 10 }}>
+          <h4 className="fw-bold mb-3 partners-title">Đối tác của chúng tôi</h4>
+          <p className="text-light mx-auto partners-subtitle" style={{ maxWidth: 760 }}>
+            Hợp tác cùng đối tác &amp; nhà tài trợ — rực rỡ, sống động và năng động.
           </p>
         </div>
 
-        <div className="partners-marquee-wrapper overflow-hidden">
+        <div
+          className="partners-marquee-wrapper overflow-hidden position-relative"
+          style={{ width: "100%", zIndex: 10, padding: 20}}
+        >
           <div
             className="partners-marquee__inner d-flex"
             style={{
@@ -142,84 +163,418 @@ function PartnersSection() {
             }}
           >
             {loopItems.map((src, idx) => (
-              <div
-                key={idx}
-                className="partners-item d-flex align-items-center justify-content-center"
-              >
-                <img
-                  src={src}
-                  alt={`partner-${idx}`}
-                  style={{
-                    border: "solid 1px #d4d4d4ff",
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain",
-                    display: "block",
-                  }}
-                />
+              <div key={idx} className="partners-item-square" aria-hidden={idx >= partners.length ? "true" : "false"}>
+                <div className="partners-card-neon">
+                  <div className="card-inner">
+                    <img src={src || "/placeholder.svg"} alt={`partner-${idx}`} />
+                    <div className="shimmer" />
+                    <div className="rainbow-border" />
+                    <div className="glow-effect" />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
-
-        <style>{`
-          /* container wrapper */
-          .partners-marquee-wrapper {
-            width: 100%;
-            overflow: hidden;
-          }
-
-          /* the moving track: ensure nowrap and keep content in one line */
-          .partners-marquee__inner {
-            display: flex;
-            flex-wrap: nowrap; /* important */
-            align-items: center;
-            min-width: max-content; /* important so duplicated halves have identical width */
-            will-change: transform;
-          }
-
-          /* each item: fixed width so halves are equal.
-             adjust width/height to taste. */
-          .partners-item {
-            flex: 0 0 160px; /* fixed box width */
-            height: 120px;
-            box-sizing: border-box;
-            padding: 8px; /* internal padding only */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          /* prevent any margins that would introduce asymmetry */
-          .partners-item + .partners-item { /* optional small gap visually via padding above */
-            /* no extra margin here to keep perfect symmetry */
-          }
-
-          /* animation: translate full half (we duplicated array so -50% moves exactly one original length) */
-          @keyframes partners-scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
-
-          /* responsive */
-          @media (max-width: 992px) {
-            .partners-item { flex: 0 0 140px; height: 100px; }
-          }
-          @media (max-width: 576px) {
-            .partners-item { flex: 0 0 110px; height: 80px; }
-          }
-
-          /* Optional: remove hover pause to avoid resume glitches — if you want pause, re-enable */
-          /* .partners-marquee-wrapper:hover .partners-marquee__inner {
-               animation-play-state: paused;
-          } */
-        `}</style>
       </MaxContainer>
+
+      <style>{`
+        /* Multi-layer animated background with vibrant colors */
+        .flashy-bg-layer-1 {
+          position: absolute;
+          inset: -50%;
+          background: 
+            radial-gradient(circle at 20% 30%, rgba(255, 0, 128, 0.3), transparent 40%),
+            radial-gradient(circle at 80% 70%, rgba(0, 216, 255, 0.3), transparent 40%),
+            radial-gradient(circle at 50% 50%, rgba(148, 0, 255, 0.2), transparent 50%),
+            linear-gradient(135deg, 
+              #ff0080 0%, 
+              #ff8c00 10%, 
+              #40e0d0 20%, 
+              #9400d3 30%, 
+              #00ffff 40%, 
+              #ff1493 50%,
+              #ffd700 60%,
+              #00ff00 70%,
+              #4169e1 80%,
+              #ff0080 100%
+            );
+          background-size: 400% 400%;
+          filter: blur(80px) saturate(2) brightness(1.2);
+          animation: rainbow-shift 15s ease-in-out infinite, bg-zoom 20s ease-in-out infinite;
+          opacity: 0.6;
+        }
+
+        @keyframes rainbow-shift {
+          0%, 100% { 
+            background-position: 0% 50%;
+            transform: rotate(0deg) scale(1);
+          }
+          25% {
+            background-position: 100% 50%;
+            transform: rotate(90deg) scale(1.1);
+          }
+          50% { 
+            background-position: 100% 100%;
+            transform: rotate(180deg) scale(1.2);
+          }
+          75% {
+            background-position: 0% 100%;
+            transform: rotate(270deg) scale(1.1);
+          }
+        }
+
+        @keyframes bg-zoom {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          50% { transform: scale(1.3) rotate(180deg); }
+        }
+
+        /* Floating colorful orbs */
+        .flashy-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(60px);
+          animation: float-orb 12s ease-in-out infinite;
+        }
+
+        .flashy-orb-1 {
+          width: 300px;
+          height: 300px;
+          background: radial-gradient(circle, rgba(255, 0, 255, 0.6), transparent);
+          top: 10%;
+          left: 10%;
+          animation-duration: 14s;
+        }
+
+        .flashy-orb-2 {
+          width: 250px;
+          height: 250px;
+          background: radial-gradient(circle, rgba(0, 255, 255, 0.6), transparent);
+          top: 60%;
+          right: 15%;
+          animation-duration: 16s;
+          animation-delay: -4s;
+        }
+
+        .flashy-orb-3 {
+          width: 350px;
+          height: 350px;
+          background: radial-gradient(circle, rgba(255, 255, 0, 0.5), transparent);
+          bottom: 20%;
+          left: 50%;
+          animation-duration: 18s;
+          animation-delay: -8s;
+        }
+
+        .flashy-orb-4 {
+          width: 280px;
+          height: 280px;
+          background: radial-gradient(circle, rgba(0, 255, 128, 0.5), transparent);
+          top: 40%;
+          right: 40%;
+          animation-duration: 13s;
+          animation-delay: -2s;
+        }
+
+        @keyframes float-orb {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          25% { transform: translate(50px, -80px) scale(1.2); }
+          50% { transform: translate(-60px, 60px) scale(0.9); }
+          75% { transform: translate(40px, 40px) scale(1.1); }
+        }
+
+        /* Animated grid overlay */
+        .grid-overlay {
+          position: absolute;
+          inset: 0;
+          background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px;
+          animation: grid-move 20s linear infinite;
+          opacity: 0.3;
+        }
+
+        @keyframes grid-move {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+
+        /* Gradient text with glow animation */
+        .partners-title {
+          font-size: 2.5rem;
+          background: linear-gradient(
+            90deg,
+            #ff0080,
+            #ff8c00,
+            #40e0d0,
+            #9400d3,
+            #00ffff,
+            #ff0080
+          );
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: gradient-flow 4s linear infinite, text-glow 2s ease-in-out infinite;
+          filter: drop-shadow(0 0 20px rgba(255, 0, 128, 0.5));
+        }
+
+        @keyframes gradient-flow {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+
+        @keyframes text-glow {
+          0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 0, 128, 0.5)); }
+          50% { filter: drop-shadow(0 0 40px rgba(0, 255, 255, 0.8)); }
+        }
+
+        .partners-subtitle {
+          animation: subtitle-pulse 3s ease-in-out infinite;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        @keyframes subtitle-pulse {
+          0%, 100% { opacity: 0.9; }
+          50% { opacity: 1; text-shadow: 0 0 20px rgba(0, 255, 255, 0.5); }
+        }
+
+        /* MARQUEE track */
+        .partners-marquee__inner {
+          display: flex;
+          flex-wrap: nowrap;
+          align-items: center;
+          min-width: max-content;
+          gap: 0;
+          will-change: transform;
+        }
+
+        .partners-item-square {
+          flex: 0 0 170px;
+          height: 150px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          padding: 8px;
+        }
+
+        /* Enhanced card with rainbow border and multiple effects */
+        .partners-card-neon {
+          width: 100%;
+          height: 100%;
+          border-radius: 20px;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transform-style: preserve-3d;
+          perspective: 1200px;
+          position: relative;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+          border: 2px solid transparent;
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.7),
+            0 0 60px rgba(255, 0, 128, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+          will-change: transform, box-shadow, filter;
+        }
+
+        .card-inner {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+
+        /* Rainbow animated border */
+        .rainbow-border {
+          position: absolute;
+          inset: -4px;
+          background: linear-gradient(
+            45deg,
+            #ff0080, #ff8c00, #40e0d0, #9400d3, #00ffff, #ff1493, #ff0080
+          );
+          background-size: 400% 400%;
+          border-radius: 20px;
+          z-index: -1;
+          animation: rainbow-rotate 3s linear infinite;
+          opacity: 0;
+          transition: opacity 0.6s ease;
+        }
+
+        @keyframes rainbow-rotate {
+          0% { background-position: 0% 50%; transform: rotate(0deg); }
+          50% { background-position: 100% 50%; transform: rotate(180deg); }
+          100% { background-position: 0% 50%; transform: rotate(360deg); }
+        }
+
+        /* Glow effect layer */
+        .glow-effect {
+          position: absolute;
+          inset: 0;
+          border-radius: 20px;
+          background: radial-gradient(circle at center, rgba(255, 255, 255, 0.1), transparent);
+          opacity: 0;
+          transition: opacity 0.6s ease;
+        }
+
+        /* LOGO image */
+        .card-inner img {
+          width: 84%;
+          height: 84%;
+          object-fit: contain;
+          display: block;
+          transform: translateZ(18px);
+          transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+          filter: saturate(1.1) contrast(1.1) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.3));
+          backface-visibility: hidden;
+        }
+
+        /* Enhanced shimmer with color gradient */
+        .card-inner .shimmer {
+          position: absolute;
+          left: -100%;
+          top: -100%;
+          width: 300%;
+          height: 300%;
+          background: linear-gradient(
+            120deg, 
+            transparent 0%, 
+            rgba(255, 0, 128, 0.3) 30%,
+            rgba(0, 255, 255, 0.3) 50%,
+            rgba(255, 255, 0, 0.3) 70%,
+            transparent 100%
+          );
+          transform: rotate(25deg) translateX(-100%);
+          mix-blend-mode: overlay;
+          pointer-events: none;
+          transition: transform 1s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* Floating animation with rotation */
+        @keyframes neon-float {
+          0% { 
+            transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg); 
+          }
+          25% {
+            transform: translateY(-12px) rotateX(5deg) rotateY(-5deg) rotateZ(2deg);
+          }
+          50% { 
+            transform: translateY(-8px) rotateX(8deg) rotateY(-8deg) rotateZ(-2deg); 
+          }
+          75% {
+            transform: translateY(-15px) rotateX(-5deg) rotateY(5deg) rotateZ(3deg);
+          }
+          100% { 
+            transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg); 
+          }
+        }
+
+        .partners-item-square:nth-child(3n) .partners-card-neon { 
+          animation: neon-float 5s ease-in-out infinite; 
+        }
+        .partners-item-square:nth-child(3n+1) .partners-card-neon { 
+          animation: neon-float 5.5s ease-in-out infinite; 
+          animation-delay: -1s;
+        }
+        .partners-item-square:nth-child(3n+2) .partners-card-neon { 
+          animation: neon-float 6s ease-in-out infinite; 
+          animation-delay: -2s;
+        }
+
+        /* Dramatic hover effects with multiple transforms and colors */
+        .partners-card-neon:hover {
+          transform: translateZ(80px) rotateX(15deg) rotateY(20deg) scale(1.18);
+          box-shadow:
+            0 50px 150px rgba(0, 0, 0, 0.8),
+            0 0 150px rgba(255, 0, 255, 0.4),
+            0 0 100px rgba(0, 255, 255, 0.4),
+            0 0 80px rgba(255, 255, 0, 0.3);
+          filter: saturate(1.5) brightness(1.15) hue-rotate(10deg);
+          border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .partners-card-neon:hover .rainbow-border {
+          opacity: 1;
+        }
+
+        .partners-card-neon:hover .glow-effect {
+          opacity: 1;
+          animation: glow-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes glow-pulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.7; }
+        }
+
+        .partners-card-neon:hover .card-inner img {
+          transform: translateZ(70px) rotateY(20deg) rotateX(8deg) scale(1.12);
+          filter: 
+            drop-shadow(0 30px 80px rgba(255, 0, 255, 0.5))
+            drop-shadow(0 -10px 40px rgba(0, 255, 255, 0.3))
+            saturate(1.5) 
+            contrast(1.2) 
+            hue-rotate(15deg);
+        }
+
+        .partners-card-neon:hover .shimmer {
+          transform: translateX(250%) rotate(25deg);
+          transition-duration: 0.9s;
+        }
+
+        /* track animation */
+        @keyframes partners-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+
+        /* Track with subtle wave motion */
+        @keyframes track-wave {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-3px); }
+        }
+
+        .partners-marquee__inner { 
+          animation: partners-scroll ${ANIMATION_DURATION}s linear infinite, 
+                     track-wave 4s ease-in-out infinite; 
+        }
+
+        /* responsive adjustments */
+        @media (max-width: 992px) {
+          .partners-item-square { flex: 0 0 150px; height: 130px; padding: 7px; }
+          .partners-card-neon { border-radius: 16px; }
+          .card-inner img { width: 80%; height: 80%; }
+          .partners-title { font-size: 2rem; }
+        }
+
+        @media (max-width: 576px) {
+          .partners-item-square { flex: 0 0 110px; height: 96px; padding: 6px; }
+          .partners-card-neon { border-radius: 12px; }
+          .card-inner img { width: 76%; height: 76%; transform: translateZ(10px); }
+          .partners-title { font-size: 1.5rem; }
+        }
+
+        /* performance optimizations */
+        .partners-marquee__inner, 
+        .partners-card-neon, 
+        .card-inner img,
+        .rainbow-border,
+        .shimmer,
+        .glow-effect { 
+          will-change: transform, filter, opacity; 
+          backface-visibility: hidden; 
+        }
+      `}</style>
     </section>
-  );
+  )
 }
-
-
 
 /* ---------- Main AboutUs component (cập nhật: chèn PartnersSection) ---------- */
 export default function AboutUs() {
