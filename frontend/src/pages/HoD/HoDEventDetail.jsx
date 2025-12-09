@@ -787,11 +787,11 @@ export default function HoDEventDetail() {
                     <div className="card-icon">
                       <i className="bi bi-shield-lock"></i>
                     </div>
-                    Chế độ xem của HoD
+                    Chế độ xem của Trưởng ban
                   </div>
                 </div>
                 <p style={{ color: "#64748b", lineHeight: 1.6 }}>
-                  Bạn đang truy cập sự kiện với quyền HoD. Bạn có thể theo dõi tiến độ, xem thông tin thành viên và chia sẻ mã mời. Các thao tác chỉnh sửa
+                  Bạn đang truy cập sự kiện với quyền Trưởng ban Tổ chức. Bạn có thể theo dõi tiến độ, xem thông tin thành viên và chia sẻ mã mời. Các thao tác chỉnh sửa
                   (thay đổi thông tin sự kiện, cập nhật hình ảnh, công khai, hủy) cần được thực hiện bởi HoOC.
                 </p>
               </div>

@@ -1,15 +1,63 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import UserLayout from "../../components/UserLayout"
 import ContactPage from "../Public/Contact"
-import { Coins, SquareCheckBig, SquareMousePointer, User, Users } from "lucide-react"
-
+import { Coins, SquareCheckBig, SquareMousePointer, User, Users, Download, RotateCw } from "lucide-react"
+import tutorialVideo from "../../assets/video_support.mp4"
 export default function SupportPage() {
   const [activeTab, setActiveTab] = useState("faq")
   const [expandedFaqId, setExpandedFaqId] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState("Tổng quan")
   const [faqSearchTerm, setFaqSearchTerm] = useState("")
+  
+  // State quản lý danh sách các file đang tải (để hiện loading)
+  const [downloadingItems, setDownloadingItems] = useState(new Set())
 
   const faqCategories = ["Tổng quan", "Tài khoản", "Sự kiện", "Tính năng"]
+// video refs + state
+  const videoRef = useRef(null)
+  const [isMuted, setIsMuted] = useState(true)
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+
+    const toggleMute = () => {
+    const v = videoRef.current
+    const next = !isMuted
+    setIsMuted(next)
+    if (v) {
+      v.muted = next
+      // if unmuting and paused, try playing
+      if (!next) v.play().catch(() => {})
+    }
+  }
+  // Khi chuyển tab tới Documents, tự động load + play (muted required for autoplay)
+  useEffect(() => {
+    if (activeTab !== "documents") {
+      // pause and reset when leaving documents tab
+      const v = videoRef.current
+      if (v) {
+        v.pause()
+        // optional: reset to start
+        try { v.currentTime = 0 } catch (e) {}
+      }
+      return
+    }
+
+    // small delay to allow DOM update
+    const t = setTimeout(async () => {
+      const v = videoRef.current
+      if (!v) return
+      v.muted = true     // ensure muted so autoplay allowed
+      v.playsInline = true
+      try {
+        await v.play()
+        setIsVideoLoaded(true)
+      } catch (err) {
+        // autoplay failed (rare for local asset when muted), keep video element but don't crash
+        console.warn("video.play() rejected:", err)
+      }
+    }, 120)
+
+    return () => clearTimeout(t)
+  }, [activeTab])
 
   const faqData = {
     "Tổng quan": [
@@ -250,40 +298,44 @@ export default function SupportPage() {
     ],
   }
 
+  // Cấu hình danh sách tài liệu với Google Drive ID
+  // LƯU Ý: Thay thế 'driveId' bằng ID thực của file trên Google Drive của bạn
   const documents = [
     {
-      icon: <SquareMousePointer color="red" />,
+      id: "doc_general",
+      icon: <SquareMousePointer size={18} />,
       title: "Hướng dẫn sử dụng tổng quan",
-      filename: "huong-dan-tong-quan.pdf",
+      filename: "huong-dan-tong-quan.docx",
+      driveId: "1Xhv3kizoSEBTzB95UfscWN4OEr13fEYKuz_DB2liWWg",
+      fileType: "docx"
     },
     {
-      icon: <User color="red" />,
+      id: "doc_org",
+      icon: <User size={18} />,
       title: "Hướng dẫn cho Trưởng ban Tổ chức",
-      filename: "huong-dan-hooc.pdf",
+      filename: "huong-dan-hooc.docx",
+      driveId: "1uTcZwbzUVyraGaZuf11xq_CqHT7wbXKo2CbYqS8CqX8",
+      fileType: "docx"
     },
     {
-      icon: <User color="red" />,
+      id: "doc_head",
+      icon: <User size={18} />,
       title: "Hướng dẫn cho Trưởng ban",
-      filename: "huong-dan-hod.pdf",
+      filename: "huong-dan-hod.docx",
+      driveId: "1XRO1KWoTphvAlYRMLSFEz0SMDPcTUQEZuyhJJ-IpcjY",
+      fileType: "docx"
     },
     {
-      icon: <User color="red" />,
+      id: "doc_mem",
+      icon: <User size={18} />,
       title: "Hướng dẫn cho Thành viên",
-      filename: "huong-dan-member.pdf",
-    },
-    {
-      icon: <SquareCheckBig color="red" />,
-      title: "Hướng dẫn quản lý công việc",
-      filename: "huong-dan-cong-viec.pdf",
-    },
-    {
-      icon: <Coins color="red" />,
-      title: "Hướng dẫn quản lý ngân sách",
-      filename: "huong-dan-ngan-sach.pdf",
-    },
+      filename: "huong-dan-member.docx",
+      driveId: "10yl11OO1mRc-64jsl9bOUP38Bsm7txzZrD4ca8J2SVs",
+      fileType: "docx"
+    }
   ]
 
-  // Lọc theo category + từ khóa (tìm trong cả câu hỏi & câu trả lời)
+  // Lọc theo category + từ khóa
   const filteredFaqs = (faqData[selectedCategory] || []).filter((faq) => {
     if (!faqSearchTerm.trim()) return true
     const term = faqSearchTerm.toLowerCase()
@@ -292,6 +344,55 @@ export default function SupportPage() {
       faq.answer.toLowerCase().includes(term)
     )
   })
+
+  // --- Hàm xử lý tải file từ Drive ---
+  const handleDriveDownload = async (doc) => {
+    // mark downloading (use a new Set copy to trigger re-render)
+    setDownloadingItems((prev) => new Set(prev).add(doc.id))
+
+    try {
+      const ft = (doc.fileType || '').toLowerCase()
+      let downloadUrl = ''
+
+      // Normalize common types
+      if (ft === 'xlsx' || ft === 'xls') {
+        downloadUrl = `https://docs.google.com/spreadsheets/d/${doc.driveId}/export?format=xlsx`
+      } else if (ft === 'doc' || ft === 'docx') {
+        downloadUrl = `https://docs.google.com/document/d/${doc.driveId}/export?format=docx`
+      } else if (ft === 'pdf') {
+        downloadUrl = `https://drive.google.com/uc?export=download&id=${doc.driveId}`
+      } else {
+        // fallback to direct drive download link; note: file must be shared as "Anyone with the link"
+        downloadUrl = `https://drive.google.com/uc?export=download&id=${doc.driveId}`
+      }
+
+      // Use a temporary anchor to open in new tab (safer than replacing current window location)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      // For some export endpoints, clicking an anchor triggers the download in the new tab.
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+
+      // If you want to force a download without opening a new tab for some file types,
+      // you could fetch the blob and create an object URL. That requires CORS to be allowed.
+    } catch (err) {
+      // nếu lỗi, log để dev biết và fallback mở trang preview
+      console.error('Download error', err)
+      window.open(`https://drive.google.com/file/d/${doc.driveId}/view`, '_blank')
+    } finally {
+      // Giải phong trạng thái loading (để UX tốt hơn, bạn có thể hủy sau 1.5s)
+      setTimeout(() => {
+        setDownloadingItems((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(doc.id)
+          return newSet
+        })
+      }, 1500)
+    }
+  }
 
   return (
     <UserLayout title="Trung tâm hỗ trợ" activePage="support" sidebarType="user">
@@ -379,7 +480,7 @@ export default function SupportPage() {
                 ))}
               </div>
 
-              {/* Thanh tìm kiếm FAQ dưới các category button */}
+              {/* Thanh tìm kiếm FAQ */}
               <div className="mt-3">
                 <div className="position-relative">
                   <i
@@ -494,46 +595,44 @@ export default function SupportPage() {
           <div className="support-page__documents-tab">
             <div className="row g-4">
               {/* Video Tutorial Section */}
-              <div className="col-lg-8">
-                <div className="support-page__video-section">
-                  <h2 className="support-page__video-title fw-bold mb-3" style={{ fontSize: '20px', color: '#1f2937' }}>
-                    Video hướng dẫn
-                  </h2>
-                  <div
-                    className="support-page__video-placeholder d-flex align-items-center justify-content-center"
-                    style={{
-                      height: "400px",
-                      borderRadius: "12px",
-                      backgroundColor: '#1f2937',
-                      border: '2px solid #374151'
-                    }}
-                  >
-                    <div className="text-center" style={{ color: '#ffffff' }}>
-                      <div className="mb-3">
-                        <svg width="80" height="80" fill="currentColor" viewBox="0 0 16 16" style={{ opacity: 0.4 }}>
-                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                          <path d="M8 4v.001M8 6v4M8 11v.001" strokeWidth="2" stroke="currentColor" />
-                        </svg>
-                      </div>
-                      <h4 className="fw-bold mb-2" style={{ fontSize: '18px' }}>Video không có sẵn</h4>
-                      <p className="mb-0" style={{ color: '#9ca3af', fontSize: '14px' }}>
-                        Video này hiện không khả dụng
-                      </p>
-                    </div>
+            <div className="col-lg-8">
+                <div className="card shadow-sm mb-4" style={{ borderRadius: 12 }}>
+                  {/* video container */}
+                  <div style={{ position: 'relative', paddingTop: 0 }}>
+                    <video
+                      ref={videoRef}
+                      src={tutorialVideo}
+                      muted={isMuted}
+                      autoPlay
+                      playsInline
+                      controls
+                      loop 
+                      preload="metadata"
+                      style={{
+                        width: '100%',
+                        height: '420px',
+                        objectFit: 'cover',
+                        borderRadius: 12,
+                        display: 'block',
+                        background: '#000'
+                      }}
+                      onCanPlay={() => setIsVideoLoaded(true)}
+                    />
                   </div>
-                  <div className="mt-4" style={{
-                    backgroundColor: '#ffffff',
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <h3 className="fw-bold mb-2" style={{ fontSize: '18px', color: '#1f2937' }}>
+
+                  {/* control row under video (aligned left) */}
+
+                </div>
+
+                {/* Card below video: same width as video, consistent padding */}
+                <div className="card mb-4 shadow-sm" style={{ borderRadius: 12 }}>
+                  <div className="card-body">
+                    <h3 className="card-title fw-bold" style={{ fontSize: 18, color: '#1f2937' }}>
                       Hướng dẫn sử dụng myFEvent cho người dùng mới
                     </h3>
-                    <p className="mb-0" style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+                    <p className="card-text text-muted" style={{ lineHeight: 1.6, fontSize: 14 }}>
                       Video hướng dẫn sử dụng hệ thống myFEvent từ cơ bản đến nâng cao. Học cách tạo và quản lý sự kiện,
                       phân công công việc, theo dõi tiến độ, quản lý ngân sách, phân tích rủi ro và phối hợp đội ngũ hiệu quả.
-                      Hệ thống giúp bạn tổ chức các sự kiện một cách chuyên nghiệp với giao diện thân thiện và đầy đủ tính năng.
                     </p>
                   </div>
                 </div>
@@ -546,45 +645,59 @@ export default function SupportPage() {
                     Tài liệu tải về
                   </h2>
                   <div className="d-flex flex-column gap-3">
-                    {documents.map((doc, index) => (
-                      <div
-                        key={index}
-                        className="support-page__document-item"
-                        style={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          padding: '16px',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <div className="d-flex align-items-start gap-3">
-                          <div
-                            className="support-page__document-icon d-flex align-items-center justify-content-center"
-                            style={{
-                              width: "48px",
-                              height: "48px",
-                              fontSize: "24px",
-                              backgroundColor: '#fef2f2',
-                              borderRadius: '8px',
-                              border: '1px solid #fee2e2',
-                              flexShrink: 0
-                            }}
-                          >
-                            {doc.icon}
-                          </div>
-                          <div className="flex-grow-1">
-                            <h5 className="fw-semibold mb-1" style={{ fontSize: '15px', color: '#1f2937' }}>
-                              {doc.title}
-                            </h5>
-                            <p className="mb-0" style={{ fontSize: '13px', color: '#dc2626' }}>
-                              {doc.filename}
-                            </p>
+                    {documents.map((doc) => {
+                      const isDownloading = downloadingItems.has(doc.id)
+                      
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => !isDownloading && handleDriveDownload(doc)}
+                          className="support-page__document-item"
+                          style={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            padding: '16px',
+                            cursor: isDownloading ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            opacity: isDownloading ? 0.7 : 1,
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div className="d-flex align-items-center gap-3">
+                            <div
+                              className="support-page__document-icon d-flex align-items-center justify-content-center"
+                              style={{
+                                width: "48px",
+                                height: "48px",
+                                fontSize: "24px",
+                                backgroundColor: '#fef2f2',
+                                borderRadius: '8px',
+                                border: '1px solid #fee2e2',
+                                flexShrink: 0
+                              }}
+                            >
+                              {doc.icon}
+                            </div>
+                            <div className="flex-grow-1">
+                              <h5 className="fw-semibold mb-1" style={{ fontSize: '15px', color: '#1f2937' }}>
+                                {doc.title}
+                              </h5>
+                              <p className="mb-0" style={{ fontSize: '13px', color: '#dc2626' }}>
+                                {doc.filename}
+                              </p>
+                            </div>
+                            <div style={{ color: '#6b7280' }}>
+                              {isDownloading ? (
+                                <RotateCw className="spin-animation" size={20} />
+                              ) : (
+                                <Download size={20} />
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -599,6 +712,17 @@ export default function SupportPage() {
           </div>
         )}
       </div>
+
+      {/* Style animation xoay cho loading */}
+      <style>{`
+        .spin-animation {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </UserLayout>
   )
 }
