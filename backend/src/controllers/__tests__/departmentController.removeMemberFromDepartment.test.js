@@ -61,8 +61,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Member removed from department'
     }));
   });
-
-
   it('[Normal] TC02 - should remove member by HoD of the department', async () => {
     const { ensureEventExists, ensureDepartmentInEvent, removeMemberFromDepartmentDoc } =
       await import('../../services/departmentService.js');
@@ -113,8 +111,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Event not found'
     }));
   });
-
-
   it('[Abnormal] TC04 - should return 404 if department not found', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -135,8 +131,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Department not found'
     }));
   });
-
-
   it('[Abnormal] TC05 - should return 403 if requester has insufficient permissions', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -160,8 +154,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Insufficient permissions'
     }));
   });
-
-
   it('[Abnormal] TC06 - should return 403 if HoD tries to remove member from different department', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -188,8 +180,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Insufficient permissions'
     }));
   });
-
-
   it('[Abnormal] TC07 - should return 404 if member not in department', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -217,8 +207,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Member is not in this department'
     }));
   });
-
-
   it('[Abnormal] TC08 - should return 404 if member does not exist', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -243,8 +231,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Member is not in this department'
     }));
   });
-
-
   it('[Abnormal] TC09 - should return 409 if trying to remove HoOC', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -272,8 +258,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Cannot remove HooC from department'
     }));
   });
-
-
   it('[Abnormal] TC10 - should return 409 if trying to remove HoD', async () => {
     const { ensureEventExists, ensureDepartmentInEvent } =
       await import('../../services/departmentService.js');
@@ -301,8 +285,6 @@ describe('departmentController.removeMemberFromDepartment', () => {
       message: 'Unassign HoD before removing from department'
     }));
   });
-
-
   it('[Abnormal] TC11 - should return 500 on database error', async () => {
     const { ensureEventExists } =
       await import('../../services/departmentService.js');
