@@ -147,11 +147,17 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
       setSessionId(sid);
       setMessages(convMessages);
       
-      // Khôi phục plans từ message cuối cùng (assistant message có plans)
+      // Khôi phục plans từ message cuối cùng (assistant message có plans và chưa được áp dụng)
       const lastAssistantMsg = [...convMessages]
         .reverse()
-        .find((m) => m.role === 'assistant' && m.data?.plans);
-      if (lastAssistantMsg?.data?.plans) {
+        .find((m) => 
+          m.role === 'assistant' && 
+          m.data?.plans && 
+          Array.isArray(m.data.plans) && 
+          m.data.plans.length > 0 &&
+          !m.data.applied // Chỉ lấy plans chưa được áp dụng
+        );
+      if (lastAssistantMsg?.data?.plans && !lastAssistantMsg.data.applied) {
         setPlans(lastAssistantMsg.data.plans);
       } else {
         setPlans([]);
@@ -479,92 +485,6 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                   }}
                 >
                   {m.role === 'user' ? m.content : renderWithBold(m.content)}
-                  
-                  {/* Hiển thị nút "Áp dụng" ngay trong message của AI nếu có plans */}
-                  {m.role === 'assistant' && (() => {
-                    const messagePlans = m.data?.plans && Array.isArray(m.data.plans) ? m.data.plans : [];
-                    const isLastMessage = idx === messages.length - 1;
-                    const activePlans = messagePlans.length > 0 ? messagePlans : (isLastMessage && plans.length > 0 ? plans : []);
-                    
-                    return activePlans.length > 0;
-                  })() && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                        AI đã đề xuất {(() => {
-                          const messagePlans = m.data?.plans && Array.isArray(m.data.plans) ? m.data.plans : [];
-                          const isLastMessage = idx === messages.length - 1;
-                          const activePlans = messagePlans.length > 0 ? messagePlans : (isLastMessage && plans.length > 0 ? plans : []);
-                          return activePlans.length;
-                        })()} kế hoạch công việc
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-success"
-                        disabled={applying}
-                        onClick={async () => {
-                          try {
-                            setApplying(true);
-                            // Lấy plans từ message.data hoặc từ state plans
-                            const messagePlans = m.data?.plans && Array.isArray(m.data.plans) ? m.data.plans : [];
-                            const isLastMessage = idx === messages.length - 1;
-                            const activePlans = messagePlans.length > 0 ? messagePlans : (isLastMessage && plans.length > 0 ? plans : []);
-                            
-                            const res = await aiAgentApi.applyPlan(activePlans, {
-                              eventId,
-                            });
-                            const msg =
-                              res?.message ||
-                              'Đã áp dụng kế hoạch EPIC/TASK vào sự kiện.';
-                            setMessages((prev) => [
-                              ...prev,
-                              {
-                                role: 'assistant',
-                                content: msg,
-                                timestamp: new Date().toISOString(),
-                              },
-                            ]);
-                            // Xóa plans khỏi message này sau khi apply
-                            setMessages((prev) =>
-                              prev.map((msg) =>
-                                msg === m
-                                  ? { ...msg, data: { ...msg.data, plans: [] } }
-                                  : msg
-                              )
-                            );
-                            setPlans([]);
-                            
-                            // Emit event để các trang task list biết cần refresh
-                            if (eventId) {
-                              window.dispatchEvent(
-                                new CustomEvent('ai:plan-applied', {
-                                  detail: { eventId },
-                                })
-                              );
-                            }
-                          } catch (e) {
-                            const detail =
-                              e?.response?.data?.message || e.message || '';
-                            setMessages((prev) => [
-                              ...prev,
-                              {
-                                role: 'assistant',
-                                content:
-                                  'Áp dụng kế hoạch vào sự kiện thất bại. ' +
-                                  (detail ? `Chi tiết: ${detail}` : ''),
-                                timestamp: new Date().toISOString(),
-                                isError: true,
-                              },
-                            ]);
-                          } finally {
-                            setApplying(false);
-                          }
-                        }}
-                        style={{ width: '100%' }}
-                      >
-                        {applying ? 'Đang áp dụng...' : 'Áp dụng vào sự kiện'}
-                      </button>
-                    </div>
-                  )}
                 </div>
                 {m.role === 'user' && (
                   <div
@@ -588,68 +508,111 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
             {loading && (
               <div className="text-muted small">AI đang soạn trả lời...</div>
             )}
-            {plans.length > 0 && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 12,
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  color: '#991b1b',
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  Kế hoạch công việc đã được AI đề xuất
-                </div>
-                <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
-                  {plans.map((p, idx) => {
-                    if (p.type === 'epics_plan') {
-                      const epics =
-                        p.plan?.epics && Array.isArray(p.plan.epics)
-                          ? p.plan.epics
-                          : [];
+            {/* Hiển thị plans từ message cuối cùng hoặc từ state plans */}
+            {(() => {
+              // Tìm message cuối cùng có plans và chưa được áp dụng
+              const lastMessageWithPlans = [...messages]
+                .reverse()
+                .find((m) => 
+                  m.role === 'assistant' && 
+                  m.data?.plans && 
+                  Array.isArray(m.data.plans) && 
+                  m.data.plans.length > 0 &&
+                  !m.data.applied // Chưa được áp dụng
+                );
+              
+              // Nếu không có trong message, dùng plans từ state (cho message mới)
+              const activePlans = lastMessageWithPlans?.data?.plans || 
+                (plans.length > 0 && !messages.some(m => m.data?.applied && m.data?.plans === plans) ? plans : []);
+              
+              // Chỉ hiển thị nếu có plans và chưa được áp dụng
+              if (activePlans.length === 0) return null;
+              
+              return (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 12,
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Kế hoạch công việc đã được AI đề xuất
+                  </div>
+                  <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
+                    {activePlans.map((p, idx) => {
+                      if (p.type === 'epics_plan') {
+                        const epics =
+                          p.plan?.epics && Array.isArray(p.plan.epics)
+                            ? p.plan.epics
+                            : [];
+                        return (
+                          <li key={`${p.type}-${idx}`}>
+                            {`EPIC cho sự kiện ${
+                              p.eventId || eventId || ''
+                            }`}:{' '}
+                            {epics.length} công việc lớn
+                          </li>
+                        );
+                      }
+                      if (p.type === 'tasks_plan') {
+                        const tasks =
+                          p.plan?.tasks && Array.isArray(p.plan.tasks)
+                            ? p.plan.tasks
+                            : [];
+                        return (
+                          <li key={`${p.type}-${idx}`}>
+                            {`TASK cho EPIC "${p.epicTitle || ''}"`}: {tasks.length}{' '}
+                            công việc
+                          </li>
+                        );
+                      }
                       return (
-                        <li key={`${p.type}-${idx}`}>
-                          {`EPIC cho sự kiện ${
-                            p.eventId || eventId || ''
-                          }`}:{' '}
-                          {epics.length} công việc lớn
-                        </li>
+                        <li key={`plan-${idx}`}>Kế hoạch khác từ tool {p.tool}</li>
                       );
-                    }
-                    if (p.type === 'tasks_plan') {
-                      const tasks =
-                        p.plan?.tasks && Array.isArray(p.plan.tasks)
-                          ? p.plan.tasks
-                          : [];
-                      return (
-                        <li key={`${p.type}-${idx}`}>
-                          {`TASK cho EPIC "${p.epicTitle || ''}"`}: {tasks.length}{' '}
-                          công việc
-                        </li>
-                      );
-                    }
-                    return (
-                      <li key={`plan-${idx}`}>Kế hoạch khác từ tool {p.tool}</li>
-                    );
-                  })}
-                </ul>
-                <div style={{ display: 'flex', gap: 8 }}>
+                    })}
+                  </ul>
                   <button
                     type="button"
                     className="btn btn-sm btn-success"
-                    disabled={applying || plans.length === 0}
+                    disabled={applying || activePlans.length === 0}
                     onClick={async () => {
                       try {
                         setApplying(true);
-                        const res = await aiAgentApi.applyPlan(plans, {
+                        const res = await aiAgentApi.applyPlan(activePlans, {
                           eventId,
+                          sessionId, // Gửi sessionId để backend có thể đánh dấu plans đã áp dụng
                         });
                         const msg =
                           res?.message ||
-                          'Đã áp dụng kế hoạch EPIC/TASK vào sự kiện.';
+                          'Áp dụng kế hoạch EPIC/TASK từ AI Event Planner hoàn tất (xem chi tiết trong summary).';
+                        
+                        // Đánh dấu plans đã được áp dụng trong message
+                        setMessages((prev) =>
+                          prev.map((msg) => {
+                            if (msg === lastMessageWithPlans || 
+                                (msg.role === 'assistant' && 
+                                 msg.data?.plans && 
+                                 Array.isArray(msg.data.plans) &&
+                                 msg.data.plans.length > 0 &&
+                                 !msg.data.applied)) {
+                              return {
+                                ...msg,
+                                data: {
+                                  ...msg.data,
+                                  applied: true, // Đánh dấu đã áp dụng
+                                },
+                              };
+                            }
+                            return msg;
+                          })
+                        );
+                        
+                        // Thêm message xác nhận
                         setMessages((prev) => [
                           ...prev,
                           {
@@ -658,6 +621,8 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                             timestamp: new Date().toISOString(),
                           },
                         ]);
+                        
+                        // Xóa plans khỏi state
                         setPlans([]);
                         
                         // Emit event để các trang task list biết cần refresh
@@ -686,20 +651,13 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                         setApplying(false);
                       }
                     }}
+                    style={{ width: '100%' }}
                   >
                     {applying ? 'Đang áp dụng...' : 'Áp dụng vào sự kiện'}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={applying}
-                    onClick={() => setPlans([])}
-                  >
-                    Bỏ qua kế hoạch lần này
-                  </button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             <div ref={bottomRef} />
           </div>
         </div>

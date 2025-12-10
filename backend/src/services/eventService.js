@@ -533,9 +533,15 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
   }
 
   if (eventDate) {
+    // Build a full-day window to avoid timezone offsets hiding events on exact dates
     const date = new Date(eventDate);
-    filter.eventStartDate = { $lte: date };
-    filter.eventEndDate = { $gte: date };
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    // An event is included if it overlaps the selected day
+    filter.eventStartDate = { $lte: endOfDay };
+    filter.eventEndDate = { $gte: startOfDay };
   }
 
   const skip = (page - 1) * limit;

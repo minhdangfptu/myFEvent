@@ -922,7 +922,7 @@ export default function CreateFeedbackForm() {
                     }}
                   >
                     {submitting && <i className="bi bi-arrow-clockwise spin-animation"></i>}
-                    {submitting ? 'Đang lưu...' : canEditCloseTime ? 'Cập nhật thời gian đóng' : 'Lưu nháp'}
+                    {submitting ? 'Đang lưu...' : canEditCloseTime ? 'Cập nhật thời gian đóng' : 'Lưu'}
                   </button>
                 </div>
               )}

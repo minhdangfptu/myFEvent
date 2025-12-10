@@ -893,7 +893,7 @@ const getRoleLabel = (role) => {
   ? isTaskLocked
     ? 'Không thể chỉnh sửa công việc khi trạng thái không phải "Chưa bắt đầu".'
     : !canManageTask
-    ? "Chỉ TBTC/TBan hoặc người tạo công việc này mới có quyền chỉnh sửa."
+    ? "Chỉ Trường ban tổ chức/Trưởng ban hoặc người tạo công việc này mới có quyền chỉnh sửa."
     : "Bạn không thể chỉnh sửa công việc này."
   : null;
 

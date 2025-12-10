@@ -120,7 +120,7 @@ export default function UnbanEventModal({ isOpen, onClose, eventData, onUnbanSuc
 
           <div style={{ marginBottom: "8px" }}>
             <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "2px", fontFamily: "inherit" }}>
-              TBTC:
+            Trường ban tổ chức:
             </div>
             <div style={{ fontSize: "13px", color: "#111827", fontWeight: "400", fontFamily: "inherit" }}>
               {eventData?.hooc || "Trần Văn Minh"}
