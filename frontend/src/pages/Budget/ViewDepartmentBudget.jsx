@@ -864,8 +864,8 @@ const ViewDepartmentBudget = () => {
                     navigate(`/events/${eventId}/budgets`, { replace: true });
                   } else if (userRole === 'HoD' || isHoD) {
                     navigate(`/events/${eventId}/budgets/departments`, { replace: true });
-                  } else {
-                    navigate(`/events/${eventId}/budgets/member`, { replace: true });
+                    } else {
+                      navigate(`/events/${eventId}/budgets/member`, { replace: true });
                   }
                 }}
                 style={{ borderRadius: "8px" }}
@@ -1078,7 +1078,7 @@ const ViewDepartmentBudget = () => {
                 }}
               >
                 <Send size={18} />
-                Bảng gửi TBTC
+                Bảng gửi Trường ban tổ chức
               </div>
             )}
             {(isApproved || isSentToMembers) && (
@@ -1411,7 +1411,7 @@ const ViewDepartmentBudget = () => {
                       userSelect: "none",
                       whiteSpace: "nowrap"
                     }}>
-                      Phản hồi từ TBTC
+                      Phản hồi từ tưởng ban tổ chức
                     </th>
                   </tr>
                 </thead>

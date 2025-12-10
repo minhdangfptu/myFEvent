@@ -317,7 +317,7 @@ export default function MemberTaskPage() {
       >
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Không tìm thấy thông tin thành viên</h5>
-          <p>Bạn chưa được phân công vào sự kiện này. Vui lòng liên hệ TBTC để được phân công.</p>
+          <p>Bạn chưa được phân công vào sự kiện này. Vui lòng liên hệ Trường ban tổ chức để được phân công.</p>
         </div>
       </UserLayout>
     );

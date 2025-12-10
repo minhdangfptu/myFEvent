@@ -1,7 +1,7 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
 const ConversationHistorySchema = new Schema({
-  eventId: { type: Types.ObjectId, ref: 'Event', required: true },
+  eventId: { type: Types.ObjectId, ref: 'Event', required: false, default: null }, // Cho phép null khi ngoài sự kiện
   userId: { type: Types.ObjectId, ref: 'User', required: true },
   sessionId: { type: String, required: true, index: true },
 

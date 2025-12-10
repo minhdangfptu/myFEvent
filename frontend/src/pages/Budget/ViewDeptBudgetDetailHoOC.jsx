@@ -432,13 +432,13 @@ const ViewDeptBudgetDetailHoOC = () => {
       });
 
       await budgetApi.saveReviewDraft(eventId, departmentId, budget._id, { items });
-      toast.success("Đã lưu nháp thành công!");
+      toast.success("Đã lưu thành công!");
       setHasChanges(false);
       // Refresh data để lấy feedback đã lưu
       await fetchData();
     } catch (error) {
       console.error("Error saving draft:", error);
-      toast.error(error?.response?.data?.message || "Lưu nháp thất bại!");
+      toast.error(error?.response?.data?.message || "Lưu thất bại!");
     } finally {
       setLoading(false);
     }
@@ -605,7 +605,7 @@ const ViewDeptBudgetDetailHoOC = () => {
   if (loading) {
     return (
       <UserLayout
-        title="View Dept Budget Detail (HoOC)"
+        title="Xem chi tiết ngân sách của các ban"
         activePage="finance-budget"
         sidebarType="hooc"
         eventId={eventId}
@@ -624,7 +624,7 @@ const ViewDeptBudgetDetailHoOC = () => {
 
   return (
     <UserLayout
-      title="View Dept Budget Detail (HoOC)"
+      title="Xem chi tiết ngân sách của các ban"
       activePage="finance-budget"
       sidebarType="hooc"
       eventId={eventId}
@@ -781,7 +781,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                     Trạng Thái
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
-                    Phản hồi từ TBTC
+                  Phản hồi từ tưởng ban tổ chức
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Thao tác
@@ -1008,7 +1008,7 @@ const ViewDeptBudgetDetailHoOC = () => {
               style={{ borderRadius: "8px" }}
             >
               <i className="bi bi-save me-2"></i>
-              Lưu Nháp
+              Lưu 
             </button>
             <button
               className="btn btn-primary"
@@ -1017,7 +1017,7 @@ const ViewDeptBudgetDetailHoOC = () => {
               style={{ borderRadius: "8px", background: "#1E40AF" }}
             >
               <i className="bi bi-check-circle me-2"></i>
-              Hoàn tất review budget
+              Hoàn tất
             </button>
           </div>
         </div>

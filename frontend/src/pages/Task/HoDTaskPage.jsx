@@ -569,7 +569,7 @@ export default function HoDTaskPage() {
     const totalSelected = selectedTaskIds.length + selectedEpicIds.length;
     
     if (totalDeletable === 0) {
-      toast.warning("Không có công việc nào có thể xóa. Các công việc do TBTC tạo không thể xóa.");
+      toast.warning("Không có công việc nào có thể xóa. Các công việc do Trường ban tổ chức tạo không thể xóa.");
       return;
     }
     
@@ -578,7 +578,7 @@ export default function HoDTaskPage() {
       : deletableEpicIds.length > 0
       ? `Bạn có chắc chắn muốn xóa ${deletableEpicIds.length} công việc lớn? (Sẽ xóa luôn tất cả công việc trong epic đó)`
       : totalDeletable < totalSelected
-      ? `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn? (${totalSelected - totalDeletable} công việc do TBTC tạo sẽ không được xóa)`
+      ? `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn? (${totalSelected - totalDeletable} công việc do Trường ban tổ chức tạo sẽ không được xóa)`
       : `Bạn có chắc chắn muốn xóa ${totalDeletable} công việc đã chọn?`;
     
     setConfirmModal({
@@ -909,7 +909,7 @@ export default function HoDTaskPage() {
       >
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Không tìm thấy ban</h5>
-          <p>Bạn chưa được phân công vào ban nào. Vui lòng liên hệ TBTC để được phân công.</p>
+          <p>Bạn chưa được phân công vào ban nào. Vui lòng liên hệ Trường ban tổ chức để được phân công.</p>
         </div>
       </UserLayout>
     );
@@ -1215,7 +1215,7 @@ export default function HoDTaskPage() {
                                   onChange={(e) => {
                                     e.stopPropagation();
                                     if (!canDeleteTask(epic)) {
-                                      toast.warning("Không thể xóa epic task do TBTC tạo");
+                                      toast.warning("Không thể xóa epic task do Trường ban tổ chức tạo");
                                       return;
                                     }
                                     
@@ -1329,7 +1329,7 @@ export default function HoDTaskPage() {
                                                 if (isDeletable) {
                                                   handleSelectTask(task.id);
                                                 } else {
-                                                  toast.warning("Không thể xóa công việc do TBTC tạo");
+                                                  toast.warning("Không thể xóa công việc do Trường ban tổ chức tạo");
                                                 }
                                               }}
                                               disabled={!isDeletable}
@@ -1353,7 +1353,7 @@ export default function HoDTaskPage() {
                                               value={task.assigneeId || ""}
                                               onChange={async (e) => {
                                                 if (!canEditTask(task)) {
-                                                  toast.warning("Không thể sửa công việc do TBTC giao");
+                                                  toast.warning("Không thể sửa công việc do Trường ban tổ chức giao");
                                                   return;
                                                 }
                                                 const newAssigneeId = e.target.value;

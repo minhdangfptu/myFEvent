@@ -26,6 +26,9 @@ const ListBudgetsPage = () => {
   const [eventRole, setEventRole] = useState("");
   const [checkingRole, setCheckingRole] = useState(true);
   const [hodDepartmentId, setHodDepartmentId] = useState(null); // Department ID nếu user là HoD
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 5;
 
   // Kiểm tra role khi component mount
@@ -997,7 +1000,7 @@ const ListBudgetsPage = () => {
                                 style={{ borderRadius: "8px" }}
                               >
                                 <i className="bi bi-send me-1"></i>
-                                Gửi cho TBTC
+                                Gửi cho Trường ban tổ chức
                               </button>
                             )}
                             {/* Nút "Xóa" cho draft và submitted, nhưng không cho xóa khi status là submitted (chờ duyệt) */}

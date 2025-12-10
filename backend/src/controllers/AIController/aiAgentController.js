@@ -9,11 +9,30 @@ import EventMember from '../../models/eventMember.js';
 import Risk from '../../models/risk.js';
 import Calendar from '../../models/calendar.js';
 import Milestone from '../../models/milestone.js';
+import EventBudgetPlan from '../../models/budgetPlanDep.js';
+import EventExpense from '../../models/expense.js';
+import mongoose from 'mongoose';
+import { fetchExpensesForBudgets, decimalToNumber } from '../../services/expenseService.js';
 
 const AI_AGENT_BASE_URL = config.AI_AGENT_BASE_URL || 'http://localhost:9000';
 const CHANNEL_AGENT = 'event_planner_agent';
 const SELF_BASE_URL =
-  config.SELF_BASE_URL || `https://myfevent-ai-assistant-production.up.railway.app/`;
+  config.SELF_BASE_URL ||
+  (config.PORT ? `http://localhost:${config.PORT}` : 'http://localhost:8080');
+
+// Hiển thị nhãn tiếng Việt cho role
+const roleLabel = (role) => {
+  switch ((role || '').trim()) {
+    case 'HoOC':
+      return 'Trưởng ban tổ chức';
+    case 'HoD':
+      return 'Trưởng ban';
+    case 'Member':
+      return 'Thành viên';
+    default:
+      return role || 'Chưa rõ';
+  }
+};
 
 const generateTitleFromText = (text = '') => {
   if (!text || typeof text !== 'string') return 'Cuộc trò chuyện mới';
@@ -245,6 +264,116 @@ const getFullEventContext = async (eventId, userId) => {
       .sort({ targetDate: 1 })
       .lean();
 
+    // 9) Lấy thông tin ngân sách (budget) theo quyền
+    let budgetFilter = {
+      eventId: new mongoose.Types.ObjectId(eventId),
+      status: { $in: ['submitted', 'approved', 'changes_requested', 'sent_to_members', 'locked'] }
+    };
+
+    // HoOC: xem tất cả budgets (không bao gồm draft)
+    // HoD/Member: chỉ xem budget của ban mình hoặc public
+    if (userRole !== 'HoOC') {
+      const orConditions = [];
+      if (userDepartmentId) {
+        orConditions.push({ departmentId: new mongoose.Types.ObjectId(userDepartmentId) });
+      }
+      orConditions.push({ isPublic: true });
+      budgetFilter.$or = orConditions;
+    }
+
+    const budgets = await EventBudgetPlan.find(budgetFilter)
+      .select('_id name status departmentId items totalCost createdAt submittedAt')
+      .populate('departmentId', 'name')
+      .lean();
+
+    // Lấy expenses cho các budgets đã được duyệt (approved, sent_to_members, locked) để tính actual
+    const approvedBudgetIds = budgets
+      .filter(b => ['approved', 'sent_to_members', 'locked'].includes(b.status))
+      .map(b => b._id);
+    
+    let expensesByBudget = new Map();
+    if (approvedBudgetIds.length > 0) {
+      expensesByBudget = await fetchExpensesForBudgets(approvedBudgetIds);
+    }
+
+    // Tính toán thống kê ngân sách
+    let totalEstimated = 0;
+    let totalActual = 0;
+    const budgetByDepartment = {};
+    const budgetStats = {
+      totalBudgets: budgets.length,
+      byStatus: {
+        submitted: 0,        // Chưa duyệt
+        approved: 0,        // Đã duyệt
+        changes_requested: 0, // Từ chối
+        sent_to_members: 0,  // Đã duyệt (gửi đến thành viên)
+        locked: 0           // Đã duyệt (đã khóa)
+      },
+      summary: {
+        pending: 0,    // Chưa duyệt (submitted)
+        approved: 0,  // Đã duyệt (approved + sent_to_members + locked)
+        rejected: 0   // Từ chối (changes_requested)
+      }
+    };
+
+    budgets.forEach(budget => {
+      const deptId = budget.departmentId?._id?.toString() || budget.departmentId?.toString() || 'no_dept';
+      const deptName = budget.departmentId?.name || 'Chưa có ban';
+      
+      if (!budgetByDepartment[deptId]) {
+        budgetByDepartment[deptId] = {
+          departmentId: budget.departmentId?._id || budget.departmentId,
+          departmentName: deptName,
+          budgets: [],
+          totalEstimated: 0,
+          totalActual: 0
+        };
+      }
+
+      const budgetEstimated = budget.items?.reduce(
+        (sum, item) => sum + (parseFloat(item.total?.toString() || 0)),
+        0
+      ) || 0;
+
+      // Tính actual amount từ expenses (chỉ cho budgets đã được duyệt)
+      let budgetActual = 0;
+      if (['approved', 'sent_to_members', 'locked'].includes(budget.status)) {
+        const planExpenses = expensesByBudget.get(budget._id.toString()) || new Map();
+        const expenseValues = Array.from(planExpenses.values());
+        budgetActual = expenseValues.reduce(
+          (sum, expense) => sum + decimalToNumber(expense.actualAmount),
+          0
+        );
+      }
+
+      totalEstimated += budgetEstimated;
+      totalActual += budgetActual;
+      
+      budgetByDepartment[deptId].budgets.push({
+        _id: budget._id,
+        name: budget.name,
+        status: budget.status,
+        estimated: budgetEstimated,
+        actual: budgetActual
+      });
+      budgetByDepartment[deptId].totalEstimated += budgetEstimated;
+      budgetByDepartment[deptId].totalActual += budgetActual;
+
+      // Đếm theo status
+      if (budgetStats.byStatus.hasOwnProperty(budget.status)) {
+        budgetStats.byStatus[budget.status]++;
+      }
+
+      // Đếm theo nhóm: chưa duyệt, đã duyệt, từ chối
+      if (budget.status === 'submitted') {
+        budgetStats.summary.pending++;
+      } else if (['approved', 'sent_to_members', 'locked'].includes(budget.status)) {
+        budgetStats.summary.approved++;
+      } else if (budget.status === 'changes_requested') {
+        budgetStats.summary.rejected++;
+      }
+    });
+
     return {
       event,
       currentUser: currentUserMembership ? {
@@ -296,6 +425,14 @@ const getFullEventContext = async (eventId, userId) => {
         description: m.description,
         targetDate: m.targetDate,
       })),
+      budgets: {
+        totalEstimated,
+        totalActual,
+        totalBudgets: budgetStats.totalBudgets,
+        byStatus: budgetStats.byStatus,
+        summary: budgetStats.summary,
+        byDepartment: Object.values(budgetByDepartment)
+      },
       summary: {
         totalDepartments: departments.length,
         totalMembers,
@@ -304,6 +441,8 @@ const getFullEventContext = async (eventId, userId) => {
         totalRisks: risks.length,
         upcomingCalendarsCount: upcomingCalendars.length,
         totalMilestones: milestones.length,
+        totalBudgetEstimated: totalEstimated,
+        totalBudgets: budgetStats.totalBudgets,
       },
     };
   } catch (error) {
@@ -318,7 +457,7 @@ const getFullEventContext = async (eventId, userId) => {
 const formatEventContextForAI = (eventData) => {
   if (!eventData) return '';
 
-  const { event, currentUser, departments, members, epics, risks, calendars, milestones, summary } = eventData;
+  const { event, currentUser, departments, members, epics, risks, calendars, milestones, budgets, summary } = eventData;
 
   const lines = [
     `Bạn đang hỗ trợ lập kế hoạch cho sự kiện "${event.name}" trong hệ thống myFEvent.`,
@@ -330,6 +469,8 @@ const formatEventContextForAI = (eventData) => {
     `- Mô tả: ${event.description || 'N/A'}`,
     `- Địa điểm: ${event.location || 'N/A'}`,
     `- Thời gian: ${event.eventStartDate ? new Date(event.eventStartDate).toLocaleString('vi-VN') : 'N/A'} → ${event.eventEndDate ? new Date(event.eventEndDate).toLocaleString('vi-VN') : 'N/A'}`,
+    `- Ngày bắt đầu (yyyy-mm-dd): ${event.eventStartDate ? new Date(event.eventStartDate).toISOString().split('T')[0] : 'N/A'}`,
+    `- Ngày kết thúc (yyyy-mm-dd): ${event.eventEndDate ? new Date(event.eventEndDate).toISOString().split('T')[0] : 'N/A'}`,
     `- Người tổ chức: ${event.organizerName || 'N/A'}`,
     ``,
   ];
@@ -337,7 +478,7 @@ const formatEventContextForAI = (eventData) => {
   if (currentUser) {
     lines.push(
       `=== THÔNG TIN NGƯỜI DÙNG HIỆN TẠI ===`,
-      `- Vai trò: ${currentUser.role}`,
+      `- Vai trò: ${roleLabel(currentUser.role)}`,
       `- Ban: ${currentUser.departmentName || 'Chưa có ban'}`,
       ``,
     );
@@ -346,13 +487,32 @@ const formatEventContextForAI = (eventData) => {
   lines.push(
     `=== TỔNG QUAN ===`,
     `- Tổng số ban: ${summary.totalDepartments}`,
-    `- Tổng số thành viên: ${summary.totalMembers} (HoOC: ${members.byRole.HoOC}, HoD: ${members.byRole.HoD}, Member: ${members.byRole.Member})`,
-    `- Tổng số EPIC: ${summary.totalEpics}`,
-    `- Tổng số TASK: ${summary.totalTasks}`,
+    `- Tổng số thành viên: ${summary.totalMembers} (Trưởng ban tổ chức: ${members.byRole.HoOC}, Trưởng ban: ${members.byRole.HoD}, Thành viên: ${members.byRole.Member})`,
+    `- Tổng số công việc lớn: ${summary.totalEpics}`,
+    `- Tổng số công việc: ${summary.totalTasks}`,
     `- Tổng số rủi ro: ${summary.totalRisks}`,
     `- Số lịch sắp tới: ${summary.upcomingCalendarsCount}`,
     `- Số cột mốc: ${summary.totalMilestones}`,
+    `- Tổng ngân sách dự kiến: ${budgets?.totalEstimated ? budgets.totalEstimated.toLocaleString('vi-VN') : 0} VNĐ`,
+    `- Tổng ngân sách thực tế: ${budgets?.totalActual ? budgets.totalActual.toLocaleString('vi-VN') : 0} VNĐ`,
+    `- Tổng số đơn ngân sách: ${budgets?.totalBudgets || 0}`,
+    `- Số đơn chưa duyệt: ${budgets?.summary?.pending || 0}`,
+    `- Số đơn đã duyệt: ${budgets?.summary?.approved || 0}`,
+    `- Số đơn từ chối: ${budgets?.summary?.rejected || 0}`,
     ``,
+    `=== QUY TẮC TẠO CÔNG VIỆC ===`,
+    `- BẠN ĐÃ CÓ ĐẦY ĐỦ THÔNG TIN về sự kiện "${event.name}" (eventId: ${event._id}) trong context này - KHÔNG CẦN gọi tool get_event_detail_for_ai nữa.`,
+    `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn": tạo NGAY LẬP TỨC dựa trên thông tin đã có, không hỏi lại các câu như "ban nào", "liên quan việc gì", "mô tả gì", "ngày bắt đầu", "eventStartDate", ...`,
+    `- eventStartDate đã có sẵn trong context (phần "Ngày bắt đầu (yyyy-mm-dd)") - KHÔNG hỏi lại người dùng về ngày bắt đầu sự kiện, hãy lấy trực tiếp từ context.`,
+    `- Không đặt hạn chót (deadline); để trống để Trưởng ban tổ chức/Trưởng ban chỉnh sau.`,
+    `- Ưu tiên gán công việc vào ban của người dùng hiện tại nếu họ thuộc một ban; nếu không có ban, tạo công việc chung của sự kiện.`,
+    `- Sử dụng ngữ cảnh sự kiện hiện tại (danh sách ban, công việc lớn đã có, mô tả sự kiện, ngày bắt đầu/kết thúc) để tự suy luận và tạo công việc phù hợp, tránh hỏi thêm.`,
+    ``,
+    `=== QUY TẮC TRẢ LỜI VỀ NGÂN SÁCH/TÀI CHÍNH ===`,
+    `- ${currentUser?.role === 'HoOC' ? 'Bạn là Trưởng ban tổ chức, có thể xem và trả lời về ngân sách của TẤT CẢ các ban trong sự kiện.' : currentUser?.role === 'HoD' ? 'Bạn là Trưởng ban, có thể xem và trả lời về ngân sách của ban mình (' + (currentUser?.departmentName || 'ban hiện tại') + ').' : 'Bạn là Thành viên, có thể xem và trả lời về ngân sách của ban mình (nếu có).'}`,
+    `- Khi người dùng hỏi về "thống kê ngân sách", "ngân sách", "budget", "chi phí", "tài chính": hãy trả lời DỰA TRÊN DỮ LIỆU ĐÃ CÓ trong context này.`,
+    `- ${currentUser?.role === 'HoOC' ? 'Bạn có thể liệt kê ngân sách của từng ban, tổng ngân sách, số lượng đơn ngân sách theo trạng thái (đã gửi, đã duyệt, yêu cầu chỉnh sửa, ...).' : 'Bạn chỉ có thể trả lời về ngân sách của ban mình, không được hỏi hoặc xem ngân sách của ban khác.'}`,
+    `- Sử dụng thông tin ngân sách đã có trong context để trả lời chính xác, không từ chối hoặc nói "không thể cung cấp thông tin tài chính".`,
   );
 
   if (departments.length > 0) {
@@ -384,7 +544,7 @@ const formatEventContextForAI = (eventData) => {
       lines.push(`\nBan: ${deptName}`);
       membersByDept[deptName].forEach((m, idx) => {
         const emailInfo = m.userEmail ? ` - Email: ${m.userEmail}` : '';
-        lines.push(`  ${idx + 1}. ${m.userName || 'N/A'} (${m.role || 'Member'})${emailInfo}`);
+        lines.push(`  ${idx + 1}. ${m.userName || 'N/A'} (${roleLabel(m.role)})${emailInfo}`);
       });
     });
 
@@ -392,26 +552,26 @@ const formatEventContextForAI = (eventData) => {
     if (currentUser && currentUser.role === 'HoOC') {
       lines.push(`\nTổng hợp:`);
       lines.push(`- Tổng số thành viên: ${members.total}`);
-      lines.push(`- HoOC: ${members.byRole.HoOC} người`);
-      lines.push(`- HoD: ${members.byRole.HoD} người`);
-      lines.push(`- Member: ${members.byRole.Member} người`);
+      lines.push(`- Trưởng ban tổ chức: ${members.byRole.HoOC} người`);
+      lines.push(`- Trưởng ban: ${members.byRole.HoD} người`);
+      lines.push(`- Thành viên: ${members.byRole.Member} người`);
     }
     
     lines.push(``);
   }
 
   if (epics.length > 0) {
-    lines.push(`=== DANH SÁCH EPIC VÀ TASK ===`);
+    lines.push(`=== DANH SÁCH CÔNG VIỆC LỚN VÀ CÔNG VIỆC ===`);
     epics.forEach((epic, idx) => {
       const deptName = epic.departmentId?.name || 'Chưa có ban';
-      lines.push(`${idx + 1}. Epic: ${epic.title} (${deptName}) - Trạng thái: ${epic.status || 'N/A'} - Số task: ${epic.taskCount || 0}`);
+      lines.push(`${idx + 1}. Công việc lớn: ${epic.title} (${deptName}) - Trạng thái: ${epic.status || 'N/A'} - Số công việc: ${epic.taskCount || 0}`);
       if (epic.description) {
         lines.push(`   Mô tả: ${epic.description}`);
       }
       
       // Hiển thị danh sách tasks trong epic (nếu có)
       if (epic.tasks && epic.tasks.length > 0) {
-        lines.push(`   Các task:`);
+        lines.push(`   Các công việc:`);
         epic.tasks.forEach((task, taskIdx) => {
           const priority = task.priority ? ` - Ưu tiên: ${task.priority}` : '';
           const dueDate = task.dueDate ? ` - Hạn: ${new Date(task.dueDate).toLocaleDateString('vi-VN')}` : '';
@@ -463,6 +623,48 @@ const formatEventContextForAI = (eventData) => {
     if (calendars.length > calendarsToShow.length) {
       lines.push(`... và ${calendars.length - calendarsToShow.length} lịch khác`);
     }
+    lines.push(``);
+  }
+
+  // Hiển thị thông tin ngân sách
+  if (budgets && budgets.totalBudgets > 0) {
+    lines.push(`=== THỐNG KÊ NGÂN SÁCH ===`);
+    lines.push(`- Tổng ngân sách dự kiến: ${budgets.totalEstimated.toLocaleString('vi-VN')} VNĐ`);
+    lines.push(`- Tổng ngân sách thực tế: ${budgets.totalActual ? budgets.totalActual.toLocaleString('vi-VN') : 0} VNĐ`);
+    lines.push(`- Tổng số đơn ngân sách: ${budgets.totalBudgets}`);
+    lines.push(`- Số đơn chưa duyệt: ${budgets.summary?.pending || 0}`);
+    lines.push(`- Số đơn đã duyệt: ${budgets.summary?.approved || 0}`);
+    lines.push(`- Số đơn từ chối: ${budgets.summary?.rejected || 0}`);
+    lines.push(`- Theo trạng thái chi tiết:`);
+    lines.push(`  + Đã gửi (chưa duyệt): ${budgets.byStatus.submitted || 0}`);
+    lines.push(`  + Đã duyệt: ${budgets.byStatus.approved || 0}`);
+    lines.push(`  + Yêu cầu chỉnh sửa (từ chối): ${budgets.byStatus.changes_requested || 0}`);
+    lines.push(`  + Đã gửi đến thành viên (đã duyệt): ${budgets.byStatus.sent_to_members || 0}`);
+    lines.push(`  + Đã khóa (đã duyệt): ${budgets.byStatus.locked || 0}`);
+    
+    if (budgets.byDepartment && budgets.byDepartment.length > 0) {
+      lines.push(``);
+      lines.push(`- Ngân sách theo ban:`);
+      budgets.byDepartment.forEach((deptBudget, idx) => {
+        lines.push(`  ${idx + 1}. ${deptBudget.departmentName}: ${deptBudget.totalEstimated.toLocaleString('vi-VN')} VNĐ (${deptBudget.budgets.length} đơn)`);
+        if (deptBudget.budgets.length > 0 && (currentUser?.role === 'HoOC' || (currentUser?.role === 'HoD' && currentUser?.departmentId?.toString() === deptBudget.departmentId?.toString()))) {
+          deptBudget.budgets.forEach((budget, bIdx) => {
+            const statusLabel = {
+              'submitted': 'Đã gửi',
+              'approved': 'Đã duyệt',
+              'changes_requested': 'Yêu cầu chỉnh sửa',
+              'sent_to_members': 'Đã gửi đến thành viên',
+              'locked': 'Đã khóa'
+            }[budget.status] || budget.status;
+            lines.push(`     - ${budget.name}: ${budget.estimated.toLocaleString('vi-VN')} VNĐ (${statusLabel})`);
+          });
+        }
+      });
+    }
+    lines.push(``);
+  } else {
+    lines.push(`=== THỐNG KÊ NGÂN SÁCH ===`);
+    lines.push(`- Chưa có đơn ngân sách nào được tạo cho sự kiện này.`);
     lines.push(``);
   }
 
@@ -518,11 +720,7 @@ const formatEventContextForAI = (eventData) => {
       );
     }
     
-    lines.push(
-      `- ${currentUser.role} KHÔNG được phép hỏi hoặc xem thông tin tài chính (budget, expense, chi phí) của người khác hoặc các ban khác`,
-      `- Nếu ${currentUser.role} hỏi về tài chính của ban khác hoặc người khác, trả lời rằng không thể cung cấp thông tin này`,
-      `- ${currentUser.role} chỉ có thể xem thông tin tài chính của ban mình (nếu có quyền) hoặc thông tin chung của sự kiện`,
-    );
+    // Quy tắc về budget đã được thêm ở phần QUY TẮC TRẢ LỜI VỀ NGÂN SÁCH/TÀI CHÍNH ở trên
   }
 
   // Thêm hướng dẫn đặc biệt cho HoOC
@@ -612,21 +810,30 @@ export const runEventPlannerAgent = async (req, res) => {
           const event = await Event.findById(eventId).lean();
           if (event) {
             const contextLines = [
-            `Bạn đang hỗ trợ lập kế hoạch cho một sự kiện trong hệ thống myFEvent.`,
+            `Bạn đang hỗ trợ lập kế hoạch cho sự kiện "${event.name}" trong hệ thống myFEvent.`,
             `QUAN TRỌNG: eventId của sự kiện hiện tại là: ${eventId}`,
             `EVENT_CONTEXT_JSON: {"eventId": "${eventId}"}`,
-            `Thông tin sự kiện cơ bản:`,
+            ``,
+            `=== THÔNG TIN SỰ KIỆN ===`,
             `- Tên: ${event.name}`,
             `- Loại: ${event.type}`,
+            `- Mô tả: ${event.description || 'N/A'}`,
             `- Địa điểm: ${event.location || 'N/A'}`,
-            `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
+            `- Thời gian: ${event.eventStartDate ? new Date(event.eventStartDate).toLocaleString('vi-VN') : 'N/A'} → ${event.eventEndDate ? new Date(event.eventEndDate).toLocaleString('vi-VN') : 'N/A'}`,
+            `- Ngày bắt đầu (yyyy-mm-dd): ${event.eventStartDate ? new Date(event.eventStartDate).toISOString().split('T')[0] : 'N/A'}`,
+            `- Ngày kết thúc (yyyy-mm-dd): ${event.eventEndDate ? new Date(event.eventEndDate).toISOString().split('T')[0] : 'N/A'}`,
+            `- Người tổ chức: ${event.organizerName || 'N/A'}`,
             ``,
             `HƯỚNG DẪN QUAN TRỌNG:`,
-            `- Khi người dùng nói "sự kiện này" thì hiểu là eventId = ${eventId}`,
-            `- Khi người dùng yêu cầu "tạo task cho sự kiện này" hoặc câu tương tự, hãy hiểu là tạo task cho eventId = ${eventId}`,
-            `- TRƯỚC KHI tạo task/epic, BẮT BUỘC phải gọi tool get_event_detail_for_ai với eventId = "${eventId}" để lấy thông tin chi tiết`,
-            `- Nếu bạn chưa gọi get_event_detail_for_ai, HÃY GỌI NGAY với eventId = "${eventId}"`,
-            `- Khi tạo task/epic, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
+            `- Bạn đã có đầy đủ thông tin về sự kiện "${event.name}" (eventId: ${eventId}) trong context này`,
+            `- eventStartDate đã có sẵn trong context (phần "Ngày bắt đầu (yyyy-mm-dd)") - KHÔNG hỏi lại người dùng về ngày bắt đầu sự kiện, hãy lấy trực tiếp từ context.`,
+            `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn", hãy tạo NGAY LẬP TỨC dựa trên thông tin sự kiện đã có`,
+            `- KHÔNG hỏi lại người dùng về ban nào, việc gì, mô tả gì, ngày bắt đầu - hãy tự suy luận từ thông tin sự kiện và tạo công việc phù hợp`,
+            `- KHÔNG đặt deadline cho công việc - để trống để Trưởng ban tổ chức hoặc Trưởng ban chỉnh sau`,
+            `- Ưu tiên gán công việc vào ban của người dùng hiện tại (nếu có), nếu không có ban thì để công việc chung của sự kiện`,
+            `- Khi tạo công việc/công việc lớn, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
+            `- Nếu cần thông tin chi tiết hơn về ban, thành viên, công việc lớn hiện có, bạn có thể gọi tool get_event_detail_for_ai với eventId = "${eventId}"`,
+            `- NHƯNG nếu đã có đủ thông tin để tạo công việc, hãy tạo ngay mà không cần gọi tool`,
           ].join('\n');
 
             const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -659,9 +866,13 @@ export const runEventPlannerAgent = async (req, res) => {
             `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
             ``,
             `HƯỚNG DẪN QUAN TRỌNG:`,
-            `- TRƯỚC KHI tạo task/epic, BẮT BUỘC phải gọi tool get_event_detail_for_ai với eventId = "${eventId}" để lấy thông tin chi tiết`,
-            `- Nếu bạn chưa gọi get_event_detail_for_ai, HÃY GỌI NGAY với eventId = "${eventId}"`,
-            `- Khi tạo task/epic, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
+            `- Bạn đã có thông tin cơ bản về sự kiện "${event.name}" (eventId: ${eventId}) trong context này`,
+            `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn", hãy tạo NGAY LẬP TỨC dựa trên thông tin sự kiện đã có`,
+            `- KHÔNG hỏi lại người dùng về ban nào, việc gì, mô tả gì - hãy tự suy luận từ thông tin sự kiện và tạo công việc phù hợp`,
+            `- KHÔNG đặt deadline cho công việc - để trống để Trưởng ban tổ chức hoặc Trưởng ban chỉnh sau`,
+            `- Nếu cần thông tin chi tiết hơn về ban, thành viên, công việc lớn hiện có, bạn có thể gọi tool get_event_detail_for_ai với eventId = "${eventId}"`,
+            `- NHƯNG nếu đã có đủ thông tin để tạo công việc, hãy tạo ngay mà không cần gọi tool`,
+            `- Khi tạo công việc/công việc lớn, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
           ].join('\n');
 
           const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -685,9 +896,13 @@ export const runEventPlannerAgent = async (req, res) => {
       historyMessagesCount: enrichedMessages.length,
     });
 
+    // Gửi eventId trong request để Python agent có thể trả về và lưu lịch sử đúng cách
     const pythonRes = await axios.post(
       apiUrl,
-      { history_messages: enrichedMessages },
+      { 
+        history_messages: enrichedMessages,
+        eventId: eventId || null, // Gửi eventId (có thể null khi ngoài sự kiện)
+      },
       {
         headers: {
           Authorization: authHeader,
@@ -717,19 +932,28 @@ export const runEventPlannerAgent = async (req, res) => {
       `agent-${Date.now()}`;
 
     // Lưu lịch sử vào ConversationHistory (giống ChatGPT-style)
-    if (userId && eventId) {
+    // Lưu cả khi có eventId (trong sự kiện) và khi không có eventId (ngoài sự kiện)
+    if (userId) {
       try {
-        let conversation = await ConversationHistory.findOne({
+        // Tìm conversation với điều kiện: userId, sessionId, channel và eventId (có thể null)
+        const query = {
           userId,
-          eventId,
           sessionId,
           channel: CHANNEL_AGENT,
-        });
+        };
+        // Nếu có eventId thì tìm theo eventId, nếu không thì tìm với eventId = null
+        if (eventId) {
+          query.eventId = eventId;
+        } else {
+          query.eventId = null; // Hoặc { $exists: false } nếu muốn tìm cả null và không có field
+        }
+        
+        let conversation = await ConversationHistory.findOne(query);
 
         if (!conversation) {
           conversation = new ConversationHistory({
             userId,
-            eventId,
+            eventId: eventId || null, // Cho phép null khi ngoài sự kiện
             sessionId,
             channel: CHANNEL_AGENT,
             messages: [],
@@ -784,20 +1008,20 @@ export const runEventPlannerAgent = async (req, res) => {
 
         conversation.updatedAt = new Date();
         await conversation.save();
-        console.log(`[aiAgentController] Saved conversation: sessionId=${sessionId}, messagesCount=${conversation.messages.length}`);
+        console.log(`[aiAgentController] Saved conversation: sessionId=${sessionId}, eventId=${eventId || 'null'}, messagesCount=${conversation.messages.length}`);
       } catch (e) {
         console.error('runEventPlannerAgent: lỗi lưu ConversationHistory', e);
         // Log chi tiết để debug
         console.error('Error details:', {
           userId,
-          eventId,
+          eventId: eventId || 'null',
           sessionId,
           error: e.message,
           stack: e.stack,
         });
       }
     } else {
-      console.warn('[aiAgentController] Cannot save conversation: missing userId or eventId', {
+      console.warn('[aiAgentController] Cannot save conversation: missing userId', {
         hasUserId: !!userId,
         hasEventId: !!eventId,
       });
@@ -1062,7 +1286,16 @@ export const listAgentSessions = async (req, res) => {
 
     // Lọc theo channel agent mới để chỉ lấy các session từ AI Assistant
     const filter = { userId, channel: CHANNEL_AGENT };
-    if (eventId) filter.eventId = eventId;
+    // Nếu có eventId thì lọc theo eventId, nếu không thì lấy các session không có eventId (null)
+    if (eventId !== undefined && eventId !== null && eventId !== '') {
+      filter.eventId = eventId;
+    } else {
+      // Khi không có eventId trong query, lấy cả session có eventId = null và session không có eventId
+      filter.$or = [
+        { eventId: null },
+        { eventId: { $exists: false } }
+      ];
+    }
 
     const sessions = await ConversationHistory.find(filter)
       .sort({ updatedAt: -1 })
@@ -1089,7 +1322,15 @@ export const getAgentSession = async (req, res) => {
     // Ưu tiên tìm theo channel agent mới; nếu không thấy thì fallback session bất kỳ
     const baseFilter = { userId, sessionId };
     const filter = { ...baseFilter, channel: CHANNEL_AGENT };
-    if (eventId) filter.eventId = eventId;
+    // Nếu có eventId thì tìm theo eventId, nếu không thì tìm với eventId = null
+    if (eventId !== undefined && eventId !== null && eventId !== '') {
+      filter.eventId = eventId;
+    } else {
+      filter.$or = [
+        { eventId: null },
+        { eventId: { $exists: false } }
+      ];
+    }
 
     let conversation = await ConversationHistory.findOne(filter).lean();
     if (!conversation) {

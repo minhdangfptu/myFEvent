@@ -301,7 +301,7 @@ const DepartmentBudgetsListPage = () => {
                                 onClick={async () => {
                                   try {
                                     await budgetApi.submitBudget(eventId, budget.departmentId, budget.budgetId);
-                                    toast.success("Gửi cho TBTC duyệt thành công!");
+                                    toast.success("Gửi cho Trường ban tổ chức duyệt thành công!");
                                     fetchData(); // Refresh danh sách
                                   } catch (error) {
                                     toast.error(error?.response?.data?.message || "Gửi duyệt thất bại!");
