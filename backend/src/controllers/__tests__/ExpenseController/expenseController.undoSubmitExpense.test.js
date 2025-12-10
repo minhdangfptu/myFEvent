@@ -153,4 +153,143 @@ describe('expenseController.undoSubmitExpense', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ message: 'Expense not found' });
   });
+  it('[Abnormal] TC04 - should return 400 when expense is not in submitted status', async () => {
+    const { ensureEventExists, ensureDepartmentInEvent } = await import('../../../services/departmentService.js');
+    const { getRequesterMembership } = await import('../../../services/eventMemberService.js');
+    const { _mockFindOne: mockFindBudget } = await import('../../../models/budgetPlanDep.js');
+    const { _mockFindOne: mockFindExpense } = await import('../../../models/expense.js');
+
+    ensureEventExists.mockResolvedValue(true);
+    ensureDepartmentInEvent.mockResolvedValue({ _id: mockDeptId });
+
+    mockFindBudget.mockResolvedValue({
+      items: [{ itemId: new mongoose.Types.ObjectId(mockItemId) }],
+    });
+
+    getRequesterMembership.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(mockMemberId),
+      departmentId: mockDeptId,
+    });
+
+    // Expense exists but status is already 'draft' (or anything other than 'submitted')
+    mockFindExpense.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(),
+      submittedStatus: 'draft',
+    });
+
+    const req = {
+      params: {
+        eventId: mockEventId,
+        departmentId: mockDeptId,
+        budgetId: mockBudgetId,
+        itemId: mockItemId,
+      },
+      user: { id: mockUserId },
+    };
+    const res = mockRes();
+
+    await expenseController.undoSubmitExpense(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Expense is not submitted' });
+  });
+
+  it('[Abnormal] TC05 - should return 403 when user is not assigned to the item', async () => {
+    const { ensureEventExists, ensureDepartmentInEvent } = await import('../../../services/departmentService.js');
+    const { getRequesterMembership } = await import('../../../services/eventMemberService.js');
+    const { _mockFindOne: mockFindBudget } = await import('../../../models/budgetPlanDep.js');
+    const { _mockFindOne: mockFindExpense } = await import('../../../models/expense.js');
+
+    ensureEventExists.mockResolvedValue(true);
+    ensureDepartmentInEvent.mockResolvedValue({ _id: mockDeptId });
+
+    // Item is assigned to someone else
+    const otherMemberId = new mongoose.Types.ObjectId();
+    mockFindBudget.mockResolvedValue({
+      items: [
+        { 
+          itemId: new mongoose.Types.ObjectId(mockItemId),
+          assignedTo: otherMemberId 
+        }
+      ],
+    });
+
+    // Current user member
+    getRequesterMembership.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(mockMemberId), // Different from otherMemberId
+      departmentId: mockDeptId,
+    });
+
+    mockFindExpense.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(),
+      submittedStatus: 'submitted',
+    });
+
+    const req = {
+      params: {
+        eventId: mockEventId,
+        departmentId: mockDeptId,
+        budgetId: mockBudgetId,
+        itemId: mockItemId,
+      },
+      user: { id: mockUserId },
+    };
+    const res = mockRes();
+
+    await expenseController.undoSubmitExpense(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ message: 'You are not assigned to this item' });
+  });
+
+  it('[Normal] TC06 - should successfully undo submit status and return 200', async () => {
+    const { ensureEventExists, ensureDepartmentInEvent } = await import('../../../services/departmentService.js');
+    const { getRequesterMembership } = await import('../../../services/eventMemberService.js');
+    const { _mockFindOne: mockFindBudget } = await import('../../../models/budgetPlanDep.js');
+    const { _mockFindOne: mockFindExpense } = await import('../../../models/expense.js');
+
+    ensureEventExists.mockResolvedValue(true);
+    ensureDepartmentInEvent.mockResolvedValue({ _id: mockDeptId });
+
+    // Item assigned to the current user
+    mockFindBudget.mockResolvedValue({
+      items: [
+        { 
+          itemId: new mongoose.Types.ObjectId(mockItemId),
+          assignedTo: new mongoose.Types.ObjectId(mockMemberId) 
+        }
+      ],
+    });
+
+    getRequesterMembership.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(mockMemberId),
+      departmentId: mockDeptId,
+    });
+
+    const mockSave = vi.fn();
+    const mockExpenseInstance = {
+      _id: new mongoose.Types.ObjectId(),
+      submittedStatus: 'submitted',
+      save: mockSave,
+    };
+    mockFindExpense.mockResolvedValue(mockExpenseInstance);
+
+    const req = {
+      params: {
+        eventId: mockEventId,
+        departmentId: mockDeptId,
+        budgetId: mockBudgetId,
+        itemId: mockItemId,
+      },
+      user: { id: mockUserId },
+    };
+    const res = mockRes();
+
+    await expenseController.undoSubmitExpense(req, res);
+
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(mockExpenseInstance.submittedStatus).toBe('draft');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: mockExpenseInstance });
+  });
 });

@@ -147,4 +147,42 @@ describe('expenseController.togglePaidStatus', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ message: 'Expense not found. Please report expense first.' });
   });
+  it('[Normal] TC04 - should successfully toggle isPaid status and return 200', async () => {
+    const { ensureEventExists, ensureDepartmentInEvent } = await import('../../../services/departmentService.js');
+    const { _mockFindOne: mockFindBudget } = await import('../../../models/budgetPlanDep.js');
+    const { _mockFindOne: mockFindExpense } = await import('../../../models/expense.js');
+
+    ensureEventExists.mockResolvedValue(true);
+    ensureDepartmentInEvent.mockResolvedValue({ _id: mockDeptId });
+
+    mockFindBudget.mockResolvedValue({
+      items: [{ itemId: new mongoose.Types.ObjectId(mockItemId) }],
+    });
+
+    const mockExpenseInstance = {
+      _id: new mongoose.Types.ObjectId(),
+      planId: new mongoose.Types.ObjectId(mockBudgetId),
+      itemId: new mongoose.Types.ObjectId(mockItemId),
+      isPaid: false,
+      save: mockExpenseSave,
+    };
+    mockFindExpense.mockResolvedValue(mockExpenseInstance);
+
+    const req = {
+      params: {
+        eventId: mockEventId,
+        departmentId: mockDeptId,
+        budgetId: mockBudgetId,
+        itemId: mockItemId,
+      },
+    };
+    const res = mockRes();
+
+    await expenseController.togglePaidStatus(req, res);
+
+    expect(mockExpenseSave).toHaveBeenCalledTimes(1);
+    expect(mockExpenseInstance.isPaid).toBe(true);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ data: mockExpenseInstance });
+  });
 });
