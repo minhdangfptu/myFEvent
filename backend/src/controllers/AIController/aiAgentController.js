@@ -1082,7 +1082,7 @@ export const runEventPlannerAgent = async (req, res) => {
  */
 export const applyEventPlannerPlan = async (req, res) => {
   try {
-    const { plans, eventId: bodyEventId } = req.body || {};
+    const { plans, eventId: bodyEventId, sessionId: bodySessionId } = req.body || {};
     const userId = req.user?.id;
 
     if (!Array.isArray(plans) || plans.length === 0) {
@@ -1100,6 +1100,8 @@ export const applyEventPlannerPlan = async (req, res) => {
     if (!eventId) {
       return res.status(400).json({ message: 'Thiếu eventId trong request' });
     }
+
+    const sessionId = bodySessionId || null;
 
     const authHeader = req.headers.authorization;
     if (!authHeader) {
@@ -1258,6 +1260,63 @@ export const applyEventPlannerPlan = async (req, res) => {
               e?.response?.data?.message || e.message
             }`
           );
+      }
+    }
+
+    // Sau khi áp dụng thành công, đánh dấu plans đã được áp dụng trong conversation history
+    if (userId && sessionId) {
+      try {
+        const query = {
+          userId,
+          sessionId,
+          channel: CHANNEL_AGENT,
+        };
+        if (eventId) {
+          query.eventId = eventId;
+        } else {
+          query.eventId = null;
+        }
+        
+        const conversation = await ConversationHistory.findOne(query);
+        if (conversation) {
+          // Tìm message có plans và đánh dấu đã áp dụng
+          // Tìm message cuối cùng có plans (chưa được áp dụng)
+          let updated = false;
+          const messagesWithPlans = conversation.messages
+            .map((msg, idx) => ({ msg, idx }))
+            .filter(
+              ({ msg }) =>
+                msg.role === 'assistant' &&
+                msg.data &&
+                msg.data.plans &&
+                Array.isArray(msg.data.plans) &&
+                msg.data.plans.length > 0 &&
+                !msg.data.applied
+            )
+            .reverse(); // Từ cuối lên đầu
+          
+          // Đánh dấu message cuối cùng có plans (thường là message mới nhất)
+          if (messagesWithPlans.length > 0) {
+            const { idx } = messagesWithPlans[0];
+            conversation.messages[idx] = {
+              ...conversation.messages[idx],
+              data: {
+                ...conversation.messages[idx].data,
+                applied: true, // Đánh dấu đã áp dụng
+              },
+            };
+            updated = true;
+          }
+          
+          if (updated) {
+            conversation.updatedAt = new Date();
+            await conversation.save();
+            console.log(`[applyEventPlannerPlan] Marked plans as applied in conversation: sessionId=${sessionId}, eventId=${eventId}`);
+          }
+        }
+      } catch (e) {
+        // Không chặn response nếu lỗi lưu trạng thái
+        console.warn('applyEventPlannerPlan: failed to mark plans as applied', e);
       }
     }
 

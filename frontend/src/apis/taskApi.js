@@ -22,10 +22,15 @@ export const taskApi = {
     return res.data;
   },
   deleteTask: async (eventId, taskId, config = {}) => {
-    const res = await axiosClient.delete(`/api/tasks/${eventId}/${taskId}`, config);
-    console.log(res);
-    if (res.status === 403) return res.status
-    return res.data;
+    try {
+      const res = await axiosClient.delete(`/api/tasks/${eventId}/${taskId}`, config);
+      // Nếu status là 403, trả về status code để frontend xử lý
+      if (res.status === 403) return res.status;
+      return res.data;
+    } catch (error) {
+      // Re-throw error để frontend có thể xử lý chi tiết
+      throw error;
+    }
   },
   // Update status/progress; 'payload' can be a string status or an object { status, progressPct, force }
   updateTaskProgress: async (eventId, taskId, payload, config = {}) => {
