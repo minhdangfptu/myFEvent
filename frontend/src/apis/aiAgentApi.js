@@ -86,9 +86,10 @@ export const aiAgentApi = {
 
   // Apply kế hoạch EPIC/TASK mà agent đã sinh ra (preview → apply)
   applyPlan: async (plans = [], options = {}) => {
-    const { eventId = null } = options || {};
+    const { eventId = null, sessionId = null } = options || {};
     const payload = {
       eventId,
+      sessionId,
       plans,
     };
     const response = await aiAxiosClient.post(

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import NoDataImg from "~/assets/no-data.png";
 import { taskApi } from "~/apis/taskApi";
 import { departmentService } from "~/services/departmentService";
@@ -67,7 +67,6 @@ export default function EventTaskPage() {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const { eventId } = useParams();
-  const location = useLocation();
   const [sortBy, setSortBy] = useState("Tên");
   const [filterPriority, setFilterPriority] = useState("Tất cả");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -84,69 +83,37 @@ export default function EventTaskPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    mountedRef.current = true;
-    
     fetchEventRole(eventId).then((role) => {
-      if (mountedRef.current) {
-        setEventRole(role);
-      }
+      setEventRole(role);
     });
     
     if (eventId) {
       userApi
         .getUserRoleByEvent(eventId)
         .then((roleResponse) => {
-          // Chỉ cập nhật state nếu component vẫn còn mounted
-          if (!mountedRef.current) return;
-          
           const role = roleResponse?.role || "";
-          
-          // CRITICAL: Chỉ set role và redirect khi role đã được xác nhận (không phải empty)
-          // Tránh redirect dựa trên role mặc định hoặc role chưa được load
-          if (!role || role.trim() === "") {
-            setEventRole("");
-            return;
-          }
-          
           setEventRole(role);
           
-          // CRITICAL: Chỉ redirect khi role thực sự là Member hoặc HoD
-          // Và chỉ redirect nếu user đang ở trang /tasks (không phải đã ở trang member-tasks hoặc hod-tasks)
-          const currentPath = location.pathname;
-          const isOnMainTasksPage = currentPath === `/events/${eventId}/tasks`;
-          
-          // CRITICAL: Không redirect nếu role là HoOC - HoOC có quyền truy cập trang tasks chính
-          // Chỉ redirect Member và HoD
-          if (role === "Member" && isOnMainTasksPage) {
+          // Redirect Member to their own task page
+          if (role === "Member") {
             navigate(`/events/${eventId}/member-tasks`, { replace: true });
             return;
           }
           
-          if (role === "HoD" && isOnMainTasksPage) {
+          // Redirect HoD to their own task page
+          if (role === "HoD") {
             navigate(`/events/${eventId}/hod-tasks`, { replace: true });
             return;
           }
-          
-          // HoOC và các role khác không bị redirect - họ có quyền ở trang tasks chính
           
           if (role === "HoD" && roleResponse?.departmentId) {
             const deptId = roleResponse.departmentId?._id || roleResponse.departmentId;
             setHoDDepartmentId(deptId);
           }
         })
-        .catch(() => {
-          // Nếu có lỗi khi check role, không redirect - để user ở lại trang hiện tại
-          if (mountedRef.current) {
-            setEventRole("");
-          }
-        });
+        .catch(() => {});
     }
-
-    // Cleanup function: đánh dấu component đã unmount
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [eventId, navigate, location.pathname]);
+  }, [eventId, navigate]);
 
   const getSidebarType = () => {
     if (eventRole === "HoOC") return "hooc";
@@ -174,7 +141,6 @@ export default function EventTaskPage() {
   const [editEpicModal, setEditEpicModal] = useState({ show: false, epic: null });
   const [epicEditForm, setEpicEditForm] = useState({ title: "", description: "", departmentId: "", milestoneId: "", startDate: "", dueDate: "" });
   const [isUpdatingEpic, setIsUpdatingEpic] = useState(false);
-  const mountedRef = useRef(true);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -186,45 +152,24 @@ export default function EventTaskPage() {
   }, []);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
     if (!eventId) return;
     departmentService
       .getDepartments(eventId)
-      .then((depts) => {
-        if (mountedRef.current) {
-          setDepartments(depts || []);
-        }
-      })
-      .catch(() => {
-        if (mountedRef.current) {
-          setDepartments([]);
-        }
-      });
+      .then((depts) => setDepartments(depts || []))
+      .catch(() => setDepartments([]));
 
     eventApi.getById(eventId)
       .then((res) => {
-        // Chỉ cập nhật state nếu component vẫn còn mounted
-        if (mountedRef.current) {
-          const event = res?.data?.event || res?.data;
-          if (event) {
-            setEventInfo({
-              createdAt: event.createdAt,
-            });
-          }
+        const event = res?.data?.event || res?.data;
+        if (event) {
+          setEventInfo({
+            createdAt: event.createdAt,
+          });
         }
       })
       .catch(() => {
-        // Chỉ cập nhật state nếu component vẫn còn mounted
-        if (mountedRef.current) {
-          setEventInfo(null);
-        }
+        setEventInfo(null);
       });
-
-    // Cleanup function: đánh dấu component đã unmount
-    return () => {
-      mountedRef.current = false;
-    };
   }, [eventId]);
 
 
@@ -276,23 +221,6 @@ export default function EventTaskPage() {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
-
-  // Listen to AI plan applied event to refresh tasks
-  useEffect(() => {
-    const handlePlanApplied = (event) => {
-      const { eventId: appliedEventId } = event.detail || {};
-      // Only refresh if the event matches current event
-      if (appliedEventId && String(appliedEventId) === String(eventId)) {
-        console.log('[EventTaskPage] AI plan applied, refreshing tasks...');
-        fetchTasks();
-      }
-    };
-
-    window.addEventListener('ai:plan-applied', handlePlanApplied);
-    return () => {
-      window.removeEventListener('ai:plan-applied', handlePlanApplied);
-    };
-  }, [eventId, fetchTasks]);
 
 
   const filteredTasks = tasks

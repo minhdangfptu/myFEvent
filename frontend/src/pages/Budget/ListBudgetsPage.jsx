@@ -1000,7 +1000,7 @@ const ListBudgetsPage = () => {
                                 style={{ borderRadius: "8px" }}
                               >
                                 <i className="bi bi-send me-1"></i>
-                                Gửi cho TBTC
+                                Gửi cho Trường ban tổ chức
                               </button>
                             )}
                             {/* Nút "Xóa" cho draft và submitted, nhưng không cho xóa khi status là submitted (chờ duyệt) */}

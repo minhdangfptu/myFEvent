@@ -9,9 +9,11 @@ export const getPaginatedUsers = async (page, limit, search, status) => {
   const filter = { role: 'user' };
 
   if (search) {
+    const regex = { $regex: search, $options: 'i' };
     filter.$or = [
-      { username: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
+      { username: regex },
+      { email: regex },
+      { fullName: regex }
     ];
   }
 

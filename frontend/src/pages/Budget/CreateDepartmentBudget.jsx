@@ -692,7 +692,7 @@ const CreateDepartmentBudget = () => {
       if (budgetId && categories.length > 0) {
         await budgetApi.updateCategories(eventId, departmentId, budgetId, categories);
       }
-      toast.success("Đã lưu nháp thành công!");
+      toast.success("Đã lưu thành công!");
       try {
         navigate(`/events/${eventId}/budgets/departments`, { replace: true });
       } catch (navError) {
@@ -701,10 +701,10 @@ const CreateDepartmentBudget = () => {
       }
     } catch (error) {
       console.error("Error saving draft:", error);
-      const errorMessage = error?.response?.data?.message || "Lưu nháp thất bại!";
+      const errorMessage = error?.response?.data?.message || "Lưu thất bại!";
       
       if (budgetId) {
-        toast.success("Đã lưu nháp thành công!");
+        toast.success("Đã lưu thành công!");
         try {
           navigate(`/events/${eventId}/budgets/departments`, { replace: true });
         } catch (navError) {
@@ -860,7 +860,7 @@ const CreateDepartmentBudget = () => {
               ) : (
                 <Save className="me-2" size={18} />
               )}
-              {isSavingDraft ? "Đang lưu..." : "Lưu Nháp"}
+              {isSavingDraft ? "Đang lưu..." : "Lưu "}
             </button>
             <button
               className={`${budget && (budget.status === 'submitted' || budget.status === 'changes_requested') ? "btn btn-danger" : "btn btn-primary"} d-flex align-items-center`}
@@ -1007,7 +1007,7 @@ const CreateDepartmentBudget = () => {
                   </th>
                   {isEditMode && budget?.status === "changes_requested" && (
                     <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "200px" }}>
-                      Phản hồi từ TBTC
+                      Phản hồi từ tưởng ban tổ chức
                     </th>
                   )}
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151", width: "120px" }}>

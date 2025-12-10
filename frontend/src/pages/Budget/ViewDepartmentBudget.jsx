@@ -361,7 +361,7 @@ const ViewDepartmentBudget = () => {
     try {
       await budgetApi.deleteDraft(eventId, departmentId, budget._id);
       toast.success("Đã xóa bản nháp thành công!");
-      navigate(`/events/${eventId}/departments/${departmentId}/budget/empty`);
+      navigate(`/events/${eventId}/budgets/departments`, { replace: true });
     } catch (error) {
       toast.error(error?.response?.data?.message || "Xóa bản nháp thất bại!");
     } finally {
@@ -860,17 +860,12 @@ const ViewDepartmentBudget = () => {
                   // Navigate back based on user role
                   if (userRole === 'Member') {
                     navigate(`/events/${eventId}/budgets/member`, { replace: true });
-                  } else if (userRole === 'HoD') {
-                    navigate(`/events/${eventId}/departments/${departmentId}/budget`, { replace: true });
                   } else if (userRole === 'HoOC') {
                     navigate(`/events/${eventId}/budgets`, { replace: true });
-                  } else {
-                    // Fallback: try to determine from isHoD
-                    if (isHoD) {
-                      navigate(`/events/${eventId}/departments/${departmentId}/budget`, { replace: true });
+                  } else if (userRole === 'HoD' || isHoD) {
+                    navigate(`/events/${eventId}/budgets/departments`, { replace: true });
                     } else {
                       navigate(`/events/${eventId}/budgets/member`, { replace: true });
-                    }
                   }
                 }}
                 style={{ borderRadius: "8px" }}
@@ -1083,7 +1078,7 @@ const ViewDepartmentBudget = () => {
                 }}
               >
                 <Send size={18} />
-                Bảng gửi TBTC
+                Bảng gửi Trường ban tổ chức
               </div>
             )}
             {(isApproved || isSentToMembers) && (
@@ -1416,7 +1411,7 @@ const ViewDepartmentBudget = () => {
                       userSelect: "none",
                       whiteSpace: "nowrap"
                     }}>
-                      Phản hồi từ TBTC
+                      Phản hồi từ tưởng ban tổ chức
                     </th>
                   </tr>
                 </thead>

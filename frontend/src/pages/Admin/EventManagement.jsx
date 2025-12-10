@@ -251,23 +251,55 @@ const EventManagement = () => {
           <option value="banned">Bị cấm</option>
         </select>
 
-        {/* Date Input */}
-        <input
-          type="date"
-          placeholder="mm/dd/yyyy"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          style={{
-            padding: "10px 12px",
-            border: "1px solid #E0E0E0",
-            borderRadius: "6px",
-            fontSize: "14px",
-            outline: "none",
-            backgroundColor: "#FFFFFF",
-            width: "140px",
-          }}
-        />
-      </div>
+          {/* Date Input */}
+          <input
+            type="date"
+            placeholder="dd/mm/yyyy"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{
+              padding: '10px 12px',
+              border: '1px solid #E0E0E0',
+              borderRadius: '6px',
+              fontSize: '14px',
+              outline: 'none',
+              backgroundColor: '#FFFFFF',
+              width: '140px'
+            }}
+          />
+
+          {/* Filter Button */}
+          <button style={{
+            padding: '10px 24px',
+            backgroundColor: '#2196F3',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span>🔍</span>
+            Lọc
+          </button>
+
+          {/* Calendar Icon */}
+          <button style={{
+            padding: '10px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E0E0E0',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Calendar style={{ width: '18px', height: '18px', color: '#616161' }} />
+          </button>
+        </div>
 
       {/* Table Container */}
       <div

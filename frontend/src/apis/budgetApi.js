@@ -81,7 +81,7 @@ export const budgetApi = {
     return unwrapResponse(res.data);
   },
 
-  // HoOC: Lưu nháp review
+  // HoOC: Lưu review
   saveReviewDraft: async (eventId, departmentId, budgetId, data) => {
     const res = await axiosClient.patch(`/api/events/${eventId}/departments/${departmentId}/budget/${budgetId}/review/draft`, data);
     return unwrapResponse(res.data);
