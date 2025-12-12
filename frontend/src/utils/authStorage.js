@@ -3,35 +3,18 @@ import Cookies from 'js-cookie';
 const ACCESS_TOKEN_KEY = 'myfe_access';
 const REFRESH_TOKEN_KEY = 'myfe_refresh';
 const USER_KEY = 'myfe_user';
-const TAB_ID_KEY = 'myfe_tab_id';
 
 const isBrowser = typeof window !== 'undefined';
 
-const getSessionStorage = () => {
+const getStorage = () => {
   if (!isBrowser) return null;
   try {
-    return window.sessionStorage;
+    // Prefer localStorage so all tabs in the profile share the same session.
+    return window.localStorage;
   } catch {
     return null;
   }
 };
-
-const ensureTabId = () => {
-  const storage = getSessionStorage();
-  if (!storage) return 'default';
-
-  const existing = storage.getItem(TAB_ID_KEY);
-  if (existing) return existing;
-
-  const newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  storage.setItem(TAB_ID_KEY, newId);
-  return newId;
-};
-
-const scopedKey = (base) => `${base}_${ensureTabId()}`;
 
 const defaultCookieOptions = () => ({
   path: '/',
@@ -43,64 +26,62 @@ const defaultCookieOptions = () => ({
 const authStorage = {
   getAccessToken: () => {
     if (!isBrowser) return null;
-    return Cookies.get(scopedKey(ACCESS_TOKEN_KEY)) || null;
+    return Cookies.get(ACCESS_TOKEN_KEY) || null;
   },
   setAccessToken: (token, options = {}) => {
     if (!isBrowser) return;
-    const key = scopedKey(ACCESS_TOKEN_KEY);
     if (!token) {
-      Cookies.remove(key, { path: '/' });
+      Cookies.remove(ACCESS_TOKEN_KEY, { path: '/' });
       return;
     }
-    Cookies.set(key, token, { ...defaultCookieOptions(), ...options });
+    Cookies.set(ACCESS_TOKEN_KEY, token, { ...defaultCookieOptions(), ...options });
   },
   getRefreshToken: () => {
     if (!isBrowser) return null;
-    return Cookies.get(scopedKey(REFRESH_TOKEN_KEY)) || null;
+    return Cookies.get(REFRESH_TOKEN_KEY) || null;
   },
   setRefreshToken: (token, options = {}) => {
     if (!isBrowser) return;
-    const key = scopedKey(REFRESH_TOKEN_KEY);
     if (!token) {
-      Cookies.remove(key, { path: '/' });
+      Cookies.remove(REFRESH_TOKEN_KEY, { path: '/' });
       return;
     }
-    Cookies.set(key, token, { ...defaultCookieOptions(), expires: 30, ...options });
+    Cookies.set(REFRESH_TOKEN_KEY, token, { ...defaultCookieOptions(), expires: 30, ...options });
   },
   getUser: () => {
-    const storage = getSessionStorage();
+    const storage = getStorage();
     if (!storage) return null;
     try {
-      const raw = storage.getItem(scopedKey(USER_KEY));
+      const raw = storage.getItem(USER_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (error) {
       console.error('Error parsing user session data:', error);
-      storage.removeItem(scopedKey(USER_KEY));
+      storage.removeItem(USER_KEY);
       return null;
     }
   },
   setUser: (user) => {
-    const storage = getSessionStorage();
+    const storage = getStorage();
     if (!storage) return;
     if (!user) {
-      storage.removeItem(scopedKey(USER_KEY));
+      storage.removeItem(USER_KEY);
       return;
     }
-    storage.setItem(scopedKey(USER_KEY), JSON.stringify(user));
+    storage.setItem(USER_KEY, JSON.stringify(user));
   },
   clearAll: () => {
     if (isBrowser) {
-      Cookies.remove(scopedKey(ACCESS_TOKEN_KEY), { path: '/' });
-      Cookies.remove(scopedKey(REFRESH_TOKEN_KEY), { path: '/' });
+      Cookies.remove(ACCESS_TOKEN_KEY, { path: '/' });
+      Cookies.remove(REFRESH_TOKEN_KEY, { path: '/' });
     }
-    const storage = getSessionStorage();
+    const storage = getStorage();
     if (storage) {
-      storage.removeItem(scopedKey(USER_KEY));
+      storage.removeItem(USER_KEY);
     }
   },
   hasSession: () => {
     if (!isBrowser) return false;
-    return !!Cookies.get(scopedKey(ACCESS_TOKEN_KEY));
+    return !!Cookies.get(ACCESS_TOKEN_KEY);
   },
 };
 

@@ -127,6 +127,7 @@ export default function HoOCDashBoard() {
   const [epicTasks, setEpicTasks] = useState([])
   const [allTasks, setAllTasks] = useState([])
   const [budgetData, setBudgetData] = useState({ planned: 0, actual: 0 })
+  const [departmentTotal, setDepartmentTotal] = useState(0)
   
   // Get event ID from URL
   const eventId = paramEventId || getEventIdFromUrl(location.pathname, location.search)
@@ -208,6 +209,11 @@ export default function HoOCDashBoard() {
             spent: data.stats?.budget?.spent || 0
           }))
           setDepartments(depts)
+        }
+
+        // Save total departments for stats card
+        if (data?.stats?.departments?.total != null) {
+          setDepartmentTotal(data.stats.departments.total)
         }
 
         // Show dashboard immediately
@@ -351,7 +357,7 @@ export default function HoOCDashBoard() {
     ? Math.min(100, Math.max(0, (completedMilestones / totalMilestones) * 100))
     : 0
   const totalMembers = members.length
-  const totalDepartments = departments.length
+  const totalDepartments = departmentTotal || departments.length
 
   // Calculate budget stats from actual budget data
   const budgetStats = useMemo(() => {

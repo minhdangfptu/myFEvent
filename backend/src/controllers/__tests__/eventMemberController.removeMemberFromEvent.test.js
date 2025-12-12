@@ -38,6 +38,11 @@ vi.mock('../../services/notificationService.js', () => ({
   createNotificationsForUsers: vi.fn(),
 }));
 
+vi.mock('../../utils/dashboardCache.js', () => ({
+  __esModule: true,
+  invalidateDashboardCache: vi.fn(),
+}));
+
 /* -------------------- Helpers -------------------- */
 
 const mockRes = () => {
@@ -58,6 +63,7 @@ describe('eventMemberController.removeMemberFromEvent', () => {
     const Event = (await import('../../models/event.js')).default;
     const Task = (await import('../../models/task.js')).default;
     const { createNotification, createNotificationsForUsers } = await import('../../services/notificationService.js');
+    const { invalidateDashboardCache } = await import('../../utils/dashboardCache.js');
 
     const validMemberId = new mongoose.Types.ObjectId().toString();
     const req = {
@@ -118,6 +124,7 @@ describe('eventMemberController.removeMemberFromEvent', () => {
       { _id: validMemberId },
       { $set: { status: 'deactive', departmentId: null } }
     );
+    expect(invalidateDashboardCache).toHaveBeenCalledWith('evt123');
     expect(createNotification).toHaveBeenCalled();
     expect(createNotificationsForUsers).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);

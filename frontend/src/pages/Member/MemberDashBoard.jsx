@@ -106,7 +106,9 @@ const isCompletedStatus = (status) => {
     normalized === "done" ||
     normalized === "đã hoàn thành" ||
     normalized === "hoàn thành" ||
-    normalized === "da hoan thanh"
+    normalized === "da hoan thanh" ||
+    normalized === "hoan_thanh" ||
+    normalized === "hoan-thanh"
   )
 }
 
@@ -126,17 +128,22 @@ const getTaskStatusText = (status, isOverdueTask = false) => {
   
   const normalized = normalizeStatus(status)
   
-  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành") {
+  // Check for completed status (including underscore-separated codes from API)
+  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành" || normalized === "hoan_thanh" || normalized === "hoan-thanh") {
     return "Hoàn thành"
   }
   if (normalized === "blocked" || normalized === "tạm hoãn" || normalized === "tam hoan") {
     return "Tạm hoãn"
   }
-  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau") {
+  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau" || normalized === "chua_bat_dau" || normalized === "chua-bat-dau") {
     return "Chưa bắt đầu"
   }
-  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy") {
+  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy" || normalized === "huy") {
     return "Đã hủy"
+  }
+  // Check for in-progress status (including underscore-separated codes from API)
+  if (normalized === "in-progress" || normalized === "in_progress" || normalized === "ongoing" || normalized === "đang làm" || normalized === "dang lam" || normalized === "da_bat_dau" || normalized === "da-bat-dau") {
+    return "Đang làm"
   }
   // Default: in-progress, ongoing, đang làm, etc.
   return "Đang làm"
@@ -278,9 +285,23 @@ export default function MemberDashBoard() {
               assigneeUserId: tasksArray[0]?.assigneeId?.userId?._id
             })
           }
+          if (userTasks.length > 0) {
+            console.log('MemberDashBoard - User tasks details:', userTasks.map(t => ({
+              id: t?._id || t?.id,
+              title: t?.title || t?.name,
+              status: t?.status,
+              dueDate: t?.dueDate || t?.deadline,
+              assigneeId: t?.assigneeId
+            })))
+          }
         }
         
-        if (!cancelled) setTasks(userTasks)
+        if (!cancelled) {
+          setTasks(userTasks)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('MemberDashBoard - Tasks state set:', userTasks.length, 'tasks')
+          }
+        }
 
         const milestoneList = Array.isArray(milestonesResponse) 
           ? milestonesResponse 
@@ -328,17 +349,60 @@ export default function MemberDashBoard() {
 
   // Calculate stats
   const totalTasks = tasks.length
-  const completedTasks = useMemo(
-    () => tasks.filter((t) => isCompletedStatus(t?.status)).length,
-    [tasks]
-  )
+  
+  const completedTasks = useMemo(() => {
+    if (!tasks || tasks.length === 0) return 0
+    
+    const completed = tasks.filter((t) => {
+      const status = t?.status
+      if (!status) return false
+      return isCompletedStatus(status)
+    }).length
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('MemberDashBoard - Completed tasks calculation:', {
+        totalTasks: tasks.length,
+        completedTasks: completed,
+        taskStatuses: tasks.map(t => ({ 
+          id: t?._id || t?.id, 
+          title: t?.title || t?.name,
+          status: t?.status,
+          isCompleted: isCompletedStatus(t?.status)
+        }))
+      })
+    }
+    
+    return completed
+  }, [tasks])
+  
   const completedTasksPercent = totalTasks > 0
     ? Math.round((completedTasks / totalTasks) * 100)
     : 0
-  const overdueTasks = useMemo(
-    () => tasks.filter((t) => isOverdue(t)).length,
-    [tasks]
-  )
+    
+  const overdueTasks = useMemo(() => {
+    if (!tasks || tasks.length === 0) return 0
+    
+    const overdue = tasks.filter((t) => {
+      return isOverdue(t)
+    }).length
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('MemberDashBoard - Overdue tasks calculation:', {
+        totalTasks: tasks.length,
+        overdueTasks: overdue,
+        taskDetails: tasks.map(t => ({
+          id: t?._id || t?.id,
+          title: t?.title || t?.name,
+          status: t?.status,
+          dueDate: t?.dueDate || t?.deadline,
+          isOverdue: isOverdue(t),
+          isCompleted: isCompletedStatus(t?.status)
+        }))
+      })
+    }
+    
+    return overdue
+  }, [tasks])
 
   // Get user tasks for display (sorted by due date, limit to 4)
   const userTasks = useMemo(() => {

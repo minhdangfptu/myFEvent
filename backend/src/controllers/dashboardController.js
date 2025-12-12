@@ -4,9 +4,9 @@ import EventMember from '../models/eventMember.js';
 import Department from '../models/department.js';
 import Milestone from '../models/milestone.js';
 import Calendar from '../models/calendar.js';
+import { getCachedDashboard, setCachedDashboard } from '../utils/dashboardCache.js';
 
 const CACHE_TTL_MS = Number(process.env.DASHBOARD_CACHE_TTL_MS || 60_000);
-const dashboardCache = new Map();
 const inflightBuilds = new Map();
 
 const COMPLETED_STATUSES = [
@@ -29,25 +29,6 @@ const firstNumberExpr = (fields, fallback = 0) =>
     }),
     fallback
   );
-
-const getCacheKey = (eventId) => `dashboard:${eventId}`;
-
-const getCachedDashboard = (eventId) => {
-  const cached = dashboardCache.get(getCacheKey(eventId));
-  if (!cached) return null;
-  if (cached.expiresAt < Date.now()) {
-    dashboardCache.delete(getCacheKey(eventId));
-    return null;
-  }
-  return cached.data;
-};
-
-const setCachedDashboard = (eventId, data) => {
-  dashboardCache.set(getCacheKey(eventId), {
-    expiresAt: Date.now() + CACHE_TTL_MS,
-    data
-  });
-};
 
 const buildMemberStats = async (eventObjectId) => {
   const grouped = await EventMember.aggregate([
@@ -372,7 +353,7 @@ export const getDashboardOverview = async (req, res) => {
           );
         }
 
-        setCachedDashboard(eventId, payload);
+        setCachedDashboard(eventId, payload, CACHE_TTL_MS);
         return payload;
       })();
 

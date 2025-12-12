@@ -176,16 +176,29 @@ export const feedbackService = {
     const closeTimeDateOnly = new Date(closeTime);
     closeTimeDateOnly.setHours(0, 0, 0, 0);
     
+    // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
     if (openTimeDateOnly < nowDateOnly) {
       const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
       err.status = 400;
       throw err;
     }
-    // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
-    if (closeTimeDateOnly <= nowDateOnly) {
-      const err = new Error('Thời gian đóng phải ở tương lai');
-      err.status = 400;
-      throw err;
+    
+    // Ngày đóng phải sau ngày mở
+    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+    // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
+    if (openTimeDateOnly.getTime() === nowDateOnly.getTime()) {
+      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+      const tomorrow = new Date(nowDateOnly);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (closeTimeDateOnly.getTime() <= tomorrow.getTime()) {
+        const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
+        err.status = 400;
+        throw err;
+      }
+    } else {
+      // Ngày mở là tương lai - ngày đóng chỉ cần sau ngày mở (đã check ở trên)
+      // Không cần check thêm vì đã check openTime < closeTime ở trên
     }
 
     // Validate questions
@@ -284,9 +297,14 @@ export const feedbackService = {
       throw err;
     }
 
+    // Parse dates to date-only for comparison
+    const nextOpenTimeDateOnly = new Date(nextOpenTime);
+    nextOpenTimeDateOnly.setHours(0, 0, 0, 0);
+    const nextCloseTimeDateOnly = new Date(nextCloseTime);
+    nextCloseTimeDateOnly.setHours(0, 0, 0, 0);
+
     if (openTime !== undefined) {
-      const nextOpenTimeDateOnly = new Date(nextOpenTime);
-      nextOpenTimeDateOnly.setHours(0, 0, 0, 0);
+      // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
       if (nextOpenTimeDateOnly < nowDateOnly) {
         const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
         err.status = 400;
@@ -294,15 +312,22 @@ export const feedbackService = {
       }
     }
 
-    if (closeTime !== undefined) {
-      const nextCloseTimeDateOnly = new Date(nextCloseTime);
-      nextCloseTimeDateOnly.setHours(0, 0, 0, 0);
-      // Ngày đóng phải sau ngày hôm nay (cho phép ngày mai trở đi)
-      if (nextCloseTimeDateOnly <= nowDateOnly) {
-        const err = new Error('Thời gian đóng phải ở tương lai');
+    // Ngày đóng phải sau ngày mở
+    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+    // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
+    if (nextOpenTimeDateOnly.getTime() === nowDateOnly.getTime()) {
+      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+      const tomorrow = new Date(nowDateOnly);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (nextCloseTimeDateOnly.getTime() <= tomorrow.getTime()) {
+        const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
         err.status = 400;
         throw err;
       }
+    } else {
+      // Ngày mở là tương lai - ngày đóng chỉ cần sau ngày mở (đã check ở trên)
+      // Không cần check thêm vì đã check nextOpenTime < nextCloseTime ở trên
     }
 
     if (name !== undefined) form.name = name.trim();
