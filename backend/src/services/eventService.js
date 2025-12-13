@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Event from '../models/event.js';
 import EventMember from '../models/eventMember.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import { invalidateDashboardCache } from '../utils/dashboardCache.js';
 import { uploadImageIfNeeded } from './cloudinaryService.js';
 import {
   calculateEventStatus,
@@ -236,6 +237,9 @@ export const eventService = {
       err.status = 400;
       throw err;
     }
+
+    invalidateDashboardCache(event._id?.toString?.() || event._id);
+
     return { message: 'Joined event', data: { eventId: event._id } };
   },
 

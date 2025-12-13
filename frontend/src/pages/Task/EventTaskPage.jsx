@@ -142,6 +142,26 @@ export default function EventTaskPage() {
   const [epicEditForm, setEpicEditForm] = useState({ title: "", description: "", departmentId: "", milestoneId: "", startDate: "", dueDate: "" });
   const [isUpdatingEpic, setIsUpdatingEpic] = useState(false);
 
+  const formatDateTimeForInput = useCallback((date) => {
+    if (!date) return "";
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Bangkok", // UTC+7
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date).reduce((acc, part) => {
+      acc[part.type] = part.value;
+      return acc;
+    }, {});
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  }, []);
+
+  const addMinutes = (date, minutes) => new Date(date.getTime() + minutes * 60000);
+
   useEffect(() => {
     const handleToggleSidebar = () => {
       setSidebarOpen(prev => !prev);
@@ -2004,18 +2024,16 @@ const closeAddTaskModal = () => {
                             }
                             disabled={assignNow}
                             min={(() => {
-                              const now = new Date();
-                              now.setMinutes(now.getMinutes() + 1);
-                              const minDateTime = now.toISOString().slice(0, 16);
+                              let minDate = addMinutes(new Date(), 1);
 
-                              // So sánh với thời gian tạo sự kiện, chọn thời gian nào lớn hơn
                               if (eventInfo?.createdAt) {
                                 const eventCreatedAt = new Date(eventInfo.createdAt);
-                                const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
-                                return eventCreatedAtStr > minDateTime ? eventCreatedAtStr : minDateTime;
+                                if (eventCreatedAt > minDate) {
+                                  minDate = eventCreatedAt;
+                                }
                               }
 
-                              return minDateTime;
+                              return formatDateTimeForInput(minDate);
                             })()}
                             max={(() => {
                               // Nếu là sub task (normal task) và có parent, giới hạn startDate không vượt quá deadline của epic task
@@ -2025,7 +2043,7 @@ const closeAddTaskModal = () => {
                                   const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
                                                    tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
                                   if (parentTask && parentTask.dueDate) {
-                                    return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                                    return formatDateTimeForInput(new Date(parentTask.dueDate));
                                   }
                                 }
                               }
@@ -2042,7 +2060,7 @@ const closeAddTaskModal = () => {
 
                                 // Chọn thời gian nào lớn hơn để hiển thị
                                 if (eventCreated && eventCreated > now) {
-                                  return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN')})`;
+                                  return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })})`;
                                 } else {
                                   return "thời điểm hiện tại";
                                 }
@@ -2053,7 +2071,7 @@ const closeAddTaskModal = () => {
                                   const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
                                                    tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
                                   if (parentTask && parentTask.dueDate) {
-                                    return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                    return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })})`;
                                   }
                                 }
                                 return "";
@@ -2071,29 +2089,23 @@ const closeAddTaskModal = () => {
                             handleAddTaskInput("dueDate", e.target.value)
                           }
                           min={(() => {
-                            const now = new Date();
-                            now.setMinutes(now.getMinutes() + 1);
-                            let minDateTime = now.toISOString().slice(0, 16);
+                            let minDate = addMinutes(new Date(), 1);
 
-                            // So sánh với thời gian tạo sự kiện, chọn thời gian nào lớn hơn
                             if (eventInfo?.createdAt) {
                               const eventCreatedAt = new Date(eventInfo.createdAt);
-                              const eventCreatedAtStr = eventCreatedAt.toISOString().slice(0, 16);
-                              if (eventCreatedAtStr > minDateTime) {
-                                minDateTime = eventCreatedAtStr;
+                              if (eventCreatedAt > minDate) {
+                                minDate = eventCreatedAt;
                               }
                             }
 
                             if (addTaskForm.startDate) {
-                              const startDate = new Date(addTaskForm.startDate);
-                              startDate.setMinutes(startDate.getMinutes() + 1);
-                              const startDateStr = startDate.toISOString().slice(0, 16);
-                              if (startDateStr > minDateTime) {
-                                minDateTime = startDateStr;
+                              const startDate = addMinutes(new Date(addTaskForm.startDate), 1);
+                              if (startDate > minDate) {
+                                minDate = startDate;
                               }
                             }
 
-                            return minDateTime;
+                            return formatDateTimeForInput(minDate);
                           })()}
                           max={(() => {
                             // Nếu là sub task (normal task) và có parent, giới hạn deadline không vượt quá deadline của epic task
@@ -2103,7 +2115,7 @@ const closeAddTaskModal = () => {
                                 const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
                                                  tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
                                 if (parentTask && parentTask.dueDate) {
-                                  return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+                                    return formatDateTimeForInput(new Date(parentTask.dueDate));
                                 }
                               }
                             }
@@ -2117,19 +2129,19 @@ const closeAddTaskModal = () => {
 
                             // Chọn thời gian nào lớn hơn để hiển thị
                             if (eventCreated && eventCreated > now) {
-                              return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN')})`;
+                              return `thời gian tạo sự kiện (${eventCreated.toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })})`;
                             } else {
                               return "thời điểm hiện tại";
                             }
                           })()}
-                          {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN')})`}
+                          {addTaskForm.startDate && ` và sau thời gian bắt đầu (${new Date(addTaskForm.startDate).toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })})`}
                           {addTaskMode === "normal" && (() => {
                             const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
                             if (effectiveParentId) {
                               const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
                                                tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
                               if (parentTask && parentTask.dueDate) {
-                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })})`;
                               }
                             }
                             return "";

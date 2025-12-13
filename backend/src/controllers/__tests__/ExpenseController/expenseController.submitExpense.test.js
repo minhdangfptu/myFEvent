@@ -200,4 +200,70 @@ describe('expenseController.submitExpense', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ message: 'Expense not found. Please report expense first.' });
   });
+  it('[Normal] TC05 - should successfully submit expense', async () => {
+    const { ensureEventExists, ensureDepartmentInEvent } = await import('../../../services/departmentService.js');
+    const { getRequesterMembership } = await import('../../../services/eventMemberService.js');
+    const { notifyExpenseSubmitted } = await import('../../../services/notificationService.js');
+    const { _mockFindOne: mockFindBudget } = await import('../../../models/budgetPlanDep.js');
+    const { _mockFindOne: mockFindExpense, _mockFind: mockFindAllExpenses } = await import('../../../models/expense.js');
+
+    ensureEventExists.mockResolvedValue(true);
+    ensureDepartmentInEvent.mockResolvedValue({ _id: mockDeptId });
+
+    mockFindBudget.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(mockBudgetId),
+      status: 'approved',
+      items: [
+        {
+          itemId: new mongoose.Types.ObjectId(mockItemId),
+          assignedTo: new mongoose.Types.ObjectId(mockMemberId)
+        }
+      ]
+    });
+
+    getRequesterMembership.mockResolvedValue({
+      _id: new mongoose.Types.ObjectId(mockMemberId),
+      departmentId: mockDeptId
+    });
+
+    const mockSave = vi.fn();
+    const mockExpenseInstance = {
+      _id: new mongoose.Types.ObjectId(),
+      planId: new mongoose.Types.ObjectId(mockBudgetId),
+      itemId: new mongoose.Types.ObjectId(mockItemId),
+      actualAmount: 100000,
+      evidence: [],
+      submittedStatus: 'pending',
+      save: mockSave
+    };
+    mockFindExpense.mockResolvedValue(mockExpenseInstance);
+
+    mockFindAllExpenses.mockResolvedValue([
+      {
+        itemId: new mongoose.Types.ObjectId(mockItemId),
+        submittedStatus: 'submitted'
+      }
+    ]);
+
+    const req = {
+      params: {
+        eventId: mockEventId,
+        departmentId: mockDeptId,
+        budgetId: mockBudgetId,
+        itemId: mockItemId
+      },
+      user: { id: mockUserId }
+    };
+    const res = mockRes();
+
+    await expenseController.submitExpense(req, res);
+
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(mockExpenseInstance.submittedStatus).toBe('submitted');
+    expect(notifyExpenseSubmitted).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      allItemsSubmitted: true
+    }));
+  });
 });
