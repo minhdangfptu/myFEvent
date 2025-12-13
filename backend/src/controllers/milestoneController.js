@@ -29,7 +29,7 @@ export const createMilestone = async (req, res) => {
     const isDuplicate = await checkDuplicateMilestone(eventId, name);
     if (isDuplicate) {
       return res.status(409).json({ 
-        message: 'Milestone with this name already exists in this event' 
+        message: 'Tên cột mốc này đã tồn tại trong sự kiện' 
       });
     }
 
@@ -87,7 +87,7 @@ export const createMilestone = async (req, res) => {
     // Handle duplicate key error from MongoDB unique index
     if (error.code === 11000 || error.name === 'MongoServerError') {
       return res.status(409).json({ 
-        message: 'Milestone with this name already exists in this event' 
+        message: 'Tên cột mốc này đã tồn tại trong sự kiện' 
       });
     }
     

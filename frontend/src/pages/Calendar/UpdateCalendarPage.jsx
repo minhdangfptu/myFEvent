@@ -97,7 +97,15 @@ export default function UpdateEventCalendarPage() {
             }
             try {
                 const role = await fetchEventRole(eventId)
-                if (mounted) setEventRole(role)
+                if (mounted) {
+                    setEventRole(role)
+                    // Block Member from accessing edit page
+                    if (role === "Member") {
+                        toast.error("Bạn không có quyền chỉnh sửa cuộc họp")
+                        navigate(`/events/${eventId}/my-calendar/${calendarId}`)
+                        return
+                    }
+                }
             } catch (_) {
                 if (mounted) setEventRole("")
             }
@@ -106,7 +114,7 @@ export default function UpdateEventCalendarPage() {
         return () => {
             mounted = false
         }
-    }, [eventId, fetchEventRole]);
+    }, [eventId, calendarId, fetchEventRole, navigate]);
 
     const [formData, setFormData] = useState({
         name: "",
@@ -513,9 +521,43 @@ export default function UpdateEventCalendarPage() {
         navigate(`/events/${eventId}/my-calendar/${calendarId}`);
     };
 
+    // Block Member from accessing edit page
+    if (eventRole === "Member") {
+        return (
+            <UserLayout sidebarType={eventRole} eventId={eventId}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+                    <div style={{ textAlign: 'center', padding: '24px' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚫</div>
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#1f2937', marginBottom: '8px' }}>
+                            Không có quyền truy cập
+                        </h2>
+                        <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '24px' }}>
+                            Bạn không có quyền chỉnh sửa cuộc họp này. Chỉ HoOC và HoD mới có quyền chỉnh sửa.
+                        </p>
+                        <button
+                            onClick={() => navigate(`/events/${eventId}/my-calendar/${calendarId}`)}
+                            style={{
+                                padding: '10px 24px',
+                                backgroundColor: '#4285f4',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '15px',
+                                fontWeight: 500
+                            }}
+                        >
+                            Quay lại chi tiết cuộc họp
+                        </button>
+                    </div>
+                </div>
+            </UserLayout>
+        );
+    }
+
     if (loadingCalendar) {
         return (
-            <UserLayout sidebarType={eventRole}>
+            <UserLayout sidebarType={eventRole} eventId={eventId}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>

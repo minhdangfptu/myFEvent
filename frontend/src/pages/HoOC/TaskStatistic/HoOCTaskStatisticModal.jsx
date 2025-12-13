@@ -81,19 +81,6 @@ export default function HoOCTaskStatisticModal({ show, dept, onClose }) {
             </div>
           </div>
 
-          <div className="hooc-task-statistic-page__kpi-card">
-            <div className="hooc-task-statistic-page__kpi-icon hooc-task-statistic-page__kpi-icon--completed">
-              <i className="bi bi-speedometer2" />
-            </div>
-            <div className="hooc-task-statistic-page__kpi-content">
-              <div className="hooc-task-statistic-page__kpi-label">
-                Tiến độ tổng của ban
-              </div>
-              <div className="hooc-task-statistic-page__kpi-value">
-                {completionRate}%
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Chart + legend – tái sử dụng layout / style của page */}

@@ -52,6 +52,7 @@ const ViewDepartmentBudget = () => {
     actualAmount: "",
     memberNote: ""
   });
+  const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
   
   const [columnWidths, setColumnWidths] = useState(null);
   
@@ -666,14 +667,26 @@ const ViewDepartmentBudget = () => {
   const handleAutoSaveExpense = async (item) => {
     if (!item || !budget) return;
     
-    // Đợi một chút để đảm bảo state đã được cập nhật
-    setTimeout(async () => {
+    // Clear existing timeout if any
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+    }
+    
+    // Debounce: chỉ save sau 500ms không có thay đổi
+    const timeoutId = setTimeout(async () => {
       try {
         const itemIdToUse = item.itemId?.toString() || 
                            item.itemId?._id?.toString() || 
                            item.itemId ||
                            item._id?.toString() ||
                            item._id;
+        
+        // Chỉ save nếu đang trong chế độ edit của item này
+        const currentEditingId = editingInlineItem?.toString() || editingInlineItem;
+        const itemIdStr = itemIdToUse?.toString();
+        if (currentEditingId !== itemIdStr) {
+          return;
+        }
         
         await budgetApi.reportExpense(
           eventId,
@@ -686,15 +699,38 @@ const ViewDepartmentBudget = () => {
             evidence: item.evidence || []
           }
         );
-        // Tự động thoát khỏi chế độ edit sau khi lưu thành công
-        setEditingInlineItem(null);
-        // Không hiển thị toast để không làm phiền user
-        await fetchData();
+        
+        // Update local state thay vì fetch lại toàn bộ data để tránh reload
+        if (budget && budget.items) {
+          const updatedItems = budget.items.map(budgetItem => {
+            const currentItemId = budgetItem.itemId?.toString() || 
+                                 budgetItem.itemId?._id?.toString() || 
+                                 budgetItem.itemId ||
+                                 budgetItem._id?.toString() ||
+                                 budgetItem._id;
+            if (currentItemId === itemIdToUse) {
+              return {
+                ...budgetItem,
+                actualAmount: parseFloat(inlineFormData.actualAmount) || 0,
+                memberNote: inlineFormData.memberNote || ""
+              };
+            }
+            return budgetItem;
+          });
+          setBudget({ ...budget, items: updatedItems });
+        }
+        
+        // Không tự động thoát khỏi chế độ edit để user có thể tiếp tục chỉnh sửa
+        // Không gọi fetchData() để tránh reload trang
       } catch (error) {
         console.error("Error auto-saving expense:", error);
         // Chỉ log error, không hiển thị toast
       }
-    }, 100);
+      
+      setAutoSaveTimeout(null);
+    }, 500);
+    
+    setAutoSaveTimeout(timeoutId);
   };
 
   const handleSubmitExpense = async (item) => {

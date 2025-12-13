@@ -514,13 +514,16 @@ const Milestone = () => {
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
-      const errorMessage = err.response?.data?.message || "Tạo cột mốc thất bại"
-      setError(errorMessage)
       
-      // Show toast for duplicate error
+      // Handle duplicate name error (409) with Vietnamese message
       if (err.response?.status === 409) {
-        toast.error(errorMessage)
+        const vietnameseMessage = "Tên cột mốc này đã tồn tại trong sự kiện. Vui lòng chọn tên khác."
+        setError(vietnameseMessage)
+        toast.error(vietnameseMessage)
       } else {
+        // For other errors, use the message from backend or default Vietnamese message
+        const errorMessage = err.response?.data?.message || "Tạo cột mốc thất bại"
+        setError(errorMessage)
         toast.error(errorMessage)
       }
     }

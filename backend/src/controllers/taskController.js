@@ -51,9 +51,16 @@ export const listTasksByEventOrDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Không có quyền xem task' });
     }
 
+    // Auto-filter by department for HoD if departmentId not explicitly provided in query
+    const query = { ...req.query };
+    if (member.role === 'HoD' && member.departmentId && !query.departmentId) {
+      // HoD should only see tasks from their department
+      query.departmentId = member.departmentId.toString();
+    }
+
     const tasks = await listTasksByEventOrDepartmentService({
       eventId,
-      query: req.query,
+      query,
     });
 
     return res.status(200).json({ data: tasks });
@@ -77,6 +84,15 @@ export const getTaskDetail = async (req, res) => {
       return res.status(404).json({ message: 'Task không tồn tại' });
     }
 
+    // HoD can only view tasks from their department
+    if (member.role === 'HoD' && member.departmentId) {
+      const taskDepartmentId = task.departmentId?._id?.toString() || task.departmentId?.toString();
+      const memberDepartmentId = member.departmentId.toString();
+      if (taskDepartmentId !== memberDepartmentId) {
+        return res.status(403).json({ message: 'Không có quyền xem task này' });
+      }
+    }
+
     return res.status(200).json({ data: task });
   } catch (err) {
     return handleServiceError(res, err, 'Lỗi lấy chi tiết task');
@@ -91,6 +107,14 @@ export const getTaskByDepartment = async (req, res) => {
     const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD', 'Member']);
     if (!member) {
       return res.status(403).json({ message: 'Không có quyền xem chi tiết task' });
+    }
+
+    // HoD can only view tasks from their department
+    if (member.role === 'HoD' && member.departmentId) {
+      const memberDepartmentId = member.departmentId.toString();
+      if (departmentId !== memberDepartmentId) {
+        return res.status(403).json({ message: 'Không có quyền xem task từ ban khác' });
+      }
     }
 
     const { departmentExists, task } = await getTaskByDepartmentService({

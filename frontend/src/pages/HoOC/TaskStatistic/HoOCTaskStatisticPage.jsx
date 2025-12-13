@@ -587,15 +587,6 @@ export default function HoOCTaskStatisticPage() {
               </>
             )}
 
-            <div className="hooc-task-statistic-page__filter-item">
-              <span className="hooc-task-statistic-page__completion-rate">
-                Tiến độ tổng:{" "}
-                {statistics?.milestone?.overallProgress ||
-                  statistics?.summary?.completedMajorTasksPercentage ||
-                  0}
-                %
-              </span>
-            </div>
           </div>
         </div>
 
@@ -715,9 +706,6 @@ export default function HoOCTaskStatisticPage() {
                         Công việc cá nhân
                       </th>
                       <th className="hooc-task-statistic-page__table-header-cell">
-                        Tiến độ tổng
-                      </th>
-                      <th className="hooc-task-statistic-page__table-header-cell">
                         Hành động
                       </th>
                     </tr>
@@ -762,19 +750,6 @@ export default function HoOCTaskStatisticPage() {
                                 {dept.remainingAssignedTasks || 0} còn lại
                               </div>
                             </div>
-                          </td>
-                          <td className="hooc-task-statistic-page__table-body-cell">
-                            <div className="hooc-task-statistic-page__progress-container">
-                              <div
-                                className="hooc-task-statistic-page__progress-bar"
-                                style={{
-                                  width: `${dept.overallProgress || 0}%`,
-                                }}
-                              ></div>
-                            </div>
-                            <span className="hooc-task-statistic-page__progress-text">
-                              {dept.overallProgress || 0}%
-                            </span>
                           </td>
                           <td className="hooc-task-statistic-page__table-body-cell">
                             <button

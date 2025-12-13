@@ -430,7 +430,7 @@ export default function CreateFeedbackForm() {
       return;
     }
 
-    // Cho phép chọn ngày hôm nay cho ngày mở
+    // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
     if (openTimeDate.getTime() < now.getTime()) {
       toast.error('Ngày mở phải ở hiện tại hoặc tương lai');
       return;
@@ -438,11 +438,18 @@ export default function CreateFeedbackForm() {
 
     // Ngày đóng phải sau ngày mở
     // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
-    if (openTimeDate.getTime() === now.getTime()) {
+    // So sánh bằng cách so sánh timestamp của ngày (không có giờ)
+    const openTimeTimestamp = openTimeDate.getTime();
+    const nowTimestamp = now.getTime();
+    
+    if (openTimeTimestamp === nowTimestamp) {
+      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
-      if (closeTimeDate.getTime() <= tomorrow.getTime()) {
+      const tomorrowTimestamp = tomorrow.getTime();
+      
+      if (closeTimeDate.getTime() <= tomorrowTimestamp) {
         toast.error('Ngày đóng phải sau ngày mở (ít nhất 1 ngày)');
         return;
       }

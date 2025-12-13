@@ -214,10 +214,6 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
           ? response.plans
           : [];
       
-      // Debug: log để kiểm tra plans
-      console.log('[AIAssistantModal] Response plans:', response?.plans);
-      console.log('[AIAssistantModal] Next plans:', nextPlans);
-      
       setPlans(nextPlans);
 
       // Lưu plans vào message data để hiển thị nút "Áp dụng" ngay trong message
@@ -225,9 +221,8 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
         role: 'assistant',
         content: assistantReply,
         timestamp: new Date().toISOString(),
-        data: nextPlans.length > 0 ? { plans: nextPlans } : undefined,
+        data: nextPlans.length > 0 ? { plans: nextPlans, applied: false } : undefined,
       };
-      console.log('[AIAssistantModal] AI message with data:', aiMessage);
       setMessages((prev) => [...prev, aiMessage]);
 
       const returnedSessionId =

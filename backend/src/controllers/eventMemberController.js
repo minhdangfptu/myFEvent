@@ -15,6 +15,7 @@ import Event from '../models/event.js';
 import Task from '../models/task.js';
 import { ensureDepartmentInEvent } from '../services/departmentService.js';
 import { createNotification, createNotificationsForUsers } from '../services/notificationService.js';
+import { invalidateDashboardCache } from '../utils/dashboardCache.js';
 
 // Get members by event
 export const getMembersByEvent = async (req, res) => {
@@ -147,6 +148,8 @@ export const updateMemberRole = async (req, res) => {
       .populate('userId', 'fullName email avatarUrl') // Cloudinary URL, không còn base64
       .populate('departmentId', 'name')
       .lean();
+
+    invalidateDashboardCache(eventId);
 
     return res.status(200).json({
       message: 'Cập nhật vai trò thành công',
@@ -354,6 +357,8 @@ export const removeMemberFromEvent = async (req, res) => {
       { $set: { status: 'deactive', departmentId: null } }
     );
 
+    invalidateDashboardCache(eventId);
+
     const event = await Event.findById(eventId).select('name').lean();
     const notifyUsers = [];
     const departmentId = member.departmentId?._id || member.departmentId;
@@ -490,6 +495,8 @@ export const leaveEvent = async (req, res) => {
       { _id: membership._id },
       { $set: { status: 'deactive' } }
     );
+
+    invalidateDashboardCache(eventId);
 
     // Gửi thông báo cho HoOC và HoD trong ban của member (nếu có department)
     const departmentId = membership.departmentId?._id || membership.departmentId;

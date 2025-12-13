@@ -31,6 +31,11 @@ vi.mock('../../services/notificationService.js', () => ({
   createNotificationsForUsers: vi.fn(),
 }));
 
+vi.mock('../../utils/dashboardCache.js', () => ({
+  __esModule: true,
+  invalidateDashboardCache: vi.fn(),
+}));
+
 /* -------------------- Helpers -------------------- */
 
 const mockRes = () => {
@@ -50,6 +55,7 @@ describe('eventMemberController.leaveEvent', () => {
     const Event = (await import('../../models/event.js')).default;
     const Task = (await import('../../models/task.js')).default;
     const { createNotificationsForUsers } = await import('../../services/notificationService.js');
+    const { invalidateDashboardCache } = await import('../../utils/dashboardCache.js');
 
     const req = {
       params: { eventId: 'evt123' },
@@ -118,6 +124,7 @@ describe('eventMemberController.leaveEvent', () => {
         $set: { assigneeId: null }
       }
     );
+    expect(invalidateDashboardCache).toHaveBeenCalledWith('evt123');
     expect(EventMember.updateOne).toHaveBeenCalledWith(
       { _id: 'member1' },
       { $set: { status: 'deactive' } }

@@ -17,6 +17,11 @@ vi.mock('../../models/eventMember.js', () => ({
   },
 }));
 
+vi.mock('../../utils/dashboardCache.js', () => ({
+  __esModule: true,
+  invalidateDashboardCache: vi.fn(),
+}));
+
 /* -------------------- Helpers -------------------- */
 
 const mockRes = () => {
@@ -34,6 +39,7 @@ describe('eventMemberController.updateMemberRole', () => {
   it('[Normal] TC01 - should update member role successfully by HoOC', async () => {
     const ensureEventRole = (await import('../../utils/ensureEventRole.js')).default;
     const EventMember = (await import('../../models/eventMember.js')).default;
+    const { invalidateDashboardCache } = await import('../../utils/dashboardCache.js');
 
     const validMemberId = new mongoose.Types.ObjectId().toString();
     const req = {
@@ -76,6 +82,7 @@ describe('eventMemberController.updateMemberRole', () => {
     await eventMemberController.updateMemberRole(req, res);
 
     expect(ensureEventRole).toHaveBeenCalledWith('hooc1', 'evt123', ['HoOC']);
+    expect(invalidateDashboardCache).toHaveBeenCalledWith('evt123');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -107,7 +107,9 @@ const isCompletedStatus = (status) => {
     normalized === "done" ||
     normalized === "đã hoàn thành" ||
     normalized === "hoàn thành" ||
-    normalized === "da hoan thanh"
+    normalized === "da hoan thanh" ||
+    normalized === "hoan_thanh" ||
+    normalized === "hoan-thanh"
   )
 }
 
@@ -127,17 +129,22 @@ const getTaskStatusText = (status, isOverdueTask = false) => {
   
   const normalized = normalizeStatus(status)
   
-  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành") {
+  // Check for completed status (including underscore-separated codes from API)
+  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành" || normalized === "hoan_thanh" || normalized === "hoan-thanh") {
     return "Hoàn thành"
   }
   if (normalized === "blocked" || normalized === "tạm hoãn" || normalized === "tam hoan") {
     return "Tạm hoãn"
   }
-  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau") {
+  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau" || normalized === "chua_bat_dau" || normalized === "chua-bat-dau") {
     return "Chưa bắt đầu"
   }
-  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy") {
+  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy" || normalized === "huy") {
     return "Đã hủy"
+  }
+  // Check for in-progress status (including underscore-separated codes from API)
+  if (normalized === "in-progress" || normalized === "in_progress" || normalized === "ongoing" || normalized === "đang làm" || normalized === "dang lam" || normalized === "da_bat_dau" || normalized === "da-bat-dau") {
+    return "Đang làm"
   }
   // Default: in-progress, ongoing, đang làm, etc.
   return "Đang làm"
@@ -313,10 +320,25 @@ export default function HoDDashBoard() {
     [tasks]
   )
 
-  // Major tasks (parent tasks or tasks with high priority)
+  // Major tasks (only epic/parent tasks)
   const majorTasks = useMemo(() => {
-    const parentTasks = tasks.filter(t => !t.parentTaskId || t.parentTaskId === null)
-    return parentTasks
+    const allTasks = Array.isArray(tasks) ? tasks : []
+    const parentIds = new Set(
+      allTasks
+        .map(t => t.parentTaskId)
+        .filter(Boolean)
+        .map(id => id.toString())
+    )
+
+    const majorOnly = allTasks.filter((t) => {
+      const type = String(t.taskType || "").toLowerCase()
+      if (type === "epic") return true
+
+      const id = (t._id || t.id || "").toString()
+      return id && parentIds.has(id)
+    })
+
+    return majorOnly
       .slice(0, 2)
       .map((task) => {
         const progress = task.progressPct || task.progress || 0
@@ -337,7 +359,7 @@ export default function HoDDashBoard() {
   // Detailed tasks (recent or upcoming tasks)
   const detailedTasks = useMemo(() => {
     return tasks
-      .filter(t => t.parentTaskId || t.status !== "completed")
+      .filter(t => t.parentTaskId || !isCompletedStatus(t.status))
       .slice(0, 3)
       .map((task) => {
         const deadline = task.dueDate || task.deadline

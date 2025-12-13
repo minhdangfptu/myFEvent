@@ -1118,10 +1118,22 @@ export const applyEventPlannerPlan = async (req, res) => {
       errors: [],
     };
 
-    // Map để lưu epicId mới được tạo: key = "department:epicTitle" hoặc "department"
+    // Helper: Normalize string for key matching (diacritics, spaces, case)
+    const normalizeKey = (str) => {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ')  // collapse multiple spaces
+        .normalize('NFD')      // decompose unicode (ả → a + combining accent)
+        .replace(/[\u0300-\u036f]/g, ''); // remove combining accents
+    };
+
+    // Map để lưu epicId mới được tạo: key = normalized "department:epicTitle" hoặc "department"
     const epicIdMap = new Map();
 
     // BƯỚC 1: Tạo tất cả EPIC trước
+    console.log(`[applyEventPlannerPlan] Starting to process ${plans.length} plans`);
     for (const rawPlan of plans) {
       if (!rawPlan || typeof rawPlan !== 'object') continue;
       if (rawPlan.type !== 'epics_plan') continue;
@@ -1132,9 +1144,15 @@ export const applyEventPlannerPlan = async (req, res) => {
         const epics = Array.isArray(epicsPlan.epics)
           ? epicsPlan.epics
           : [];
-        if (!epics.length) continue;
+        
+        console.log(`[applyEventPlannerPlan] Processing epics_plan: eventId=${planEventId}, epics count=${epics.length}`);
+        if (!epics.length) {
+          console.warn('[applyEventPlannerPlan] No epics in this plan, skipping');
+          continue;
+        }
 
         try {
+          console.log(`[applyEventPlannerPlan] Creating ${epics.length} epics at ${SELF_BASE_URL}/api/events/${planEventId}/epics/ai-bulk-create`);
           const resp = await axios.post(
             `${SELF_BASE_URL}/api/events/${planEventId}/epics/ai-bulk-create`,
             { epics },
@@ -1150,37 +1168,48 @@ export const applyEventPlannerPlan = async (req, res) => {
         const createdEpics = Array.isArray(respData.data) ? respData.data : [];
         summary.epicsCreated += createdEpics.length;
 
-        // Lưu mapping: department + epicTitle -> epicId mới
+        console.log(`[applyEventPlannerPlan] Successfully created ${createdEpics.length} epics`);
+
+        // Lưu mapping: department + epicTitle -> epicId mới (với normalization)
         // Sử dụng thông tin từ epics array ban đầu để map
         createdEpics.forEach((epic, index) => {
-          if (!epic || !epic._id) return;
+          if (!epic || !epic._id) {
+            console.warn(`[applyEventPlannerPlan] Created epic at index ${index} has no _id, skipping`);
+            return;
+          }
           // Lấy thông tin từ epic ban đầu (epics[index]) vì response có thể không có departmentId.name
           const originalEpic = epics[index];
           const deptName = (originalEpic?.department || '').trim();
           const epicTitle = (epic.title || originalEpic?.title || '').trim();
           
-          // Tạo key để map: "department:epicTitle"
-          const key1 = `${deptName}:${epicTitle}`.toLowerCase().trim();
-          const key2 = deptName.toLowerCase().trim();
+          // Tạo normalized keys để map
+          const normalizedDept = normalizeKey(deptName);
+          const normalizedTitle = normalizeKey(epicTitle);
+          const key1 = normalizedDept && normalizedTitle ? `${normalizedDept}:${normalizedTitle}` : '';
+          const key2 = normalizedDept || '';
           
-          epicIdMap.set(key1, String(epic._id));
-          // Nếu có department nhưng không có epicTitle cụ thể, dùng key2
-          if (deptName && !epicTitle) {
-            epicIdMap.set(key2, String(epic._id));
-          }
+          if (key1) epicIdMap.set(key1, String(epic._id));
+          if (key2) epicIdMap.set(key2, String(epic._id));
           
           console.log('[applyEventPlannerPlan] Mapped epic:', {
             epicId: String(epic._id),
-            department: deptName,
+            deptName,
             epicTitle,
+            normalizedDept,
+            normalizedTitle,
             key1,
             key2,
           });
         });
 
-        console.log('[applyEventPlannerPlan] Created epics and mapped:', Array.from(epicIdMap.entries()));
+        console.log('[applyEventPlannerPlan] Epic ID map after creation:', Array.from(epicIdMap.entries()));
         } catch (e) {
-          console.error('applyEventPlannerPlan: apply epics failed', e?.response?.data || e);
+          console.error('[applyEventPlannerPlan] ERROR creating epics:', {
+            message: e.message,
+            status: e.response?.status,
+            data: e.response?.data,
+            url: e.config?.url,
+          });
           summary.errors.push(
             `Lỗi áp dụng EPIC plan cho eventId=${planEventId}: ${
               e?.response?.data?.message || e.message
@@ -1190,6 +1219,7 @@ export const applyEventPlannerPlan = async (req, res) => {
     }
 
     // BƯỚC 2: Tạo TASK, map epicId từ EPIC vừa tạo
+    console.log(`[applyEventPlannerPlan] Starting tasks processing with ${plans.length} plans, epicIdMap size=${epicIdMap.size}`);
     for (const rawPlan of plans) {
       if (!rawPlan || typeof rawPlan !== 'object') continue;
       if (rawPlan.type !== 'tasks_plan') continue;
@@ -1202,29 +1232,49 @@ export const applyEventPlannerPlan = async (req, res) => {
           ? tasksPlan.tasks
           : [];
 
-      if (!tasks.length) continue;
+      console.log(`[applyEventPlannerPlan] Processing tasks_plan: epicId=${epicId}, tasks count=${tasks.length}`);
+      if (!tasks.length) {
+        console.warn('[applyEventPlannerPlan] No tasks in this plan, skipping');
+        continue;
+      }
 
       // Nếu không có epicId hoặc epicId không hợp lệ, thử tìm từ map
       if (!epicId || !epicId.toString().match(/^[0-9a-fA-F]{24}$/)) {
-        const deptName = rawPlan.department || '';
-        const epicTitle = rawPlan.epicTitle || '';
-        const key1 = `${deptName}:${epicTitle}`.toLowerCase().trim();
-        const key2 = deptName.toLowerCase().trim();
+        const deptName = (rawPlan.department || '').trim();
+        const epicTitle = (rawPlan.epicTitle || '').trim();
+        const normalizedDept = normalizeKey(deptName);
+        const normalizedTitle = normalizeKey(epicTitle);
+        const key1 = normalizedDept && normalizedTitle ? `${normalizedDept}:${normalizedTitle}` : '';
+        const key2 = normalizedDept || '';
         
-        epicId = epicIdMap.get(key1) || epicIdMap.get(key2);
+        console.log('[applyEventPlannerPlan] Attempting to map epicId:', {
+          deptName,
+          epicTitle,
+          normalizedDept,
+          normalizedTitle,
+          key1,
+          key2,
+          mapSize: epicIdMap.size,
+          mapEntries: Array.from(epicIdMap.entries()),
+        });
+        
+        epicId = key1 ? epicIdMap.get(key1) : undefined;
+        if (!epicId && key2) epicId = epicIdMap.get(key2);
         
         if (!epicId) {
-          console.warn('[applyEventPlannerPlan] Cannot find epicId for tasks_plan:', {
+          console.error('[applyEventPlannerPlan] ERROR - Cannot find epicId for tasks_plan:', {
             department: deptName,
             epicTitle,
             originalEpicId: rawPlan.epicId,
+            attemptedKeys: [key1, key2],
+            availableEpicsInMap: Array.from(epicIdMap.keys()),
           });
           summary.errors.push(
-            `Không tìm thấy EPIC cho tasks_plan: department="${deptName}", epicTitle="${epicTitle}". Có thể EPIC chưa được tạo hoặc không khớp.`
+            `Không tìm thấy EPIC cho tasks_plan: department="${deptName}", epicTitle="${epicTitle}". Có thể EPIC chưa được tạo hoặc không khớp. (Khóa tìm: ${key1 || key2})`
           );
           continue;
         }
-        console.log('[applyEventPlannerPlan] Mapped epicId for tasks_plan:', {
+        console.log('[applyEventPlannerPlan] Successfully mapped epicId for tasks_plan:', {
           department: deptName,
           epicTitle,
           mappedEpicId: epicId,
@@ -1239,6 +1289,7 @@ export const applyEventPlannerPlan = async (req, res) => {
         };
 
         try {
+          console.log(`[applyEventPlannerPlan] Creating ${tasks.length} tasks for epicId=${epicId} at ${SELF_BASE_URL}/api/events/${planEventId}/epics/${epicId}/tasks/ai-bulk-create`);
           const resp = await axios.post(
             `${SELF_BASE_URL}/api/events/${planEventId}/epics/${epicId}/tasks/ai-bulk-create`,
             payload,
@@ -1253,8 +1304,15 @@ export const applyEventPlannerPlan = async (req, res) => {
           const respData = resp?.data || {};
           const created = Array.isArray(respData.data) ? respData.data.length : 0;
           summary.tasksCreated += created;
+          console.log(`[applyEventPlannerPlan] Successfully created ${created} tasks for epicId=${epicId}`);
         } catch (e) {
-          console.error('applyEventPlannerPlan: apply tasks failed', e?.response?.data || e);
+          console.error('[applyEventPlannerPlan] ERROR creating tasks:', {
+            epicId,
+            message: e.message,
+            status: e.response?.status,
+            data: e.response?.data,
+            url: e.config?.url,
+          });
           summary.errors.push(
             `Lỗi áp dụng TASK plan cho epicId=${epicId}: ${
               e?.response?.data?.message || e.message
@@ -1324,6 +1382,7 @@ export const applyEventPlannerPlan = async (req, res) => {
       message:
         'Áp dụng kế hoạch EPIC/TASK từ AI Event Planner hoàn tất (xem chi tiết trong summary).',
       summary,
+      success: summary.errors.length === 0,
     });
   } catch (err) {
     console.error('applyEventPlannerPlan error:', err);
