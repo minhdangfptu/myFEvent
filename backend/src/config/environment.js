@@ -41,4 +41,5 @@ export const config = {
     // AI Agent
     AI_AGENT_BASE_URL: process.env.AI_AGENT_BASE_URL,
     SELF_BASE_URL: process.env.SELF_BASE_URL,
+    BACKEND_BASE_URL: process.env.BACKEND_BASE_URL, // Thêm dòng này
 };

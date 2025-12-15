@@ -169,15 +169,31 @@ export const feedbackService = {
 
     const now = new Date();
     // So sánh chỉ theo ngày (không theo giờ phút) để cho phép chọn ngày hôm nay
+    // Parse date string (YYYY-MM-DD) in local timezone to avoid timezone issues
+    const parseLocalDate = (dateString) => {
+      if (!dateString) return null;
+      // If dateString is already a Date object, convert to string first
+      const date = typeof dateString === 'string' ? dateString : dateString.toISOString().split('T')[0];
+      const [year, month, day] = date.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      localDate.setHours(0, 0, 0, 0);
+      return localDate;
+    };
+    
     const nowDateOnly = new Date(now);
     nowDateOnly.setHours(0, 0, 0, 0);
-    const openTimeDateOnly = new Date(openTime);
-    openTimeDateOnly.setHours(0, 0, 0, 0);
-    const closeTimeDateOnly = new Date(closeTime);
-    closeTimeDateOnly.setHours(0, 0, 0, 0);
+    const openTimeDateOnly = parseLocalDate(openTime);
+    const closeTimeDateOnly = parseLocalDate(closeTime);
+    
+    if (!openTimeDateOnly || !closeTimeDateOnly) {
+      const err = new Error('Thời gian mở và đóng không hợp lệ');
+      err.status = 400;
+      throw err;
+    }
     
     // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
-    if (openTimeDateOnly < nowDateOnly) {
+    // So sánh timestamp để tránh vấn đề timezone
+    if (openTimeDateOnly.getTime() < nowDateOnly.getTime()) {
       const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
       err.status = 400;
       throw err;
@@ -285,27 +301,45 @@ export const feedbackService = {
 
     const now = new Date();
     // So sánh chỉ theo ngày (không theo giờ phút) để cho phép chọn ngày hôm nay
+    // Parse date string (YYYY-MM-DD) in local timezone to avoid timezone issues
+    const parseLocalDate = (dateString) => {
+      if (!dateString) return null;
+      // If dateString is already a Date object, convert to string first
+      const date = typeof dateString === 'string' ? dateString : dateString.toISOString().split('T')[0];
+      const [year, month, day] = date.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      localDate.setHours(0, 0, 0, 0);
+      return localDate;
+    };
+    
     const nowDateOnly = new Date(now);
     nowDateOnly.setHours(0, 0, 0, 0);
     
-    const nextOpenTime = openTime !== undefined ? new Date(openTime) : form.openTime;
-    const nextCloseTime = closeTime !== undefined ? new Date(closeTime) : form.closeTime;
+    // Get next openTime and closeTime (either from body or keep existing)
+    const nextOpenTime = openTime !== undefined ? openTime : form.openTime;
+    const nextCloseTime = closeTime !== undefined ? closeTime : form.closeTime;
 
-    if (nextOpenTime >= nextCloseTime) {
+    // Parse dates to date-only for comparison
+    const nextOpenTimeDateOnly = parseLocalDate(nextOpenTime);
+    const nextCloseTimeDateOnly = parseLocalDate(nextCloseTime);
+
+    if (!nextOpenTimeDateOnly || !nextCloseTimeDateOnly) {
+      const err = new Error('Thời gian mở và đóng không hợp lệ');
+      err.status = 400;
+      throw err;
+    }
+
+    // So sánh timestamp để tránh vấn đề timezone
+    if (nextOpenTimeDateOnly.getTime() >= nextCloseTimeDateOnly.getTime()) {
       const err = new Error('Thời gian đóng phải sau thời gian mở');
       err.status = 400;
       throw err;
     }
 
-    // Parse dates to date-only for comparison
-    const nextOpenTimeDateOnly = new Date(nextOpenTime);
-    nextOpenTimeDateOnly.setHours(0, 0, 0, 0);
-    const nextCloseTimeDateOnly = new Date(nextCloseTime);
-    nextCloseTimeDateOnly.setHours(0, 0, 0, 0);
-
     if (openTime !== undefined) {
       // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
-      if (nextOpenTimeDateOnly < nowDateOnly) {
+      // So sánh timestamp để tránh vấn đề timezone
+      if (nextOpenTimeDateOnly.getTime() < nowDateOnly.getTime()) {
         const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
         err.status = 400;
         throw err;
@@ -332,8 +366,17 @@ export const feedbackService = {
 
     if (name !== undefined) form.name = name.trim();
     if (description !== undefined) form.description = description?.trim() || '';
-    form.openTime = nextOpenTime;
-    form.closeTime = nextCloseTime;
+    // Convert parsed dates back to Date objects for storage
+    if (openTime !== undefined) {
+      const openTimeStart = new Date(nextOpenTimeDateOnly);
+      openTimeStart.setHours(0, 0, 0, 0);
+      form.openTime = openTimeStart;
+    }
+    if (closeTime !== undefined) {
+      const closeTimeEnd = new Date(nextCloseTimeDateOnly);
+      closeTimeEnd.setHours(23, 59, 59, 999);
+      form.closeTime = closeTimeEnd;
+    }
     // Luôn set targetAudience là ['Member', 'HoD']
     form.targetAudience = ['Member', 'HoD'];
 

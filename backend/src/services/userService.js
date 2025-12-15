@@ -3,10 +3,12 @@ import EventMember from '../models/eventMember.js';
 
 export const getPaginatedUsers = async (page, limit, search, status) => {
   const filter = {role: 'user'};
-  if (search) {
-    const regex = { $regex: search, $options: 'i' };
+  if (search && search.trim() !== '') {
+    // Trim search term to remove leading/trailing spaces
+    const searchTerm = search.trim();
+    const regex = { $regex: searchTerm, $options: 'i' };
+    // Search in fullName and email only (username field doesn't exist in User model)
     filter.$or = [
-      { username: regex },
       { email: regex },
       { fullName: regex }
     ];
