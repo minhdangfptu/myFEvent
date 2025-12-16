@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { eventApi } from "../apis/eventApi";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
+import { APP_VERSION } from "~/config/index";
+import { ArrowLeft, Bell, HelpCircle, Menu, Moon, Settings, Sun, Home, User as UserIcon } from "lucide-react";
+
 
 export default function UserSidebar({
   sidebarOpen,
@@ -24,6 +27,9 @@ export default function UserSidebar({
 
   const { events, loading } = useEvents();
   const navigate = useNavigate();
+
+  // Chỉ show loading khi chưa có events VÀ đang loading
+  const showLoading = loading && events.length === 0;
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -48,7 +54,7 @@ export default function UserSidebar({
       style={{
         width: sidebarOpen ? "230px" : "70px",
         height: "100vh",
-        transition: "width 0.3s ease",
+        transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         position: "fixed",
         left: 0,
         top: 0,
@@ -61,11 +67,30 @@ export default function UserSidebar({
     >
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
-        .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
+        .group-title {
+          font-size:.75rem;
+          font-weight:600;
+          letter-spacing:.05em;
+          color:#374151;
+          margin:16px 0 8px;
+          text-transform:uppercase;
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .group-title {
+          opacity: 0;
+        }
         .btn-nav{ border:0;background:transparent;color:#374151;border-radius:8px;padding:10px 12px;text-align:left;
           transition:all .2s ease;width:100%;display:flex;align-items:center;justify-content:space-between;}
         .btn-nav:hover{ background:#e9ecef; }
         .btn-nav.active{ background:#e9ecef;color:#111827; }
+        .btn-nav span {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .btn-nav span {
+          opacity: 0;
+        }
         .menu-item-hover:hover .btn-nav{ background:#e9ecef; }
         .btn-submenu{ border:0;background:transparent;color:#6b7280;border-radius:6px;padding:8px 12px 8px 24px;
           text-align:left;transition:all .2s ease;width:100%;font-size:.9rem;}
@@ -75,6 +100,39 @@ export default function UserSidebar({
         .theme-option{ flex:1;padding:8px 12px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;
           align-items:center;justify-content:center;gap:6px;font-size:.85rem;color:#6b7280;transition:all .2s;}
         .theme-option.active{ background:#fff;color:#374151;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+        .menu-button {
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #030303;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .menu-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .menu-button:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          transform: scale(0.95);
+        }
+        .menu-button svg {
+          transition: transform 0.2s ease;
+        }
+
+        .fade-content {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .fade-content {
+          opacity: 0;
+          pointer-events: none;
+        }
 
         .hover-submenu{
           position: absolute;
@@ -111,43 +169,44 @@ export default function UserSidebar({
       {/* Header */}
       <div className="p-3" style={{ flexShrink: 0 }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <div
-            className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
-          >
-            <div className="logo-content d-flex align-items-center ">
+          {sidebarOpen ? (
+            <>
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginRight: "10px",
-                }}
+                className="logo-container"
+                style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
               >
                 <img
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
                   className="hover-rotate"
                   src="/website-icon-fix@3x.png"
                   alt="myFEvent"
                   style={{ width: 40, height: 40 }}
                 />
-              </div>
-              {sidebarOpen && (
                 <img
+                  className="fade-content"
+                  onClick={() => navigate("/")}
                   src="/logo-03.png"
                   alt="myFEvent"
                   style={{ width: "auto", height: 40 }}
                 />
-              )}
-            </div>
-          </div>
+              </div>
 
-          {sidebarOpen && (
+              <button
+                className="menu-button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Đóng sidebar"
+              >
+                <Menu size={20} />
+              </button>
+            </>
+          ) : (
             <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setSidebarOpen(false)}
-              style={{ padding: "4px 8px" }}
+              className="menu-button"
+              onClick={() => setSidebarOpen(true)}
+              style={{ width: "100%" }}
+              aria-label="Mở sidebar"
             >
-              <i className="bi bi-arrow-left"></i>
+              <Menu size={20} />
             </button>
           )}
         </div>
@@ -155,20 +214,23 @@ export default function UserSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {loading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(255,255,255,0.75)",
+              background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
+              width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={40} />
-            
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
           </div>
         ) : (
           <>
@@ -182,7 +244,7 @@ export default function UserSidebar({
                   title="Trang chủ"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    <Home className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
                   </div>
                 </button>
@@ -194,7 +256,7 @@ export default function UserSidebar({
                   title="Hồ sơ"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-person-circle me-3" style={{ width: 20 }} />
+                    <UserIcon className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Hồ sơ</span>}
                   </div>
                 </button>
@@ -212,7 +274,7 @@ export default function UserSidebar({
                   title="Thông báo"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                    <Bell className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Thông báo</span>}
                   </div>
                 </button>
@@ -224,8 +286,20 @@ export default function UserSidebar({
                   title="Cài đặt"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                    <Settings className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Cài đặt</span>}
+                  </div>
+                </button>
+                <button
+                  className={`btn-nav ${
+                    activePage === "support" ? "active" : ""
+                  }`}
+                  onClick={() => navigate("/support")}
+                  title="Hỗ trợ"
+                >
+                  <div className="d-flex align-items-center">
+                    <HelpCircle className="me-3" size={18} style={{ width: 20 }} />
+                    {sidebarOpen && <span>Hỗ trợ</span>}
                   </div>
                 </button>
               </div>
@@ -234,41 +308,85 @@ export default function UserSidebar({
         )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
+      {/* Theme toggle hoặc Logo ở dưới */}
       <div
         className="p-2"
         style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
       >
         {sidebarOpen ? (
-          <div
-            className="theme-toggle"
-            style={{ paddingBottom: 10, margin: 0 }}
-          >
-            <button
-              className={`theme-option ${theme === "light" ? "active" : ""}`}
-              onClick={() => setTheme("light")}
+          <div style={{  margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <Sun size={18} />
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <Moon size={18} />
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              className="fade-content"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
             >
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button
-              className={`theme-option ${theme === "dark" ? "active" : ""}`}
-              onClick={() => setTheme("dark")}
-            >
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Phiên bản {APP_VERSION}
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.png"
+                alt="FPTU - FEVENT TEAM"
+                style={{ height: "30px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
-          <button
-            className="btn btn-ghost btn-sm w-100"
-            onClick={() => setSidebarOpen(true)}
-            style={{ padding: "5px", margin: "0 1.5px 0 2px" }}
-            title="Mở rộng"
-            aria-label="Mở/đóng thanh bên"
-          >
-            <i className="bi bi-list"></i>
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
+            <img
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover-rotate"
+              src="/website-icon-fix@3x.png"
+              alt="myFEvent"
+              style={{ width: 40, height: 40, cursor: "pointer" }}
+            />
+          </div>
         )}
       </div>
     </div>

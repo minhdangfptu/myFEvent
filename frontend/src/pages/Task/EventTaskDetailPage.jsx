@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,39 @@ import Loading from "~/components/Loading";
 import ConfirmModal from "~/components/ConfirmModal";
 import { useNotifications } from "~/contexts/NotificationsContext";
 import { useAuth } from "~/contexts/AuthContext";
+
+const STATUS = {
+  NOT_STARTED: "chua_bat_dau",
+  IN_PROGRESS: "da_bat_dau",
+  DONE: "hoan_thanh",
+  CANCELLED: "huy",
+};
+
+const STATUS_LABELS = {
+  [STATUS.NOT_STARTED]: "Chưa bắt đầu",
+  [STATUS.IN_PROGRESS]: "Đang làm",
+  [STATUS.DONE]: "Hoàn thành",
+  [STATUS.CANCELLED]: "Đã hủy",
+};
+
+const STATUS_STYLE_MAP = {
+  [STATUS.NOT_STARTED]: { bg: "#F3F4F6", color: "#374151" },
+  [STATUS.IN_PROGRESS]: { bg: "#FEF3C7", color: "#92400E" },
+  [STATUS.DONE]: { bg: "#DCFCE7", color: "#166534" },
+  [STATUS.CANCELLED]: { bg: "#FEE2E2", color: "#991B1B" },
+};
+
+const STATUS_TRANSITIONS = {
+  [STATUS.NOT_STARTED]: [STATUS.IN_PROGRESS, STATUS.CANCELLED],
+  [STATUS.IN_PROGRESS]: [STATUS.DONE, STATUS.CANCELLED],
+  [STATUS.DONE]: [STATUS.IN_PROGRESS],
+  [STATUS.CANCELLED]: [STATUS.IN_PROGRESS],
+};
+
+const statusToLabel = (code) => STATUS_LABELS[code] || "Không xác định";
+const FORBIDDEN_CONFIG = { skipGlobal403: true };
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message || fallback;
 
 export default function EventTaskDetailPage() {
   const { t } = useTranslation();
@@ -44,51 +77,141 @@ export default function EventTaskDetailPage() {
     estimateUnit: "h",
     parentId: "",
     dependenciesText: "",
+    taskType: "",
   });
   const [eventInfo, setEventInfo] = useState(null);
   const [meta, setMeta] = useState({
     createdAt: "",
     updatedAt: "",
   });
+  const [originalTask, setOriginalTask] = useState(null); // Lưu task gốc để so sánh khi validate
+  const [taskCreatorId, setTaskCreatorId] = useState("");
+  const [taskCreatorName, setTaskCreatorName] = useState("");
+  const [taskCreatorRole, setTaskCreatorRole] = useState("");
   const [relatedTasks, setRelatedTasks] = useState({
     parent: null, // { id, title }
     dependencies: [], // [{ id, title }]
   });
+  const [tasksAll, setTasksAll] = useState([]);
+  const [claimingTask, setClaimingTask] = useState(false);
+  const [releasingSelf, setReleasingSelf] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const mountedRef = useRef(true);
 
   const toId = (v) =>
     typeof v === "string" ? v : v && v._id ? String(v._id) : "";
 
+  const handleNavigateToTaskList = () => {
+    if (eventRole === "HoOC") {
+      navigate(`/events/${eventId}/tasks`);
+    } else  if (eventRole === "HoD") {
+      navigate(`/events/${eventId}/hod-tasks`);
+    } else{
+      navigate(`/events/${eventId}/member-tasks`);
+    }
+  }
+
+  // Helper function to convert UTC time to local datetime string for datetime-local input
+  const toLocalDateTimeString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    // Get timezone offset in minutes and convert to milliseconds
+    const offset = date.getTimezoneOffset() * 60 * 1000;
+    // Create new date adjusted for local timezone
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  // Helper function to convert date string to date-only format (YYYY-MM-DD) for date input
+  const toLocalDateString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    // Get timezone offset in minutes and convert to milliseconds
+    const offset = date.getTimezoneOffset() * 60 * 1000;
+    // Create new date adjusted for local timezone
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 10);
+  };
+
+  const getTaskCreatorId = (task) =>
+    toId(task?.createdBy?.userId) || toId(task?.createdBy);
+
+  const getTaskCreatorInfo = (task) => ({
+    id: getTaskCreatorId(task),
+    name:
+      task?.createdBy?.userId?.fullName ||
+      task?.createdBy?.fullName ||
+      task?.createdBy?.name ||
+      "",
+    role:
+      task?.createdBy?.eventRole ||
+      task?.createdBy?.role ||
+      (task?.createdBy?.userId?.eventRole || task?.createdBy?.userId?.role) ||
+      "",
+  });
+
+const getRoleLabel = (role) => {
+  const key = (role || "").toLowerCase();
+  if (key === "hooc") return "Trưởng ban Tổ chức";
+  if (key === "hod") return "Trưởng ban";
+  if (key === "member") return "Thành viên";
+  if (!role) return "";
+  return role;
+};
+
+  const normalizedRole = (eventRole || "").trim().toLowerCase();
   const getSidebarType = () => {
-    if (eventRole === "HoOC") return "hooc";
-    if (eventRole === "HoD") return "HoD";
-    if (eventRole === "Member") return "member";
+    if (normalizedRole === "hooc") return "hooc";
+    if (normalizedRole === "hod") return "HoD";
+    if (normalizedRole === "member") return "member";
     return "user";
   };
 
   useEffect(() => {
-    fetchEventRole(eventId).then(setEventRole);
+    mountedRef.current = true;
+    
+    fetchEventRole(eventId).then((role) => {
+      if (mountedRef.current) {
+        setEventRole(role);
+      }
+    });
 
     // Lấy thông tin sự kiện để validate deadline
     if (eventId) {
       eventApi
         .getById(eventId)
         .then((res) => {
-          const event = res?.data?.event || res?.data;
-          if (event) {
-            setEventInfo({
-              eventStartDate: event.eventStartDate,
-              eventEndDate: event.eventEndDate,
-            });
+          // Chỉ cập nhật state nếu component vẫn còn mounted
+          if (mountedRef.current) {
+            const event = res?.data?.event || res?.data;
+            if (event) {
+              setEventInfo({
+                eventStartDate: event.eventStartDate,
+                eventEndDate: event.eventEndDate,
+                createdAt: event.createdAt,
+              });
+            }
           }
         })
         .catch(() => {
-          setEventInfo(null);
+          // Chỉ cập nhật state nếu component vẫn còn mounted
+          if (mountedRef.current) {
+            setEventInfo(null);
+          }
         });
     }
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId]);
 
   useEffect(() => {
     if (!eventId || !taskId) return;
+    mountedRef.current = true;
     setLoading(true);
     Promise.all([
       taskApi.getTaskDetail(eventId, taskId),
@@ -96,7 +219,11 @@ export default function EventTaskDetailPage() {
       milestoneApi.listMilestonesByEvent(eventId),
     ])
       .then(async ([taskRes, depts, ms]) => {
+        // Chỉ cập nhật state nếu component vẫn còn mounted
+        if (!mountedRef.current) return;
+        
         const task = taskRes?.data;
+        setOriginalTask(task); // Lưu task gốc để so sánh khi validate
         setDepartments(depts || []);
         setMilestones(ms?.data || []);
         if (task?.departmentId?._id) {
@@ -104,137 +231,153 @@ export default function EventTaskDetailPage() {
             eventId,
             task.departmentId._id
           );
-          setAssignees(mems || []);
+          if (mountedRef.current) {
+            setAssignees(mems || []);
+          }
         } else {
-          setAssignees([]);
+          if (mountedRef.current) {
+            setAssignees([]);
+          }
         }
-        setAssigneeFallbackName(
-          task?.assigneeId?.userId?.fullName || task?.assigneeId?.fullName || ""
-        );
-        setAssigneeFallbackAvatar(
-          task?.assigneeId?.userId?.avatarUrl ||
-            task?.assigneeId?.avatarUrl ||
-            ""
-        );
-        const parentId = toId(task?.parentId);
-        const dependencies = Array.isArray(task?.dependencies)
-          ? task.dependencies.map(toId).filter(Boolean)
-          : [];
+        if (mountedRef.current) {
+          setAssigneeFallbackName(
+            task?.assigneeId?.userId?.fullName || task?.assigneeId?.fullName || ""
+          );
+          setAssigneeFallbackAvatar(
+            task?.assigneeId?.userId?.avatarUrl ||
+              task?.assigneeId?.avatarUrl ||
+              ""
+          );
+          const parentId = toId(task?.parentId);
+          const dependencies = Array.isArray(task?.dependencies)
+            ? task.dependencies.map(toId).filter(Boolean)
+            : [];
 
-        setForm({
-          title: task?.title || "",
-          description: task?.description || "",
-          departmentId: toId(task?.departmentId),
-          assigneeId: toId(task?.assigneeId),
-          milestoneId: toId(task?.milestoneId),
-          startDate: task?.startDate
-            ? new Date(task.startDate).toISOString().slice(0, 16)
-            : "",
-          dueDate: task?.dueDate
-            ? new Date(task.dueDate).toISOString().slice(0, 16)
-            : "",
-          status:
-            task?.status === "done"
-              ? "Đã xong"
-              : task?.status === "in_progress"
-              ? "Đang làm"
-              : task?.status === "blocked"
-              ? "Tạm hoãn"
-              : task?.status === "cancelled"
-              ? "Đã huỷ"
-              : "Chưa bắt đầu",
-          progressPct:
-            typeof task?.progressPct === "number" ? task.progressPct : 0,
-          estimate: task?.estimate ?? "",
-          estimateUnit: task?.estimateUnit || "h",
-          parentId: parentId,
-          dependenciesText: dependencies.join(","),
-        });
-        setMeta({
-          createdAt: task?.createdAt || "",
-          updatedAt: task?.updatedAt || "",
-        });
-
-        // Fetch thông tin parent task và dependencies tasks
-        const fetchRelatedTasks = async () => {
-          const tasksToFetch = [];
-          if (parentId) tasksToFetch.push({ id: parentId, type: "parent" });
-          dependencies.forEach((depId) => {
-            if (depId) tasksToFetch.push({ id: depId, type: "dependency" });
+          setForm({
+            title: task?.title || "",
+            description: task?.description || "",
+            departmentId: toId(task?.departmentId),
+            assigneeId: toId(task?.assigneeId),
+            milestoneId: toId(task?.milestoneId),
+            startDate: toLocalDateString(task?.startDate),
+            dueDate: toLocalDateTimeString(task?.dueDate),
+            status: task?.status || STATUS.NOT_STARTED,
+            progressPct:
+              typeof task?.progressPct === "number" ? task.progressPct : 0,
+            estimate: task?.estimate ?? "",
+            estimateUnit: task?.estimateUnit || "h",
+            parentId: parentId,
+            dependenciesText: dependencies.join(","),
+            taskType: task?.taskType || "normal",
           });
+          setMeta({
+            createdAt: task?.createdAt || "",
+            updatedAt: task?.updatedAt || "",
+          });
+          const creatorInfo = getTaskCreatorInfo(task);
+          setTaskCreatorId(creatorInfo.id);
+          setTaskCreatorName(creatorInfo.name);
+          setTaskCreatorRole(creatorInfo.role);
 
-          if (tasksToFetch.length === 0) {
-            setRelatedTasks({ parent: null, dependencies: [] });
-            return;
-          }
+          // Fetch thông tin parent task và dependencies tasks
+          const fetchRelatedTasks = async () => {
+            const tasksToFetch = [];
+            if (parentId) tasksToFetch.push({ id: parentId, type: "parent" });
+            dependencies.forEach((depId) => {
+              if (depId) tasksToFetch.push({ id: depId, type: "dependency" });
+            });
 
-          try {
-            const taskPromises = tasksToFetch.map(({ id }) =>
-              taskApi.getTaskDetail(eventId, id).catch(() => null)
-            );
-            const results = await Promise.all(taskPromises);
-
-            let parentTask = null;
-            const dependencyTasks = [];
-
-            results.forEach((result, index) => {
-              if (!result?.data) return;
-              const taskData = result.data;
-              const taskInfo = {
-                id: taskData._id || taskData.id,
-                title: taskData.title || "—",
-              };
-
-              if (tasksToFetch[index].type === "parent") {
-                parentTask = taskInfo;
-              } else {
-                dependencyTasks.push(taskInfo);
+            if (tasksToFetch.length === 0) {
+              if (mountedRef.current) {
+                setRelatedTasks({ parent: null, dependencies: [] });
               }
-            });
+              return;
+            }
 
-            setRelatedTasks({
-              parent: parentTask,
-              dependencies: dependencyTasks,
-            });
-          } catch (error) {
-            console.error("Error fetching related tasks:", error);
-            setRelatedTasks({ parent: null, dependencies: [] });
-          }
-        };
+            try {
+              const taskPromises = tasksToFetch.map(({ id }) =>
+                taskApi.getTaskDetail(eventId, id).catch(() => null)
+              );
+              const results = await Promise.all(taskPromises);
 
-        fetchRelatedTasks();
+              // Chỉ cập nhật state nếu component vẫn còn mounted
+              if (!mountedRef.current) return;
+
+              let parentTask = null;
+              const dependencyTasks = [];
+
+              results.forEach((result, index) => {
+                if (!result?.data) return;
+                const taskData = result.data;
+                const taskInfo = {
+                  id: taskData._id || taskData.id,
+                  title: taskData.title || "—",
+                };
+
+                if (tasksToFetch[index].type === "parent") {
+                  parentTask = taskInfo;
+                } else {
+                  dependencyTasks.push(taskInfo);
+                }
+              });
+
+              if (mountedRef.current) {
+                setRelatedTasks({
+                  parent: parentTask,
+                  dependencies: dependencyTasks,
+                });
+              }
+            } catch (error) {
+              console.error("Error fetching related tasks:", error);
+              if (mountedRef.current) {
+                setRelatedTasks({ parent: null, dependencies: [] });
+              }
+            }
+          };
+
+          fetchRelatedTasks();
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      });
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
   }, [eventId, taskId]);
 
   useEffect(() => {
-    if (!form.departmentId || !eventId) return setAssignees([]);
+    if (!form.departmentId || !eventId) {
+      if (mountedRef.current) {
+        setAssignees([]);
+      }
+      return;
+    }
     departmentService
       .getMembersByDepartment(eventId, form.departmentId)
-      .then((members) => setAssignees(members || []));
+      .then((members) => {
+        if (mountedRef.current) {
+          setAssignees(members || []);
+        }
+      });
   }, [form.departmentId, eventId]);
 
-  const statusMapToBackend = (s) =>
-    s === "Đã xong"
-      ? "done"
-      : s === "Đang làm"
-      ? "in_progress"
-      : s === "Tạm hoãn"
-      ? "blocked"
-      : s === "Đã huỷ"
-      ? "cancelled"
-      : "todo";
+  useEffect(() => {
+    if (!eventId) return;
+    taskApi.getTaskByEvent(eventId).then(res => {
+      if (mountedRef.current) {
+        setTasksAll(res?.data || []);
+      }
+    });
+  }, [eventId, isEditing]);
 
-  const statusMapToLabel = (s) =>
-    s === "done"
-      ? "Đã xong"
-      : s === "in_progress"
-      ? "Đang làm"
-      : s === "blocked"
-      ? "Tạm hoãn"
-      : s === "cancelled"
-      ? "Đã huỷ"
-      : "Chưa bắt đầu";
+  useEffect(() => {
+    setPendingStatus(form.status || STATUS.NOT_STARTED);
+  }, [form.status]);
 
   const handleChange = (field, value) =>
     setForm((f) => ({
@@ -242,25 +385,44 @@ export default function EventTaskDetailPage() {
       [field]: value,
     }));
 
-  const handleStatusChange = async (value) => {
-    const backendStatus = statusMapToBackend(value);
+  const handleStatusChange = async (newStatusCode) => {
+    if (!canUpdateStatus) {
+      toast.error("Bạn không có quyền cập nhật trạng thái công việc này.");
+      setShowStatusModal(false);
+      return;
+    }
+    const targetStatus = newStatusCode || STATUS.NOT_STARTED;
+    setUpdatingStatus(true);
     try {
-      await taskApi.updateTaskProgress(eventId, taskId, {
-        status: backendStatus,
-      });
-      setForm((f) => ({ ...f, status: value }));
+      await taskApi.updateTaskProgress(
+        eventId,
+        taskId,
+        {
+          status: targetStatus,
+        },
+        FORBIDDEN_CONFIG
+      );
+      setForm((f) => ({ ...f, status: targetStatus }));
       setIsEditing(false);
+      setShowStatusModal(false);
+      toast.success("Cập nhật trạng thái thành công");
       // Backend sẽ tự động tạo notification khi task hoàn thành
     } catch (err) {
       const msg = err?.response?.data?.message;
       toast.error(msg || "Cập nhật trạng thái thất bại");
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
   const handleAssigneeChange = async (newAssigneeId) => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền cập nhật người thực hiện.");
+      return;
+    }
     try {
       if (!newAssigneeId) {
-        await taskApi.unassignTask(eventId, taskId);
+        await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
         setForm((f) => ({ ...f, assigneeId: "" }));
         setAssigneeFallbackName("");
         setIsEditing(false);
@@ -271,46 +433,75 @@ export default function EventTaskDetailPage() {
             String(x.userId?._id) === String(newAssigneeId)
         );
         const membershipId = member?._id || newAssigneeId;
-        await taskApi.assignTask(eventId, taskId, membershipId);
+        await taskApi.assignTask(
+          eventId,
+          taskId,
+          membershipId,
+          FORBIDDEN_CONFIG
+        );
         setForm((f) => ({ ...f, assigneeId: String(membershipId) }));
         const a = member;
         setAssigneeFallbackName(a?.userId?.fullName || a?.fullName || "");
         setIsEditing(false);
         // Backend sẽ tự động tạo notification khi giao việc cho Member
       }
-    } catch {
-      toast.error("Cập nhật người thực hiện thất bại");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Cập nhật người thực hiện thất bại"));
     }
   };
 
   const handleRemoveAssignee = async () => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền cập nhật người thực hiện.");
+      return;
+    }
     try {
-      await taskApi.unassignTask(eventId, taskId);
+      await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
       setForm((f) => ({ ...f, assigneeId: "" }));
       setAssigneeFallbackName("");
       toast.success("Đã huỷ gán người thực hiện");
-    } catch {
-      toast.error("Huỷ gán thất bại");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Huỷ gán thất bại"));
     }
   };
 
   const handleSave = async () => {
-    // Kiểm tra xem có thể edit không
-    const canEditCurrent =
-      form.status === "Chưa bắt đầu" ||
-      statusMapToBackend(form.status) === "todo";
-    if (!canEditCurrent) {
-      toast.error(
-        "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
-      );
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền chỉnh sửa công việc này.");
       setIsEditing(false);
       return;
     }
-
     if (!form.title || !form.dueDate) {
       toast.error("Vui lòng điền đủ các trường bắt buộc");
       return;
     }
+    
+    // Validate deadline và startDate của sub task không được vượt quá deadline của epic task
+    if (form.parentId) {
+      const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+      if (parentTask && parentTask.dueDate) {
+        const parentDeadline = new Date(parentTask.dueDate);
+        
+        // Validate deadline
+        const subTaskDeadline = new Date(form.dueDate);
+        if (subTaskDeadline > parentDeadline) {
+          toast.error(`Deadline của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+          setSaving(false);
+          return;
+        }
+        
+        // Validate startDate
+        if (form.startDate) {
+          const subTaskStartDate = new Date(form.startDate);
+          if (subTaskStartDate > parentDeadline) {
+            toast.error(`Thời gian bắt đầu của công việc không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')}).`);
+            setSaving(false);
+            return;
+          }
+        }
+      }
+    }
+    
     setSaving(true);
     try {
       const dependencies = (form.dependenciesText || "")
@@ -324,7 +515,12 @@ export default function EventTaskDetailPage() {
         // assignee is managed via assign/unassign API
         milestoneId: form.milestoneId || undefined,
         startDate: form.startDate
-          ? new Date(form.startDate).toISOString()
+          ? (() => {
+              // Ensure date-only format is converted properly (set to midnight local time)
+              const date = new Date(form.startDate);
+              date.setHours(0, 0, 0, 0);
+              return date.toISOString();
+            })()
           : undefined,
         dueDate: new Date(form.dueDate).toISOString(),
         // status is managed via updateTaskProgress API
@@ -335,7 +531,7 @@ export default function EventTaskDetailPage() {
         estimateUnit: form.estimateUnit || "h",
         parentId: form.parentId || undefined,
         dependencies: dependencies.length ? dependencies : [],
-      });
+      }, FORBIDDEN_CONFIG);
       toast.success("Lưu thay đổi thành công");
       setIsEditing(false);
     } catch (err) {
@@ -354,18 +550,51 @@ export default function EventTaskDetailPage() {
   };
 
   const handleDelete = () => {
+    if (!canModifyTask) {
+      toast.error("Bạn không có quyền xóa công việc này.");
+      return;
+    }
     setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
+    // Store the role before deletion to ensure we have it for navigation
+    const currentRole = eventRole || (await fetchEventRole(eventId));
+    
     try {
-      await taskApi.deleteTask(eventId, taskId);
+      await taskApi.deleteTask(eventId, taskId, FORBIDDEN_CONFIG);
       toast.success("Đã xóa công việc");
-      navigate(`/events/${eventId}/tasks`);
-    } catch {
-      toast.error("Xóa công việc thất bại");
-    } finally {
       setShowDeleteModal(false);
+      
+      // Navigate based on role to avoid 403 error
+      // Use window.location.href to bypass React Router permission checks that might fail after deletion
+      setTimeout(() => {
+        if (currentRole === "HoOC") {
+          window.location.href = `/events/${eventId}/tasks`;
+        } else if (currentRole === "HoD") {
+          window.location.href = `/events/${eventId}/hod-tasks`;
+        } else {
+          window.location.href = `/events/${eventId}/member-tasks`;
+        }
+      }, 100);
+    } catch (error) {
+      const errorMessage = getErrorMessage(error, "Xóa công việc thất bại");
+      toast.error(errorMessage);
+      setShowDeleteModal(false);
+      
+      // Only navigate if delete was successful (no error response or non-403/404 error)
+      // 403/404 errors indicate the operation failed, so don't navigate
+      if (!error?.response || (error.response.status !== 403 && error.response.status !== 404)) {
+        setTimeout(() => {
+          if (currentRole === "HoOC") {
+            window.location.href = `/events/${eventId}/tasks`;
+          } else if (currentRole === "HoD") {
+            window.location.href = `/events/${eventId}/hod-tasks`;
+          } else {
+            window.location.href = `/events/${eventId}/member-tasks`;
+          }
+        }, 100);
+      }
     }
   };
 
@@ -379,6 +608,7 @@ export default function EventTaskDetailPage() {
         milestoneApi.listMilestonesByEvent(eventId),
       ]);
       const task = taskRes?.data;
+      setOriginalTask(task); // Lưu task gốc để so sánh khi validate
       setDepartments(depts || []);
       setMilestones(ms?.data || []);
       if (task?.departmentId?._id) {
@@ -408,22 +638,9 @@ export default function EventTaskDetailPage() {
         departmentId: toId(task?.departmentId),
         assigneeId: toId(task?.assigneeId),
         milestoneId: toId(task?.milestoneId),
-        startDate: task?.startDate
-          ? new Date(task.startDate).toISOString().slice(0, 16)
-          : "",
-        dueDate: task?.dueDate
-          ? new Date(task.dueDate).toISOString().slice(0, 16)
-          : "",
-        status:
-          task?.status === "done"
-            ? "Đã xong"
-            : task?.status === "in_progress"
-            ? "Đang làm"
-            : task?.status === "blocked"
-            ? "Tạm hoãn"
-            : task?.status === "cancelled"
-            ? "Đã huỷ"
-            : "Chưa bắt đầu",
+        startDate: toLocalDateString(task?.startDate),
+        dueDate: toLocalDateTimeString(task?.dueDate),
+        status: task?.status || STATUS.NOT_STARTED,
         progressPct:
           typeof task?.progressPct === "number" ? task.progressPct : 0,
         estimate: task?.estimate ?? "",
@@ -435,6 +652,10 @@ export default function EventTaskDetailPage() {
         createdAt: task?.createdAt || "",
         updatedAt: task?.updatedAt || "",
       });
+      const creatorInfo = getTaskCreatorInfo(task);
+      setTaskCreatorId(creatorInfo.id);
+      setTaskCreatorName(creatorInfo.name);
+      setTaskCreatorRole(creatorInfo.role);
 
       // Fetch thông tin parent task và dependencies tasks
       const fetchRelatedTasks = async () => {
@@ -489,6 +710,41 @@ export default function EventTaskDetailPage() {
     }
   };
 
+  const handleSelfAssign = async () => {
+    if (!currentMembershipId) {
+      toast.error("Không tìm thấy thông tin thành viên của bạn trong ban này");
+      return;
+    }
+    try {
+      setClaimingTask(true);
+      await taskApi.assignTask(
+        eventId,
+        taskId,
+        currentMembershipId,
+        FORBIDDEN_CONFIG
+      );
+      toast.success("Đã nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể nhận công việc"));
+    } finally {
+      setClaimingTask(false);
+    }
+  };
+
+  const handleSelfUnassign = async () => {
+    try {
+      setReleasingSelf(true);
+      await taskApi.unassignTask(eventId, taskId, FORBIDDEN_CONFIG);
+      toast.success("Đã bỏ nhận công việc");
+      await refetchDetail();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể bỏ nhận công việc"));
+    } finally {
+      setReleasingSelf(false);
+    }
+  };
+
   const assigneeName = useMemo(() => {
     const a = assignees.find(
       (x) =>
@@ -531,15 +787,115 @@ export default function EventTaskDetailPage() {
     return [];
   }, [assignees, form.assigneeId, assigneeFallbackName]);
 
-  // Kiểm tra xem có thể edit không (chỉ khi status = "todo"/"Chưa bắt đầu")
-  const canEdit =
-    form.status === "Chưa bắt đầu" ||
-    statusMapToBackend(form.status) === "todo";
+  const currentUserId = user?._id || user?.id || user?.userId;
+
+  const currentMembership = useMemo(() => {
+    if (!currentUserId || !Array.isArray(assignees)) return null;
+    return assignees.find((member) => {
+      const memberUserId =
+        member?.userId?._id ||
+        member?.userId ||
+        member?.id ||
+        member?._id;
+      return (
+        memberUserId && String(memberUserId) === String(currentUserId)
+      );
+    });
+  }, [assignees, currentUserId]);
+
+  const currentMembershipId =
+    currentMembership?._id || currentMembership?.id || currentMembership?.userId;
+  const currentMembershipDeptId =
+    currentMembership?.departmentId?._id ||
+    currentMembership?.departmentId ||
+    form.departmentId;
+  const isSelfAssigned =
+    currentMembershipId &&
+    form.assigneeId &&
+    String(form.assigneeId) === String(currentMembershipId);
+  const canHoDClaim =
+    normalizedRole === "hod" &&
+    !!currentMembershipId &&
+    (!!form.departmentId
+      ? String(form.departmentId) === String(currentMembershipDeptId || form.departmentId)
+      : true);
+  const isHoD = normalizedRole === "hod";
+  const isHoOC = normalizedRole === "hooc";
+  const isMemberRole = normalizedRole === "member";
+  const isTaskCreator =
+    !!taskCreatorId &&
+    !!currentUserId &&
+    String(taskCreatorId) === String(currentUserId);
+  const isNormalTask = form.taskType === "normal" || !form.taskType || form.taskType === "";
+  const isEpicTask = form.taskType === "epic";
+  
+  const canManageTask = isEpicTask 
+    ? (isHoOC || isTaskCreator) 
+    : (isHoD || isTaskCreator);
+  
+  // Không cho phép chỉnh sửa/xóa khi task đang "Đang làm"
+  const isTaskLocked =
+  form.status === STATUS.IN_PROGRESS ||
+  form.status === STATUS.DONE ||
+  form.status === STATUS.CANCELLED;
+
+  const canModifyTask = canManageTask && !isTaskLocked;
+  const assignedToOther =
+    !!form.assigneeId &&
+    (!currentMembershipId ||
+      String(form.assigneeId) !== String(currentMembershipId));
+
+  // HoOC có thể hủy task từ Chưa bắt đầu hoặc Đang làm (không được hủy nếu đã hoàn thành)
+  // Người được giao task có thể cập nhật trạng thái bình thường
+  const canHoOCCancel = isHoOC && isNormalTask && 
+    (form.status === STATUS.NOT_STARTED || form.status === STATUS.IN_PROGRESS);
+  const canUpdateStatus = isSelfAssigned || canHoOCCancel;
+
+  // HoOC hoặc HoD tạo task có thể chỉnh sửa, nhưng không khi đang "Đang làm"
+  // HoOC không thể chỉnh sửa normal task
+  const canEdit = canManageTask && !isTaskLocked;
+  const creatorRoleLabel = getRoleLabel(taskCreatorRole);
+  const creatorBadgeLabel = creatorRoleLabel || taskCreatorRole || "";
+  const isTaskFromHoOC = (taskCreatorRole || "").toLowerCase() === "hooc";
+  const creatorNoticeLabel =
+    creatorBadgeLabel || (isTaskFromHoOC ? "Trưởng ban Tổ chức" : "người giao việc");
+  useEffect(() => {
+    if (!canModifyTask && isEditing) {
+      setIsEditing(false);
+    }
+  }, [canModifyTask, isEditing]);
+  const canEditFields = canEdit;
+  const statusOptions = useMemo(() => {
+    const current = form.status || STATUS.NOT_STARTED;
+    let candidates = [current, ...(STATUS_TRANSITIONS[current] || [])];
+    
+    // HoOC có thể hủy task từ Chưa bắt đầu hoặc Đang làm (không được hủy nếu đã hoàn thành)
+    if (canHoOCCancel && !candidates.includes(STATUS.CANCELLED)) {
+      candidates.push(STATUS.CANCELLED);
+    }
+    
+    return Array.from(new Set(candidates));
+  }, [form.status, canHoOCCancel]);
+
+  const handleQuickStatusAdvance = () => {
+    if (!canUpdateStatus) return;
+    const current = form.status || STATUS.NOT_STARTED;
+    const next = STATUS_TRANSITIONS[current]?.[0];
+    if (!next) {
+      toast.info("Không thể chuyển trạng thái từ trạng thái hiện tại.");
+      return;
+    }
+    handleStatusChange(next);
+  };
 
   // Hiển thị thông báo khi không thể edit
-  const editDisabledMessage = !canEdit
-    ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'. Chỉ có thể cập nhật trạng thái."
-    : null;
+  const editDisabledMessage = !canEditFields
+  ? isTaskLocked
+    ? 'Không thể chỉnh sửa công việc khi trạng thái không phải "Chưa bắt đầu".'
+    : !canManageTask
+    ? "Chỉ Trường ban tổ chức/Trưởng ban hoặc người tạo công việc này mới có quyền chỉnh sửa."
+    : "Bạn không thể chỉnh sửa công việc này."
+  : null;
 
   const leftBlock = (
     <div className="col-lg-7">
@@ -551,7 +907,7 @@ export default function EventTaskDetailPage() {
           value={form.title}
           onChange={(e) => handleChange("title", e.target.value)}
           placeholder="Nhập tên công việc"
-          disabled={!canEdit}
+          disabled={!canEditFields}
         />
       </div>
       <div className="mb-3">
@@ -562,7 +918,7 @@ export default function EventTaskDetailPage() {
           onChange={(e) => handleChange("description", e.target.value)}
           rows={4}
           placeholder="Mô tả ngắn..."
-          disabled={!canEdit}
+          disabled={!canEditFields}
         />
       </div>
       <div className="row">
@@ -571,27 +927,15 @@ export default function EventTaskDetailPage() {
           <div className="input-group">
             <select
               className="form-select"
-              value={form.status}
+              value={form.status || STATUS.NOT_STARTED}
               onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={!canUpdateStatus}
             >
-              {(() => {
-                const current = statusMapToBackend(form.status);
-                // Chỉ assignee mới được update status, chỉ hiển thị các trạng thái có thể chuyển
-                const NEXT = {
-                  todo: ["in_progress"],
-                  in_progress: ["blocked", "done"],
-                  blocked: ["in_progress"],
-                  done: [],
-                  cancelled: [],
-                };
-                const candidates = [current, ...(NEXT[current] || [])];
-                const unique = Array.from(new Set(candidates));
-                return unique.map((s) => (
-                  <option key={s} value={s}>
-                    {statusMapToLabel(s)}
-                  </option>
-                ));
-              })()}
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {statusToLabel(s)}
+                </option>
+              ))}
             </select>
             <span className="input-group-text">▼</span>
           </div>
@@ -599,55 +943,18 @@ export default function EventTaskDetailPage() {
       </div>
       <div className="row">
         <div className="col-md-6 mb-3">
-          <label className="form-label">Ước lượng</label>
-          <div className="input-group">
-            <input
-              type="number"
-              className="form-control"
-              min={0}
-              step="0.5"
-              value={form.estimate}
-              onChange={(e) => handleChange("estimate", e.target.value)}
-              placeholder="Số lượng"
-              disabled={!canEdit}
-            />
-            <select
-              className="form-select"
-              value={form.estimateUnit}
-              onChange={(e) => handleChange("estimateUnit", e.target.value)}
-              style={{ maxWidth: 120 }}
-              disabled={!canEdit}
-            >
-              <option value="h">giờ</option>
-              <option value="d">ngày</option>
-              <option value="w">tuần</option>
-            </select>
+          <label className="form-label">Công việc lớn</label>
+          <div className="form-control" style={{ 
+            backgroundColor: '#f8f9fa', 
+            cursor: 'not-allowed',
+            border: '1px solid #dee2e6',
+            color: '#6c757d'
+          }}>
+            {relatedTasks.parent ? relatedTasks.parent.title : "Không có"}
           </div>
         </div>
-        <div className="col-md-6 mb-3">
-          <label className="form-label">Công việc cha (parentId)</label>
-          <input
-            type="text"
-            className="form-control"
-            value={form.parentId}
-            onChange={(e) => handleChange("parentId", e.target.value)}
-            placeholder="Nhập ID công việc cha"
-            disabled={!canEdit}
-          />
-        </div>
       </div>
-      <div className="mb-3">
-        <label className="form-label">
-          Phụ thuộc (dependencies, phân tách dấu phẩy)
-        </label>
-        <input
-          type="text"
-          className="form-control"
-          value={form.dependenciesText}
-          onChange={(e) => handleChange("dependenciesText", e.target.value)}
-          placeholder="id1,id2,id3"
-          disabled={!canEdit}
-        />
+      <div className="row">
       </div>
       <div className="soft-card p-3">
         <div className="text-muted small mb-2">Thông tin chi tiết</div>
@@ -677,21 +984,13 @@ export default function EventTaskDetailPage() {
     <div className="col-lg-5">
       <div className="mb-3">
         <label className="form-label">Ban phụ trách</label>
-        <div className="input-group">
-          <select
-            className="form-select"
-            value={form.departmentId}
-            onChange={(e) => handleChange("departmentId", e.target.value)}
-            disabled={!canEdit}
-          >
-            <option value="">Chọn ban</option>
-            {departments.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <span className="input-group-text">▼</span>
+        <div className="form-control" style={{ 
+          backgroundColor: '#f8f9fa', 
+          cursor: 'not-allowed',
+          border: '1px solid #dee2e6',
+          color: '#6c757d'
+        }}>
+          {departments.find((d) => d._id === form.departmentId)?.name || "—"}
         </div>
       </div>
       <div className="mb-3">
@@ -701,7 +1000,7 @@ export default function EventTaskDetailPage() {
             className="form-select"
             value={form.assigneeId}
             onChange={(e) => handleAssigneeChange(e.target.value)}
-            disabled={!form.departmentId || !canEdit}
+            disabled={!form.departmentId || !canEditFields}
           >
             <option value="">Chọn người thực hiện</option>
             {displayedAssignees.map((m) => (
@@ -747,13 +1046,41 @@ export default function EventTaskDetailPage() {
                 </div>
               </div>
             </div>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={handleRemoveAssignee}
-              disabled={!canEdit}
-            >
-              🗑
-            </button>
+            {canModifyTask && (
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={handleRemoveAssignee}
+              >
+                🗑
+              </button>
+            )}
+          </div>
+        )}
+        {canHoDClaim && (
+          <div className="d-flex flex-wrap gap-2 mt-2">
+            {!isSelfAssigned && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={handleSelfAssign}
+                disabled={claimingTask}
+              >
+                {claimingTask ? "Đang nhận..." : "Tôi sẽ thực hiện công việc này"}
+              </button>
+            )}
+            {isSelfAssigned && (
+              <>
+                <span className="text-success small fw-semibold d-flex align-items-center">
+                  Bạn đang phụ trách công việc này
+                </span>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={handleSelfUnassign}
+                  disabled={releasingSelf}
+                >
+                  {releasingSelf ? "Đang bỏ nhận..." : "Nhường lại"}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -764,7 +1091,7 @@ export default function EventTaskDetailPage() {
             className="form-select"
             value={form.milestoneId}
             onChange={(e) => handleChange("milestoneId", e.target.value)}
-            disabled={!canEdit}
+            disabled={!canEditFields}
           >
             <option value="">Chọn cột mốc</option>
             {milestones.map((m) => (
@@ -779,39 +1106,78 @@ export default function EventTaskDetailPage() {
       <div className="mb-3">
         <label className="form-label">Thời gian bắt đầu</label>
         <input
-          type="datetime-local"
+          type="date"
           className="form-control"
-          value={form.startDate}
-          onChange={(e) => handleChange("startDate", e.target.value)}
-          disabled={!canEdit}
+          value={form.startDate || ""}
+          onChange={(e) => handleChange("startDate", e.target.value || "")}
+          disabled={!canEditFields}
           min={(() => {
-            const now = new Date();
-            now.setMinutes(now.getMinutes() + 1);
-            const minDateTime = now.toISOString().slice(0, 16);
-            if (eventInfo?.eventStartDate) {
-              const eventStart = new Date(eventInfo.eventStartDate);
-              const eventStartStr = eventStart.toISOString().slice(0, 16);
-              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+            // Nếu có startDate cũ, cho phép giữ nguyên (không giới hạn theo ngày hiện tại)
+            if (originalTask?.startDate) {
+              const oldStartDate = new Date(originalTask.startDate);
+              oldStartDate.setHours(0, 0, 0, 0);
+              // Chỉ giới hạn theo thời gian tạo sự kiện nếu có
+              if (eventInfo?.createdAt) {
+                const eventCreated = new Date(eventInfo.createdAt);
+                eventCreated.setHours(0, 0, 0, 0);
+                return eventCreated.toISOString().split('T')[0];
+              }
+              return undefined;
             }
-            return minDateTime;
+
+            // Khi tạo mới: yêu cầu ngày sau hoặc bằng hôm nay
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const minDate = now.toISOString().split('T')[0];
+
+            if (eventInfo?.createdAt) {
+              const eventCreated = new Date(eventInfo.createdAt);
+              eventCreated.setHours(0, 0, 0, 0);
+              const eventCreatedStr = eventCreated.toISOString().split('T')[0];
+              return eventCreatedStr > minDate ? eventCreatedStr : minDate;
+            }
+            return minDate;
           })()}
-          max={
-            eventInfo?.eventEndDate
-              ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined
-          }
+          max={(() => {
+            // Nếu có parent task, giới hạn startDate không vượt quá deadline của epic task
+            if (form.parentId) {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                const parentDueDate = new Date(parentTask.dueDate);
+                parentDueDate.setHours(0, 0, 0, 0);
+                return parentDueDate.toISOString().split('T')[0];
+              }
+            }
+            return undefined;
+          })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
-            Thời gian bắt đầu phải sau thời điểm hiện tại
-            {eventInfo.eventStartDate &&
-              ` và sau ${new Date(eventInfo.eventStartDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {eventInfo.eventEndDate &&
-              `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
-                "vi-VN"
-              )}`}
+            {(() => {
+              let message = "";
+              
+              // Nếu có startDate cũ, không cảnh báo về quá khứ
+              if (originalTask?.startDate) {
+                if (eventInfo.createdAt) {
+                  message = `Thời gian bắt đầu phải sau ${new Date(eventInfo.createdAt).toLocaleDateString("vi-VN")}`;
+                }
+              } else {
+                // Khi tạo mới: yêu cầu ngày sau hoặc bằng hôm nay
+                message = "Thời gian bắt đầu phải từ hôm nay trở đi";
+                if (eventInfo.createdAt) {
+                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleDateString("vi-VN")}`;
+                }
+              }
+
+              if (form.parentId) {
+                const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+                if (parentTask && parentTask.dueDate) {
+                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleDateString('vi-VN')})`;
+                }
+              }
+
+              return message;
+            })()}
           </div>
         )}
       </div>
@@ -822,41 +1188,81 @@ export default function EventTaskDetailPage() {
           className="form-control"
           value={form.dueDate}
           onChange={(e) => handleChange("dueDate", e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEditFields}
           min={(() => {
             if (form.startDate) {
               const startDate = new Date(form.startDate);
               startDate.setMinutes(startDate.getMinutes() + 1);
               return startDate.toISOString().slice(0, 16);
             }
+
             const now = new Date();
             now.setMinutes(now.getMinutes() + 1);
             const minDateTime = now.toISOString().slice(0, 16);
-            if (eventInfo?.eventStartDate) {
-              const eventStart = new Date(eventInfo.eventStartDate);
-              const eventStartStr = eventStart.toISOString().slice(0, 16);
-              return eventStartStr > minDateTime ? eventStartStr : minDateTime;
+
+            // Nếu có dueDate cũ và nó đã ở quá khứ, chỉ giới hạn theo thời gian tạo sự kiện
+            if (originalTask?.dueDate) {
+              const oldDueDate = new Date(originalTask.dueDate);
+              if (oldDueDate <= now) {
+                // Cho phép giữ nguyên thời gian cũ (dù ở quá khứ)
+                return eventInfo?.createdAt
+                  ? new Date(eventInfo.createdAt).toISOString().slice(0, 16)
+                  : undefined;
+              }
+            }
+
+            // Trường hợp còn lại: yêu cầu thời gian sau hiện tại
+            if (eventInfo?.createdAt) {
+              const eventCreated = new Date(eventInfo.createdAt);
+              const eventCreatedStr = eventCreated.toISOString().slice(0, 16);
+              return eventCreatedStr > minDateTime ? eventCreatedStr : minDateTime;
             }
             return minDateTime;
           })()}
-          max={
-            eventInfo?.eventEndDate
-              ? new Date(eventInfo.eventEndDate).toISOString().slice(0, 16)
-              : undefined
-          }
+          max={(() => {
+            // Nếu có parent task, giới hạn deadline không vượt quá deadline của epic task
+            if (form.parentId) {
+              const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+              if (parentTask && parentTask.dueDate) {
+                return new Date(parentTask.dueDate).toISOString().slice(0, 16);
+              }
+            }
+            return undefined;
+          })()}
         />
         {eventInfo && (
           <div className="form-text small text-muted">
-            Deadline phải sau thời điểm hiện tại
-            {form.startDate && " và sau thời gian bắt đầu"}
-            {eventInfo.eventStartDate &&
-              `, sau ${new Date(eventInfo.eventStartDate).toLocaleString(
-                "vi-VN"
-              )}`}
-            {eventInfo.eventEndDate &&
-              `, trước ${new Date(eventInfo.eventEndDate).toLocaleString(
-                "vi-VN"
-              )}`}
+            {(() => {
+              const now = new Date();
+              const oldDueDate = originalTask?.dueDate ? new Date(originalTask.dueDate) : null;
+              const isOldDateInPast = oldDueDate && oldDueDate <= now;
+
+              let message = "";
+
+              if (form.startDate) {
+                message = "Deadline phải sau thời gian bắt đầu";
+              } else if (isOldDateInPast) {
+                // Nếu thời gian cũ đã ở quá khứ, chỉ cảnh báo về event constraints
+                if (eventInfo.createdAt) {
+                  message = `Deadline phải sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
+              } else {
+                // Nếu không, yêu cầu thời gian sau hiện tại
+                message = "Deadline phải sau thời điểm hiện tại";
+                if (eventInfo.createdAt) {
+                  message += ` và sau ${new Date(eventInfo.createdAt).toLocaleString("vi-VN")}`;
+                }
+              }
+
+              if (form.parentId) {
+                const parentTask = tasksAll.find((t) => String(t._id) === String(form.parentId));
+                if (parentTask && parentTask.dueDate) {
+                  message += `. Không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                }
+              }
+
+              return message;
+            })()}
           </div>
         )}
       </div>
@@ -877,16 +1283,38 @@ export default function EventTaskDetailPage() {
         <div className="row">
           <div className="col-md-6 mb-2">
             <div className="text-muted small">Trạng thái</div>
-            <div className="fw-medium">{form.status || "—"}</div>
-          </div>
-          <div className="col-md-6 mb-2">
-            <div className="text-muted small">Ước lượng</div>
             <div className="fw-medium">
-              {(form.estimate ?? "") === ""
-                ? "—"
-                : `${form.estimate}${form.estimateUnit}`}
+              <span
+                className="status-badge"
+                style={{
+                  display: "inline-flex",
+                  padding: "6px 16px",
+                  borderRadius: 999,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: canUpdateStatus ? "pointer" : "default",
+                  transition: "opacity .2s",
+                  backgroundColor:
+                    STATUS_STYLE_MAP[form.status]?.bg || "#E5E7EB",
+                  color: STATUS_STYLE_MAP[form.status]?.color || "#111827",
+                }}
+                onClick={handleQuickStatusAdvance}
+                title={
+                  canUpdateStatus
+                    ? "Click để chuyển sang trạng thái tiếp theo"
+                    : ""
+                }
+              >
+                {statusToLabel(form.status)}
+              </span>
             </div>
+            {canUpdateStatus && (
+              <div className="text-muted small mt-1">
+                Nhấn để chuyển sang trạng thái tiếp theo.
+              </div>
+            )}
           </div>
+          
         </div>
       </div>
       <div className="soft-card p-3 mb-3">
@@ -895,12 +1323,10 @@ export default function EventTaskDetailPage() {
             <div className="text-muted small">Thời gian bắt đầu</div>
             <div className="fw-medium">
               {form.startDate
-                ? new Date(form.startDate).toLocaleString("vi-VN", {
+                ? new Date(form.startDate).toLocaleDateString("vi-VN", {
                     year: "numeric",
                     month: "2-digit",
                     day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
                   })
                 : "—"}
             </div>
@@ -924,7 +1350,7 @@ export default function EventTaskDetailPage() {
       <div className="soft-card p-3">
         <div className="fw-medium mb-2">Liên kết công việc</div>
         <div className="mb-3">
-          <div className="text-muted small mb-1">Công việc tổng</div>
+          <div className="text-muted small mb-1">Công việc lớn</div>
           {relatedTasks.parent ? (
             <div className="fw-medium">
               <a
@@ -955,37 +1381,7 @@ export default function EventTaskDetailPage() {
           )}
         </div>
         <div>
-          <div className="text-muted small mb-1">Công việc trước</div>
-          {relatedTasks.dependencies.length > 0 ? (
-            <div className="fw-medium">
-              {relatedTasks.dependencies.map((dep, idx) => (
-                <div key={dep.id} className="mb-1">
-                  <a
-                    href={`/events/${eventId}/tasks/${dep.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(`/events/${eventId}/tasks/${dep.id}`);
-                    }}
-                    style={{
-                      color: "#3B82F6",
-                      textDecoration: "none",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.textDecoration = "none";
-                    }}
-                  >
-                    {dep.title}
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="fw-medium">—</div>
-          )}
+        
         </div>
       </div>
     </div>
@@ -1003,6 +1399,28 @@ export default function EventTaskDetailPage() {
         <div className="text-muted small">Người thực hiện</div>
         <div className="fw-medium">{assigneeName}</div>
       </div>
+      {taskCreatorName && (
+        <div className="soft-card p-3 mb-3">
+          <div className="text-muted small">Người tạo</div>
+          <div className="fw-medium d-flex align-items-center gap-2">
+            <span>{taskCreatorName}</span>
+            {creatorBadgeLabel && (
+              <span
+                className="badge rounded-pill text-bg-light"
+                style={{ border: "1px solid #e5e7eb" }}
+              >
+                {creatorBadgeLabel}
+              </span>
+            )}
+          </div>
+          {!canManageTask && isHoD && (
+            <div className="text-danger small mt-2">
+              Công việc do {creatorNoticeLabel} giao. Bạn chỉ có thể
+              cập nhật trạng thái.
+            </div>
+          )}
+        </div>
+      )}
       <div className="soft-card p-3 mb-3">
         <div className="text-muted small">Cột mốc</div>
         <div className="fw-medium">
@@ -1072,6 +1490,7 @@ export default function EventTaskDetailPage() {
         title={t("taskPage.title")}
         activePage={"work" && "work-board"}
         sidebarType={getSidebarType()}
+        eventId={eventId}
       >
         <ToastContainer position="top-right" autoClose={3000} />
         <style>{`
@@ -1085,50 +1504,48 @@ export default function EventTaskDetailPage() {
               <h4 className="mb-0">
                 {isEditing ? "Chỉnh sửa công việc" : "Chi tiết công việc"}
               </h4>
-              {!canEdit && (
+              {editDisabledMessage && (
                 <div
                   className="text-muted small mt-1"
                   style={{ color: "#dc3545" }}
                 >
-                  ⚠️ Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'.
-                  Chỉ có thể cập nhật trạng thái.
+                  ⚠️ {editDisabledMessage}
+                </div>
+              )}
+              {!canManageTask && isHoD && taskCreatorName && (
+                <div className="alert alert-info py-2 px-3 mt-2 mb-0">
+                  Công việc này được giao bởi {taskCreatorName}
+                  {creatorBadgeLabel ? ` (${creatorBadgeLabel})` : ""}. Bạn chỉ
+                  có thể cập nhật trạng thái hoặc theo dõi tiến độ.
                 </div>
               )}
             </div>
             <div className="d-flex align-items-center gap-2">
-              <button className="btn btn-warning" onClick={() => navigate(-1)}>
+              <button className="btn btn-warning" onClick={() => handleNavigateToTaskList()}>
                 Danh sách công việc
               </button>
               {!isEditing ? (
                 <>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => setIsEditing(true)}
-                    disabled={form.status !== "Chưa bắt đầu"}
-                    title={
-                      form.status !== "Chưa bắt đầu"
-                        ? "Chỉ có thể chỉnh sửa task khi trạng thái là 'Chưa bắt đầu'"
-                        : ""
-                    }
-                  >
-                    Chỉnh sửa
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={handleDelete}
-                    disabled={
-                      form.status === "Đang làm" ||
-                      statusMapToBackend(form.status) === "in_progress"
-                    }
-                    title={
-                      form.status === "Đang làm" ||
-                      statusMapToBackend(form.status) === "in_progress"
-                        ? "Không thể xóa task khi đang ở trạng thái 'Đang làm'"
-                        : ""
-                    }
-                  >
-                    Xóa
-                  </button>
+                  {canModifyTask && (
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => {
+                        setIsEditing(true);
+                      }}
+                      title={isTaskLocked ? 'Không thể chỉnh sửa công việc khi trạng thái không phải "Chưa bắt đầu".' : ''}
+                    >
+                      Chỉnh sửa
+                    </button>
+                  )}
+                  {canModifyTask && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleDelete}
+                      title={isTaskLocked ? 'Không thể xóa công việc khi trạng thái không phải "Chưa bắt đầu".' : ''}
+                    >
+                      Xóa
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -1143,11 +1560,13 @@ export default function EventTaskDetailPage() {
                   </button>
                   <button
                     className="btn btn-danger"
-                    disabled={saving || !canEdit}
+                    disabled={saving || !canEditFields}
                     onClick={handleSave}
                     title={
-                      !canEdit
-                        ? "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
+                      !canEditFields
+                        ? isMemberRole
+                          ? "Thành viên không có quyền chỉnh sửa task"
+                          : "Không thể chỉnh sửa task khi trạng thái không phải 'Chưa bắt đầu'"
                         : ""
                     }
                   >
@@ -1158,25 +1577,16 @@ export default function EventTaskDetailPage() {
             </div>
           </div>
           {loading ? (
-            <div className="soft-card p-5 text-center text-muted">
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(255,255,255,1)",
-                  zIndex: 2000,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Loading size={100} />
+            <div className="soft-card p-5 text-center">
+              <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: "400px" }}>
+                <Loading size={80} />
+                <div className="text-muted mt-3">Đang tải thông tin công việc...</div>
               </div>
             </div>
           ) : (
             <div className="row g-4">
-              {isEditing ? leftBlock : viewLeftBlock}
-              {isEditing ? rightBlock : viewRightBlock}
+              {(canModifyTask && isEditing) ? leftBlock : viewLeftBlock}
+              {(canModifyTask && isEditing) ? rightBlock : viewRightBlock}
             </div>
           )}
         </div>
@@ -1187,6 +1597,61 @@ export default function EventTaskDetailPage() {
         onConfirm={confirmDelete}
         message="Bạn có chắc muốn xóa công việc này?"
       />
+      {showStatusModal && (
+        <div
+          className="modal fade show"
+          style={{
+            display: "block",
+            background: "rgba(0,0,0,0.45)",
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Cập nhật trạng thái</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowStatusModal(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <label className="form-label">Chọn trạng thái mới</label>
+                <select
+                  className="form-select"
+                  value={pendingStatus}
+                  onChange={(e) => setPendingStatus(e.target.value)}
+                >
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {statusToLabel(s)}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-text mt-2">
+                  Chỉ hiển thị các trạng thái mà bạn được phép chuyển.
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={() => setShowStatusModal(false)}
+                  disabled={updatingStatus}
+                >
+                  Huỷ
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleStatusChange(pendingStatus)}
+                  disabled={updatingStatus}
+                >
+                  {updatingStatus ? "Đang cập nhật..." : "Cập nhật"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

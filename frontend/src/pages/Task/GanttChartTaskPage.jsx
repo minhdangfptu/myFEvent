@@ -14,16 +14,24 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
   const timelineRef = useRef(null);
   const nameBodyRef = useRef(null);
   const headerScrollRef = useRef(null);
+  const hasScrolledToToday = useRef(false);
 
-  // Tính toán ngày bắt đầu và kết thúc
   const getDatesRange = () => {
-    const year = new Date().getFullYear();
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year, 11, 31);
-    return { startDate, endDate };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const startDate = new Date(today);
+    startDate.setMonth(startDate.getMonth() - 3);
+    startDate.setDate(1); // Start from first day of month
+    
+    const endDate = new Date(today);
+    endDate.setMonth(endDate.getMonth() + 6);
+    endDate.setDate(0); // Last day of month
+    
+    return { startDate, endDate, today };
   };
 
-  const { startDate, endDate } = getDatesRange();
+  const { startDate, endDate, today } = getDatesRange();
 
   // Tạo danh sách các cột ngày/tuần/tháng
   const getTimeColumns = () => {
@@ -39,18 +47,25 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
         current.setDate(current.getDate() + 1);
       }
     } else if (viewMode === "week") {
+      let weekNumber = 1;
       while (current <= endDate) {
+        const weekStart = new Date(current);
+        const weekEnd = new Date(current);
+        weekEnd.setDate(weekEnd.getDate() + 6);
         columns.push({
           date: new Date(current),
-          label: `T${Math.ceil((current.getDate() + 6 - current.getDay()) / 7)}`,
+          label: `Tuần ${weekNumber}`,
         });
+        weekNumber++;
         current.setDate(current.getDate() + 7);
       }
     } else if (viewMode === "month") {
       while (current <= endDate) {
+        const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+                           "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
         columns.push({
           date: new Date(current),
-          label: `T${current.getMonth() + 1}`,
+          label: monthNames[current.getMonth()],
         });
         current.setMonth(current.getMonth() + 1);
       }
@@ -63,7 +78,16 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
   const columnWidth = viewMode === "day" ? 50 : viewMode === "week" ? 100 : 150;
   const totalTimelineWidth = timeColumns.length * columnWidth;
 
-  // Vị trí task trên timeline
+  useEffect(() => {
+    if (timelineRef.current && today && !hasScrolledToToday.current) {
+      const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+      const daysFromStart = (today - startDate) / (1000 * 60 * 60 * 24);
+      const scrollPosition = (daysFromStart / totalDays) * totalTimelineWidth - (timelineRef.current.clientWidth / 2);
+      timelineRef.current.scrollLeft = Math.max(0, scrollPosition);
+      hasScrolledToToday.current = true;
+    }
+  }, [startDate, endDate, totalTimelineWidth, today]);
+
   const getTaskPosition = (task) => {
     const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
     const taskStart = (task.start - startDate) / (1000 * 60 * 60 * 24);
@@ -74,16 +98,13 @@ const CustomGanttChart = ({ tasks, viewMode, onTaskClick }) => {
     return { left, width };
   };
 
-  // Xử lý scroll
   const handleTimelineScroll = () => {
     if (!timelineRef.current) return;
 
-    // Đồng bộ scroll dọc
     if (nameBodyRef.current) {
       nameBodyRef.current.scrollTop = timelineRef.current.scrollTop;
     }
 
-    // Đồng bộ scroll ngang cho header
     if (headerScrollRef.current) {
       window.requestAnimationFrame(() => {
         if (headerScrollRef.current && timelineRef.current) {
@@ -490,8 +511,10 @@ export default function GanttChartTaskPage() {
         const apiRes = await taskApi.getTaskByEvent(eventId);
         const arr = apiRes?.data || [];
 
-        const mapped = arr.map((task) => {
-          const startDate = task.createdAt ? new Date(task.createdAt) : new Date();
+        const normalTasks = arr.filter((task) => task.taskType === "normal" || !task.taskType);
+        
+        const mapped = normalTasks.map((task) => {
+          const startDate = task.startDate ? new Date(task.startDate) : (task.createdAt ? new Date(task.createdAt) : new Date());
           let endDate = startDate;
 
           if (task.dueDate) {
@@ -521,7 +544,8 @@ export default function GanttChartTaskPage() {
             name: task.title || "Unnamed Task",
             id: task._id,
             progress: typeof task.progressPct === "number" ? task.progressPct : 0,
-            isDisabled: task.status === "cancelled",
+            isDisabled: task.status === "huy",
+            status: task.status,
             styles: {
               progressColor: getStatusColor(task.status),
               backgroundColor: getStatusColor(task.status),
@@ -553,11 +577,10 @@ export default function GanttChartTaskPage() {
     }
     if (filterStatus !== "Tất cả") {
       const map = {
-        "Chưa bắt đầu": "todo",
-        "Đang làm": "in_progress",
-        "Hoàn thành": "done",
-        "Tạm hoãn": "blocked",
-        "Đã huỷ": "cancelled",
+        "Chưa bắt đầu": "chua_bat_dau",
+        "Đang làm": "da_bat_dau",
+        "Hoàn thành": "hoan_thanh",
+        "Đã huỷ": "huy",
       };
       const st = map[filterStatus];
       if (st) {
@@ -572,8 +595,13 @@ export default function GanttChartTaskPage() {
 
   const getStatusColor = (status) => {
     const colorMap = {
-      done: "#28a745",
-      in_progress: "#ffa500",
+      hoan_thanh: "#10b981", // Green for completed
+      da_bat_dau: "#f59e0b", // Orange for in progress
+      chua_bat_dau: "#5b6ef5", // Blue for not started
+      huy: "#6c757d", // Gray for cancelled
+      // Legacy status codes (if any)
+      done: "#10b981",
+      in_progress: "#f59e0b",
       blocked: "#dc3545",
       todo: "#5b6ef5",
       cancelled: "#6c757d",
@@ -591,8 +619,9 @@ export default function GanttChartTaskPage() {
     return (
       <UserLayout
         title={t("taskPage.title") || "Gantt Chart"}
-        activePage="work-board"
+        activePage="work-gantt"
         sidebarType={getSidebarType()}
+        eventId={eventId}
       >
         <div
           className="d-flex justify-content-center align-items-center"
@@ -611,6 +640,7 @@ export default function GanttChartTaskPage() {
       title={(t("taskPage.title") || "Tasks") + ": Biểu đồ Gantt"}
       activePage="work-gantt"
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <div
         className="container-fluid"
@@ -634,7 +664,7 @@ export default function GanttChartTaskPage() {
               <input
                 type="text"
                 className="form-control"
-                placeholder="Tìm kiếm timeline..."
+                placeholder="Tìm kiếm công việc..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -666,7 +696,6 @@ export default function GanttChartTaskPage() {
               <option value="Chưa bắt đầu">Chưa bắt đầu</option>
               <option value="Đang làm">Đang làm</option>
               <option value="Hoàn thành">Hoàn thành</option>
-              <option value="Tạm hoãn">Tạm hoãn</option>
               <option value="Đã huỷ">Đã huỷ</option>
             </select>
 
@@ -676,9 +705,8 @@ export default function GanttChartTaskPage() {
             >
               {[
                 ["#5b6ef5", "Chưa bắt đầu"],
-                ["#ffa500", "Đang làm"],
-                ["#28a745", "Hoàn thành"],
-                ["#dc3545", "Tạm hoãn"],
+                ["#f59e0b", "Đang làm"],
+                ["#10b981", "Hoàn thành"],
                 ["#6c757d", "Đã huỷ"],
               ].map(([bg, label]) => (
                 <div

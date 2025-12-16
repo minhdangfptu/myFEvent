@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ToastContainer, toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import ConfirmModal from "~/components/ConfirmModal"
 import { useNavigate, useParams } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
+import { taskApi } from "../../apis/taskApi"
 import { useEvents } from "../../contexts/EventContext"
+import { CalendarX2 } from "lucide-react"
+import Loading from "~/components/Loading"
 
 const styles = {
   container: {
@@ -26,7 +29,7 @@ const styles = {
     margin: 0,
   },
   btnCreate: {
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     border: "none",
     padding: "0.75rem 1.5rem",
@@ -86,7 +89,7 @@ const styles = {
   },
   milestoneDot: {
     position: "absolute",
-    left: "-1.5rem",
+    left: "-1.9rem",
     top: "1.25rem",
     width: "2rem",
     height: "2rem",
@@ -179,7 +182,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s ease",
     fontSize: "0.95rem",
-    background: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
+    background: "#ef4444",
     color: "white",
     boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
   },
@@ -202,6 +205,45 @@ const styles = {
     height: "300px",
     color: "#9ca3af",
     fontSize: "1rem",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "3rem 2rem",
+    textAlign: "center",
+    color: "#9ca3af",
+  },
+  emptyStateIcon: {
+    width: "80px",
+    height: "80px",
+    color: "#d1d5db",
+    marginBottom: "1.5rem",
+  },
+  emptyStateTitle: {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    marginBottom: "0.5rem",
+  },
+  emptyStateText: {
+    fontSize: "0.95rem",
+    color: "#9ca3af",
+    maxWidth: "300px",
+  },
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4rem 2rem",
+    minHeight: "400px",
+  },
+  loadingText: {
+    marginTop: "1.5rem",
+    fontSize: "1rem",
+    color: "#6b7280",
   },
   modalOverlay: {
     position: "fixed",
@@ -319,6 +361,7 @@ const Milestone = () => {
   const { eventId } = useParams()
   const { events, fetchEventRole, getEventRole } = useEvents()
   const [eventRole, setEventRole] = useState("")
+  const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   const [milestones, setMilestones] = useState([])
   const [selectedMilestone, setSelectedMilestone] = useState(null)
@@ -327,12 +370,9 @@ const Milestone = () => {
     name: "",
     description: "",
     targetDate: "",
-    status: "Đã lên kế hoạch",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [showCreatedModal, setShowCreatedModal] = useState(false)
-
   const currentEvent = events.find((event) => event._id === eventId)
 
   useEffect(() => {
@@ -356,6 +396,13 @@ const Milestone = () => {
     }
   }, [eventId, fetchEventRole])
 
+  const getSidebarType = () => {
+    if (eventRole === "HoOC") return "HoOC"
+    if (eventRole === "HoD") return "HoD"
+    if (eventRole === "Member") return "Member"
+    return "user"
+  }
+
   const parseAnyDate = (value) => {
     if (!value) return null
     const d = new Date(value)
@@ -375,23 +422,42 @@ const Milestone = () => {
     return null
   }
 
-  const fetchMilestones = async () => {
+  const fetchMilestones = async (showLoading = true) => {
     try {
-      setLoading(true)
-      const response = await milestoneApi.listMilestonesByEvent(eventId)
-      const sorted = [...(response.data || [])].sort((a, b) => {
+      if (showLoading) setLoading(true)
+      const [milestoneResponse, tasksResponse] = await Promise.all([
+        milestoneApi.listMilestonesByEvent(eventId),
+        taskApi.getTaskByEvent(eventId)
+      ])
+      
+      const milestones = milestoneResponse.data || []
+      const tasks = tasksResponse?.data || []
+      
+      // Count tasks per milestone
+      const taskCountMap = {}
+      tasks.forEach(task => {
+        const milestoneId = task.milestoneId?._id || task.milestoneId
+        if (milestoneId) {
+          const milestoneIdStr = String(milestoneId)
+          taskCountMap[milestoneIdStr] = (taskCountMap[milestoneIdStr] || 0) + 1
+        }
+      })
+      
+      const sorted = [...milestones].sort((a, b) => {
         const da = parseAnyDate(a?.targetDate) || new Date(8640000000000000)
         const db = parseAnyDate(b?.targetDate) || new Date(8640000000000000)
         return da.getTime() - db.getTime()
       })
-      const mappedMilestones = sorted.map((ms, index) => ({
-        id: ms._id || ms.id,
-        name: ms.name,
-        date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
-        status: getStatusLabel(ms.status),
-        description: ms.description || "",
-        relatedTasks: ms.tasksCount || 0,
-      }))
+      const mappedMilestones = sorted.map((ms, index) => {
+        const milestoneIdStr = String(ms._id || ms.id)
+        return {
+          id: ms._id || ms.id,
+          name: ms.name,
+          date: ms.targetDate ? new Date(ms.targetDate).toLocaleDateString("vi-VN") : "",
+          description: ms.description || "",
+          relatedTasks: taskCountMap[milestoneIdStr] || 0,
+        }
+      })
       setMilestones(mappedMilestones)
       if (mappedMilestones.length > 0 && !selectedMilestone) {
         setSelectedMilestone(mappedMilestones[0])
@@ -400,41 +466,7 @@ const Milestone = () => {
       console.error("Error fetching milestones:", err)
       setError("Không thể tải danh sách cột mốc")
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case "planned":
-        return "Đã lên kế hoạch"
-      case "in_progress":
-        return "Đang thực hiện"
-      case "completed":
-        return "Đã hoàn thành"
-      case "delayed":
-        return "Trễ hạn"
-      case "cancelled":
-        return "Đã hủy"
-      default:
-        return "Đã lên kế hoạch"
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Đã lên kế hoạch":
-        return "#3b82f6"
-      case "Đang thực hiện":
-        return "#f59e0b"
-      case "Đã hoàn thành":
-        return "#10b981"
-      case "Trễ hạn":
-        return "#dc2626"
-      case "Đã hủy":
-        return "#6b7280"
-      default:
-        return "#6b7280"
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -442,13 +474,7 @@ const Milestone = () => {
     setSelectedMilestone(milestone)
   }
 
-  const handleEditMilestone = (milestoneId) => {
-    setLoading(true)
-    navigate(`/events/${eventId}/hooc-edit-milestone/${milestoneId}`)
-  }
-
   const handleViewDetails = (milestoneId) => {
-    setLoading(true)
     navigate(`/events/${eventId}/milestone-detail/${milestoneId}`)
   }
 
@@ -458,43 +484,59 @@ const Milestone = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault()
-    try {
-      setLoading(true)
-      setError("")
+    setError("")
 
-      const response = await milestoneApi.createMilestone(eventId, {
+    if (!createForm.targetDate) {
+      toast.error("Vui lòng chọn thời hạn cột mốc")
+      return
+    }
+
+    const selectedDate = new Date(createForm.targetDate)
+    const today = new Date(todayISODate)
+    selectedDate.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+
+    if (selectedDate < today) {
+      toast.error("Không thể chọn cột mốc ở ngày trong quá khứ")
+      return
+    }
+
+    try {
+      await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
         targetDate: createForm.targetDate,
-        status: getStatusValue(createForm.status),
       })
 
-      await fetchMilestones()
+      await fetchMilestones(false)
       setShowCreateModal(false)
-      setCreateForm({ name: "", description: "", targetDate: "", status: "Đã lên kế hoạch" })
-      setShowCreatedModal(true)
+      setCreateForm({ name: "", description: "", targetDate: "" })
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
-      setError(err.response?.data?.message || "Tạo cột mốc thất bại")
-    } finally {
-      setLoading(false)
+      
+      // Handle duplicate name error (409) with Vietnamese message
+      if (err.response?.status === 409) {
+        const vietnameseMessage = "Tên cột mốc này đã tồn tại trong sự kiện. Vui lòng chọn tên khác."
+        setError(vietnameseMessage)
+        toast.error(vietnameseMessage)
+      } else {
+        // For other errors, use the message from backend or default Vietnamese message
+        const errorMessage = err.response?.data?.message || "Tạo cột mốc thất bại"
+        setError(errorMessage)
+        toast.error(errorMessage)
+      }
     }
-  }
-
-  const getStatusValue = (label) => {
-    const map = {
-      "Đã lên kế hoạch": "planned",
-      "Đang thực hiện": "in_progress",
-      "Đã hoàn thành": "completed",
-      "Trễ hạn": "delayed",
-      "Đã hủy": "cancelled",
-    }
-    return map[label] || "planned"
   }
 
   return (
-    <UserLayout eventRole={eventRole} activePage= "overview-timeline" sidebarType="hooc" title='Cột mốc sự kiện'>
+    <UserLayout
+      eventRole={eventRole}
+      activePage="overview-timeline"
+      sidebarType={getSidebarType()}
+      title='Cột mốc sự kiện'
+      eventId={eventId}
+    >
       <style>{animationStyles}</style>
       <ToastContainer position="top-right" autoClose={3000} />
 
@@ -520,44 +562,64 @@ const Milestone = () => {
 
         {error && <div style={styles.errorMessage}>{error}</div>}
 
-        <div style={styles.content} className="milestone-content-responsive">
-          <div style={styles.timelineSection}>
-            <div style={styles.timelineLine}></div>
-            <div style={styles.milestonesList}>
-              {milestones.map((milestone, index) => (
-                <div
-                  key={milestone.id}
-                  style={{
-                    ...styles.milestoneItem,
-                    ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
-                  }}
-                  onClick={() => handleMilestoneClick(milestone)}
-                  onMouseEnter={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "#f3f4f6"
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedMilestone?.id !== milestone.id) {
-                      e.currentTarget.style.background = "transparent"
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      ...styles.milestoneDot,
-                      background: `linear-gradient(135deg, ${getStatusColor(milestone.status)} 0%, rgba(239, 68, 68, 0.3) 100%)`,
-                    }}
-                  >
-                    <div style={styles.dotInner}></div>
-                  </div>
-                  <div style={styles.milestoneInfo}>
-                    <div style={styles.milestoneDate}>{milestone.date}</div>
-                    <div style={styles.milestoneName}>{milestone.name}</div>
-                  </div>
+        {loading ? (
+          <div style={{ ...styles.content, ...styles.loadingContainer }}>
+            <Loading size={80} />
+            <div style={styles.loadingText}>Đang tải danh sách cột mốc...</div>
+          </div>
+        ) : (
+          <div style={styles.content} className="milestone-content-responsive">
+            <div style={styles.timelineSection}>
+              {milestones.length > 0 ? (
+              <>
+                <div style={styles.timelineLine}></div>
+                <div style={styles.milestonesList}>
+                  {milestones.map((milestone, index) => (
+                    <div
+                      key={milestone.id}
+                      style={{
+                        ...styles.milestoneItem,
+                        ...(selectedMilestone?.id === milestone.id ? styles.milestoneItemActive : {}),
+                      }}
+                      onClick={() => handleMilestoneClick(milestone)}
+                      onMouseEnter={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "#f3f4f6"
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedMilestone?.id !== milestone.id) {
+                          e.currentTarget.style.background = "transparent"
+                        }
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...styles.milestoneDot,
+                          background: `linear-gradient(135deg, #ef4444 0%, rgba(239, 68, 68, 0.3) 100%)`,
+                        }}
+                      >
+                        <div style={styles.dotInner}></div>
+                      </div>
+                      <div style={styles.milestoneInfo}>
+                        <div style={styles.milestoneDate}>{milestone.date}</div>
+                        <div style={styles.milestoneName}>{milestone.name}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div style={styles.emptyState}>
+                <CalendarX2 style={styles.emptyStateIcon} strokeWidth={1.5} />
+                <h3 style={styles.emptyStateTitle}>Chưa có cột mốc nào</h3>
+                <p style={styles.emptyStateText}>
+                  {eventRole === "HoOC"
+                    ? "Hãy tạo cột mốc đầu tiên để bắt đầu quản lý tiến độ sự kiện của bạn"
+                    : "Chưa có cột mốc nào được tạo cho sự kiện này"}
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={styles.detailsSection} className="details-section-responsive">
@@ -565,14 +627,6 @@ const Milestone = () => {
               <div style={styles.milestoneDetails}>
                 <div style={styles.detailsHeader}>
                   <h2 style={styles.detailsHeaderTitle}>{selectedMilestone.name}</h2>
-                  <span
-                    style={{
-                      ...styles.statusBadge,
-                      backgroundColor: getStatusColor(selectedMilestone.status),
-                    }}
-                  >
-                    {selectedMilestone.status}
-                  </span>
                 </div>
 
                 <div style={styles.detailsBody}>
@@ -611,18 +665,6 @@ const Milestone = () => {
                     Xem Agenda
                   </button>
                   <button
-                    style={styles.btnSecondary}
-                    onClick={() => handleEditMilestone(selectedMilestone.id)}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "#e5e7eb"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "#f3f4f6"
-                    }}
-                  >
-                    Chỉnh sửa
-                  </button>
-                  <button
                     style={styles.btnPrimary}
                     onClick={() => handleViewDetails(selectedMilestone.id)}
                     onMouseEnter={(e) => {
@@ -640,11 +682,12 @@ const Milestone = () => {
               </div>
             ) : (
               <div style={styles.noSelection}>
-                <p>Chọn một cột mốc để xem chi tiết</p>
+                {/* <p>Chọn một cột mốc để xem chi tiết</p> */}
               </div>
             )}
           </div>
         </div>
+        )}
 
         {showCreateModal && (
           <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
@@ -652,7 +695,7 @@ const Milestone = () => {
               <h2 style={styles.modalTitle}>Tạo Cột Mốc Mới</h2>
               <form onSubmit={handleCreateSubmit}>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Tên cột mốc:</label>
+                  <label style={styles.formLabel}>Tên cột mốc* :</label>
                   <input
                     type="text"
                     style={styles.formInput}
@@ -686,11 +729,12 @@ const Milestone = () => {
                   />
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Ngày dự kiến:</label>
+                  <label style={styles.formLabel}>Ngày dự kiến* :</label>
                   <input
                     type="date"
                     style={styles.formInput}
                     value={createForm.targetDate}
+                    min={todayISODate}
                     onChange={(e) => setCreateForm({ ...createForm, targetDate: e.target.value })}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#ef4444"
@@ -702,28 +746,6 @@ const Milestone = () => {
                     }}
                     required
                   />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Trạng thái:</label>
-                  <select
-                    style={styles.formInput}
-                    value={createForm.status}
-                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value })}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#ef4444"
-                      e.target.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.1)"
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e5e7eb"
-                      e.target.style.boxShadow = "none"
-                    }}
-                  >
-                    <option>Đã lên kế hoạch</option>
-                    <option>Đang thực hiện</option>
-                    <option>Đã hoàn thành</option>
-                    <option>Trễ hạn</option>
-                    <option>Đã hủy</option>
-                  </select>
                 </div>
                 <div style={styles.modalActions}>
                   <button
@@ -764,12 +786,6 @@ const Milestone = () => {
           </div>
         )}
       </div>
-      <ConfirmModal
-        show={showCreatedModal}
-        onClose={() => setShowCreatedModal(false)}
-        onConfirm={() => setShowCreatedModal(false)}
-        message="Tạo cột mốc thành công!"
-      />
     </UserLayout>
   )
 }

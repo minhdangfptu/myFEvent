@@ -1,12 +1,12 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { getAllOccurredRisksByEvent, statisticRisk } from "~/apis/riskApi"; // Add statistics API import
 import { toast } from "react-toastify"; // Add for error handling
-import "./RiskStatistics.css"; // Import enhanced chart CSS
+import "./RiskStatistics.css";
+import { Check } from "lucide-react";
+ // Import enhanced chart CSS
 
 export default function RiskStatisticsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,7 +35,12 @@ export default function RiskStatisticsPage() {
   // Get unique departments for filter dropdown
   const uniqueDepartments = [
     ...new Set(occurredRisks.map((risk) => risk.departmentName)),
-  ].filter(Boolean);
+  ].filter(Boolean).sort((a, b) => {
+    // Sort with "Toàn BTC" first if it exists, then alphabetically
+    if (a === "Toàn BTC") return -1;
+    if (b === "Toàn BTC") return 1;
+    return a.localeCompare(b, 'vi');
+  });
 
   // Filter and sort data
   const filteredData = occurredRisks
@@ -100,7 +105,7 @@ export default function RiskStatisticsPage() {
         return {
           label: "Đã xử lý",
           color: "#10b981",
-          icon: <i className="bi bi-check-lg"></i>,
+          icon: <Check size={18} />,
         };
       case "resolving":
         return {
@@ -160,6 +165,16 @@ export default function RiskStatisticsPage() {
     fetchEventRole(eventId).then(setEventRole);
   }, [eventId, fetchEventRole]);
 
+  // Permission check - redirect Members to risk list page
+  useEffect(() => {
+    if (!eventRole) return; // Wait for role to load
+
+    if (eventRole === "Member") {
+      toast.error("Bạn không có quyền truy cập trang thống kê");
+      navigate(`/event/${eventId}/risks`);
+    }
+  }, [eventRole, navigate, eventId]);
+
   const getSidebarType = () => {
     if (eventRole === "HoOC") return "HoOC";
     if (eventRole === "HoD") return "HoD";
@@ -206,6 +221,21 @@ export default function RiskStatisticsPage() {
               const angle = (item.value / total) * 360;
               const startAngle = currentAngle;
               const endAngle = currentAngle + angle;
+
+              // Special case: when there's only one item, draw a full circle
+              if (data.length === 1) {
+                return (
+                  <circle
+                    key={index}
+                    cx="200"
+                    cy="200"
+                    r="100"
+                    fill={colors[index % colors.length]}
+                    stroke="#fff"
+                    strokeWidth="3"
+                  />
+                );
+              }
 
               const x1 =
                 200 + 100 * Math.cos(((startAngle - 90) * Math.PI) / 180);
@@ -358,6 +388,7 @@ export default function RiskStatisticsPage() {
       title="Tổng kết Rủi ro"
       activePage={"risk-analysis"}
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <div className="p-4" style={{ backgroundColor: "#f9fafb" }}>
         {/* Header - KEEP ORIGINAL */}
@@ -373,16 +404,7 @@ export default function RiskStatisticsPage() {
               Tổng quan và phân tích chi tiết rủi ro sau sự kiện
             </p>
           </div>
-          <div className="d-flex gap-2">
-            <button className="btn btn-success d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-excel"></i>
-              Xuất Excel
-            </button>
-            <button className="btn btn-danger d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-pdf"></i>
-              Xuất PDF
-            </button>
-          </div>
+
         </div>
 
         {/* KPI Cards - KEEP ORIGINAL */}
@@ -425,6 +447,9 @@ export default function RiskStatisticsPage() {
                     {statisticsData?.summary?.riskWithMostIncidents
                       ?.incidentCount || 0}
                   </h3>
+                  {/* <small className="text-muted">
+                    {statisticsData?.summary?.riskWithMostIncidents?.department}
+                  </small> */}
                   <div className="mt-2" style={{ fontSize: "20px" }}>
                     🚨
                   </div>
@@ -540,17 +565,26 @@ export default function RiskStatisticsPage() {
                   </div>
                 ) : (
                   <div className="bar-chart-container">
-                    {(statisticsData?.riskFrequency || [])
-                      .sort((a, b) => b.value - a.value) // Sort by value descending
-                      .slice(0, 5) // Take only top 5 items
-                      .map((item, idx) => {
+                    {(() => {
+                      const chartData = (statisticsData?.riskFrequency || [])
+                        .sort((a, b) => b.value - a.value) // Sort by value descending
+                        .slice(0, 5); // Take only top 5 items
+                      const dataCount = chartData.length;
+                      
+                      return chartData.map((item, idx) => {
                         const maxValue = Math.max(
                           ...(statisticsData?.riskFrequency || []).map(
                             (i) => i.value
                           )
                         );
-                        const percentage =
+                        let percentage =
                           maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                        
+                        // Limit bar width when there's only one data point
+                        if (dataCount === 1 && percentage > 80) {
+                          percentage = 80;
+                        }
+                        
                         const totalRisks = (
                           statisticsData?.riskFrequency || []
                         ).reduce((sum, r) => sum + r.value, 0);
@@ -588,7 +622,8 @@ export default function RiskStatisticsPage() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                     {(statisticsData?.riskFrequency || []).length > 5 && (
                       <div className="bar-chart-more">
                         <small
@@ -625,17 +660,26 @@ export default function RiskStatisticsPage() {
                   </div>
                 ) : (
                   <div className="bar-chart-container">
-                    {(statisticsData?.riskByDepartment || [])
-                      .sort((a, b) => b.value - a.value) // Sort by value descending
-                      .slice(0, 5) // Take only top 5 items
-                      .map((item, idx) => {
+                    {(() => {
+                      const chartData = (statisticsData?.riskByDepartment || [])
+                        .sort((a, b) => b.value - a.value) // Sort by value descending
+                        .slice(0, 5); // Take only top 5 items
+                      const dataCount = chartData.length;
+                      
+                      return chartData.map((item, idx) => {
                         const maxValue = Math.max(
                           ...(statisticsData?.riskByDepartment || []).map(
                             (i) => i.value
                           )
                         );
-                        const percentage =
+                        let percentage =
                           maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                        
+                        // Limit bar width when there's only one data point
+                        if (dataCount === 1 && percentage > 80) {
+                          percentage = 80;
+                        }
+                        
                         const totalIncidents = (
                           statisticsData?.riskByDepartment || []
                         ).reduce((sum, d) => sum + d.value, 0);
@@ -674,7 +718,8 @@ export default function RiskStatisticsPage() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                     {(statisticsData?.riskByDepartment || []).length > 5 && (
                       <div className="bar-chart-more">
                         <small

@@ -1,25 +1,34 @@
 import axiosClient from './axiosClient';
 
 export const eventApi = {
-  getAllPublicEvents: async () => {
+  getAllPublicEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
     try {
-      const response = await axiosClient.get('/api/events/public');
+      const params = new URLSearchParams();
+      if (page) params.append('page', page);
+      if (limit) params.append('limit', limit);
+      if (search) params.append('search', search);
+      if (status) params.append('status', status);
+      const response = await axiosClient.get(`/api/events/public?${params.toString()}`);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
-  getEventById: async (eventId) => {
+  getEventById: async (eventId, config = {}) => {
     try {
-      const response = await axiosClient.get(`/api/events/${eventId}`);
+      const axiosConfig = {
+        ...config,
+        skipGlobal404: config.skipGlobal404 || false,
+        skipGlobal403: config.skipGlobal403 || false
+      };
+      const response = await axiosClient.get(`/api/events/${eventId}`, axiosConfig);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
-  create: async ({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images }) => {
-    // console.log({ name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
-    const res = await axiosClient.post('/api/events', { name, description, eventStartDate, eventEndDate, location, type, organizerName, images });
+  create: async ({ name, description, eventStartDate, eventEndDate, location, type, organizerName, image }) => {
+    const res = await axiosClient.post('/api/events', { name, description, eventStartDate, eventEndDate, location, type, organizerName, image });
     // console.log(res);
     // Trả về cả status, message và data nếu có
     return {
@@ -28,12 +37,8 @@ export const eventApi = {
       data: res.data?.data || res.data
     };
   },
-  replaceImages: async (eventId, images) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
-    return res.data;
-  },
-  addImages: async (eventId, images) => {
-    const res = await axiosClient.post(`/api/events/${eventId}/images`, { images });
+  updateEventImage: async (eventId, image) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/image`, { image });
     return res.data;
   },
   getEventSummary: async (eventId) => {
@@ -57,12 +62,13 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/private/${id}`);
     return res.data;
   },
-  replaceEventImages: async (eventId, images) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/images`, { images });
-    return res.data;
-  },
-  listMyEvents: async () => {
-    const res = await axiosClient.get('/api/events/me/list');
+  listMyEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (page) params.append('page', page);
+    if (limit) params.append('limit', limit);
+    if (search) params.append('search', search);
+    if (status) params.append('status', status);
+    const res = await axiosClient.get(`/api/events/me/list?${params.toString()}`);
     return res.data;
   },
   getAllEventDetail: async (eventId) => {
@@ -70,7 +76,7 @@ export const eventApi = {
     return res.data;
   },
   debugAuth: async () => {
-    const res = await axiosClient.get('/api/auth/profile');
+    const res = await axiosClient.get('/api/user/profile');
     return res.data;
   },
   getMembersByEvent: async (eventId) => {
@@ -85,6 +91,26 @@ export const eventApi = {
     const res = await axiosClient.get(`/api/events/${eventId}/members/${memberId}`);
     return res.data;
   },
+  updateMemberRole: async (eventId, memberId, role) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/members/${memberId}/role`, { role });
+    return res.data;
+  },
+  changeMemberDepartment: async (eventId, memberId, departmentId) => {
+    const res = await axiosClient.patch(`/api/events/${eventId}/members/${memberId}/department`, { departmentId });
+    return res.data;
+  },
+  removeMemberFromEvent: async (eventId, memberId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/${memberId}`);
+    return res.data;
+  },
+  leaveEvent: async (eventId) => {
+    const res = await axiosClient.delete(`/api/events/${eventId}/members/me`);
+    return res.data;
+  },
+  getCoreTeamList: async (eventId) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/members/coreteam`);
+    return res.data;
+  }
   
 }
 

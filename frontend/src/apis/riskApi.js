@@ -75,19 +75,6 @@ export const riskApi = {
     return res.data;
   },
 
-  
-
-  // ========== UTILITY OPERATIONS ==========
-
-  // Bulk update risk statuses
-  // PATCH /api/events/:eventId/risks/bulk-status
-  bulkUpdateRiskStatus: async (eventId, { riskIds, status }) => {
-    const res = await axiosClient.patch(`/api/events/${eventId}/risks/bulk-status`, {
-      riskIds,
-      status
-    });
-    return res.data;
-  },
 
   // Export risk data
   // GET /api/events/:eventId/risks/export
@@ -107,14 +94,6 @@ export const riskApi = {
     const res = await axiosClient.post(`/api/events/${eventId}/risks/${riskId}/update-status`);
     return res.data;
   },
-
-  // Batch auto-update all risk statuses
-  // POST /api/events/:eventId/risks/batch-update-status
-  batchUpdateRiskStatuses: async (eventId) => {
-    const res = await axiosClient.post(`/api/events/${eventId}/risks/batch-update-status`);
-    return res.data;
-  },
-
 
   // ========== GLOBAL OPERATIONS ==========
 
@@ -150,28 +129,31 @@ export const riskApiHelpers = {
 
   // Validate risk data before send
   validateRiskData: (riskData) => {
-    const required = ['name', 'departmentId', 'risk_category', 'impact', 'likelihood', 'risk_mitigation_plan'];
+    const required = ['name', 'risk_category', 'impact', 'likelihood', 'risk_mitigation_plan'];
     const missing = required.filter(field => !riskData[field]);
-    
+
+    // Only require departmentId when scope is "department"
+    if (riskData.scope === "department" && !riskData.departmentId) {
+      missing.push('departmentId');
+    }
+
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
 
     // Validate enums
-    const validCategories = [
-      'infrastructure', 'mc-guests', 'communication', 'players', 'staffing',
-      'communication_post', 'attendees', 'weather', 'time', 'timeline', 
-      'tickets', 'collateral', 'game', 'sponsorship', 'finance', 
-      'transportation', 'decor', 'others'
-    ];
-    
+    const validScopes = ['event', 'department'];
+    // Remove validCategories - accept any string for risk_category to allow custom categories
+
     const validImpacts = ['low', 'medium', 'high'];
     const validLikelihoods = ['very_low', 'low', 'medium', 'high', 'very_high'];
-    const validStatuses = ['not_yet', 'resolved', 'cancelled'];
+    const validStatuses = ['not_yet', 'resolved', 'resolving'];
 
-    if (!validCategories.includes(riskData.risk_category)) {
-      throw new Error(`Invalid risk_category. Must be one of: ${validCategories.join(', ')}`);
+    if (riskData.scope && !validScopes.includes(riskData.scope)) {
+      throw new Error(`Invalid scope. Must be one of: ${validScopes.join(', ')}`);
     }
+
+    // Remove risk_category validation - allow any string value
 
     if (!validImpacts.includes(riskData.impact)) {
       throw new Error(`Invalid impact. Must be one of: ${validImpacts.join(', ')}`);
@@ -224,6 +206,7 @@ export const riskApiHelpers = {
     if (filters.likelihood) params.likelihood = filters.likelihood;
     if (filters.risk_status) params.risk_status = filters.risk_status;
     if (filters.departmentId) params.departmentId = filters.departmentId;
+    if (filters.scope) params.scope = filters.scope;
     
     return params;
   },
@@ -341,23 +324,9 @@ export const riskApiWithErrorHandling = {
     );
   },
 
-  // ===== UTILITIES WITH ERROR HANDLING =====
-
-  bulkUpdateRiskStatus: async (eventId, data) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.bulkUpdateRiskStatus(eventId, data)
-    );
-  },
-
   updateRiskStatusManually: async (eventId, riskId) => {
     return riskApiWithErrorHandling.handleApiCall(() => 
       riskApi.updateRiskStatusManually(eventId, riskId)
-    );
-  },
-
-  batchUpdateRiskStatuses: async (eventId) => {
-    return riskApiWithErrorHandling.handleApiCall(() => 
-      riskApi.batchUpdateRiskStatuses(eventId)
     );
   },
 

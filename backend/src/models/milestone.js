@@ -6,11 +6,17 @@ const MilestoneSchema = new Schema({
     name: { type: String, required: true },
     description: { type: String },
     targetDate: { type: Date, required: true },
-    status: { 
-        type: String, 
-        enum: ['planned', 'in_progress', 'completed', 'delayed', 'cancelled'], 
-        default: 'planned' 
-      },
     isDeleted: { type: Boolean, default: false },
 }, { timestamps: true, versionKey: false });
+
+// Indexes để tối ưu query performance
+MilestoneSchema.index({ eventId: 1, targetDate: 1 }); // Compound index cho queries và sort
+MilestoneSchema.index({ eventId: 1, isDeleted: 1 }); // Filter milestones theo event và deleted status
+MilestoneSchema.index({ targetDate: 1 }); // Sort theo targetDate
+// Unique index to prevent duplicate milestone names in the same event (only for non-deleted milestones)
+MilestoneSchema.index({ eventId: 1, name: 1, isDeleted: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { isDeleted: false } 
+});
+
 export default mongoose.model('Milestone', MilestoneSchema);

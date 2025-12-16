@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ["CÔNG VIỆC", "LỊCH HỌP", "CỘT MỐC", "KHÁC"],
+      enum: ["CÔNG VIỆC", "LỊCH HỌP", "CỘT MỐC", "THÀNH VIÊN", "TÀI CHÍNH", "PHẢN HỒI", "RỦI RO", "KHÁC"],
       default: "KHÁC",
     },
     title: {
@@ -52,6 +52,32 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Agenda",
     },
+    relatedCalendarId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Calendar",
+    },
+    relatedBudgetId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EventBudgetPlan",
+    },
+    relatedExpenseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EventExpense",
+    },
+    relatedFeedbackId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FeedbackForm",
+    },
+    relatedRiskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Risk",
+    },
+    relatedItemId: {
+      type: String,
+    },
+    targetUrl: {
+      type: String,
+    }
   },
   {
     timestamps: true,

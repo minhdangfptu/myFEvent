@@ -2,6 +2,7 @@ import Event from '../models/event.js';
 import Department from '../models/department.js';
 import EventMember from '../models/eventMember.js';
 import User from '../models/user.js';
+import Task from '../models/task.js';
 
 // Basic helpers
 export const ensureEventExists = async (eventId) => {
@@ -11,6 +12,13 @@ export const ensureEventExists = async (eventId) => {
 
 export const ensureDepartmentInEvent = async (eventId, departmentId) => {
   return await Department.findOne({ _id: departmentId, eventId });
+};
+
+export const findDepartmentByName = async (eventId, name) => {
+  return await Department.findOne({ 
+    eventId, 
+    name: { $regex: new RegExp(`^${name}$`, 'i') } 
+  });
 };
 
 
@@ -26,7 +34,7 @@ export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) =
 
   const [items, total] = await Promise.all([
     Department.find(filter)
-      .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+      .populate({ path: 'leaderId', select: 'fullName' })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -34,12 +42,36 @@ export const findDepartmentsByEvent = async (eventId, { search, skip, limit }) =
     Department.countDocuments(filter)
   ]);
 
-  return { items, total };
+  let memberCounts = {};
+  const departmentIds = items.map((dept) => dept._id).filter(Boolean);
+  if (departmentIds.length > 0) {
+    const counts = await EventMember.aggregate([
+      {
+        $match: {
+          departmentId: { $in: departmentIds },
+          role: { $ne: 'HoOC' },
+          status: { $ne: 'deactive' }
+        }
+      },
+      {
+        $group: {
+          _id: '$departmentId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    memberCounts = counts.reduce((acc, curr) => {
+      acc[curr._id.toString()] = curr.count;
+      return acc;
+    }, {});
+  }
+
+  return { items, total, memberCounts };
 };
 
 export const findDepartmentById = async (departmentId) => {
   return await Department.findOne({ _id: departmentId })
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
@@ -47,7 +79,7 @@ export const findDepartmentById = async (departmentId) => {
 export const createDepartmentDoc = async (payload) => {
   const department = await Department.create(payload);
   return await Department.findById(department._id)
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
@@ -56,7 +88,7 @@ export const updateDepartmentDoc = async (departmentId, set) => {
     departmentId,
     { $set: set },
     { new: true }
-  ).populate({ path: 'leaderId', select: 'fullName email avatarUrl' }).lean();
+  ).populate({ path: 'leaderId', select: 'fullName' }).lean();
 };
 
 export const deleteDepartmentDoc = async (departmentId) => {
@@ -68,21 +100,26 @@ export const assignHoDToDepartment = async (eventId, department, userId) => {
   department.leaderId = userId;
   await department.save();
 
+  const targetMembership = await EventMember.findOne({ eventId, userId, status: { $ne: 'deactive' } });
+  if (!targetMembership) {
+    throw new Error('Người dùng chưa tham gia sự kiện');
+  }
+
   await EventMember.findOneAndUpdate(
-    { eventId, userId },
+    { _id: targetMembership._id },
     { $set: { departmentId: department._id, role: 'HoD' } },
-    { upsert: true, new: true }
+    { new: true }
   );
 
   if (previousLeaderId && previousLeaderId !== userId) {
     await EventMember.findOneAndUpdate(
-      { eventId, userId: previousLeaderId },
-      { $set: { departmentId: department._id, role: 'staff' } }
+      { eventId, userId: previousLeaderId, status: { $ne: 'deactive' } },
+      { $set: { departmentId: department._id, role: 'Member' } }
     );
   }
 
   return await Department.findById(department._id)
-    .populate({ path: 'leaderId', select: 'fullName email avatarUrl' })
+    .populate({ path: 'leaderId', select: 'fullName' })
     .lean();
 };
 
@@ -91,28 +128,39 @@ export const ensureUserExists = async (userId) => {
 };
 
 export const isUserMemberOfDepartment = async (eventId, departmentId, userId) => {
-  const m = await EventMember.findOne({ eventId, userId, departmentId }).lean();
+  const m = await EventMember.findOne({ eventId, userId, departmentId, status: { $ne: 'deactive' } }).lean();
   return !!m;
 };
 
 export const addMemberToDepartmentDoc = async (eventId, departmentId, memberId, roleToSet) => {
   return await EventMember.findOneAndUpdate(
-    { _id: memberId },
+    { _id: memberId, status: { $ne: 'deactive' } },
     { $set: { departmentId, ...(roleToSet ? { role: roleToSet } : {}) } },
     { new: true }
   ).populate('userId', 'fullName email avatarUrl');
 };
 
 export const removeMemberFromDepartmentDoc = async (eventId, departmentId, memberId) => {
+  await Task.updateMany(
+    {
+      eventId,
+      assigneeId: memberId,
+      status: { $in: ['chua_bat_dau', 'da_bat_dau'] }
+    },
+    {
+      $set: { assigneeId: null }
+    }
+  );
+
   return await EventMember.findOneAndUpdate(
-    { _id: memberId, departmentId },
+    { _id: memberId, departmentId, status: { $ne: 'deactive' } },
     { $set: { departmentId: null, role: 'Member' } },
     { new: true }
   );
 };
 
 export const findEventMemberById = async (memberId) => {
-  return await EventMember.findOne({ _id: memberId }).lean();
+  return await EventMember.findOne({ _id: memberId, status: { $ne: 'deactive' } }).lean();
 };
 
 

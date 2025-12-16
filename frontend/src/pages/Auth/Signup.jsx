@@ -4,10 +4,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { authApi } from '../../apis/authApi';
+import authStorage from '../../utils/authStorage';
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     fullName: "",
@@ -17,13 +18,31 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // FE password validation
+  const validatePassword = (password) => {
+    const regex = /^(?=.*[0-9])(?=.*[!@#$%^&*]).{8,50}$/;
+    return regex.test(password);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+    if (name === "password") {
+      if (!validatePassword(value)) {
+        setPasswordError("Mật khẩu phải 8–50 ký tự, chứa ít nhất 1 số và 1 ký tự đặc biệt.");
+      } else {
+        setPasswordError("");
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -31,14 +50,16 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
+    // Confirm password validation
     if (formData.password !== formData.confirmPassword) {
       setError("Mật khẩu xác nhận không khớp!");
       setLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự!");
+    // Password rule validation
+    if (!validatePassword(formData.password)) {
+      setError("Mật khẩu phải từ 8–50 ký tự, chứa ít nhất 1 số và 1 ký tự đặc biệt!");
       setLoading(false);
       return;
     }
@@ -46,8 +67,12 @@ export default function SignupPage() {
     try {
       const { confirmPassword, ...registerData } = formData;
       await signup(registerData);
+
       setSuccess(true);
-      navigate('/email-confirmation', { state: { email: registerData.email } });
+
+      navigate('/email-confirmation', { 
+        state: { email: registerData.email } 
+      });
     } catch (error) {
       console.error('Signup error:', error);
       const msg = error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
@@ -61,28 +86,26 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      // Decode the JWT token to get user info
       const decoded = jwtDecode(credentialResponse.credential);
-      
-      // Send the credential to backend
+
       const response = await authApi.googleLogin({
         credential: credentialResponse.credential,
         g_csrf_token: document.cookie.split("; ").find(r => r.startsWith("g_csrf_token="))?.split("=")[1] || undefined
       });
-      
-      // Persist auth data
+
       const accessToken = response.accessToken || response.tokens?.accessToken;
       const refreshToken = response.refreshToken || response.tokens?.refreshToken;
       const userData = response.user || null;
 
-      if (accessToken) localStorage.setItem('access_token', accessToken);
-      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
-      if (userData) localStorage.setItem('user', JSON.stringify(userData));
+      if (accessToken) authStorage.setAccessToken(accessToken);
+      if (refreshToken) authStorage.setRefreshToken(refreshToken);
+      if (userData) authStorage.setUser(userData);
 
       if (userData) {
         window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } }));
       }
-        navigate('/home-page', { replace: true });  
+
+      navigate('/home-page', { replace: true });
     } catch (error) {
       console.error('Google signup error:', error);
       setError(error.response?.data?.message || error?.message || 'Đăng ký Google thất bại.');
@@ -110,7 +133,7 @@ export default function SignupPage() {
               <div className="alert alert-danger" role="alert">{error}</div>
             )}
             {success && (
-              <div className="alert alert-success" role="alert">Đăng ký thành công! Đang chuyển về trang đăng nhập...</div>
+              <div className="alert alert-success" role="alert">Đăng ký thành công! Đang chuyển trang...</div>
             )}
 
             <form onSubmit={handleSubmit}>
@@ -122,7 +145,7 @@ export default function SignupPage() {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Nhập địa chỉ email của bạn"
+                  placeholder="Nhập email"
                   required
                   disabled={loading}
                 />
@@ -136,45 +159,73 @@ export default function SignupPage() {
                   type="text"
                   value={formData.fullName}
                   onChange={handleInputChange}
-                  placeholder="Nhập tên đầy đủ của bạn"
+                  placeholder="Nhập tên đầy đủ"
                   required
                   disabled={loading}
                 />
               </div>
+
               <div className="mb-3">
                 <label className="form-label">Mật khẩu</label>
-                <input
-                  className="form-control"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="Nhập mật khẩu của bạn"
-                  required
-                  disabled={loading}
-                />
+                <div className="position-relative">
+                  <input
+                    className="form-control"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="Nhập mật khẩu"
+                    required
+                    disabled={loading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
+                {passwordError && (
+                  <small className="text-danger">{passwordError}</small>
+                )}
               </div>
 
               <div className="mb-3">
                 <label className="form-label">Xác nhận mật khẩu</label>
-                <input
-                  className="form-control"
-                  name="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  placeholder="Nhập lại mật khẩu của bạn"
-                  required
-                  disabled={loading}
-                />
+                <div className="position-relative">
+                  <input
+                    className="form-control"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    placeholder="Nhập lại mật khẩu"
+                    required
+                    disabled={loading}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn position-absolute top-50 translate-middle-y border-0 bg-transparent"
+                    style={{ right: '8px', zIndex: 10 }}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
+                  >
+                    <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`} style={{ color: '#6b7280' }}></i>
+                  </button>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-danger w-100 mb-3" disabled={loading}>
                 {loading ? (
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
                     Đang đăng ký...
-                  </span>
+                  </>
                 ) : (
                   'Đăng ký'
                 )}
@@ -189,7 +240,6 @@ export default function SignupPage() {
                   theme="outline"
                   size="large"
                   text="signup_with"
-                  shape="rectangular"
                 />
               </div>
             </form>
@@ -204,5 +254,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-

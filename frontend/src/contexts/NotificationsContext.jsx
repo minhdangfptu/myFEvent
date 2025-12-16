@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { notificationApi } from '../apis/notificationApi'
+import authStorage from '../utils/authStorage'
 
 const NotificationsContext = createContext(null)
 
@@ -10,7 +11,15 @@ export function NotificationsProvider({ children }) {
 
   // Fetch notifications from API
   const fetchNotifications = async () => {
-    if (!enabled) return
+    // Check token before making request
+    const hasToken = authStorage.hasSession()
+    if (!hasToken) {
+      setEnabled(false)
+      setNotifications([])
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       const response = await notificationApi.getNotifications()
@@ -24,12 +33,27 @@ export function NotificationsProvider({ children }) {
         title: n.title || '',
         createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         unread: n.unread !== undefined ? n.unread : true,
-        color: n.color || '#ef4444'
+        color: n.color || '#ef4444',
+        // Keep relational ids so we can navigate to the right place on click
+        eventId: n.eventId || n.event?.id || n.event,
+        relatedTaskId: n.relatedTaskId || n.taskId || n.task,
+        relatedMilestoneId: n.relatedMilestoneId || n.milestoneId || n.milestone,
+        relatedAgendaId: n.relatedAgendaId || n.agendaId || n.agenda,
+        relatedCalendarId: n.relatedCalendarId || n.calendarId || n.calendar,
+        // Optional explicit target URL from backend, if provided
+        targetUrl: n.targetUrl || n.url
       }))
       setNotifications(mapped)
     } catch (error) {
-      console.error('Error fetching notifications:', error)
-      setNotifications([])
+      // If 401, token is invalid - disable fetching
+      if (error?.response?.status === 401) {
+        console.warn('Unauthorized - disabling notifications fetching')
+        setEnabled(false)
+        setNotifications([])
+      } else {
+        console.error('Error fetching notifications:', error)
+        // Don't clear notifications on other errors, just log
+      }
     } finally {
       setLoading(false)
     }
@@ -37,7 +61,7 @@ export function NotificationsProvider({ children }) {
 
   useEffect(() => {
     // Enable fetching only if token exists
-    const hasToken = !!localStorage.getItem('access_token')
+    const hasToken = authStorage.hasSession()
     setEnabled(hasToken)
 
     if (hasToken) {
@@ -57,16 +81,25 @@ export function NotificationsProvider({ children }) {
     window.addEventListener('auth:logout', onLogout)
 
     // Poll for new notifications every 30 seconds when enabled
-    const interval = setInterval(() => {
-      if (enabled) fetchNotifications()
-    }, 30000)
+    let interval = null
+    if (hasToken) {
+      interval = setInterval(() => {
+        const stillHasToken = authStorage.hasSession()
+        if (stillHasToken) {
+          fetchNotifications()
+        } else {
+          setEnabled(false)
+          setNotifications([])
+        }
+      }, 30000)
+    }
 
     return () => {
-      clearInterval(interval)
+      if (interval) clearInterval(interval)
       window.removeEventListener('auth:login', onLogin)
       window.removeEventListener('auth:logout', onLogout)
     }
-  }, [enabled])
+  }, []) // Empty dependency array - only run once on mount
 
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
 

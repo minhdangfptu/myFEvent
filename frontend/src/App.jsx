@@ -1,8 +1,12 @@
 import * as React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { toast } from "react-toastify";
+import { WifiOff } from "lucide-react";
+import { useAuth } from "./contexts/AuthContext";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -48,6 +52,7 @@ import ErrorPage404 from "./pages/Errors/ErrorPage404";
 import ErrorPage403 from "./pages/Errors/ErrorPage403";
 import ErrorPage401 from "./pages/Errors/ErrorPage401";
 import ErrorPage502 from "./pages/Errors/ErrorPage502";
+import ErrorPage504 from "./pages/Errors/ErrorPage504";
 import ErrorPageOffline from "./pages/Errors/ErrorPageOffline";
 import { ToastContainer } from "react-toastify";
 import HoDDashBoard from "./pages/HoD/HoDDashBoard";
@@ -60,6 +65,7 @@ import EventTaskPage from "./pages/Task/EventTaskPage";
 import EventTaskDetailPage from "./pages/Task/EventTaskDetailPage";
 import GanttChartTaskPage from "./pages/Task/GanttChartTaskPage";
 import HoDTaskPage from "./pages/Task/HoDTaskPage";
+import MemberTaskPage from "./pages/Task/MemberTaskPage";
 import EventDetailPage from "./pages/User/EventDetailPage";
 import MemberProfilePage from "./pages/ManageDept&Member/MemberDetail";
 import EventCalendar from "./pages/Calendar/EventCalendar";
@@ -67,29 +73,208 @@ import CreateEventCalenderPage from "./pages/Calendar/CreateCalendarPage";
 import CreateDepartmentCalendarPage from "./pages/Calendar/CreateDepartmentCalendarPage";
 import CalendarDetail from "./pages/Calendar/CalendarDetail";
 import UpdateEventCalendarPage from "./pages/Calendar/UpdateCalendarPage";
+import UpdateDepartmentCalendarPage from "./pages/Calendar/UpdateDepartmentCalendarPage";
 
 // Feedback Pages
 import ManageFeedbackEventPage from "./pages/Feedback/ManageFeedbackEventPage";
 import CreateFeedbackForm from "./pages/Feedback/CreateFeedbackForm";
 import FeedbackSummary from "./pages/Feedback/FeedbackSummary";
+import MemberFeedbackListPage from "./pages/Feedback/MemberFeedbackListPage";
+import SubmitFeedbackResponsePage from "./pages/Feedback/SubmitFeedbackResponsePage";
 import RiskStatistics from "./pages/Risk/RiskStatistics";
 import RiskDetailPage from "./pages/Risk/RiskDetailPage";
 import AgendaPage from "./pages/Agenda/AgendaPage";
+import DepartmentBudgetEmpty from "./pages/Budget/DepartmentBudgetEmpty";
+import CreateDepartmentBudget from "./pages/Budget/CreateDepartmentBudget";
+import ViewDepartmentBudget from "./pages/Budget/ViewDepartmentBudget";
+import ListBudgetsPage from "./pages/Budget/ListBudgetsPage";
+import DepartmentBudgetsListPage from "./pages/Budget/DepartmentBudgetsListPage";
+import ViewDeptBudgetDetailHoOC from "./pages/Budget/ViewDeptBudgetDetailHoOC";
+import BudgetStatistics from "./pages/Budget/BudgetStatistics";
+import BudgetStatisticsHoD from "./pages/Budget/BudgetStatisticsHoD";
+import MemberExpensePage from "./pages/Budget/MemberExpensePage";
+import MemberBudgetPage from "./pages/Budget/MemberBudgetPage";
+import HoOCTaskStatisticPage from "./pages/HoOC/TaskStatistic/HoOCTaskStatisticPage";
+import HoDTaskStatisticPage from "./pages/HoD/TaskStatistic/HoDTaskStatisticPage";
+import DataExportPage from "./pages/HoOC/ExportData/DataExportPage";
+import DataTemplatePage from "./pages/HoOC/ExportData/DataTemplatePage";
+import DataExportPreviewModal from "./components/DataExportPreviewModal";
+import AdminDashboard from "./pages/Admin/AdminDashBoard";
+import { User } from "lucide-react";
+import UserManagement from "./pages/Admin/UserManagement";
+import EventDetailManagement from "./pages/Admin/EventDetailManagement";
+import UserDetailManagement from "./pages/Admin/UserDetailManagement";
+import EventManagement from "./pages/Admin/EventManagement";
+import ErrorPage503 from "./pages/Errors/ErrorPage503";
+import ErrorPage500 from "./pages/Errors/ErrorPage500";
+import AxiosInterceptor from "./components/AxiosInterceptor";
+import ErrorBoundary from "./components/ErrorBoundary";
+import SupportPage from "./pages/User/SupportPage";
+import SupportButton from "./components/SupportButton";
+import GlobalAIAssistant from "./components/chat/GlobalAIAssistant";
+
+// Component để redirect URL cũ có budgetId trong path review (giữ lại để backward compatibility)
+// Nhưng giờ ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId, nên có thể dùng trực tiếp
+const BudgetReviewRedirect = () => {
+  const { eventId, departmentId, budgetId } = useParams();
+  // Nếu có budgetId, giữ nguyên URL (không redirect)
+  // Nếu không có budgetId, redirect về review không có budgetId
+  if (budgetId) {
+    // Render ViewDeptBudgetDetailHoOC trực tiếp thay vì redirect
+    return <ViewDeptBudgetDetailHoOC />;
+  }
+  return <Navigate to={`/events/${eventId}/departments/${departmentId}/budget/review`} replace />;
+};
+
+// Network Warning Overlay Component
+function NetworkWarningOverlay({ isVisible, onClose }) {
+  if (!isVisible) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(255, 255, 255, 0.9)",
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "16px",
+      }}
+    >
+      <WifiOff size={64} color="#ef4444" />
+      <h2 style={{ color: "#ef4444", margin: 0, fontSize: "24px" }}>
+        Mạng không ổn định
+      </h2>
+      <p style={{ color: "#6b7280", margin: 0, textAlign: "center" }}>
+        Kết nối mạng đang gặp sự cố. Vui lòng kiểm tra kết nối của bạn.
+      </p>
+      <button
+        onClick={onClose}
+        style={{
+          marginTop: "16px",
+          padding: "10px 24px",
+          backgroundColor: "#ef4444",
+          color: "white",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontSize: "16px",
+        }}
+      >
+        Đóng
+      </button>
+    </div>
+  );
+}
+
+function RootRedirect() {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border" role="status" aria-hidden="true"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    if (user?.role === 'admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/home-page" replace />;
+  }
+
+  return <Navigate to="/landingpage" replace />;
+}
 
 export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const toastIdRef = React.useRef(null);
+
+  // Detect online/offline status from browser and axios network errors
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    const handleNetworkOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("network:offline", handleNetworkOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("network:offline", handleNetworkOffline);
+    };
+  }, []);
+
+  const handleNetworkTimeout = useCallback(() => {
+    // Show overlay
+    setShowNetworkWarning(true);
+
+    // Show toast for 1 minute (60000ms) with icon
+    if (!toast.isActive(toastIdRef.current)) {
+      toastIdRef.current = toast.warning(
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <WifiOff size={20} />
+          <span>Mạng không ổn định! Vui lòng kiểm tra kết nối.</span>
+        </div>,
+        {
+          autoClose: 60000,
+          closeButton: true,
+          closeOnClick: true,
+          draggable: true,
+          onClose: () => {
+            setShowNetworkWarning(false);
+          }
+        }
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("network:timeout", handleNetworkTimeout);
+    return () => {
+      window.removeEventListener("network:timeout", handleNetworkTimeout);
+    };
+  }, [handleNetworkTimeout]);
+
+  const handleCloseOverlay = () => {
+    setShowNetworkWarning(false);
+    if (toastIdRef.current) {
+      toast.dismiss(toastIdRef.current);
+    }
+  };
+
+  // Show offline page when network is disconnected
+  if (isOffline) {
+    return <ErrorPageOffline />;
+  }
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
-        <ToastContainer position="top-right" autoClose={3000} />
+      <AxiosInterceptor>
+        <ToastContainer position="top-right" autoClose={3000} style={{ marginTop: '60px' }}/>
+        <SupportButton />
+        <GlobalAIAssistant />
         <NotificationsProvider>
           <EventProvider>
+            <ErrorBoundary>
             <Routes>
               {/* Default Route */}
               <Route
                 path="/"
-                element={<Navigate to="/landingpage" replace />}
+                element={<RootRedirect />}
               />
 
               {/* Public Routes */}
@@ -317,7 +502,7 @@ export default function App() {
           <Route 
             path="events/:eventId/tasks" 
             element={
-              <ProtectedRoute requiredRole="user">
+              <ProtectedRoute requiredRole="user" requiredEventRoles={["HoOC"]}>
                 <EventTaskPage />
               </ProtectedRoute>
             } 
@@ -331,6 +516,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="events/:eventId/member-tasks" 
+            element={
+              <ProtectedRoute>
+                <MemberTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="events/:eventId/tasks/:taskId" 
             element={
               <ProtectedRoute requiredRole="user">
@@ -338,12 +531,27 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          
+          <Route 
+            path="events/:eventId/tasks/hod-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoDTaskStatisticPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="events/:eventId/tasks/gantt" 
             element={
               <ProtectedRoute requiredRole="user">
                 <GanttChartTaskPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="events/:eventId/tasks/hooc-statistic" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <HoOCTaskStatisticPage />
               </ProtectedRoute>
             } 
           />
@@ -403,6 +611,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/events/:eventId/departments/:departmentId/calendars/:calendarId/edit-department-calendar"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UpdateDepartmentCalendarPage />
+              </ProtectedRoute>
+            }
+          />
           <Route 
             path="/home-page" 
             element={
@@ -454,13 +670,339 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/departments/statistics" 
+            element={
+              <ProtectedRoute>
+                <BudgetStatisticsHoD />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Route với budgetId - ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Route không có budgetId - backward compatibility */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/budgets/member" 
+            element={
+              <ProtectedRoute>
+                <MemberBudgetPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/events/:eventId/feedback/member" 
+            element={
+              <ProtectedRoute>
+                <MemberFeedbackListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/feedback/forms/:formId/respond" 
+            element={
+              <ProtectedRoute>
+                <SubmitFeedbackResponsePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoD */}
+          <Route 
+            path="/events/:eventId/budgets/departments" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetsListPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/departments/statistics" 
+            element={
+              <ProtectedRoute>
+                <BudgetStatisticsHoD />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget" 
+            element={
+              <ProtectedRoute>
+                <ViewDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/empty" 
+            element={
+              <ProtectedRoute>
+                <DepartmentBudgetEmpty />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/create" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/departments/:departmentId/budget/edit" 
+            element={
+              <ProtectedRoute>
+                <CreateDepartmentBudget />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Budget Routes - HoOC */}
+          <Route 
+            path="/events/:eventId/budgets" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ListBudgetsPage />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Route với budgetId - ViewDeptBudgetDetailHoOC đã hỗ trợ budgetId */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/:budgetId/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Route không có budgetId - backward compatibility */}
+          <Route 
+            path="/events/:eventId/departments/:departmentId/budget/review" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <ViewDeptBudgetDetailHoOC />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/budgets/statistics" 
+            element={
+              <ProtectedRoute requiredEventRoles={['HoOC']}>
+                <BudgetStatistics />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Budget Routes - Member */}
+          <Route
+            path="/events/:eventId/budgets/member" 
+            element={
+              <ProtectedRoute>
+                <MemberBudgetPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/expenses" 
+            element={
+              <ProtectedRoute>
+                <MemberExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/events/:eventId/export/data" 
+            element={
+              <ProtectedRoute>
+                <DataExportPage/>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/events/:eventId/export/templates" 
+            element={
+              <ProtectedRoute>
+                <DataTemplatePage />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Admin Routes */}
           <Route
-            path="/admin"
+            path="/admin/dashboard"
             element={
               <ProtectedRoute requiredRole="admin">
-                <div>Admin Page (Replace with your component)</div>
+                <AdminDashboard/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/event-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/event-management/:eventId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <EventDetailManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/user-management/:userId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <UserDetailManagement/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <ProtectedRoute>
+                <SupportPage/>
               </ProtectedRoute>
             }
           />
@@ -468,7 +1010,9 @@ export default function App() {
               {/* Error Routes */}
               <Route path="/401" element={<ErrorPage401 />} />
               <Route path="/502" element={<ErrorPage502 />} />
-              <Route path="/off" element={<ErrorPageOffline />} />
+              <Route path="/504" element={<ErrorPage504 />} />
+              <Route path="/503" element={<ErrorPage503 />} />
+              <Route path="/500" element={<ErrorPage500 />} />
               <Route
                 path="/unauthorized"
                 element={
@@ -478,8 +1022,10 @@ export default function App() {
               {/* 404 Route - Must be last */}
               <Route path="*" element={<ErrorPage404 />} />
             </Routes>
+            </ErrorBoundary>
           </EventProvider>
         </NotificationsProvider>
+        </AxiosInterceptor>
       </BrowserRouter>
     </GoogleOAuthProvider>
   );

@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,11 +25,19 @@ export default function TaskAssignmentBoard({
   members, 
   eventId, 
   departmentId,
-  onTaskAssigned,
-  currentUserId 
+  onTaskAssigned
 }) {
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
+  const isCompletedTask = (task) => {
+    const status = String(task?.status || "").toLowerCase();
+    return (
+      status === "hoan_thanh" ||
+      status === "completed" ||
+      status === "done" ||
+      status === "hoàn thành"
+    );
+  };
   
   // Separate unassigned tasks and members
   const [unassignedTasks, setUnassignedTasks] = useState([]);
@@ -104,6 +110,10 @@ export default function TaskAssignmentBoard({
     // Determine target based on collision detection result
     // If overId is 'unassigned-column', unassign
     if (overId === 'unassigned-column') {
+      if (isCompletedTask(activeTask)) {
+        toast.info('Công việc đã hoàn thành, không thể đổi người phụ trách');
+        return;
+      }
       const currentAssigneeId = activeTask.assigneeId ? 
         String(typeof activeTask.assigneeId === 'object' ? (activeTask.assigneeId._id || activeTask.assigneeId) : activeTask.assigneeId) : 
         null;
@@ -149,6 +159,10 @@ export default function TaskAssignmentBoard({
 
     // Check if dropped on a member (overId starts with "member-")
     if (overId.startsWith('member-')) {
+      if (isCompletedTask(activeTask)) {
+        toast.info('Công việc đã hoàn thành, không thể đổi người phụ trách');
+        return;
+      }
       const targetMemberId = overId.replace('member-', '');
       
       // Check if task is already assigned to this member

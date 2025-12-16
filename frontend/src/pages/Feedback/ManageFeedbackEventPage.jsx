@@ -5,7 +5,10 @@ import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
+import ConfirmModal from '../../components/ConfirmModal';
 import { useEvents } from '../../contexts/EventContext';
+import { Calendar, Inbox, RotateCw } from "lucide-react";
+
 
 export default function ManageFeedbackEventPage() {
   const { eventId } = useParams();
@@ -17,6 +20,10 @@ export default function ManageFeedbackEventPage() {
   const [forms, setForms] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [actionState, setActionState] = useState({ id: null, type: '' });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [formToDelete, setFormToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -31,8 +38,7 @@ export default function ManageFeedbackEventPage() {
       const role = await fetchEventRole(eventId);
       setEventRole(role);
       if (role !== 'HoOC') {
-        toast.error('Bạn không có quyền truy cập trang này');
-        navigate('/home-page');
+        navigate(`/events/${eventId}/feedback/member`, { replace: true });
       }
     } catch (error) {
       console.error('Error loading role:', error);
@@ -67,21 +73,51 @@ export default function ManageFeedbackEventPage() {
 
   const handleCloseForm = async (formId) => {
     try {
+      setActionState({ id: formId, type: 'close' });
       await feedbackApi.closeForm(eventId, formId);
       toast.success('Đóng biểu mẫu thành công');
       loadForms();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể đóng biểu mẫu');
+    } finally {
+      setActionState({ id: null, type: '' });
     }
   };
-  console.log (event);
+
   const handleReopenForm = async (formId) => {
     try {
-      await feedbackApi.reopenForm(eventId, formId);
-      toast.success('Mở lại biểu mẫu thành công');
+      setActionState({ id: formId, type: 'reopen' });
+      const res = await feedbackApi.reopenForm(eventId, formId);
+      toast.success(res?.message || 'Mở lại biểu mẫu thành công');
       loadForms();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể mở lại biểu mẫu');
+    } finally {
+      setActionState({ id: null, type: '' });
+    }
+  };
+
+  const handleDeleteForm = (formId) => {
+    setFormToDelete(formId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteForm = async () => {
+    if (!formToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      setActionState({ id: formToDelete, type: 'delete' });
+      await feedbackApi.deleteForm(eventId, formToDelete);
+      toast.success('Đã xoá biểu mẫu');
+      loadForms();
+      setShowDeleteModal(false);
+      setFormToDelete(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể xoá biểu mẫu');
+    } finally {
+      setIsDeleting(false);
+      setActionState({ id: null, type: '' });
     }
   };
 
@@ -137,35 +173,37 @@ export default function ManageFeedbackEventPage() {
               </h1>
               {event && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6b7280', fontSize: '14px' }}>
-                  <i className="bi bi-calendar-event"></i>
+                  <Calendar size={18} />
                   <span>Sự kiện: {event.name}</span>
                 </div>
               )}
             </div>
-            <button
-              onClick={() => navigate(`/events/${eventId}/feedback/create`)}
-              style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <i className="bi bi-plus-lg"></i>
-              Tạo biểu mẫu mới
-            </button>
+            {forms.length > 0 && (
+              <button
+                onClick={() => navigate(`/events/${eventId}/feedback/create`)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <i className="bi bi-plus-lg"></i>
+                Tạo biểu mẫu mới
+              </button>
+            )}
           </div>
 
           {forms.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
-              <i className="bi bi-inbox" style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }}></i>
+              <Inbox size={28} />
               <p>Chưa có biểu mẫu phản hồi nào</p>
               <button
                 onClick={() => navigate(`/events/${eventId}/feedback/create`)}
@@ -208,36 +246,109 @@ export default function ManageFeedbackEventPage() {
                         {getStatusBadge(form.status)}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {(form.status === 'open' || form.status === 'closed') && (
+                        <button
+                          onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/summary`)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#2563eb',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            padding: '6px 12px'
+                          }}
+                        >
+                          Xem phản hồi
+                        </button>
+                      )}
+                      {form.status === 'draft' && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/edit`)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#2563eb',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              padding: '6px 12px'
+                            }}
+                          >
+                            Chỉnh sửa
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setActionState({ id: form._id, type: 'publish' });
+                              try {
+                                await feedbackApi.publishForm(eventId, form._id);
+                                toast.success('Xuất bản biểu mẫu thành công');
+                                loadForms();
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || 'Không thể xuất bản biểu mẫu');
+                              } finally {
+                                setActionState({ id: null, type: '' });
+                              }
+                            }}
+                            disabled={actionState.id === form._id && actionState.type === 'publish'}
+                            style={{
+                              backgroundColor: '#dc2626',
+                              border: 'none',
+                              color: '#fff',
+                              borderRadius: '6px',
+                              padding: '6px 16px',
+                              fontSize: '14px',
+                              cursor: actionState.id === form._id && actionState.type === 'publish' ? 'not-allowed' : 'pointer',
+                              opacity: actionState.id === form._id && actionState.type === 'publish' ? 0.7 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            {actionState.id === form._id && actionState.type === 'publish' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                            {actionState.id === form._id && actionState.type === 'publish' ? 'Đang xuất bản...' : 'Xuất bản'}
+                          </button>
+                        </>
+                      )}
+                      {form.status !== 'draft' && (
+                        <button
+                          onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/edit`)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#2563eb',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            padding: '6px 12px'
+                          }}
+                        >
+                          Xem mẫu
+                        </button>
+                      )}
                       <button
-                        onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/summary`)}
+                        onClick={() => handleDeleteForm(form._id)}
+                        disabled={actionState.id === form._id && actionState.type === 'delete'}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#2563eb',
-                          cursor: 'pointer',
+                          backgroundColor: 'transparent',
+                          border: '1px solid #9ca3af',
+                          color: '#6b7280',
+                          borderRadius: '6px',
+                          padding: '6px 16px',
                           fontSize: '14px',
-                          padding: '6px 12px'
+                          cursor: actionState.id === form._id && actionState.type === 'delete' ? 'not-allowed' : 'pointer',
+                          opacity: actionState.id === form._id && actionState.type === 'delete' ? 0.6 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
                       >
-                        Xem phản hồi
+                        {actionState.id === form._id && actionState.type === 'delete' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                        {actionState.id === form._id && actionState.type === 'delete' ? 'Đang xoá...' : 'Xoá'}
                       </button>
-                      <button
-                        onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/edit`)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#2563eb',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          padding: '6px 12px'
-                        }}
-                      >
-                        Chỉnh sửa
-                      </button>
-                      {form.status === 'open' ? (
+                      {form.status === 'open' && (
                         <button
                           onClick={() => handleCloseForm(form._id)}
+                          disabled={actionState.id === form._id && actionState.type === 'close'}
                           style={{
                             backgroundColor: 'transparent',
                             border: '1px solid #ef4444',
@@ -245,14 +356,21 @@ export default function ManageFeedbackEventPage() {
                             borderRadius: '6px',
                             padding: '6px 16px',
                             fontSize: '14px',
-                            cursor: 'pointer'
+                            cursor: actionState.id === form._id && actionState.type === 'close' ? 'not-allowed' : 'pointer',
+                            opacity: actionState.id === form._id && actionState.type === 'close' ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}
                         >
-                          Đóng form
+                          {actionState.id === form._id && actionState.type === 'close' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                          {actionState.id === form._id && actionState.type === 'close' ? 'Đang đóng...' : 'Đóng form'}
                         </button>
-                      ) : form.status === 'closed' ? (
+                      )}
+                      {form.status === 'closed' && (
                         <button
                           onClick={() => handleReopenForm(form._id)}
+                          disabled={actionState.id === form._id && actionState.type === 'reopen'}
                           style={{
                             backgroundColor: 'transparent',
                             border: '1px solid #10b981',
@@ -260,12 +378,17 @@ export default function ManageFeedbackEventPage() {
                             borderRadius: '6px',
                             padding: '6px 16px',
                             fontSize: '14px',
-                            cursor: 'pointer'
+                            cursor: actionState.id === form._id && actionState.type === 'reopen' ? 'not-allowed' : 'pointer',
+                            opacity: actionState.id === form._id && actionState.type === 'reopen' ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}
                         >
-                          Mở lại
+                          {actionState.id === form._id && actionState.type === 'reopen' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                          {actionState.id === form._id && actionState.type === 'reopen' ? 'Đang mở...' : 'Mở lại'}
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>
@@ -323,6 +446,17 @@ export default function ManageFeedbackEventPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        show={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setFormToDelete(null);
+        }}
+        onConfirm={confirmDeleteForm}
+        message="Bạn chắc chắn muốn xoá biểu mẫu này? Hành động không thể hoàn tác."
+        isLoading={isDeleting}
+      />
     </UserLayout>
   );
 }

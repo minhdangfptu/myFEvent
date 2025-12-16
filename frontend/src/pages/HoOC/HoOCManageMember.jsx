@@ -1,9 +1,22 @@
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
+import { departmentApi } from "../../apis/departmentApi";
 import { useLocation } from "react-router-dom";
 import { useEvents } from "../../contexts/EventContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl";
+import ConfirmModal from "../../components/ConfirmModal";
+import { toast, ToastContainer } from "react-toastify";
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  UserX,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 function AddMemberModal({ open, onClose, onConfirm }) {
   const [emails, setEmails] = useState(["", ""]);
@@ -106,28 +119,37 @@ export default function ManageMemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("");
-  const [events, setEvents] = useState([]);
+
+  // pagination: chỉ lưu page & limit
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
-    total: 0,
-    totalPages: 0,
   });
+
   const [eventRole, setEventRole] = useState("");
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [userDepartmentId, setUserDepartmentId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    type: null,
+    member: null,
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const location = useLocation();
-  const { events: myEvents, fetchEventRole, getEventRole } = useEvents();
+  const { events: myEvents, fetchEventRole } = useEvents();
+  const { user } = useAuth();
 
-  // Prefetched from MemberEvent
   const prefetchedEvent = location.state?.event || null;
-  const prefetchedMembersByDepartment = location.state?.membersByDepartment || null;
+  const prefetchedMembersByDepartment =
+    location.state?.membersByDepartment || null;
 
   const currentEventId = useMemo(
     () => getEventIdFromUrl(location.pathname, location.search),
     [location]
   );
 
-  // Xác định event hiện tại: ưu tiên dữ liệu truyền sang, sau đó đến context, cuối cùng là URL
+  // Xác định event hiện tại
   const currentEvent = useMemo(() => {
     if (prefetchedEvent) return prefetchedEvent;
     const list = Array.isArray(myEvents) ? myEvents : [];
@@ -137,13 +159,13 @@ export default function ManageMemberPage() {
     return list.find((e) => (e._id || e.id) === targetId) || null;
   }, [prefetchedEvent, myEvents, currentEventId]);
 
-  // Đồng bộ selectedEvent để dùng khi cần gọi API fallback
+  // Đồng bộ selectedEvent
   useEffect(() => {
     const id = (currentEvent?._id || currentEvent?.id) || "";
     if (id && selectedEvent !== id) setSelectedEvent(id);
   }, [currentEvent, selectedEvent]);
 
-  // Load event role for permissions and sidebar
+  // Load event role
   useEffect(() => {
     let mounted = true;
     const id = (currentEvent?._id || currentEvent?.id) || currentEventId;
@@ -154,41 +176,54 @@ export default function ManageMemberPage() {
     const loadRole = async () => {
       try {
         const role = await fetchEventRole(id);
-        if (mounted) setEventRole(role);
+        if (mounted) {
+          if (typeof role === "string") {
+            setEventRole(role);
+          } else if (role && typeof role === "object") {
+            setEventRole(role.role || "");
+            setUserDepartmentId(role.departmentId || null);
+          } else {
+            setEventRole("");
+          }
+        }
       } catch (_) {
         if (mounted) setEventRole("");
       }
     };
     loadRole();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [currentEvent, currentEventId, fetchEventRole]);
 
-  // Nếu có dữ liệu prefetched, flatten ngay và không gọi API
+  // Nếu có dữ liệu prefetched
   useEffect(() => {
     const usePrefetched = async () => {
       if (!prefetchedMembersByDepartment) return false;
       setLoading(true);
       try {
-        const normalized = Object.entries(prefetchedMembersByDepartment).flatMap(
-          ([deptName, members]) =>
-            (members || []).map((m, idx) => ({
-              id: m.id || m._id || m.email || `${deptName}-${idx}`,
-              avatar:
-                m.avatar ||
-                m.avatarUrl ||
-                m.photoUrl ||
-                "https://i.pravatar.cc/100?u=" + (m.email || m._id || idx),
-              name: m.name || m.fullName || m.displayName || m.email || "Không rõ",
-              dept: deptName || m.department || m.departmentName || "—",
-              role: m.role || m.membership || "Member",
-            }))
+        const normalized = Object.entries(
+          prefetchedMembersByDepartment
+        ).flatMap(([deptName, members]) =>
+          (members || []).map((m, idx) => ({
+            id: m.id || m._id || m.email || `${deptName}-${idx}`,
+            avatar:
+              m.avatar ||
+              m.avatarUrl ||
+              m.photoUrl ||
+              "https://i.pravatar.cc/100?u=" + (m.email || m._id || idx),
+            name:
+              m.name || m.fullName || m.displayName || m.email || "Không rõ",
+            dept: deptName || m.department || m.departmentName || "—",
+            departmentId:
+              m.departmentId ||
+              m.department?._id ||
+              m.department?.id ||
+              null,
+            role: m.role || m.membership || "Member",
+          }))
         );
         setMembers(normalized);
-        setPagination((p) => ({
-          ...p,
-          total: normalized.length,
-          totalPages: Math.max(1, Math.ceil(normalized.length / p.limit)),
-        }));
         setError("");
         return true;
       } catch (e) {
@@ -201,7 +236,7 @@ export default function ManageMemberPage() {
     usePrefetched();
   }, [prefetchedMembersByDepartment]);
 
-  // Fallback: nếu không có prefetched thì gọi API
+  // Fallback: không có prefetched thì gọi API
   useEffect(() => {
     const shouldFetch = !prefetchedMembersByDepartment && !!selectedEvent;
     if (!shouldFetch) return;
@@ -219,16 +254,17 @@ export default function ManageMemberPage() {
             m.avatarUrl ||
             m.photoUrl ||
             "https://i.pravatar.cc/100?u=" + (m.email || m._id || idx),
-          name: m.fullName || m.name || m.displayName || m.email || "Không rõ",
+          name:
+            m.fullName || m.name || m.displayName || m.email || "Không rõ",
           dept: m.department?.name || m.departmentName || m.dept || "—",
+          departmentId:
+            m.departmentId ||
+            m.department?._id ||
+            m.department?.id ||
+            null,
           role: m.role || m.membership || "Member",
         }));
         setMembers(normalized);
-        setPagination((p) => ({
-          ...p,
-          total: normalized.length,
-          totalPages: Math.max(1, Math.ceil(normalized.length / p.limit)),
-        }));
       } catch (err) {
         console.error("Error loading members:", err);
         setError("Không thể tải danh sách thành viên");
@@ -240,12 +276,174 @@ export default function ManageMemberPage() {
     loadMembers();
   }, [prefetchedMembersByDepartment, selectedEvent]);
 
-  const filtered = members.filter((r) =>
-    r.name.toLowerCase().includes(query.toLowerCase())
-  );
+  // Hàm chuyển đổi role sang tên hiển thị
+  const getRoleDisplayName = (role) => {
+    if (role === "HoOC") return "Trưởng ban Tổ chức";
+    if (role === "HoD") return "Trưởng ban";
+    if (role === "Member") return "Thành viên";
+    return role || "—";
+  };
 
-  const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc';
-  const isMember = eventRole === 'Member';
+  // Lọc + sort
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = members.filter((r) =>
+      r.name.toLowerCase().includes(q)
+    );
+
+    const compare = (a, b) =>
+      (a || "").localeCompare(b || "", "vi", { sensitivity: "base" });
+
+    list.sort((a, b) => {
+      if (sort === "Ban") {
+        return compare(a.dept, b.dept);
+      }
+      if (sort === "Vai trò") {
+        return compare(getRoleDisplayName(a.role), getRoleDisplayName(b.role));
+      }
+      // Mặc định: Tên
+      return compare(a.name, b.name);
+    });
+
+    return list;
+  }, [members, query, sort]);
+
+  // ==== Pagination tính toán từ filtered ====
+  const totalRows = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pagination.limit));
+
+  // Nếu page > totalPages (vd sau khi lọc), ép về totalPages
+  useEffect(() => {
+    setPagination((prev) => {
+      const safePage = Math.min(prev.page, totalPages) || 1;
+      if (safePage === prev.page) return prev;
+      return { ...prev, page: safePage };
+    });
+  }, [totalPages]);
+
+  const startIndex = (pagination.page - 1) * pagination.limit;
+  const endIndex = Math.min(startIndex + pagination.limit, totalRows);
+  const currentPageRows = filtered.slice(startIndex, endIndex);
+
+  const sidebarType =
+    eventRole === "Member"
+      ? "Member"
+      : eventRole === "HoD"
+      ? "HoD"
+      : eventRole === "HoOC"
+      ? "HoOC"
+      : "user";
+  const isMember = eventRole === "Member";
+
+  // Close dropdown khi click ngoài
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    if (openDropdown !== null) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [openDropdown]);
+
+  const showConfirmRemoveFromEvent = (member) => {
+    setConfirmModal({
+      show: true,
+      type: "removeFromEvent",
+      member: member,
+    });
+  };
+
+  const showConfirmRemoveFromDepartment = (member) => {
+    setConfirmModal({
+      show: true,
+      type: "removeFromDepartment",
+      member: member,
+    });
+  };
+
+  const canManageMember = (member) => {
+    if (member.role === "HoOC") return false;
+    
+    // Prevent ANYONE from managing themselves (HoOC, HoD, Member)
+    const currentUserId = user?._id || user?.id || null;
+    const memberUserId = member.userId?._id || member.userId?.id || member.userId || null;
+    const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+    if (isViewingSelf) {
+      return false; // No one can manage/remove themselves
+    }
+    
+    if (eventRole === "HoOC") return true;
+    if (eventRole === "HoD") {
+      if (!userDepartmentId) return false;
+      // Normalize IDs for comparison
+      const normalizedUserDeptId = String(userDepartmentId);
+      const normalizedMemberDeptId = member.departmentId ? String(member.departmentId) : null;
+      // HoD can only manage members in their own department
+      return normalizedMemberDeptId === normalizedUserDeptId;
+    }
+    return false;
+  };
+
+  const handleConfirmDelete = async () => {
+    const { type, member } = confirmModal;
+    if (!member) return;
+
+    const eventId = currentEvent?._id || currentEvent?.id || currentEventId;
+    if (!eventId) {
+      toast.error("Không tìm thấy ID sự kiện");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      if (type === "removeFromEvent") {
+        await eventApi.removeMemberFromEvent(eventId, member.id);
+        setMembers((prev) => prev.filter((m) => m.id !== member.id));
+        toast.success("Đã xóa thành viên khỏi ban tổ chức thành công");
+      } else if (type === "removeFromDepartment") {
+        if (!member.departmentId) {
+          toast.error("Không tìm thấy ID ban");
+          return;
+        }
+        await departmentApi.removeMemberFromDepartment(
+          eventId,
+          member.departmentId,
+          member.id
+        );
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === member.id
+              ? { ...m, dept: "—", departmentId: null, role: "Member" }
+              : m
+          )
+        );
+        toast.success(`Đã xóa thành viên khỏi ban "${member.dept}" thành công`);
+      }
+
+      setConfirmModal({ show: false, type: null, member: null });
+      setOpenDropdown(null);
+    } catch (error) {
+      console.error("Error removing member:", error);
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Không thể xóa thành viên";
+      toast.error(errorMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const getConfirmMessage = () => {
+    const { type, member } = confirmModal;
+    if (!member) return "";
+
+    if (type === "removeFromEvent") {
+      return `Bạn có chắc muốn xóa "${member.name}" khỏi ban tổ chức?`;
+    } else if (type === "removeFromDepartment") {
+      return `Bạn có chắc muốn xóa "${member.name}" khỏi ban "${member.dept}"?`;
+    }
+    return "";
+  };
 
   return (
     <UserLayout
@@ -255,29 +453,33 @@ export default function ManageMemberPage() {
       showSearch={false}
       eventId={currentEventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <style>{`
-				.cell-action{cursor:pointer}
-				.table thead th{font-size:12px;color:#6b7280;font-weight:600;border-bottom-color:#e5e7eb}
-			`}</style>
+        .cell-action{cursor:pointer}
+        .table thead th{font-size:12px;color:#6b7280;font-weight:600;border-bottom-color:#e5e7eb}
+        .dropdown-item{transition:background-color 0.15s ease-in-out}
+        .dropdown-item:hover{background-color:#f3f4f6}
+        .dropdown-item:active{background-color:#e5e7eb}
+      `}</style>
       <div className="container-fluid" style={{ maxWidth: 1150 }}>
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div className="d-flex align-items-center gap-2">
             <div className="fw-semibold" style={{ color: "#EF4444" }}>
-              {" "}
-              Danh sách thành viên sự kiện {currentEvent?.name || "Sự kiện của bạn"}
+              Danh sách thành viên sự kiện{" "}
+              {currentEvent?.name || "Sự kiện của bạn"}
             </div>
           </div>
-          <div className="d-flex align-items-center gap-2">
+          {/* <div className="d-flex align-items-center gap-2">
             {!isMember && (
               <button
                 className="btn btn-danger d-inline-flex align-items-center gap-2"
                 onClick={() => setShowModal(true)}
               >
-                <i className="bi bi-plus" />
+                <Plus size={18} />
                 Thêm thành viên
               </button>
             )}
-          </div>
+          </div> */}
         </div>
 
         <div className="d-flex align-items-center gap-3 mb-3">
@@ -285,8 +487,9 @@ export default function ManageMemberPage() {
             className="position-relative"
             style={{ maxWidth: 300, width: "100%" }}
           >
-            <i
-              className="bi bi-search position-absolute"
+            <Search
+              size={16}
+              className="position-absolute"
               style={{ left: 10, top: 10, color: "#9ca3af" }}
             />
             <input
@@ -304,90 +507,309 @@ export default function ManageMemberPage() {
               onChange={(e) => setSort(e.target.value)}
               style={{ width: 160 }}
             >
-              <option>Tên</option>
-              <option>Ban</option>
-              <option>Vai trò</option>
+              <option value="Tên">Tên</option>
+              <option value="Ban">Ban</option>
+              <option value="Vai trò">Vai trò</option>
             </select>
           </div>
         </div>
 
         <div className="card border-0 shadow-sm">
-          <div className="table-responsive">
+          <div className="table-responsive" style={{ overflow: "visible" }}>
             <table className="table align-middle mb-0">
               <thead>
                 <tr>
-                  <th style={{ width: 48, fontSize: "14px", fontWeight: "500", color: "#374151" }}>
-                    <input className="form-check-input" type="checkbox" />
+                  <th
+                    style={{
+                      width: 60,
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  >
+                    STT
                   </th>
-                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }} >Ảnh</th>
-                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Tên</th>
-                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Ban</th>
-                  <th style={{  fontSize: "14px", fontWeight: "500", color: "#374151" }}>Vai trò</th>
-                  <th style={{ width: 56, fontSize: "14px", fontWeight: "500", color: "#374151" }}>Action</th>
+                  <th
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  >
+                    Ảnh
+                  </th>
+                  <th
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  >
+                    Tên
+                  </th>
+                  <th
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  >
+                    Ban
+                  </th>
+                  <th
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  >
+                    Vai trò
+                  </th>
+                  <th
+                    style={{
+                      width: 56,
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      color: "#374151",
+                    }}
+                  ></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 10).map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <input  className="form-check-input" type="checkbox" />
-                    </td>
-                    <td>
-                      <img
-                        src={r.avatar}
-                        className="rounded-circle"
-                        style={{ width: 28, height: 28 }}
-                      />
-                    </td>
-                    <td style={{ padding: "10px", fontWeight: "500", color: "#374151" }}>{r.name}</td>
-                    <td>{r.dept}</td>
-                    <td>{r.role}</td>
-                    <td className="cell-action text-end">
-                      <i className="bi bi-three-dots" />
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4">
+                      Đang tải danh sách thành viên...
                     </td>
                   </tr>
-                ))}
+                )}
+                {!loading && totalRows === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-muted">
+                      Không có thành viên nào
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  currentPageRows.map((r, index) => {
+                    const isDropdownOpen = openDropdown === r.id;
+                    const hasDepartment = r.dept && r.dept !== "—";
+                    const canManage = canManageMember(r);
+
+                    return (
+                      <tr key={r.id}>
+                        <td
+                          style={{
+                            padding: "10px",
+                            fontWeight: "500",
+                            color: "#6b7280",
+                          }}
+                        >
+                          {startIndex + index + 1}
+                        </td>
+                        <td>
+                          <img
+                            src={r.avatar}
+                            className="rounded-circle"
+                            style={{ width: 28, height: 28, objectFit: "cover" }}
+                            alt={r.name}
+                          />
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px",
+                            fontWeight: "500",
+                            color: "#374151",
+                          }}
+                        >
+                          {r.name}
+                        </td>
+                        <td>{r.dept}</td>
+                        <td>{getRoleDisplayName(r.role)}</td>
+                        <td className="cell-action text-end position-relative">
+                          {canManage && (
+                            <>
+                              <MoreVertical
+                                size={18}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdown(
+                                    isDropdownOpen ? null : r.id
+                                  );
+                                }}
+                                style={{ cursor: "pointer" }}
+                              />
+                              {isDropdownOpen && (
+                                <div
+                                  className="position-absolute bg-white shadow-sm border rounded"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    minWidth: "220px",
+                                    zIndex: 1050,
+                                    marginTop: "4px",
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {eventRole === "HoOC" && (
+                                    <>
+                                      <button
+                                        className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                        style={{ fontSize: "14px" }}
+                                        onClick={() => {
+                                          setOpenDropdown(null);
+                                          showConfirmRemoveFromEvent(r);
+                                        }}
+                                      >
+                                        <UserX
+                                          size={16}
+                                          className="text-danger"
+                                        />
+                                        <span>
+                                          Xóa khỏi ban tổ chức
+                                        </span>
+                                      </button>
+                                      {hasDepartment && r.departmentId && (
+                                        <>
+                                          <hr className="my-1" />
+                                          <button
+                                            className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                            style={{ fontSize: "14px" }}
+                                            onClick={() => {
+                                              setOpenDropdown(null);
+                                              showConfirmRemoveFromDepartment(
+                                                r
+                                              );
+                                            }}
+                                          >
+                                            <LogOut
+                                              size={16}
+                                              className="text-warning"
+                                            />
+                                            <span>
+                                              Xóa khỏi ban "{r.dept}"
+                                            </span>
+                                          </button>
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                  {eventRole === "HoD" &&
+                                    hasDepartment &&
+                                    r.departmentId && (
+                                      <button
+                                        className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                        style={{ fontSize: "14px" }}
+                                        onClick={() => {
+                                          setOpenDropdown(null);
+                                          showConfirmRemoveFromDepartment(r);
+                                        }}
+                                      >
+                                        <LogOut
+                                          size={16}
+                                          className="text-warning"
+                                        />
+                                        <span>
+                                          Xóa khỏi ban "{r.dept}"
+                                        </span>
+                                      </button>
+                                    )}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
+
+          {/* Footer phân trang */}
           <div className="d-flex align-items-center justify-content-between px-3 py-2 border-top">
             <div className="text-secondary small">
-              Dòng 1 - 10 trong tổng số {members.length} dòng
+              {totalRows === 0
+                ? "Không có dữ liệu"
+                : `Dòng ${startIndex + 1} - ${endIndex} trong tổng số ${totalRows} dòng`}
             </div>
             <div className="d-flex align-items-center gap-2">
               <span className="text-secondary small">Hiển thị</span>
               <select
                 className="form-select form-select-sm"
-                style={{ width: 72 }}
-                defaultValue={10}
+                style={{ width: 80 }}
+                value={pagination.limit}
+                onChange={(e) =>
+                  setPagination((prev) => ({
+                    ...prev,
+                    limit: Number(e.target.value),
+                    page: 1, // reset về trang 1 khi đổi page size
+                  }))
+                }
               >
-                <option>10</option>
-                <option>20</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
               </select>
               <nav>
                 <ul className="pagination pagination-sm mb-0">
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      «
-                    </a>
+                  {/* Prev */}
+                  <li className={`page-item ${pagination.page <= 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => {
+                        if (pagination.page > 1) {
+                          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                        }
+                      }}
+                      disabled={pagination.page <= 1}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
                   </li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      1
-                    </a>
-                  </li>
-                  <li className="page-item active">
-                    <span className="page-link">2</span>
-                  </li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      3
-                    </a>
-                  </li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      »
-                    </a>
+                  {/* Page numbers */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first page, last page, current page, and pages around current
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - pagination.page) <= 1) return true;
+                      return false;
+                    })
+                    .map((page, idx, arr) => {
+                      // Add ellipsis if needed
+                      const prevPage = arr[idx - 1];
+                      const showEllipsis = prevPage && page - prevPage > 1;
+                      return (
+                        <React.Fragment key={page}>
+                          {showEllipsis && (
+                            <li className="page-item disabled">
+                              <span className="page-link">...</span>
+                            </li>
+                          )}
+                          <li className={`page-item ${pagination.page === page ? 'active' : ''}`}>
+                            <button
+                              className="page-link"
+                              onClick={() => setPagination(prev => ({ ...prev, page }))}
+                            >
+                              {page}
+                            </button>
+                          </li>
+                        </React.Fragment>
+                      );
+                    })}
+                  {/* Next */}
+                  <li className={`page-item ${pagination.page >= totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => {
+                        if (pagination.page < totalPages) {
+                          setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                        }
+                      }}
+                      disabled={pagination.page >= totalPages}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
                   </li>
                 </ul>
               </nav>
@@ -402,6 +824,16 @@ export default function ManageMemberPage() {
             onConfirm={() => setShowModal(false)}
           />
         )}
+
+        <ConfirmModal
+          show={confirmModal.show}
+          onClose={() =>
+            setConfirmModal({ show: false, type: null, member: null })
+          }
+          onConfirm={handleConfirmDelete}
+          message={getConfirmMessage()}
+          isLoading={isDeleting}
+        />
       </div>
     </UserLayout>
   );

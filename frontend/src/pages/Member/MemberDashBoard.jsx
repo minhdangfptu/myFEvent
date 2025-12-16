@@ -1,18 +1,19 @@
-"use client"
-
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import UserLayout from "../../components/UserLayout"
 import { eventApi } from "../../apis/eventApi"
 import { taskApi } from "../../apis/taskApi"
 import { milestoneService } from "../../services/milestoneService"
+import calendarService from "../../services/calendarService"
 import Loading from "../../components/Loading"
+import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { useAuth } from "../../contexts/AuthContext"
+import { Calendar, Sparkles, Goal, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, CheckCircle2, PinOff } from "lucide-react";
 
-// Helper function to generate calendar days
+// Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
   const today = new Date()
   const year = today.getFullYear()
@@ -22,13 +23,33 @@ function generateCalendarDays() {
   const lastDay = new Date(year, month + 1, 0)
   const daysInMonth = lastDay.getDate()
   
+  // Get day of week for first day of month (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const firstDayOfWeek = firstDay.getDay()
+  // Convert to Monday-based week (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
+  const mondayBasedDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
+  
   const days = []
+  
+  // Add empty days at the beginning to align with Monday start
+  for (let i = 0; i < mondayBasedDay; i++) {
+    days.push(null)
+  }
+  
+  // Add actual days of the month
   for (let i = 1; i <= daysInMonth; i++) {
     days.push({
       day: i,
-      today: i === today.getDate(),
+      today: i === today.getDate() && month === today.getMonth() && year === today.getFullYear(),
       highlight: false
     })
+  }
+  
+  // Add empty days at the end to complete the last week
+  const remainingDays = 7 - (days.length % 7)
+  if (remainingDays < 7) {
+    for (let i = 0; i < remainingDays; i++) {
+      days.push(null)
+    }
   }
   
   return days
@@ -54,6 +75,28 @@ const parseDate = (value) => {
   return null
 }
 
+const normalizeCalendars = (payload) => {
+  const data = unwrapApiData(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.calendars)) return data.calendars
+  if (Array.isArray(data.list)) return data.list
+  if (Array.isArray(data.items)) return data.items
+  return []
+}
+
+const parseCalendarEventStart = (calendar) => {
+  if (!calendar) return null
+  const candidate =
+    calendar.startAt ||
+    (calendar.meetingDate
+      ? `${calendar.meetingDate}T${calendar.startTime || "00:00"}`
+      : null)
+  if (!candidate) return null
+  const date = new Date(candidate)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 const normalizeStatus = (status) => String(status ?? "").trim().toLowerCase()
 
 const isCompletedStatus = (status) => {
@@ -63,7 +106,9 @@ const isCompletedStatus = (status) => {
     normalized === "done" ||
     normalized === "đã hoàn thành" ||
     normalized === "hoàn thành" ||
-    normalized === "da hoan thanh"
+    normalized === "da hoan thanh" ||
+    normalized === "hoan_thanh" ||
+    normalized === "hoan-thanh"
   )
 }
 
@@ -83,17 +128,22 @@ const getTaskStatusText = (status, isOverdueTask = false) => {
   
   const normalized = normalizeStatus(status)
   
-  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành") {
+  // Check for completed status (including underscore-separated codes from API)
+  if (normalized === "done" || normalized === "completed" || normalized === "hoàn thành" || normalized === "đã hoàn thành" || normalized === "hoan_thanh" || normalized === "hoan-thanh") {
     return "Hoàn thành"
   }
   if (normalized === "blocked" || normalized === "tạm hoãn" || normalized === "tam hoan") {
     return "Tạm hoãn"
   }
-  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau") {
+  if (normalized === "todo" || normalized === "chưa bắt đầu" || normalized === "chua bat dau" || normalized === "chua_bat_dau" || normalized === "chua-bat-dau") {
     return "Chưa bắt đầu"
   }
-  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy") {
+  if (normalized === "cancelled" || normalized === "đã hủy" || normalized === "da huy" || normalized === "huy") {
     return "Đã hủy"
+  }
+  // Check for in-progress status (including underscore-separated codes from API)
+  if (normalized === "in-progress" || normalized === "in_progress" || normalized === "ongoing" || normalized === "đang làm" || normalized === "dang lam" || normalized === "da_bat_dau" || normalized === "da-bat-dau") {
+    return "Đang làm"
   }
   // Default: in-progress, ongoing, đang làm, etc.
   return "Đang làm"
@@ -111,6 +161,7 @@ export default function MemberDashBoard() {
   const [eventData, setEventData] = useState(null)
   const [tasks, setTasks] = useState([])
   const [milestones, setMilestones] = useState([])
+  const [calendarEvents, setCalendarEvents] = useState([])
   const [eventRole, setEventRole] = useState("")
   const [hoveredDay, setHoveredDay] = useState(null)
   
@@ -128,20 +179,40 @@ export default function MemberDashBoard() {
       }
       try {
         const role = await fetchEventRole(eventId)
-        if (mounted) setEventRole(role)
+        if (mounted) {
+          setEventRole(role)
+          // If user doesn't have access, redirect to home page
+          if (!role || role === '') {
+            navigate('/home-page')
+            return
+          }
+        }
       } catch (_) {
-        if (mounted) setEventRole("")
+        if (mounted) {
+          setEventRole("")
+          navigate('/home-page')
+        }
       }
     }
     loadRole()
     return () => {
       mounted = false
     }
-  }, [eventId, fetchEventRole])
+  }, [eventId, fetchEventRole, navigate])
 
-  // Fetch all data
+  // Fetch all data - only fetch if user has access
   useEffect(() => {
     if (!eventId || !user) {
+      setLoading(false)
+      return
+    }
+
+    // Don't fetch if user doesn't have access
+    if (eventRole === '' && eventId) {
+      // Still checking role, wait
+      return
+    }
+    if (!eventRole || eventRole === '') {
       setLoading(false)
       return
     }
@@ -152,7 +223,7 @@ export default function MemberDashBoard() {
       try {
         setLoading(true)
 
-        // Fetch event data, tasks, milestones, and members
+        // Fetch critical data first (event, tasks, milestones, members)
         const [eventResponse, tasksResponse, milestonesResponse, membersResponse] = await Promise.all([
           eventApi.getById(eventId),
           taskApi.getTaskByEvent(eventId),
@@ -214,9 +285,23 @@ export default function MemberDashBoard() {
               assigneeUserId: tasksArray[0]?.assigneeId?.userId?._id
             })
           }
+          if (userTasks.length > 0) {
+            console.log('MemberDashBoard - User tasks details:', userTasks.map(t => ({
+              id: t?._id || t?.id,
+              title: t?.title || t?.name,
+              status: t?.status,
+              dueDate: t?.dueDate || t?.deadline,
+              assigneeId: t?.assigneeId
+            })))
+          }
         }
         
-        if (!cancelled) setTasks(userTasks)
+        if (!cancelled) {
+          setTasks(userTasks)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('MemberDashBoard - Tasks state set:', userTasks.length, 'tasks')
+          }
+        }
 
         const milestoneList = Array.isArray(milestonesResponse) 
           ? milestonesResponse 
@@ -229,12 +314,27 @@ export default function MemberDashBoard() {
             return da.getTime() - db.getTime()
           })
         if (!cancelled) setMilestones(sortedMilestones)
+
+        // Show dashboard immediately
+        if (!cancelled) setLoading(false)
+
+        // Lazy load calendar events in background (non-critical)
+        if (!cancelled) {
+          calendarService.getCalendarsByEventId(eventId)
+            .then(calendarsResponse => {
+              if (!cancelled) {
+                setCalendarEvents(normalizeCalendars(calendarsResponse))
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading calendar events:", err)
+              }
+            })
+        }
       } catch (error) {
         if (!cancelled) {
           console.error("Error fetching dashboard data:", error)
-        }
-      } finally {
-        if (!cancelled) {
           setLoading(false)
         }
       }
@@ -245,21 +345,64 @@ export default function MemberDashBoard() {
     return () => {
       cancelled = true
     }
-  }, [eventId, user])
+  }, [eventId, user, eventRole])
 
   // Calculate stats
   const totalTasks = tasks.length
-  const completedTasks = useMemo(
-    () => tasks.filter((t) => isCompletedStatus(t?.status)).length,
-    [tasks]
-  )
+  
+  const completedTasks = useMemo(() => {
+    if (!tasks || tasks.length === 0) return 0
+    
+    const completed = tasks.filter((t) => {
+      const status = t?.status
+      if (!status) return false
+      return isCompletedStatus(status)
+    }).length
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('MemberDashBoard - Completed tasks calculation:', {
+        totalTasks: tasks.length,
+        completedTasks: completed,
+        taskStatuses: tasks.map(t => ({ 
+          id: t?._id || t?.id, 
+          title: t?.title || t?.name,
+          status: t?.status,
+          isCompleted: isCompletedStatus(t?.status)
+        }))
+      })
+    }
+    
+    return completed
+  }, [tasks])
+  
   const completedTasksPercent = totalTasks > 0
     ? Math.round((completedTasks / totalTasks) * 100)
     : 0
-  const overdueTasks = useMemo(
-    () => tasks.filter((t) => isOverdue(t)).length,
-    [tasks]
-  )
+    
+  const overdueTasks = useMemo(() => {
+    if (!tasks || tasks.length === 0) return 0
+    
+    const overdue = tasks.filter((t) => {
+      return isOverdue(t)
+    }).length
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('MemberDashBoard - Overdue tasks calculation:', {
+        totalTasks: tasks.length,
+        overdueTasks: overdue,
+        taskDetails: tasks.map(t => ({
+          id: t?._id || t?.id,
+          title: t?.title || t?.name,
+          status: t?.status,
+          dueDate: t?.dueDate || t?.deadline,
+          isOverdue: isOverdue(t),
+          isCompleted: isCompletedStatus(t?.status)
+        }))
+      })
+    }
+    
+    return overdue
+  }, [tasks])
 
   // Get user tasks for display (sorted by due date, limit to 4)
   const userTasks = useMemo(() => {
@@ -319,111 +462,146 @@ export default function MemberDashBoard() {
       })
   }, [tasks])
 
-  // Prepare timeline data from milestones (max 5)
+  // FIX: Prepare timeline data from milestones (max 5) - Check date passed
   const eventTimeline = useMemo(
     () =>
-      milestones.slice(0, 5).map((milestone) => ({
-        name: milestone?.name || "Cột mốc",
-        date: formatDate(milestone?.targetDate || milestone?.dueDate),
-        completed: isCompletedStatus(milestone?.status)
-      })),
+      milestones.slice(0, 5).map((milestone) => {
+        const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+        const isPast = targetDate && targetDate < new Date()
+        
+        return {
+          name: milestone?.name || "Cột mốc",
+          date: formatDate(milestone?.targetDate || milestone?.dueDate),
+          completed: isCompletedStatus(milestone?.status) || isPast
+        }
+      }),
     [milestones]
   )
 
   // Calendar data (current month)
-  const calendarDays = generateCalendarDays()
+  const calendarDays = useMemo(() => {
+    const baseDays = generateCalendarDays()
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const calendarDays = new Set()
+    const milestoneDays = new Set()
+
+    // Track days with calendar events
+    calendarEvents.forEach((event) => {
+      const startDate = parseCalendarEventStart(event)
+      if (!startDate) return
+      if (startDate.getFullYear() !== year || startDate.getMonth() !== month) return
+      calendarDays.add(startDate.getDate())
+    })
+
+    // Track days with milestones
+    milestones.forEach((milestone) => {
+      const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+      if (!targetDate) return
+      if (targetDate.getFullYear() !== year || targetDate.getMonth() !== month) return
+      milestoneDays.add(targetDate.getDate())
+    })
+
+    return baseDays.map((day) => {
+      if (!day) return null
+      return {
+        ...day,
+        hasCalendar: calendarDays.has(day.day),
+        hasMilestone: milestoneDays.has(day.day),
+        highlight: calendarDays.has(day.day) || milestoneDays.has(day.day)
+      }
+    })
+  }, [calendarEvents, milestones])
 
   // Get events for a specific day
   const getEventsForDay = useMemo(() => {
     const today = new Date()
     const year = today.getFullYear()
     const month = today.getMonth()
-    
+
     return (day) => {
       if (!day) return []
-      const targetDate = new Date(year, month, day)
-      
-      return milestones.filter((milestone) => {
-        const milestoneDate = parseDate(milestone?.targetDate || milestone?.dueDate)
-        if (!milestoneDate) return false
-        
-        // Compare only year, month, day (ignore time)
-        return (
-          milestoneDate.getFullYear() === targetDate.getFullYear() &&
-          milestoneDate.getMonth() === targetDate.getMonth() &&
-          milestoneDate.getDate() === targetDate.getDate()
-        )
+      const items = []
+
+      // Add calendar events for this day
+      calendarEvents.forEach((event) => {
+        const startDate = parseCalendarEventStart(event)
+        if (!startDate) return
+        if (startDate.getFullYear() === year && startDate.getMonth() === month && startDate.getDate() === day) {
+          items.push({
+            ...event,
+            itemType: 'calendar',
+            startDate
+          })
+        }
       })
+
+      // Add milestones for this day
+      milestones.forEach((milestone) => {
+        const targetDate = parseDate(milestone?.targetDate || milestone?.dueDate)
+        if (!targetDate) return
+        if (targetDate.getFullYear() === year && targetDate.getMonth() === month && targetDate.getDate() === day) {
+          items.push({
+            ...milestone,
+            itemType: 'milestone',
+            startDate: targetDate
+          })
+        }
+      })
+
+      items.sort((a, b) => {
+        if (a.itemType === 'milestone' && b.itemType !== 'milestone') return -1
+        if (a.itemType !== 'milestone' && b.itemType === 'milestone') return 1
+        return a.startDate - b.startDate
+      })
+
+      return items
     }
+  }, [calendarEvents, milestones])
+
+  // FIX: Logic tính % hoàn thành milestone (bao gồm cả ngày quá khứ)
+  const completedMilestoneCount = useMemo(() => {
+    return milestones.filter((m) => {
+      const targetDate = parseDate(m?.targetDate || m?.dueDate)
+      const isPast = targetDate && targetDate < new Date()
+      return isCompletedStatus(m?.status) || isPast
+    }).length
   }, [milestones])
 
   const milestoneCompletionPercent = milestones.length > 0
-    ? Math.round((milestones.filter((m) => isCompletedStatus(m?.status)).length / milestones.length) * 100)
+    ? Math.round((completedMilestoneCount / milestones.length) * 100)
     : 0
   const milestoneProgressRatio = milestones.length > 0
-    ? Math.min(100, Math.max(0, (milestones.filter((m) => isCompletedStatus(m?.status)).length / milestones.length) * 100))
+    ? Math.min(100, Math.max(0, (completedMilestoneCount / milestones.length) * 100))
     : 0
 
   const sidebarType = eventRole === 'Member' ? 'member' : eventRole === 'HoD' ? 'hod' : 'hooc'
 
   if (loading) {
     return (
-      <UserLayout
-        title="Dashboard tổng quan"
-        sidebarType={sidebarType}
-        activePage="overview-dashboard"
-        eventId={eventId}
-      >
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={80} />
-        </div>
+      <UserLayout title="Dashboard tổng quan" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+        <DashboardSkeleton />
       </UserLayout>
     )
   }
 
   if (!eventId) {
     return (
-      <UserLayout
-        title="Dashboard tổng quan"
-        sidebarType={sidebarType}
-        activePage="overview-dashboard"
-        eventId={null}
-      >
+      <UserLayout title="Dashboard tổng quan" sidebarType={sidebarType} activePage="overview-dashboard" eventId={null}>
         <div className="alert alert-warning" style={{ margin: "20px" }}>
           <h5>Chưa chọn sự kiện</h5>
           <p>Vui lòng chọn một sự kiện từ danh sách để xem dashboard.</p>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => navigate("/home-page")}
-          >
-            Quay lại trang chủ
-          </button>
+          <button className="btn btn-primary" onClick={() => navigate("/home-page")}>Quay lại trang chủ</button>
         </div>
       </UserLayout>
     )
   }
 
-  if (!eventData) {
+  if (!loading && !eventData) {
     return (
-      <UserLayout
-        title="Dashboard tổng quan"
-        sidebarType={sidebarType}
-        activePage="overview-dashboard"
-        eventId={eventId}
-      >
-        <div className="alert alert-danger" style={{ margin: "20px" }}>
-          Không tìm thấy sự kiện
-        </div>
+      <UserLayout title="Dashboard tổng quan" sidebarType={sidebarType} activePage="overview-dashboard" eventId={eventId}>
+        <div className="alert alert-danger" style={{ margin: "20px" }}>Không tìm thấy sự kiện</div>
       </UserLayout>
     )
   }
@@ -442,79 +620,43 @@ export default function MemberDashBoard() {
           {/* Stats Cards */}
           <div className="row g-4 mb-4">
             <div className="col-12 col-sm-6 col-md-6 col-lg-4">
-              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-3"
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        backgroundColor: "#dbeafe",
-                        fontSize: "24px",
-                      }}
-                    >
-                      📋
+                    <div className="d-flex align-items-center justify-content-center rounded-3" style={{ width: "56px", height: "56px", backgroundColor: "#e9d5ff", fontSize: "24px" }}>
+                      <LaptopMinimalCheck style={{ color: "#8b5cf6" }} />
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
-                    {totalTasks}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Tổng số công việc của bạn
-                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>{totalTasks}</div>
+                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>Tổng số công việc của bạn</div>
                 </div>
               </div>
             </div>
 
             <div className="col-12 col-sm-6 col-md-6 col-lg-4">
-              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-3"
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        backgroundColor: "#d4f4dd",
-                        fontSize: "24px",
-                      }}
-                    >
-                      ✓
+                    <div className="d-flex align-items-center justify-content-center rounded-3" style={{ width: "56px", height: "56px", backgroundColor: "#d4f4dd", fontSize: "24px" }}>
+                      <CircleCheckBig style={{ color: "#22c55e" }} />
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#10b981", lineHeight: "1" }}>
-                    {completedTasksPercent}%
-                  </div>
-                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Công việc đã hoàn thành
-                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>{completedTasksPercent}%</div>
+                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>Công việc đã hoàn thành</div>
                 </div>
               </div>
             </div>
 
             <div className="col-12 col-sm-6 col-md-6 col-lg-4">
-              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-3"
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        backgroundColor: "#fee2e2",
-                        fontSize: "24px",
-                      }}
-                    >
-                      ⚠️
+                    <div className="d-flex align-items-center justify-content-center rounded-3" style={{ width: "56px", height: "56px", backgroundColor: "#fee2e2", fontSize: "24px" }}>
+                      <FileExclamationPoint style={{ color: "#ef4444" }} />
                     </div>
                   </div>
-                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#ef4444", lineHeight: "1" }}>
-                    {overdueTasks}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Công việc quá hạn
-                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#ef4444", lineHeight: "1" }}>{overdueTasks}</div>
+                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>Công việc quá hạn</div>
                 </div>
               </div>
             </div>
@@ -524,8 +666,8 @@ export default function MemberDashBoard() {
           <div className="row g-3 mb-4">
             {/* User Tasks */}
             <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ minHeight: "458px", display: "flex", flexDirection: "column" }}>
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "18px", color: "#1f2937" }}>
                     Công việc của bạn
                   </h6>
@@ -537,40 +679,21 @@ export default function MemberDashBoard() {
                         const isOverdueTask = taskObj ? isOverdue(taskObj) : false
                         const statusText = getTaskStatusText(task.status, isOverdueTask)
                         
-                        // Status color mapping
-                        const statusColor = statusText === "Hoàn thành"
-                          ? { bg: "#d4f4dd", text: "#166534" }
-                          : statusText === "Quá hạn"
-                          ? { bg: "#fee2e2", text: "#991b1b" }
-                          : statusText === "Tạm hoãn"
-                          ? { bg: "#fee2e2", text: "#991b1b" }
-                          : statusText === "Đã hủy"
-                          ? { bg: "#e5e7eb", text: "#6b7280" }
-                          : statusText === "Chưa bắt đầu"
-                          ? { bg: "#fef3c7", text: "#92400e" }
-                          : { bg: "#fef3c7", text: "#92400e" } // Đang làm
+                        const statusColor = statusText === "Hoàn thành" ? { bg: "#d4f4dd", text: "#166534" }
+                          : statusText === "Quá hạn" ? { bg: "#fee2e2", text: "#991b1b" }
+                          : statusText === "Tạm hoãn" ? { bg: "#fee2e2", text: "#991b1b" }
+                          : statusText === "Đã hủy" ? { bg: "#e5e7eb", text: "#6b7280" }
+                          : { bg: "#fef3c7", text: "#92400e" } 
                         
                         return (
                           <div key={task.id} className="d-flex align-items-center justify-content-between p-3 rounded-2" style={{ backgroundColor: "#f9fafb" }}>
                             <div className="d-flex align-items-center flex-grow-1">
                               <div>
-                                <div style={{ fontSize: "14px", color: "#374151", fontWeight: "500" }}>
-                                  {task.title}
-                                </div>
-                                <div className="text-muted" style={{ fontSize: "12px" }}>
-                                  {task.deadline}
-                                </div>
+                                <div style={{ fontSize: "14px", color: "#374151", fontWeight: "500" }}>{task.title}</div>
+                                <div className="text-muted" style={{ fontSize: "12px" }}>{task.deadline}</div>
                               </div>
                             </div>
-                            <span
-                              className="px-3 py-1 rounded-pill"
-                              style={{
-                                backgroundColor: statusColor.bg,
-                                color: statusColor.text,
-                                fontSize: "12px",
-                                fontWeight: "500"
-                              }}
-                            >
+                            <span className="px-3 py-1 rounded-pill" style={{ backgroundColor: statusColor.bg, color: statusColor.text, fontSize: "12px", fontWeight: "500" }}>
                               {statusText}
                             </span>
                           </div>
@@ -578,9 +701,13 @@ export default function MemberDashBoard() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center text-muted py-4">
-                      <div style={{ fontSize: "48px", opacity: 0.3 }}>📋</div>
-                      <div className="mt-2">Chưa có công việc</div>
+                    // FIX: Thêm màn hình hiển thị khi không có item nào (Empty State)
+                    <div className="text-center text-muted d-flex flex-column align-items-center justify-content-center" style={{ flex: 1 }}>
+                      <div style={{ padding: "20px", borderRadius: "50%", backgroundColor: "#f3f4f6", marginBottom: "16px" }}>
+                        <CheckCircle2 size={32} color="#9ca3af" />
+                      </div>
+                      <h6 style={{ fontSize: "16px", color: "#4b5563", marginBottom: "4px" }}>Bạn đang rảnh rỗi!</h6>
+                      <p style={{ fontSize: "14px", color: "#9ca3af" }}>Chưa có công việc nào được giao cho bạn.</p>
                     </div>
                   )}
                 </div>
@@ -589,10 +716,10 @@ export default function MemberDashBoard() {
 
             {/* Calendar */}
             <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-body p-4">
+              <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
+                <div className="card-body p-4" style={{ cursor: "pointer", minHeight: "458px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
+                    <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937", cursor: "pointer" }}>
                       Lịch họp sắp tới
                     </h6>
                     <span className="text-muted" style={{ fontSize: "14px" }}>
@@ -603,14 +730,8 @@ export default function MemberDashBoard() {
                   <table className="table table-borderless mb-0" style={{ width: "100%" }}>
                     <thead>
                       <tr>
-                        {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((day) => (
-                          <th
-                            key={day}
-                            className="text-center text-muted"
-                            style={{ fontSize: "11px", fontWeight: 500, padding: "8px 4px" }}
-                          >
-                            {day}
-                          </th>
+                        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => (
+                          <th key={day} className="text-center text-muted" style={{ fontSize: "11px", fontWeight: 500, padding: "8px 4px" }}>{day}</th>
                         ))}
                       </tr>
                     </thead>
@@ -619,46 +740,59 @@ export default function MemberDashBoard() {
                         <tr key={weekIndex}>
                           {Array.from({ length: 7 }, (_, dayIndex) => {
                             const dayData = calendarDays[weekIndex * 7 + dayIndex]
+                            if (!dayData) return <td key={dayIndex} style={{ padding: "8px 4px" }}></td>
+                            
+                            const isToday = !!dayData?.today
                             const isHovered = hoveredDay === dayData?.day
                             const dayEvents = dayData?.day ? getEventsForDay(dayData.day) : []
+                            const hasEvents = dayEvents.length > 0
+                            const isMilestone = dayData?.hasMilestone
+                            const isCalendar = dayData?.hasCalendar
                             
-                            // Check if this day has milestones
-                            const hasMilestone = dayEvents.length > 0
+                            let bgColor = "transparent"
+                            let textColor = "#374151"
+
+                            if (isHovered && hasEvents) {
+                              if (isMilestone && isCalendar) { bgColor = "#fef3e8"; textColor = "#92400e" }
+                              else if (isMilestone) { bgColor = "#ffe4e6"; textColor = "#991b1b" }
+                              else { bgColor = "#dbeafe"; textColor = "#1e40af" }
+                            } else if (hasEvents) {
+                              if (isMilestone && isCalendar) { bgColor = "#fef3c7"; textColor = "#92400e" }
+                              else if (isMilestone) { bgColor = "#fee2e2"; textColor = "#991b1b" }
+                              else { bgColor = "#e0f2fe"; textColor = "#1e40af" }
+                            }
                             
+                            if (isToday) textColor = hasEvents && isCalendar ? "#1e40af" : (isMilestone ? "#dc2626" : "#dc2626")
+
                             return (
                               <td
                                 key={dayIndex}
-                                className={`text-center ${
-                                  dayData?.today ? "text-white rounded" : dayData?.highlight ? "fw-semibold" : ""
-                                }`}
+                                className={`text-center ${isToday ? "text-white rounded" : hasEvents ? "fw-semibold" : ""}`}
                                 style={{
                                   fontSize: "13px",
-                                  backgroundColor: dayData?.today
-                                    ? "#dc2626"
-                                    : hasMilestone && !dayData?.today
-                                    ? "#fef3c7"
-                                    : isHovered
-                                    ? "#fee2e2"
-                                    : dayData?.highlight
-                                    ? "#fee2e2"
-                                    : "transparent",
-                                  color: dayData?.today 
-                                    ? "white" 
-                                    : hasMilestone && !dayData?.today
-                                    ? "#92400e"
-                                    : isHovered 
-                                    ? "#dc2626" 
-                                    : dayData?.highlight 
-                                    ? "#dc2626" 
-                                    : "#374151",
-                                  padding: "8px 4px",
+                                  backgroundColor: bgColor,
+                                  color: textColor,
+                                  border: `none`,
+                                  minWidth: 0, width: "36px", height: "36px", padding: 0,
+                                  borderRadius: "7px",
                                   cursor: dayData?.day ? "pointer" : "default",
-                                  transition: "all 0.2s ease",
+                                  transition: "all 0.2s",
+                                  verticalAlign: "middle"
                                 }}
                                 onMouseEnter={() => dayData?.day && setHoveredDay(dayData.day)}
                                 onMouseLeave={() => setHoveredDay(null)}
                               >
-                                {dayData?.day || ""}
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "36px" }}>
+                                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, color: textColor }}>
+                                    <span style={{ textDecoration: isToday ? "underline" : "none", textUnderlineOffset: isToday ? "3px" : undefined, textDecorationThickness: isToday ? "2px" : undefined }}>
+                                      {dayData?.day}
+                                    </span>
+                                    {/* FIX: Thêm icon vào Grid lịch */}
+                                    {isMilestone && isCalendar && <Sparkles size={16} style={{marginLeft: 3}} />}
+                                    {!isMilestone && isCalendar && <Calendar size={16} style={{marginLeft: 3}} />}
+                                    {isMilestone && !isCalendar && <Goal size={16} style={{marginLeft: 3}} />}
+                                  </span>
+                                </div>
                               </td>
                             )
                           })}
@@ -667,74 +801,98 @@ export default function MemberDashBoard() {
                     </tbody>
                   </table>
 
-                  {hoveredDay && getEventsForDay(hoveredDay).length > 0 ? (
-                    <div className="mt-4 pt-3 border-top">
-                      {getEventsForDay(hoveredDay).map((event, index) => {
-                        const eventDate = parseDate(event?.targetDate || event?.dueDate)
-                        const timeStr = eventDate ? eventDate.toLocaleTimeString('vi-VN', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        }) : ''
+                  {(() => {
+                    const hoveredEvents = hoveredDay ? getEventsForDay(hoveredDay) : []
+                    if (hoveredDay && hoveredEvents.length > 0) {
+                      if (hoveredEvents.length > 1) {
+                        const hasMilestone = hoveredEvents.some(e => e.itemType === 'milestone')
+                        const hasCalendar = hoveredEvents.some(e => e.itemType === 'calendar')
+                        const milestoneCount = hoveredEvents.filter(e => e.itemType === 'milestone').length
+                        const calendarCount = hoveredEvents.filter(e => e.itemType === 'calendar').length
+                        
+                        let chipConfig = {}
+                        if (hasMilestone && hasCalendar) {
+                          chipConfig = { icon: "⭐", label: "Cột mốc & Lịch họp", bgColor: "#fef3c7", borderColor: "#fcd34d", textColor: "#92400e" }
+                        } else if (hasMilestone) {
+                          chipConfig = { icon: "🎯", label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc", bgColor: "#fef2f2", borderColor: "#dc2626", textColor: "#dc2626" }
+                        } else {
+                          chipConfig = { icon: "📅", label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp", bgColor: "#eff6ff", borderColor: "#3b82f6", textColor: "#1e40af" }
+                        }
+                        
+                        const eventNames = hoveredEvents.map(e => e?.name || (e.itemType === 'milestone' ? 'Cột mốc' : 'Lịch họp')).filter(Boolean)
                         
                         return (
-                          <div key={index} className={index > 0 ? "mt-3" : ""}>
-                            <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                              {event?.name || "Cột mốc"}
-                            </div>
-                            {timeStr && (
-                              <div className="text-muted" style={{ fontSize: "13px" }}>
-                                {timeStr}
+                          <div className="mt-4 pt-3 border-top">
+                            <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
+                              <div className="d-flex align-items-start gap-2">
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>
+                                  {chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}
+                                </span>
+                                <div style={{ flex: 1 }}>
+                                  <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: chipConfig.bgColor === "#fef3c7" ? "#fef3c7" : chipConfig.bgColor, color: chipConfig.textColor, padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4, border: `1px solid ${chipConfig.borderColor}` }}>{chipConfig.label}</span>
+                                  <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: chipConfig.textColor }}>{eventNames.join(", ")}</div>
+                                  <div className="text-muted" style={{ fontSize: "11px" }}>{hoveredEvents.length} sự kiện trong ngày này</div>
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         )
-                      })}
-                    </div>
-                  ) : hoveredDay ? (
-                    <div className="mt-4 pt-3 border-top">
-                      <div className="text-muted" style={{ fontSize: "13px" }}>
-                        Không có sự kiện
-                      </div>
-                    </div>
-                  ) : milestones.length > 0 && (() => {
-                    // Show next upcoming milestone
-                    const upcomingMilestone = milestones.find(m => !isCompletedStatus(m?.status))
-                    if (!upcomingMilestone) return null
-                    const milestoneDate = parseDate(upcomingMilestone?.targetDate || upcomingMilestone?.dueDate)
-                    if (!milestoneDate) return null
-                    
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const milestoneDay = new Date(milestoneDate)
-                    milestoneDay.setHours(0, 0, 0, 0)
-                    
-                    const diffTime = milestoneDay - today
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-                    
-                    if (diffDays >= 0 && diffDays <= 7) {
-                      const timeStr = milestoneDate.toLocaleTimeString('vi-VN', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })
-                      const dateStr = diffDays === 0 ? "Hôm nay" : diffDays === 1 ? "Mai" : formatDate(milestoneDate)
+                      }
                       
                       return (
                         <div className="mt-4 pt-3 border-top">
-                          <div className="d-flex align-items-center gap-2">
-                            <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
-                            <div>
-                              <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#374151" }}>
-                                {upcomingMilestone?.name || "Cột mốc"}
+                          {hoveredEvents.map((item, index) => {
+                            if (item.itemType === 'milestone') {
+                              return (
+                                <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                  <div style={{ backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", borderLeft: "3px solid #dc2626" }}>
+                                    <div className="d-flex align-items-start gap-2">
+                                      <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+                                      <div style={{ flex: 1 }}>
+                                        <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: "#fee2e2", color: "#991b1b", padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4 }}>Cột mốc</span>
+                                        <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#dc2626" }}>{item?.name || "Cột mốc"}</div>
+                                        {item?.description && (<div className="text-muted" style={{ fontSize: "11px" }}>{item.description}</div>)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            }
+                            const startDate = parseCalendarEventStart(item)
+                            const endCandidate = item?.endAt || (item?.meetingDate && item?.endTime ? `${item.meetingDate}T${item.endTime}` : null)
+                            const endDate = endCandidate ? new Date(endCandidate) : null
+                            const timeStr = startDate ? startDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""
+                            const endStr = endDate && !Number.isNaN(endDate.getTime()) ? endDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""
+                            const timeDisplay = endStr && timeStr ? `${timeStr} - ${endStr}` : timeStr
+                            return (
+                              <div key={index} className={index > 0 ? "mt-3" : ""}>
+                                <div style={{ backgroundColor: "#eff6ff", padding: "10px", borderRadius: "6px", borderLeft: "3px solid #3b82f6" }}>
+                                  <div className="d-flex align-items-start gap-2">
+                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📅</span>
+                                    <div style={{ flex: 1 }}>
+                                      <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: "#dbeafe", color: "#1e40af", padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4 }}>Lịch họp</span>
+                                      <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#1e40af" }}>{item?.name || "Lịch họp"}</div>
+                                      {timeDisplay && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}><span>⏰</span><span>{timeDisplay}</span></div>)}
+                                      {item?.location && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}><span>📍</span><span>{item.location}</span></div>)}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-muted" style={{ fontSize: "12px" }}>
-                                {timeStr} {dateStr}
-                              </div>
-                            </div>
-                          </div>
+                            )
+                          })}
                         </div>
                       )
                     }
-                    return null
+                    if (hoveredDay) {
+                      return <div className="mt-4 pt-3 border-top"><div className="text-muted" style={{ fontSize: "13px" }}>Không có lịch họp</div></div>
+                    }
+                    return (
+                      <div className="mt-4 pt-3 border-top" style={{ minHeight: 80 }}>
+                        <div className="text-muted text-center" style={{ fontSize: 14, fontStyle: "italic" }}>
+                          Di chuột vào một ngày trên lịch để xem chi tiết lịch họp hoặc cột mốc.
+                        </div>
+                      </div>
+                    )
                   })()}
                 </div>
               </div>
@@ -752,87 +910,35 @@ export default function MemberDashBoard() {
                         {eventData.name}
                       </h6>
                       <div className="text-muted" style={{ fontSize: "14px" }}>
-                        {milestones.filter((m) => isCompletedStatus(m?.status)).length}/{milestones.length} hoàn tất
+                        {completedMilestoneCount}/{milestones.length} hoàn tất
                       </div>
                     </div>
-                    <button 
-                      className="btn btn-danger btn-sm d-flex align-items-center gap-1" 
-                      style={{ fontSize: "13px" }}
-                      onClick={() => navigate(`/member-event-detail/${eventId}`)}
-                    >
+                    <button className="btn btn-danger btn-sm d-flex align-items-center gap-1" style={{ fontSize: "13px" }} onClick={() => navigate(`/member-event-detail/${eventId}`)}>
                       Xem chi tiết →
                     </button>
                   </div>
 
                   {/* Horizontal Timeline */}
-                  {eventTimeline.length > 0 && (
+                  {eventTimeline.length > 0 ? (
                     <div style={{ position: "relative", padding: "20px 0" }}>
-                      {/* Timeline Line */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "28px",
-                          left: "0",
-                          right: "0",
-                          height: "3px",
-                          backgroundColor: "#e5e7eb",
-                        }}
-                      >
-                        {/* Progress Line */}
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "0",
-                            left: "0",
-                            height: "100%",
-                            width: `${milestoneProgressRatio}%`,
-                            backgroundColor: "#dc2626",
-                            transition: "width 0.5s ease",
-                          }}
-                        ></div>
+                      <div style={{ position: "absolute", top: "28px", left: "0", right: "0", height: "3px", backgroundColor: "#e5e7eb" }}>
+                        <div style={{ position: "absolute", top: "0", left: "0", height: "100%", width: `${milestoneProgressRatio}%`, backgroundColor: "#dc2626", transition: "width 0.5s ease" }}></div>
                       </div>
-
-                      {/* Timeline Steps */}
                       <div className="d-flex justify-content-between" style={{ position: "relative", zIndex: 1 }}>
                         {eventTimeline.map((step, index) => (
                           <div key={index} className="d-flex flex-column align-items-center" style={{ gap: "8px" }}>
-                            {/* Step Dot */}
-                            <div
-                              className="rounded-circle"
-                              style={{
-                                width: "16px",
-                                height: "16px",
-                                backgroundColor: step.completed ? "#dc2626" : "white",
-                                border: `3px solid ${step.completed ? "#dc2626" : "#e5e7eb"}`,
-                                transition: "all 0.3s ease",
-                              }}
-                            ></div>
-                            {/* Step Label */}
-                            <div
-                              className="text-center"
-                              style={{
-                                fontSize: "12px",
-                                color: "#374151",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {step.name}
-                            </div>
-                            {/* Step Date */}
-                            <div
-                              className="text-center"
-                              style={{
-                                fontSize: "11px",
-                                color: "#9ca3af",
-                              }}
-                            >
-                              {step.date}
-                            </div>
+                            <div className="rounded-circle" style={{ width: "16px", height: "16px", backgroundColor: step.completed ? "#dc2626" : "white", border: `3px solid ${step.completed ? "#dc2626" : "#e5e7eb"}`, transition: "all 0.3s ease" }}></div>
+                            <div className="text-center" style={{ fontSize: "12px", color: "#374151", fontWeight: 500 }}>{step.name}</div>
+                            <div className="text-center" style={{ fontSize: "11px", color: "#9ca3af" }}>{step.date}</div>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
+                  ):(
+                   <div className="text-center text-muted py-4">
+                    <div><PinOff style={{ width: "40px", height: "40px", marginBottom: "10px" }} color="#9ca3af" /></div>
+                    Chưa có dữ liệu cột mốc
+                  </div>)}
                 </div>
               </div>
             </div>
@@ -842,4 +948,3 @@ export default function MemberDashBoard() {
     </UserLayout>
   )
 }
-

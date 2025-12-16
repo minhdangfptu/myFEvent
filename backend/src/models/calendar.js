@@ -27,4 +27,10 @@ const CalendarSchema = new Schema({
   createdBy: { type: Types.ObjectId, ref: 'EventMember', required: true },
 }, { timestamps: true, versionKey: false });
 
+// Indexes để tối ưu query performance
+CalendarSchema.index({ eventId: 1, startAt: 1 }); // Compound index cho queries phổ biến
+CalendarSchema.index({ departmentId: 1, startAt: 1 }); // Cho department calendars
+CalendarSchema.index({ type: 1 }); // Cho filter by type
+CalendarSchema.index({ 'participants.member': 1 }); // Cho tìm calendars của một member
+
 export default mongoose.model('Calendar', CalendarSchema);

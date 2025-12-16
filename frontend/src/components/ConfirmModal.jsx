@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function ConfirmModal({ show, onClose, onConfirm, message = "Bạn có chắc chắn?" }) {
+export default function ConfirmModal({ show, onClose, onConfirm, message = "Bạn có chắc chắn?", isLoading = false }) {
   if (!show) return null;
   return (
     <div style={{
@@ -21,8 +21,11 @@ export default function ConfirmModal({ show, onClose, onConfirm, message = "Bạ
       }}>
         <div style={{ marginBottom: 16 }}>{message}</div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <button className="btn btn-secondary" onClick={onClose}>Huỷ</button>
-          <button className="btn btn-danger" onClick={onConfirm}>Xác nhận</button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>Huỷ</button>
+          <button className="btn btn-danger d-flex align-items-center" onClick={onConfirm} disabled={isLoading}>
+            {isLoading && <i className="bi bi-arrow-clockwise spin-animation me-2"></i>}
+            {isLoading ? 'Đang xử lý...' : 'Xác nhận'}
+          </button>
         </div>
       </div>
     </div>

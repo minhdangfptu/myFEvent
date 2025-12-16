@@ -13,7 +13,7 @@ const HoOCManageMilestoneEmpty = () => {
   };
 
   return (
-    <UserLayout title="Manage Milestone Page - Empty" sidebarType="hooc" activePage="work-timeline">
+    <UserLayout title="Manage Milestone Page - Empty" sidebarType="hooc" activePage="work-timeline" eventId={eventId}>
       {/* Main Content */}
       <div className="bg-white rounded-3 shadow-sm" style={{ padding: '30px' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">

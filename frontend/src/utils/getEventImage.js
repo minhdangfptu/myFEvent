@@ -4,7 +4,7 @@
  */
 export function getEventImage(event, fallback = '/default-events.jpg') {
   if (!event) return fallback
-  const img = event.image ?? event.images ?? null
+  const img = event.coverImage ?? event.image ?? event.images ?? null
   if (!img) return fallback
 
   if (Array.isArray(img)) {

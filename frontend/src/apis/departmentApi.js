@@ -1,8 +1,10 @@
 import axiosClient from './axiosClient';
 
 export const departmentApi = {
-  getDepartments: async (eventId) => {
-    const res = await axiosClient.get(`/api/events/${eventId}/departments`);
+  getDepartments: async (eventId, page = 1, limit = 100) => {
+    const res = await axiosClient.get(`/api/events/${eventId}/departments`, {
+      params: { page, limit }
+    });
     return res.data;
   },
   getDepartmentDetail: async (eventId, departmentId) => {

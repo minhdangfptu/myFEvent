@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { baseUrl } from '../config/index.js';
+import authStorage from '../utils/authStorage.js';
 
 const axiosClient = axios.create({
   baseURL: baseUrl,
@@ -7,16 +8,13 @@ const axiosClient = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  timeout: 10000,
+  timeout: 30000, // Tăng từ 13s lên 30s để phù hợp với MongoDB timeout
 });
 
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = authStorage.getAccessToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
-    
-    // If data is FormData, let axios set Content-Type automatically (multipart/form-data)
-    // Don't override Content-Type for FormData
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -31,11 +29,26 @@ axiosClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Detect timeout error FIRST (before offline check)
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      window.dispatchEvent(new CustomEvent('network:timeout'));
+      return Promise.reject(error);
+    }
+
+    // Detect network error (offline) - only if not a timeout
+    if (
+      error.code === 'ERR_NETWORK' ||
+      error.message === 'Network Error'
+    ) {
+      window.dispatchEvent(new CustomEvent('network:offline'));
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const refreshToken = authStorage.getRefreshToken();
         if (!refreshToken) throw new Error('No refresh token available');
 
         const response = await axios.post(
@@ -49,16 +62,14 @@ axiosClient.interceptors.response.use(
         const newRefreshToken = data.refreshToken || data.refresh_token;
         if (!newAccessToken) throw new Error('No access token in refresh response');
 
-        localStorage.setItem('access_token', newAccessToken);
+        authStorage.setAccessToken(newAccessToken);
         if (newRefreshToken) {
-          localStorage.setItem('refresh_token', newRefreshToken);
+          authStorage.setRefreshToken(newRefreshToken);
         }
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosClient(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        authStorage.clearAll();
 
         window.dispatchEvent(new CustomEvent('auth:logout'));
 

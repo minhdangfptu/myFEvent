@@ -25,6 +25,15 @@ export const listFormsByEvent = (req, res) =>
     return { status: 200, ...result };
   });
 
+export const listFormsNameByEvent = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId } = req.params;
+    const { page, limit } = req.query;
+    const result = await feedbackService.listFormsNameByEvent({ userId, eventId, page, limit });
+    return { status: 200, ...result };
+  });
+
 // POST /api/feedback/event/:eventId/forms
 export const createForm = (req, res) =>
   handle(res, async () => {
@@ -49,6 +58,15 @@ export const updateForm = (req, res) =>
     const userId = req.user?.id;
     const { eventId, formId } = req.params;
     const result = await feedbackService.updateForm({ userId, eventId, formId, body: req.body });
+    return { status: 200, ...result };
+  });
+
+// DELETE /api/feedback/event/:eventId/forms/:formId
+export const deleteForm = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId, formId } = req.params;
+    const result = await feedbackService.deleteForm({ userId, eventId, formId });
     return { status: 200, ...result };
   });
 
@@ -79,6 +97,15 @@ export const reopenForm = (req, res) =>
     return { status: 200, ...result };
   });
 
+// GET /api/feedback/event/:eventId/forms/:formId/summary
+export const getFormSummary = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId, formId } = req.params;
+    const result = await feedbackService.getFormSummary({ userId, eventId, formId });
+    return { status: 200, ...result };
+  });
+
 // GET /api/feedback/event/:eventId/available-forms
 export const getAvailableFormsForMember = (req, res) =>
   handle(res, async () => {
@@ -97,13 +124,19 @@ export const submitResponse = (req, res) =>
     return { status: 201, ...result };
   });
 
-// GET /api/feedback/event/:eventId/forms/:formId/summary
-export const getFormSummary = (req, res) =>
+// GET /api/feedback/event/:eventId/forms/:formId/export
+export const exportFormResponses = (req, res) =>
   handle(res, async () => {
     const userId = req.user?.id;
     const { eventId, formId } = req.params;
-    const result = await feedbackService.getFormSummary({ userId, eventId, formId });
+    const result = await feedbackService.exportFormResponses({ userId, eventId, formId });
     return { status: 200, ...result };
   });
 
-
+export const getAllEventFeedback = (req, res) =>
+  handle(res, async () => {
+    const userId = req.user?.id;
+    const { eventId } = req.params;
+    const result = await feedbackService.getAllEventFeedback({ userId, eventId });
+    return { status: 200, ...result };
+  });

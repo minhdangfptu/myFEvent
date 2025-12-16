@@ -1,10 +1,12 @@
 import {
 	getCalendarByEventId,
-	getCalendarByDepartmentId,
 	createCalendar,
 	updateCalendar,
 	getCalendarById,
 	getCalendarsInEventScope,
+    addParticipantsToCalendar,
+    removeParticipantFromCalendar
+
 } from "../services/calendarService.js";
 import {
     findEventById
@@ -15,13 +17,72 @@ import {
 import {
     getRequesterMembership,
     getMembersByEventRaw,
-    getMembersByDepartmentRaw
+    getMembersByDepartmentRaw,
+    getEventMemberById,
+    getActiveEventMembers
+
 } from "../services/eventMemberService.js";
+import {
+    notifyMeetingReminder,
+    notifyRemovedFromCalendar,
+    notifyAddedToCalendar,
+    notifyCalendarUpdated
+} from "../services/notificationService.js";
+import EventMember from '../models/eventMember.js';
+
+const extractUserIdsFromMembers = async (memberIds = []) => {
+  if (!Array.isArray(memberIds) || memberIds.length === 0) return [];
+  const members = await EventMember.find({ _id: { $in: memberIds } })
+    .populate('userId', '_id')
+    .lean();
+  return members
+    .map(m => m.userId?._id)
+    .filter(Boolean)
+    .map(id => id.toString());
+};
+
+const toIdString = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+        if (value._id) return value._id.toString();
+        if (typeof value.toString === 'function') return value.toString();
+    }
+    return null;
+};
+
+export const resolveCalendarEventId = async (calendar) => {
+    if (!calendar) return { eventId: null, department: null };
+    if (calendar.eventId) {
+        return { eventId: calendar.eventId.toString(), department: null };
+    }
+    const departmentId = toIdString(calendar.departmentId);
+    if (!departmentId) return { eventId: null, department: null };
+    const department = await findDepartmentById(departmentId);
+    return { eventId: department?.eventId?.toString() || null, department };
+};
+
+const isCalendarCreator = (calendar, membershipId) => {
+    const creatorId = toIdString(calendar?.createdBy);
+    if (!creatorId || !membershipId) return false;
+    return creatorId === membershipId.toString();
+};
+
+const toParticipantMemberId = (participant) => {
+    const memberField = participant?.member;
+    if (!memberField) return null;
+    if (typeof memberField === 'string') return memberField;
+    if (typeof memberField === 'object') {
+        if (memberField._id) return memberField._id.toString();
+        if (typeof memberField.toString === 'function') return memberField.toString();
+    }
+    return null;
+};
 
 export const getCalendarsForEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const event = findEventById(eventId);
+        const event = await findEventById(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
         }
@@ -33,59 +94,6 @@ export const getCalendarsForEvent = async (req, res) => {
     }
 };
 
-export const getCalendarsForDepartment = async (req, res) => {
-    try {
-        const { departmentId } = req.params;
-		const department = await findDepartmentById(departmentId);
-        if (!department) {
-            return res.status(404).json({ message: 'Department not found' });
-        }
-        const calendars = await getCalendarByDepartmentId(departmentId);
-        return res.status(200).json({ data: calendars });
-    } catch (error) {
-        console.error('getCalendarForDepartment error:', error);
-        return res.status(500).json({ message: 'Failed to load calendar' });
-    }
-};
-
-export const createCalendarForEntity = async (req, res) => {
-    try {
-
-        const { entityType, entityId, calendarData } = req.body;
-        let entity;
-        if (entityType === 'event') {
-            entity = await findEventById(entityId);
-            if (!entity) {
-                return res.status(404).json({ message: 'Event not found' });
-            };
-            const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            isHoOC = requesterMembership?.role === 'HoOC';
-            if (!isHoOC) {
-                return res.status(403).json({ message: 'Only HoOC can create calendar for event!' });
-            }
-            const calendar = await createCalendar(calendarData);
-            return res.status(200).json({ data: calendar });
-
-        } else if (entityType === 'department') {
-            entity = await findDepartmentById(entityId);
-            if (!entity) {
-                return res.status(404).json({ message: 'Department not found' });
-            }
-            const requesterMembership = await getRequesterMembership(entityId, req.user?.id);
-            isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId.toString() === entityId;
-            if (!isHoDOfDepartment) {
-                return res.status(403).json({ message: 'Only HoD of this department can create calendar for this department!' });
-            }
-            const calendar = await createCalendar(calendarData);
-            return res.status(200).json({ data: calendar });
-        } else {
-            return res.status(400).json({ message: 'Invalid entity type' });
-        }
-    } catch (error) {
-        console.error('createCalendarForEntity error:', error);
-        return res.status(500).json({ message: 'Failed to create calendar' });
-    }
-};
 export const createCalendarForEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
@@ -133,11 +141,20 @@ export const createCalendarForEvent = async (req, res) => {
         let participants = [];
         if (participantType) {
             if (participantType === 'all') {
-                const allMembers = await getMembersByEventRaw(eventId);
+                const allMembers = await EventMember.find({
+                    eventId,
+                    status: { $ne: 'deactive' }
+                }).select('_id').lean();
                 participants = allMembers.map(member => ({
                     member: member._id,
-                    participateStatus: 'unconfirmed'
+                    participateStatus: member._id?.toString() === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
                 }));
+                if (ownerMemberid && !participants.some(p => p.member?.toString() === ownerMemberid.toString())) {
+                    participants.unshift({
+                        member: ownerMemberid,
+                        participateStatus: 'confirmed'
+                    });
+                }
             } else if (participantType === 'departments') {
                 if (!departments) {
                     return res.status(400).json({ message: 'departments is required when participantType is "departments"' });
@@ -162,13 +179,11 @@ export const createCalendarForEvent = async (req, res) => {
                 if (!Array.isArray(departmentIds) || departmentIds.length === 0) {
                     return res.status(400).json({ message: 'departments must be a non-empty array' });
                 }
-                const departmentIdSet = new Set(departmentIds.map(id => id?.toString()));
-                const allMembers = await getMembersByEventRaw(eventId);
-                
-                const selectedMembers = allMembers.filter(member => {
-                    const depIdStr = member?.departmentId?._id ? member.departmentId._id.toString() : null;
-                    return depIdStr && departmentIdSet.has(depIdStr);
-                });
+                const selectedMembers = await EventMember.find({
+                    eventId,
+                    departmentId: { $in: departmentIds },
+                    status: { $ne: 'deactive' }
+                }).select('_id').lean();
                 
                 const seen = new Set();
                 participants = selectedMembers.map(member => {
@@ -176,10 +191,10 @@ export const createCalendarForEvent = async (req, res) => {
                     seen.add(idStr);
                     return {
                         member: member._id,
-                        participateStatus: idStr === ownerMemberid.toString() ? 'confirmed' : 'unconfirmed'
+                        participateStatus: idStr === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
                     };
                 });
-                if (!seen.has(ownerMemberid.toString())) {
+                if (ownerMemberid && !seen.has(ownerMemberid.toString())) {
                     participants.unshift({
                         member: ownerMemberid,
                         participateStatus: 'confirmed'
@@ -265,6 +280,19 @@ export const createCalendarForEvent = async (req, res) => {
         };
 
         const calendar = await createCalendar(calendarData);
+        const participantMemberIds = calendar.participants?.map(p => p.member).filter(Boolean) || [];
+        const userIds = await extractUserIdsFromMembers(participantMemberIds);
+        const requesterUserId = req.user?.id;
+        const targetUserIds = userIds.filter(id => id !== requesterUserId?.toString());
+        if (targetUserIds.length > 0) {
+          await notifyAddedToCalendar({
+            eventId,
+            calendarId: calendar._id,
+            userIds: targetUserIds,
+            calendarName: calendar.name,
+            creatorUserId: requesterUserId,
+          });
+        }
         return res.status(201).json({ data: calendar });
     } catch (error) {
         console.error('createCalendarForEvent error:', error.message);
@@ -294,6 +322,7 @@ export const createCalendarForDepartment = async (req, res) => {
         }
         const ownerMemberid = requesterMembership?._id;
 		let { name, startAt, endAt, locationType, location, meetingDate, startTime, endTime, participantType, members, notes, attachments } = req.body;
+        console.log(members);
         if (!startAt && meetingDate && startTime) {
             startAt = new Date(`${meetingDate}T${startTime}`).toISOString();
         }
@@ -313,6 +342,7 @@ export const createCalendarForDepartment = async (req, res) => {
                 message: 'locationType must be either "online" or "offline"'
             });
         }
+
 		const startDate = new Date(startAt);
 		const endDate = new Date(endAt);
 		if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -323,61 +353,76 @@ export const createCalendarForDepartment = async (req, res) => {
 		}
 
 		let participants = [];
+        if (participantType) {
 		if (participantType === 'all') {
-			const allMembers = await getMembersByDepartmentRaw(departmentId);
+			const allMembers = await EventMember.find({
+				departmentId,
+				status: { $ne: 'deactive' }
+			}).select('_id').lean();
 			participants = allMembers.map(member => ({
 				member: member._id,
-				participateStatus: (member._id?.toString() === ownerMemberid?.toString()) ? 'confirmed' : 'unconfirmed'
+                    participateStatus: member._id?.toString() === ownerMemberid?.toString() ? 'confirmed' : 'unconfirmed'
 			}));
-			// Ensure owner is included and confirmed
-			const ownerIncluded = participants.some(p => p.member?.toString() === ownerMemberid?.toString());
-			if (!ownerIncluded && ownerMemberid) {
+                if (ownerMemberid && !participants.some(p => p.member?.toString() === ownerMemberid.toString())) {
 				participants.unshift({
 					member: ownerMemberid,
 					participateStatus: 'confirmed'
 				});
 			}
 		} else {
-			// Manual selection path: accept `members` or `participants` from body
-			let selectedMemberIds = members;
-			if ((selectedMemberIds === undefined || selectedMemberIds === null) && Array.isArray(req.body.participants)) {
-				// If participants array is provided as full objects, keep as-is below
-				selectedMemberIds = null;
+                // Manual selection: accept `members` from body
+                if (members === undefined || members === null) {
+                    return res.status(400).json({
+                        message: 'members is required when participantType is not "all"',
+                        received: { members, participantType }
+                    });
 			}
 
-			if (selectedMemberIds !== null) {
-				if (Array.isArray(selectedMemberIds)) {
-					// ok
-				} else if (typeof selectedMemberIds === 'string') {
-					const trimmed = selectedMemberIds.trim();
+                let memberIds;
+                if (Array.isArray(members)) {
+                    memberIds = members;
+                } else if (typeof members === 'string') {
+                    const trimmed = members.trim();
 					if (!trimmed || trimmed === 'null' || trimmed === 'undefined') {
-						return res.status(400).json({ message: 'members cannot be empty' });
+                        return res.status(400).json({
+                            message: 'members cannot be empty',
+                            received: trimmed
+                        });
 					}
 					try {
-						selectedMemberIds = JSON.parse(trimmed);
+                        memberIds = JSON.parse(trimmed);
 					} catch (e) {
-						return res.status(400).json({ message: 'Invalid members JSON format: ' + e.message });
+                        console.error('JSON parse error for members:', e.message, 'value:', trimmed);
+                        return res.status(400).json({
+                            message: 'Invalid members JSON format: ' + e.message,
+                            received: trimmed.substring(0, 100)
+                        });
 					}
-				} else if (selectedMemberIds !== undefined) {
+                } else {
 					return res.status(400).json({
 						message: 'members must be an array or a JSON string',
-						receivedType: typeof selectedMemberIds
+                        receivedType: typeof members,
+                        received: members
 					});
 				}
 
-				if (selectedMemberIds !== null) {
-					if (!Array.isArray(selectedMemberIds)) {
-						return res.status(400).json({ message: 'members must parse to an array' });
+                if (!Array.isArray(memberIds)) {
+                    return res.status(400).json({
+                        message: 'members must parse to an array',
+                        parsedType: typeof memberIds,
+                        parsed: memberIds
+                    });
 					}
-					if (selectedMemberIds.length === 0) {
+
+                if (memberIds.length === 0) {
 						return res.status(400).json({ message: 'members must be a non-empty array' });
 					}
-					const seen = new Set(selectedMemberIds.map(id => id?.toString()));
-					participants = selectedMemberIds.map(memberId => ({
+                const seen = new Set(memberIds.map(id => id.toString()));
+                participants = memberIds.map(memberId => ({
 						member: memberId,
-						participateStatus: (memberId?.toString() === ownerMemberid?.toString()) ? 'confirmed' : 'unconfirmed'
+                    participateStatus: (memberId?.toString() === ownerMemberid.toString()) ? 'confirmed' : 'unconfirmed'
 					}));
-					if (ownerMemberid && !seen.has(ownerMemberid.toString())) {
+                if (!seen.has(ownerMemberid.toString())) {
 						participants.unshift({
 							member: ownerMemberid,
 							participateStatus: 'confirmed'
@@ -386,14 +431,8 @@ export const createCalendarForDepartment = async (req, res) => {
 				}
 			}
 
-			// If participants provided directly in body, trust it
-			if (participants.length === 0 && Array.isArray(req.body.participants) && req.body.participants.length > 0) {
+        if (Array.isArray(req.body.participants) && req.body.participants.length > 0) {
 				participants = req.body.participants;
-			}
-
-			if (participants.length === 0) {
-				return res.status(400).json({ message: 'At least one participant is required' });
-			}
 		}
 
 		const calendarData = {
@@ -410,16 +449,40 @@ export const createCalendarForDepartment = async (req, res) => {
 			createdBy: ownerMemberid
 		};
 
-		const calendar = await createCalendar(calendarData);
-		return res.status(201).json({ data: calendar });
+        const calendar = await createCalendar(calendarData);
+        const participantMemberIds = calendar.participants?.map(p => p.member).filter(Boolean) || [];
+        const userIds = await extractUserIdsFromMembers(participantMemberIds);
+        const requesterUserId = req.user?.id;
+        const targetUserIds = userIds.filter(id => id !== requesterUserId?.toString());
+        if (targetUserIds.length > 0) {
+          const departmentEventId = department.eventId?.toString();
+          await notifyAddedToCalendar({
+            eventId: departmentEventId,
+            calendarId: calendar._id,
+            userIds: targetUserIds,
+            calendarName: calendar.name,
+            creatorUserId: requesterUserId,
+          });
+        }
+        return res.status(201).json({ data: calendar });
     } catch (error) {
         console.error('createCalendarForDepartment error:', error.message);
-        return res.status(500).json({ message: 'Failed to create calendar' });
+
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message).join(', ');
+            return res.status(400).json({ message: 'Validation error: ' + messages });
+        }
+
+        // Handle other errors
+        const errorMessage = error?.message || 'Unknown error occurred';
+        return res.status(500).json({ message: 'Failed to create calendar: ' + errorMessage });
     }
-}
+};
 export const updateCalendarForEvent = async (req, res) => {
     try {
-        const { calendarId, updateData } = req.body;
+        const { calendarId } = req.params;
+        const {  updateData } = req.body;
 		let calendar = await getCalendarById(calendarId);
         if (!calendar) {
             return res.status(404).json({ message: 'Calendar not found' });
@@ -428,7 +491,7 @@ export const updateCalendarForEvent = async (req, res) => {
 		let ownerMemberid = null;
 		if (calendar.eventId) { // Calendar belongs to event
 			const requesterMembership = await getRequesterMembership(calendar.eventId?.toString(), req.user?.id);
-            isHoOC = requesterMembership?.role === 'HoOC';
+            const isHoOC = requesterMembership?.role === 'HoOC';
 			ownerMemberid = requesterMembership?._id;
             if (!isHoOC) {
                 return res.status(403).json({ message: 'Only HoOC can update calendar for event!' });
@@ -440,7 +503,7 @@ export const updateCalendarForEvent = async (req, res) => {
 				return res.status(404).json({ message: 'Department not found' });
 			}
 			const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
-			isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
+			const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
 			ownerMemberid = requesterMembership?._id;
             if (!isHoDOfDepartment) {
                 return res.status(403).json({ message: 'Only HoD of this department can update calendar for this department!' });
@@ -637,6 +700,18 @@ export const updateCalendarForEvent = async (req, res) => {
 		await updateCalendar(calendarId, allowedUpdate);
 		// Return populated document
 		calendar = await getCalendarById(calendarId);
+
+		// Send notification to all participants about the update
+		const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+		if (calendarEventId && calendar.participants && calendar.participants.length > 0) {
+			await notifyCalendarUpdated(
+				calendarEventId,
+				calendarId,
+				calendar.participants,
+				calendar.name
+			);
+		}
+
 		return res.status(200).json({ data: calendar });
     } catch (error) {
         console.error('updateCalendarForEntity error:', error);
@@ -700,6 +775,8 @@ export const getMyCalendarInEvent = async (req, res) => {
             return res.status(403).json({ message: 'Infficient permissions' });
         };
         const { eventId } = req.params;
+        const { month, year } = req.query;
+
         const event = await findEventById(eventId);
         if (!event) {
             return res.status(404).json({ message: 'Event not found' });
@@ -708,9 +785,22 @@ export const getMyCalendarInEvent = async (req, res) => {
         if (!membership) {
             return res.status(403).json({ message: 'You are not a member of this event' });
         }
+
+        // Calculate date range if month/year provided
+        let startDate = null;
+        let endDate = null;
+        if (month && year) {
+            const monthNum = parseInt(month);
+            const yearNum = parseInt(year);
+            if (!isNaN(monthNum) && !isNaN(yearNum) && monthNum >= 1 && monthNum <= 12) {
+                startDate = new Date(yearNum, monthNum - 1, 1);
+                endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+            }
+        }
+
         let calendars = [];
         try {
-            calendars = await getCalendarsInEventScope(eventId);
+            calendars = await getCalendarsInEventScope(eventId, startDate, endDate);
             if (!Array.isArray(calendars)) calendars = [];
         } catch (_) {
             // Fallback to event-only calendars if event-scope query fails
@@ -722,14 +812,46 @@ export const getMyCalendarInEvent = async (req, res) => {
             }
         }
         const membershipId = membership._id.toString();
+        const userDepartmentId = (typeof membership.departmentId === 'object' && membership.departmentId !== null)
+            ? (membership.departmentId._id || membership.departmentId.id)?.toString()
+            : membership.departmentId?.toString();
+
         const myCalendars = calendars.filter(calendar => {
-            return Array.isArray(calendar.participants) && calendar.participants.some(participant => {
+            // Check if user is in participants list
+            const isParticipant = Array.isArray(calendar.participants) && calendar.participants.some(participant => {
                 const memberField = participant?.member;
                 const participantMemberId = (memberField && typeof memberField === 'object')
                     ? (memberField._id || memberField)?.toString()
                     : (memberField)?.toString();
                 return participantMemberId === membershipId;
             });
+
+            // If user is a participant, include the calendar
+            if (isParticipant) return true;
+
+            // For event-wide calendars (type = 'event'): all members of the event can see them
+            // This fixes the issue where new members joining after calendar creation can see event-wide meetings
+            const calendarType = calendar.type;
+            const hasDepartmentId = calendar.departmentId &&
+                (typeof calendar.departmentId === 'object' ? calendar.departmentId._id : calendar.departmentId);
+
+            if (calendarType === 'event' || !hasDepartmentId) {
+                // Event-wide calendar: all members can see
+                return true;
+            }
+
+            // For department calendars: if user belongs to that department, show the meeting
+            // This fixes the issue where members joining later can see department meetings
+            if (hasDepartmentId && userDepartmentId) {
+                const calendarDepartmentId = (typeof calendar.departmentId === 'object' && calendar.departmentId._id)
+                    ? calendar.departmentId._id.toString()
+                    : calendar.departmentId.toString();
+                if (calendarDepartmentId === userDepartmentId) {
+                    return true;
+                }
+            }
+
+            return false;
         });
         return res.status(200).json({ data: myCalendars });
     } catch (error) {
@@ -740,15 +862,377 @@ export const getMyCalendarInEvent = async (req, res) => {
 export const getCalendarDetail = async (req, res) => {
     try {
         const { calendarId } = req.params;
+        const userId = req.user?.id;
+        
+        if (!calendarId) {
+            return res.status(400).json({ message: 'calendarId is required' });
+        }
+        
+        if (!userId) {
+            return res.status(403).json({ message: 'Authentication required' });
+        }
+        
         const calendar = await getCalendarById(calendarId);
         if (!calendar) {
             return res.status(404).json({ message: 'Calendar not found' });
         }
-        return res.status(200).json({ data: calendar });
+        
+        // Lấy eventId từ calendar
+        const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+        if (!calendarEventId) {
+            return res.status(400).json({ message: 'Calendar does not belong to any event' });
+        }
+        
+        // Kiểm tra user có phải là member active của event không
+        const membership = await getRequesterMembership(calendarEventId, userId);
+        if (!membership) {
+            return res.status(403).json({ message: 'You are not a member of this event' });
+        }
+        
+        // Kiểm tra member có status active không (không phải deactive)
+        if (membership.status === 'deactive') {
+            return res.status(403).json({ message: 'You do not have permission to view this calendar' });
+        }
+        
+        // Kiểm tra quyền xem calendar (tương tự logic trong getMyCalendarInEvent)
+        const membershipId = membership._id.toString();
+        const userDepartmentId = membership.departmentId?.toString();
+        
+        // Check if user is in participants list
+        const isParticipant = Array.isArray(calendar.participants) && calendar.participants.some(participant => {
+            const memberField = participant?.member;
+            const participantMemberId = (memberField && typeof memberField === 'object')
+                ? (memberField._id || memberField)?.toString()
+                : (memberField)?.toString();
+            return participantMemberId === membershipId;
+        });
+        
+        // If user is a participant, allow access
+        if (isParticipant) {
+            return res.status(200).json({ data: calendar });
+        }
+        
+        // For event-wide calendars (type = 'event'): all active members of the event can see them
+        const calendarType = calendar.type;
+        const hasDepartmentId = calendar.departmentId && 
+            (typeof calendar.departmentId === 'object' ? calendar.departmentId._id : calendar.departmentId);
+        
+        if (calendarType === 'event' || !hasDepartmentId) {
+            // Event-wide calendar: all active members can see
+            return res.status(200).json({ data: calendar });
+        }
+        
+        // For department calendars: if user belongs to that department, allow access
+        if (hasDepartmentId && userDepartmentId) {
+            const calendarDepartmentId = (typeof calendar.departmentId === 'object' && calendar.departmentId._id)
+                ? calendar.departmentId._id.toString()
+                : calendar.departmentId.toString();
+            if (calendarDepartmentId === userDepartmentId) {
+                return res.status(200).json({ data: calendar });
+            }
+        }
+        
+        // User does not have permission to view this calendar
+        return res.status(403).json({ message: 'You do not have permission to view this calendar' });
     } catch (error) {
         console.error('getCalendarDetail error:', error);
         return res.status(500).json({ message: 'Failed to load calendar detail' });
     }
 }
 
-// deleteCalendar functionality reverted
+export const getAvailableMembers = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Calendar not found' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Calendar does not belong to this event' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Infficient permissions' });
+    }
+
+    const allMembers = await getActiveEventMembers(calendarEventId);
+    const currentMemberIds = new Set(
+      (calendar.participants || [])
+        .map(toParticipantMemberId)
+        .filter(Boolean)
+    );
+    const availableMembers = allMembers.filter(
+      member => !currentMemberIds.has(member._id.toString())
+    );
+
+    console.log('Available members:', availableMembers.map(m => m._id.toString()));
+
+    return res.status(200).json({
+      message: 'Successfully get available members',
+      data: availableMembers
+    });
+  } catch (error) {
+    console.error('Error in getAvailableMembers:', error);
+    return res.status(500).json({
+      message: 'Failed to get available members'
+    });
+  }
+};
+
+export const addParticipants = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+    const { memberIds } = req.body;
+
+    if (!Array.isArray(memberIds) || memberIds.length === 0) {
+      return res.status(400).json({
+        message: 'memberIds phải là array và không được rỗng'
+      });
+    }
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền thêm người tham gia' });
+    }
+
+    const existingMemberIds = new Set(
+      (calendar.participants || [])
+        .map(toParticipantMemberId)
+        .filter(Boolean)
+    );
+    const newMemberIds = memberIds
+      .map(id => id?.toString())
+      .filter(id => id && !existingMemberIds.has(id));
+
+    if (newMemberIds.length === 0) {
+      return res.status(400).json({
+        message: 'Tất cả thành viên đã có trong lịch họp'
+      });
+    }
+
+    const newParticipants = newMemberIds.map(memberId => ({
+      member: memberId,
+      participateStatus: 'unconfirmed',
+    }));
+
+    await addParticipantsToCalendar(calendarId, newParticipants);
+
+    const memberDocs = await EventMember.find({ _id: { $in: newMemberIds } })
+      .populate('userId', '_id')
+      .lean();
+    const targetUserIds = memberDocs
+      .map(doc => doc.userId?._id)
+      .filter(Boolean)
+      .map(id => id.toString());
+    const requesterUserId = requesterMembership?.userId?._id?.toString() || req.user?.id;
+    const userIdsToNotify = targetUserIds.filter(id => id !== requesterUserId?.toString());
+
+    await notifyAddedToCalendar({
+      eventId,
+      calendarId,
+      userIds: userIdsToNotify,
+      calendarName: calendar.name,
+      creatorUserId: requesterUserId
+    });
+
+    const updatedCalendar = await getCalendarById(calendarId);
+
+    return res.status(200).json({
+      message: `Đã thêm ${newMemberIds.length} người tham gia`,
+      data: updatedCalendar
+    });
+  } catch (error) {
+    console.error('Error in addParticipants:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi thêm người tham gia'
+    });
+  }
+};
+
+export const removeParticipant = async (req, res) => {
+  try {
+    const { eventId, calendarId, memberId } = req.params;
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa người tham gia' });
+    }
+
+    const creatorId = toIdString(calendar.createdBy);
+    if (creatorId === memberId) {
+      return res.status(400).json({
+        message: 'Không thể xóa người tạo cuộc họp'
+      });
+    }
+
+    const participantExists = (calendar.participants || []).some(
+      participant => toParticipantMemberId(participant) === memberId
+    );
+
+    if (!participantExists) {
+      return res.status(404).json({
+        message: 'Không tìm thấy người tham gia trong lịch họp'
+      });
+    }
+
+    const eventMember = await getEventMemberById(memberId);
+
+    await removeParticipantFromCalendar(calendarId, memberId);
+
+    if (eventMember && eventMember.userId) {
+      await notifyRemovedFromCalendar(
+        eventId,
+        calendarId,
+        toIdString(eventMember.userId),
+        calendar.name
+      );
+    }
+
+    const updatedCalendar = await getCalendarById(calendarId);
+
+    return res.status(200).json({
+      message: 'Đã xóa người tham gia',
+      data: updatedCalendar
+    });
+  } catch (error) {
+    console.error('Error in removeParticipant:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi xóa người tham gia'
+    });
+  }
+};
+
+export const deleteCalendar = async (req, res) => {
+    try {
+        const { calendarId } = req.params;
+        const calendar = await getCalendarById(calendarId);
+        if (!calendar) {
+            return res.status(404).json({ message: 'Calendar not found' });
+        }
+
+        // Permission checks - same as update
+        let ownerMemberid = null;
+        if (calendar.eventId) {
+            const requesterMembership = await getRequesterMembership(calendar.eventId?.toString(), req.user?.id);
+            const isHoOC = requesterMembership?.role === 'HoOC';
+            ownerMemberid = requesterMembership?._id;
+            if (!isHoOC) {
+                return res.status(403).json({ message: 'Only HoOC can delete calendar for event!' });
+            }
+        } else if (calendar.departmentId) {
+            const department = await findDepartmentById(calendar.departmentId?.toString());
+            if (!department) {
+                return res.status(404).json({ message: 'Department not found' });
+            }
+            const requesterMembership = await getRequesterMembership(department.eventId?.toString(), req.user?.id);
+            const isHoDOfDepartment = requesterMembership?.role === 'HoD' && requesterMembership?.departmentId?.toString() === calendar.departmentId?.toString();
+            ownerMemberid = requesterMembership?._id;
+            if (!isHoDOfDepartment) {
+                return res.status(403).json({ message: 'Only HoD of this department can delete calendar for this department!' });
+            }
+        }
+
+        // Delete the calendar
+        const Calendar = (await import('../models/calendar.js')).default;
+        await Calendar.findByIdAndDelete(calendarId);
+
+        return res.status(200).json({
+            message: 'Calendar deleted successfully',
+            data: { calendarId }
+        });
+    } catch (error) {
+        console.error('Error in deleteCalendar:', error);
+        return res.status(500).json({
+            message: 'Failed to delete calendar'
+        });
+    }
+};
+
+export const sendReminder = async (req, res) => {
+  try {
+    const { eventId, calendarId } = req.params;
+    const { target } = req.body;
+
+    if (!['unconfirmed', 'all'].includes(target)) {
+      return res.status(400).json({
+        message: 'Target phải là "unconfirmed" hoặc "all"'
+      });
+    }
+
+    const calendar = await getCalendarById(calendarId);
+    if (!calendar) {
+      return res.status(404).json({ message: 'Không tìm thấy lịch họp' });
+    }
+
+    const { eventId: calendarEventId } = await resolveCalendarEventId(calendar);
+    if (!calendarEventId || calendarEventId !== eventId) {
+      return res.status(400).json({ message: 'Lịch họp không thuộc sự kiện này' });
+    }
+
+    const requesterMembership = await getRequesterMembership(calendarEventId, req.user?.id);
+    if (!requesterMembership || !isCalendarCreator(calendar, requesterMembership._id)) {
+      return res.status(403).json({ message: 'Bạn không có quyền gửi nhắc nhở' });
+    }
+
+    let targetParticipants = calendar.participants || [];
+    if (target === 'unconfirmed') {
+      targetParticipants = targetParticipants.filter(
+        participant => participant.participateStatus === 'unconfirmed'
+      );
+    }
+
+    if (targetParticipants.length === 0) {
+      return res.status(400).json({
+        message: target === 'unconfirmed'
+          ? 'Không có người tham gia nào chưa phản hồi'
+          : 'Không có người tham gia nào'
+      });
+    }
+
+    await notifyMeetingReminder(
+      eventId,
+      calendarId,
+      targetParticipants,
+      calendar.name,
+      calendar.startAt
+    );
+
+    const targetText = target === 'all'
+      ? 'tất cả người tham gia'
+      : 'những người chưa phản hồi';
+
+    return res.status(200).json({
+      message: `Đã gửi nhắc nhở đến ${targetParticipants.length} ${targetText}`,
+      count: targetParticipants.length
+    });
+  } catch (error) {
+    console.error('Error in sendReminder:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi gửi nhắc nhở'
+    });
+  }
+};

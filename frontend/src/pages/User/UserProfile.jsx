@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import UserLayout from '../../components/UserLayout';
-import { authApi } from '../../apis/authApi';
+import { userApi } from '../../apis/userApi';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Loading from '~/components/Loading';
+import { useAuth } from '../../contexts/AuthContext';
+import authStorage from '../../utils/authStorage';
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { setUser } = useAuth?.() || {};
 
   // notify wrapper using react-toastify
   const notify = (type, msg) => {
@@ -20,7 +23,7 @@ export default function UserProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await authApi.getProfile();
+        const res = await userApi.getProfile();
         setProfile(res?.data || res || null);
       } catch (e) {
         setProfile(null);
@@ -34,6 +37,34 @@ export default function UserProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ fullName: '', phone: '', bio: '', highlight: '', tags: [] });
+  const [phoneError, setPhoneError] = useState('');
+
+  // Validate phone number (Vietnamese format)
+  const validatePhone = (phone) => {
+    if (!phone || phone.trim() === '') {
+      return ''; // Empty is allowed
+    }
+
+    // Remove spaces and dashes
+    const cleanPhone = phone.replace(/[\s-]/g, '');
+
+    // Vietnamese phone: starts with 0 and has 10 digits, or +84 with 11-12 digits
+    const vnPhoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
+    const intlPhoneRegex = /^\+84[3|5|7|8|9][0-9]{8}$/;
+
+    if (!vnPhoneRegex.test(cleanPhone) && !intlPhoneRegex.test(cleanPhone)) {
+      return 'Số điện thoại không hợp lệ. VD: 0912345678 hoặc +84912345678';
+    }
+
+    return '';
+  };
+
+  const handlePhoneChange = (value) => {
+    // Only allow numbers, +, spaces, and dashes
+    const filtered = value.replace(/[^0-9+\s-]/g, '');
+    setForm({ ...form, phone: filtered });
+    setPhoneError(validatePhone(filtered));
+  };
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -97,6 +128,15 @@ export default function UserProfilePage() {
   // Lưu toàn bộ hồ sơ (bao gồm avatar nếu có)
   const handleSave = async () => {
     if (saving) return;
+
+    // Validate phone before saving
+    const phoneValidationError = validatePhone(form.phone);
+    if (phoneValidationError) {
+      setPhoneError(phoneValidationError);
+      notify('error', 'Vui lòng kiểm tra lại số điện thoại.');
+      return;
+    }
+
     setSaving(true);
     try {
       // Đảm bảo gửi đầy đủ các field, kể cả khi chúng là empty string
@@ -121,18 +161,13 @@ export default function UserProfilePage() {
       }
       // Nếu không có avatarFile mới, không gửi avatarUrl để giữ nguyên avatar hiện tại
 
-      const response = await authApi.updateProfile(payload);
-      
-      // Sử dụng dữ liệu từ response hoặc reload từ server
-      let newProfile = response?.data || null;
-      if (!newProfile) {
-        const res = await authApi.getProfile();
-        newProfile = res?.data || res || null;
-      }
-      
+      const response = await userApi.updateProfile(payload);
+
+      // Backend trả về data đầy đủ trong response
+      const newProfile = response?.data || null;
+
       if (newProfile) {
         setProfile(newProfile);
-        // Cập nhật form state với dữ liệu mới từ server
         setForm({
           fullName: newProfile.fullName || '',
           phone: newProfile.phone || '',
@@ -141,15 +176,18 @@ export default function UserProfilePage() {
           tags: Array.isArray(newProfile.tags) ? newProfile.tags : []
         });
         setAvatarPreview(newProfile.avatarUrl || null);
-        
+        setUnsavedAvatar(false);
+        // Đồng bộ context, storage, event
+        if (setUser) setUser(newProfile);
+        authStorage.setUser(newProfile);
+        window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
         try {
           window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
-        } catch (e) { /* noop */ }
+        } catch (e) {}
       }
 
       setEditing(false);
       setAvatarFile(null);
-      setUnsavedAvatar(false);
       cleanupObjectUrl();
 
       notify('success', 'Lưu thay đổi thành công!');
@@ -175,10 +213,21 @@ export default function UserProfilePage() {
     setPerformingAvatarSave(true);
     try {
       const b64 = await fileToBase64(avatarFile);
-      await authApi.updateProfile({ avatarUrl: b64 });
+      const response = await userApi.updateProfile({ avatarUrl: b64 });
 
-      const res = await authApi.getProfile();
-      setProfile(res?.data || res || null);
+      // Backend trả về data đầy đủ trong response
+      const newProfile = response?.data || null;
+      if (newProfile) {
+        setProfile(newProfile);
+
+        // Dispatch event to update other components
+        if (setUser) setUser(newProfile);
+        authStorage.setUser(newProfile);
+        window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
+        try {
+          window.dispatchEvent(new CustomEvent('user-updated', { detail: newProfile }));
+        } catch (e) {}
+      }
 
       setShowAvatarConfirm(false);
       setUnsavedAvatar(false);
@@ -186,7 +235,9 @@ export default function UserProfilePage() {
       cleanupObjectUrl();
       notify('success', 'Ảnh đại diện đã được lưu.');
     } catch (e) {
-      notify('error', 'Lưu ảnh đại diện thất bại. Vui lòng thử lại.');
+      console.error('Save avatar error:', e);
+      const errorMessage = e?.response?.data?.message || e?.message || 'Lưu ảnh đại diện thất bại. Vui lòng thử lại.';
+      notify('error', errorMessage);
     } finally {
       setPerformingAvatarSave(false);
     }
@@ -243,23 +294,19 @@ export default function UserProfilePage() {
     }
   }, [showAvatarDropdown]);
 
+  if (loading) {
+    return (
+      <UserLayout title="Hồ sơ của tôi" activePage="account">
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+          <Loading />
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải hồ sơ...</div>
+        </div>
+      </UserLayout>
+    );
+  }
+
   return (
     <UserLayout title="Hồ sơ của tôi" activePage="account">
-      {loading ? (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(255,255,255,1)",
-            zIndex: 2000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Loading size={100} />
-        </div>
-      ) : null}
 
       <style>{`
         .mp-primary { color: #EF4444; }
@@ -373,14 +420,31 @@ export default function UserProfilePage() {
                           <span>{row.icon}</span>
                           <div className="small text-muted fw-medium">{row.label}</div>
                         </div>
-                        {editing && (row.key === 'fullName' || row.key === 'phone') ? (
+                        {editing && row.key === 'fullName' && (
                           <input
                             className="form-control"
-                            value={form[row.key]}
-                            onChange={(e) => setForm({ ...form, [row.key]: e.target.value })}
-                            placeholder={`Nhập ${row.label.toLowerCase()}`}
+                            value={form.fullName}
+                            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                            placeholder="Nhập họ và tên"
                           />
-                        ) : (
+                        )}
+                        {editing && row.key === 'phone' && (
+                          <>
+                            <input
+                              className={`form-control ${phoneError ? 'is-invalid' : ''}`}
+                              value={form.phone}
+                              onChange={(e) => handlePhoneChange(e.target.value)}
+                              placeholder="Nhập số điện thoại (VD: 0912345678)"
+                              maxLength={15}
+                            />
+                            {phoneError && (
+                              <div className="invalid-feedback d-block">
+                                {phoneError}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {(!editing || (row.key !== 'fullName' && row.key !== 'phone')) && (
                           <div className="fw-medium">{row.value || <span className="text-muted">Chưa cập nhật</span>}</div>
                         )}
                       </div>
@@ -434,7 +498,7 @@ export default function UserProfilePage() {
                             className="btn btn-sm p-0 border-0 bg-transparent"
                             style={{ fontSize: '18px', lineHeight: 1, color: '#6b7280' }}
                             onClick={async () => {
-                              try { await authApi.removeTag(t); } catch (_) {}
+                              try { await userApi.removeTag(t); } catch (_) {}
                               setForm({ ...form, tags: form.tags.filter(x => x !== t) });
                             }}
                           >
@@ -493,6 +557,7 @@ export default function UserProfilePage() {
                           className="btn btn-outline-secondary px-4"
                           onClick={() => {
                             setEditing(false);
+                            setPhoneError('');
                             if (profile) {
                               setForm({
                                 fullName: profile.fullName || '',
@@ -510,7 +575,7 @@ export default function UserProfilePage() {
                         >
                           Hủy
                         </button>
-                        <button className="btn btn-danger px-4" onClick={handleSave} disabled={saving}>
+                        <button className="btn btn-danger px-4" onClick={handleSave} disabled={saving || !!phoneError}>
                           {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
                         </button>
                       </div>

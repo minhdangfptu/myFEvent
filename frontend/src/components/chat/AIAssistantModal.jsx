@@ -1,140 +1,279 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { aiChatApi } from '../../apis/aiChatApi.js';
+import { Send, User, Bot, X } from 'lucide-react';
+import { aiAgentApi } from '../../apis/aiAgentApi.js';
 
-export default function AIAssistantModal({ isOpen, onClose }) {
-  const [sessionId, setSessionId] = useState(null);
+const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là Trợ lý feAI của myFEvent.
+
+Tôi có thể giúp bạn:
+• Tạo sự kiện theo yêu cầu của bạn 
+• Tạo công việc cho sự kiện của bạn 
+• Tóm tắt và tra cứu thông tin về sự kiện của bạn 
+
+Hãy mô tả nhanh sự kiện bạn đang chuẩn bị nhé!`;
+
+const mapHistory = (messages) =>
+  messages.map((msg) => ({
+    role: msg.role === 'user' ? 'user' : 'assistant',
+    content: msg.content,
+  }));
+
+const generateTitleFromText = (text) => {
+  if (!text || typeof text !== 'string') return 'Cuộc trò chuyện mới';
+  const words = text.trim().split(/\s+/);
+  const firstFive = words.slice(0, 5).join(' ');
+  return words.length > 5 ? `${firstFive} ...` : firstFive;
+};
+
+// Render đơn giản markdown cơ bản trong nội dung AI:
+// - **text**  → <strong>text</strong>
+// - ### Heading → dòng đậm hơn (giống heading nhỏ)
+const renderWithBold = (text) => {
+  if (!text || typeof text !== 'string') return text;
+
+  const lines = text.split('\n');
+
+  return lines.map((line, lineIdx) => {
+    const isHeading = line.trim().startsWith('### ');
+    const content = isHeading ? line.trim().slice(4) : line;
+
+    const parts = content.split(/(\*\*[^*]+?\*\*)/g);
+
+    const inner = parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={idx}>
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+
+    return (
+      <div
+        key={lineIdx}
+        style={isHeading ? { fontWeight: 700, marginTop: 4, marginBottom: 2 } : undefined}
+      >
+        {inner}
+      </div>
+    );
+  });
+};
+
+export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
-  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [tasksTable, setTasksTable] = useState([]);
-  const [wbsInfo, setWbsInfo] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [plans, setPlans] = useState([]); // các kế hoạch EPIC/TASK do agent sinh ra cho lần chat gần nhất
+  const [applying, setApplying] = useState(false);
   const containerRef = useRef(null);
+  const bottomRef = useRef(null);
 
-  const placeholder = useMemo(() => (
-    'Hỏi AI-gentask về kế hoạch sự kiện, ví dụ: "Concert ngày 25/12 tại đường 30m, 50 người, có ban Marketing và Hậu cần"'
-  ), []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    (async () => {
-      try {
-        const res = await aiChatApi.listSessions();
-        setSessions(res?.data?.sessions || []);
-      } catch {}
-    })();
-  }, [isOpen]);
+  const placeholder = useMemo(
+    () =>
+      'Ví dụ: "Workshop AI cho 200 người tại FU, cần gợi ý các ban tham gia và timeline"',
+    []
+  );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setInput('');
+      setLoading(false);
+      return;
+    }
+
+    // Load session list
+    setLoadingSessions(true);
+    aiAgentApi
+      .listSessions(eventId)
+      .then((data) => {
+        const list = data?.sessions;
+        if (Array.isArray(list)) {
+          setSessions(list);
+        } else {
+          // giữ nguyên nếu server không trả đúng format
+        }
+      })
+      .catch(() => {
+        // không xoá danh sách hiện tại nếu lỗi mạng / 401,...
+      })
+      .finally(() => setLoadingSessions(false));
+
+    setMessages([
+      {
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    setSessionId(null);
+
     setTimeout(() => containerRef.current?.focus(), 50);
-  }, [isOpen]);
+  }, [isOpen, eventId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isOpen]);
 
   const startNewChat = () => {
-    setSessionId(crypto.randomUUID());
-    setMessages([]);
+    setSessionId(null);
+    setMessages([
+      {
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    setInput('');
+    setPlans([]); // Reset plans khi bắt đầu chat mới
   };
 
-  const flattenDepartmentsToTable = (departments) => {
-    const rows = [];
-    if (!departments || typeof departments !== 'object') return rows;
-    const parseDate = (s) => {
-      if (!s) return null;
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? null : d;
-    };
-    const estimateHours = (priority) => {
-      const map = { critical: 16, high: 12, medium: 8, low: 4 };
-      return map[(priority || '').toLowerCase()] ?? 8;
-    };
-    Object.values(departments).forEach((arr) => {
-      (arr || []).forEach((t) => {
-        const sd = parseDate(t?.['start-date']);
-        const ed = parseDate(t?.deadline);
-        const duration = sd && ed ? Math.max(0, Math.round((ed - sd) / (1000 * 60 * 60 * 24))) : 0;
-        const depends = Array.isArray(t?.depends_on) ? t.depends_on.join(',') : (t?.depends_on ?? '');
-        rows.push({
-          task_id: t?.task_id || '',
-          name: t?.name || '',
-          'start-date': t?.['start-date'] || '',
-          deadline: t?.deadline || '',
-          duration_days: duration,
-          depends_on: String(depends),
-          estimated_hours: estimateHours(t?.priority),
-          complexity: t?.complexity || '',
-          priority: t?.priority || '',
-          suggested_team_size: t?.suggested_team_size || t?.suggestedTeamSize || '',
-        });
-      });
-    });
-    return rows;
-  };
-
-  const exportCSV = () => {
-    if (!tasksTable || tasksTable.length === 0) return;
-    const headers = ['task_id','name','start-date','deadline','duration_days','depends_on','estimated_hours','complexity','priority','suggested_team_size'];
-    const esc = (v) => {
-      const s = v == null ? '' : String(v);
-      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-      return s;
-    };
-    const lines = [headers.join(',')].concat(
-      tasksTable.map(r => headers.map(h => esc(r[h])).join(','))
-    );
-    const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tasks_table.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const switchSession = async (sid) => {
-    setSessionId(sid);
+  const openSession = async (sid) => {
+    if (!sid) return;
+    setLoading(true);
     try {
-      const res = await aiChatApi.getHistory(sid);
-      setMessages(res?.data?.history || []);
+      const data = await aiAgentApi.getSession(sid, eventId);
+      const convo = data?.conversation || data;
+      const convMessages = (convo?.messages || []).map((m) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content,
+        timestamp: m.timestamp,
+        data: m.data, // Giữ lại data để lấy plans
+      }));
+      setSessionId(sid);
+      setMessages(convMessages);
+      
+      // Khôi phục plans từ message cuối cùng (assistant message có plans và chưa được áp dụng)
+      const lastAssistantMsg = [...convMessages]
+        .reverse()
+        .find((m) => 
+          m.role === 'assistant' && 
+          m.data?.plans && 
+          Array.isArray(m.data.plans) && 
+          m.data.plans.length > 0 &&
+          !m.data.applied // Chỉ lấy plans chưa được áp dụng
+        );
+      if (lastAssistantMsg?.data?.plans && !lastAssistantMsg.data.applied) {
+        setPlans(lastAssistantMsg.data.plans);
+      } else {
+        setPlans([]);
+      }
+    } catch (e) {
+      console.error('Failed to load session', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshSessions = async () => {
+    try {
+      const data = await aiAgentApi.listSessions(eventId);
+      const list = data?.sessions;
+      if (Array.isArray(list)) {
+        setSessions(list);
+      }
     } catch {
-      setMessages([]);
+      // ignore
     }
   };
 
   const send = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed || loading) return;
+
     const sid = sessionId || crypto.randomUUID();
-    setSessionId(sid);
-    const userMsg = { role: 'user', content: input, timestamp: new Date().toISOString() };
-    setMessages((prev) => [...prev, userMsg]);
+
+    const userMessage = {
+      role: 'user',
+      content: trimmed,
+      timestamp: new Date().toISOString(),
+    };
+
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
     setInput('');
     setLoading(true);
-    try {
-      const res = await aiChatApi.sendMessage({ message: userMsg.content, session_id: sid });
-      const aiMsg = { role: 'assistant', content: res?.data?.message || '', timestamp: new Date().toISOString() };
-      setMessages((prev) => [...prev, aiMsg]);
 
-      // Extract tasks table when planning is complete
-      const data = res?.data || {};
-      if (data?.state === 'planning_complete') {
-        setWbsInfo({ extracted_info: data.extracted_info, rag_insights: data.rag_insights });
-        if (Array.isArray(data?.tasks_table) && data.tasks_table.length) {
-          setTasksTable(data.tasks_table);
-        } else {
-          const flat = flattenDepartmentsToTable(data?.departments || data?.wbs?.departments);
-          setTasksTable(flat);
+    try {
+      setSessionId(sid);
+      const response = await aiAgentApi.runTurn(mapHistory(nextMessages), {
+        eventId,
+        sessionId: sid,
+      });
+      const assistantReply =
+        response?.assistant_reply ||
+        'Tôi chưa nhận được phản hồi từ AI Agent. Vui lòng thử lại nhé.';
+
+      // Lưu lại kế hoạch (nếu có) để user xem & áp dụng sau
+      const nextPlans =
+        Array.isArray(response?.plans) && response.plans.length > 0
+          ? response.plans
+          : [];
+      
+      setPlans(nextPlans);
+
+      // Lưu plans vào message data để hiển thị nút "Áp dụng" ngay trong message
+      const aiMessage = {
+        role: 'assistant',
+        content: assistantReply,
+        timestamp: new Date().toISOString(),
+        data: nextPlans.length > 0 ? { plans: nextPlans, applied: false } : undefined,
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+
+      const returnedSessionId =
+        response?.sessionId || response?.session_id || sid;
+      setSessionId(returnedSessionId);
+
+      // Cập nhật sidebar ngay lập tức để không phải chờ server
+      setSessions((prev) => {
+        const idStr = String(returnedSessionId);
+        const now = new Date().toISOString();
+        const title = generateTitleFromText(userMessage.content);
+        const existingIdx = prev.findIndex(
+          (s) => String(s.sessionId || s.session_id || s._id) === idStr
+        );
+        if (existingIdx === -1) {
+          return [
+            {
+              sessionId: idStr,
+              title,
+              updatedAt: now,
+            },
+            ...prev,
+          ];
         }
-      }
-      // refresh sessions list
-      const list = await aiChatApi.listSessions();
-      setSessions(list?.data?.sessions || []);
-    } catch (e) {
-      const detail = e?.response?.data?.detail || e?.message || 'Lỗi không xác định';
-      console.error('AI chat error:', e);
-      const errMsg = { role: 'assistant', content: `Xin lỗi, có lỗi kết nối tới AI. (${String(detail)})`, timestamp: new Date().toISOString() };
-      setMessages((prev) => [...prev, errMsg]);
+        const clone = [...prev];
+        clone[existingIdx] = {
+          ...clone[existingIdx],
+          title: clone[existingIdx].title || title,
+          updatedAt: now,
+        };
+        return clone;
+      });
+
+      // Sau đó đồng bộ lại với server (nếu cần)
+      refreshSessions();
+    } catch (error) {
+      const detail =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        'Không thể kết nối tới AI Agent.';
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Xin lỗi, tôi gặp sự cố khi gửi yêu cầu.\nChi tiết: ${detail}`,
+          timestamp: new Date().toISOString(),
+          isError: true,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -148,7 +287,7 @@ export default function AIAssistantModal({ isOpen, onClose }) {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0,0,0,0.2)',
-        zIndex: 1049,
+        zIndex: 1050,
       }}
       onClick={onClose}
     >
@@ -158,153 +297,429 @@ export default function AIAssistantModal({ isOpen, onClose }) {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
-          right: '24px',
-          bottom: '24px',
-          width: 'min(520px, 33vw)',
-          height: '70vh',
-          background: 'white',
-          borderRadius: '16px',
+          right: '32px',
+          bottom: '32px',
+          width: 'min(900px, 60vw)',
+          height: '75vh',
+          background: '#fff',
+          borderRadius: '16px 16px 16px 16px',
           boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700 }}>AI-gentask</span>
-            <button className="btn btn-sm btn-outline-secondary" onClick={startNewChat}>
-              <i className="bi bi-plus-lg me-1"></i>New Chat
-            </button>
-            <div style={{ position: 'relative' }}>
-              <button className="btn btn-sm btn-outline-secondary" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-haspopup>
-                <i className="bi bi-three-dots"></i>
-              </button>
-              {menuOpen && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, background: 'white', border: '1px solid #eee', borderRadius: 8, padding: 8, width: 280, maxHeight: 260, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-                  <div className="small text-muted mb-2">Hội thoại trước đó</div>
-                  {sessions.length === 0 && (
-                    <div className="text-muted small">Chưa có phiên trò chuyện</div>
-                  )}
-                  {sessions.map((s) => (
-                    <button
-                      key={s.session_id}
-                      className={`btn btn-light w-100 text-start mb-1 ${sessionId === s.session_id ? 'active' : ''}`}
-                      onClick={() => { setMenuOpen(false); switchSession(s.session_id); }}
-                      title={`${s.session_id}`}
-                    >
-                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {s.current_event || s.session_id}
-                      </div>
-                      <div className="small text-muted">{s.message_count} tin nhắn</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+        <div
+          style={{
+            padding: '12px 16px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 700 }}>Trợ lý feAI</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              Đồng hành lập kế hoạch sự kiện
             </div>
           </div>
-          <button className="btn btn-sm btn-outline-danger" onClick={onClose}>
-            Đóng
+          <button
+            onClick={onClose}
+            type="button"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              color: '#6b7280',
+              transition: 'background-color 0.2s, color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#111827';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6b7280';
+            }}
+            aria-label="Đóng"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        <div ref={containerRef} tabIndex={-1} style={{ flex: 1, padding: '12px 16px', overflow: 'auto', background: '#fafafa' }}>
-          {messages.length === 0 && (
-            <div className="text-muted" style={{ marginTop: 24 }}>
-              Bắt đầu trò chuyện với AI để lên kế hoạch WBS cho sự kiện của bạn.
-            </div>
-          )}
-          {messages.map((m, idx) => (
-            <div key={idx} style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                background: m.role === 'assistant' ? '#dc2626' : '#e5e7eb',
-                color: m.role === 'assistant' ? 'white' : '#111827',
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            minHeight: 0,
+          }}
+        >
+          {/* Sidebar sessions giống ChatGPT */}
+          <div
+            style={{
+              width: 260,
+              borderRight: '1px solid #eee',
+              padding: '8px',
+              overflowY: 'auto',
+              background: '#f9fafb',
+            }}
+          >
+            <div
+              style={{
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 14,
-                flex: '0 0 auto',
-              }}>
-                {m.role === 'assistant' ? <i className="bi bi-robot"></i> : <i className="bi bi-person"></i>}
-              </div>
-              <div style={{ background: 'white', border: '1px solid #eee', borderRadius: 12, padding: '8px 12px', maxWidth: '90%' }}>
-                <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
-              </div>
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, color: '#6b7280' }}>
+                Cuộc trò chuyện
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={startNewChat}
+              >
+                Mới
+              </button>
             </div>
-          ))}
-          {loading && (
-            <div className="text-muted small">AI đang soạn trả lời...</div>
-          )}
+            {loadingSessions ? (
+              <div className="text-muted small">Đang tải...</div>
+            ) : sessions.length === 0 ? (
+              <div className="text-muted small">
+                Chưa có cuộc trò chuyện nào
+              </div>
+            ) : (
+              sessions.map((s) => {
+                const sid = s.sessionId || s.session_id || s._id;
+                const active = String(sid) === String(sessionId);
+                const title = s.title || `Cuộc trò chuyện ${String(sid).slice(-6)}`;
+                return (
+                  <button
+                    key={sid}
+                    type="button"
+                    onClick={() => openSession(sid)}
+                    className="btn btn-light w-100 text-start mb-1"
+                    style={{
+                      borderColor: active ? '#dc2626' : '#e5e7eb',
+                      backgroundColor: active ? '#fef2f2' : '#ffffff',
+                      fontSize: 13,
+                    }}
+                  >
+                    <div
+                      style={{
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {title}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
 
-          {tasksTable.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontWeight: 600 }}>Bảng công việc (Excel-like)</div>
-                <button className="btn btn-sm btn-outline-primary" onClick={exportCSV}>
-                  <i className="bi bi-download me-1"></i>Export CSV
-                </button>
+          {/* Khung chat chính */}
+          <div
+            ref={containerRef}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              overflowY: 'auto',
+              background: '#f3f4f6',
+            }}
+          >
+            {messages.map((m, idx) => (
+              <div
+                key={`${m.role}-${idx}-${m.timestamp}`}
+                style={{
+                  marginBottom: 12,
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'flex-start',
+                  justifyContent:
+                    m.role === 'user' ? 'flex-end' : 'flex-start',
+                }}
+              >
+                {m.role !== 'user' && (
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: '#dc2626',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Bot size={18} />
+                  </div>
+                )}
+                <div
+                  style={{
+                    maxWidth: '80%',
+                    backgroundColor: m.role === 'user' ? '#dc2626' : '#fff',
+                    color: m.role === 'user' ? '#fff' : '#111827',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 12,
+                    padding: '8px 12px',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.5,
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  {m.role === 'user' ? m.content : renderWithBold(m.content)}
+                </div>
+                {m.role === 'user' && (
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: '#e5e7eb',
+                      color: '#111827',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <User size={18} />
+                  </div>
+                )}
               </div>
-              <div style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'auto', maxHeight: 220 }}>
-                <table className="table table-sm mb-0">
-                  <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
-                    <tr>
-                      <th>task_id</th>
-                      <th>name</th>
-                      <th>start-date</th>
-                      <th>deadline</th>
-                      <th>duration_days</th>
-                      <th>depends_on</th>
-                      <th>estimated_hours</th>
-                      <th>complexity</th>
-                      <th>priority</th>
-                      <th>suggested_team_size</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tasksTable.map((r, i) => (
-                      <tr key={i}>
-                        <td>{r.task_id}</td>
-                        <td style={{ minWidth: 220 }}>{r.name}</td>
-                        <td>{r['start-date']}</td>
-                        <td>{r.deadline}</td>
-                        <td>{r.duration_days}</td>
-                        <td style={{ minWidth: 120 }}>{r.depends_on}</td>
-                        <td>{r.estimated_hours}</td>
-                        <td>{r.complexity}</td>
-                        <td>{r.priority}</td>
-                        <td>{r.suggested_team_size}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+            ))}
+            {loading && (
+              <div className="text-muted small">AI đang soạn trả lời...</div>
+            )}
+            {/* Hiển thị plans từ message cuối cùng hoặc từ state plans */}
+            {(() => {
+              // Tìm message cuối cùng có plans và chưa được áp dụng
+              const lastMessageWithPlans = [...messages]
+                .reverse()
+                .find((m) => 
+                  m.role === 'assistant' && 
+                  m.data?.plans && 
+                  Array.isArray(m.data.plans) && 
+                  m.data.plans.length > 0 &&
+                  !m.data.applied // Chưa được áp dụng
+                );
+              
+              // Nếu không có trong message, dùng plans từ state (cho message mới)
+              const activePlans = lastMessageWithPlans?.data?.plans || 
+                (plans.length > 0 && !messages.some(m => m.data?.applied && m.data?.plans === plans) ? plans : []);
+              
+              // Chỉ hiển thị nếu có plans và chưa được áp dụng
+              if (activePlans.length === 0) return null;
+              
+              return (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 12,
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Kế hoạch công việc đã được AI đề xuất
+                  </div>
+                  <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
+                    {activePlans.map((p, idx) => {
+                      if (p.type === 'epics_plan') {
+                        const epics =
+                          p.plan?.epics && Array.isArray(p.plan.epics)
+                            ? p.plan.epics
+                            : [];
+                        return (
+                          <li key={`${p.type}-${idx}`}>
+                            {`EPIC cho sự kiện ${
+                              p.eventId || eventId || ''
+                            }`}:{' '}
+                            {epics.length} công việc lớn
+                          </li>
+                        );
+                      }
+                      if (p.type === 'tasks_plan') {
+                        const tasks =
+                          p.plan?.tasks && Array.isArray(p.plan.tasks)
+                            ? p.plan.tasks
+                            : [];
+                        return (
+                          <li key={`${p.type}-${idx}`}>
+                            {`TASK cho EPIC "${p.epicTitle || ''}"`}: {tasks.length}{' '}
+                            công việc
+                          </li>
+                        );
+                      }
+                      return (
+                        <li key={`plan-${idx}`}>Kế hoạch khác từ tool {p.tool}</li>
+                      );
+                    })}
+                  </ul>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success"
+                    disabled={applying || activePlans.length === 0}
+                    onClick={async () => {
+                      try {
+                        setApplying(true);
+                        const res = await aiAgentApi.applyPlan(activePlans, {
+                          eventId,
+                          sessionId, // Gửi sessionId để backend có thể đánh dấu plans đã áp dụng
+                        });
+                        const msg =
+                          res?.message ||
+                          'Áp dụng kế hoạch EPIC/TASK từ AI Event Planner hoàn tất (xem chi tiết trong summary).';
+                        
+                        // Đánh dấu plans đã được áp dụng trong message
+                        setMessages((prev) =>
+                          prev.map((msg) => {
+                            if (msg === lastMessageWithPlans || 
+                                (msg.role === 'assistant' && 
+                                 msg.data?.plans && 
+                                 Array.isArray(msg.data.plans) &&
+                                 msg.data.plans.length > 0 &&
+                                 !msg.data.applied)) {
+                              return {
+                                ...msg,
+                                data: {
+                                  ...msg.data,
+                                  applied: true, // Đánh dấu đã áp dụng
+                                },
+                              };
+                            }
+                            return msg;
+                          })
+                        );
+                        
+                        // Thêm message xác nhận
+                        setMessages((prev) => [
+                          ...prev,
+                          {
+                            role: 'assistant',
+                            content: msg,
+                            timestamp: new Date().toISOString(),
+                          },
+                        ]);
+                        
+                        // Xóa plans khỏi state
+                        setPlans([]);
+                        
+                        // Emit event để các trang task list biết cần refresh
+                        if (eventId) {
+                          window.dispatchEvent(
+                            new CustomEvent('ai:plan-applied', {
+                              detail: { eventId },
+                            })
+                          );
+                        }
+                      } catch (e) {
+                        const detail =
+                          e?.response?.data?.message || e.message || '';
+                        setMessages((prev) => [
+                          ...prev,
+                          {
+                            role: 'assistant',
+                            content:
+                              'Áp dụng kế hoạch vào sự kiện thất bại. ' +
+                              (detail ? `Chi tiết: ${detail}` : ''),
+                            timestamp: new Date().toISOString(),
+                            isError: true,
+                          },
+                        ]);
+                      } finally {
+                        setApplying(false);
+                      }
+                    }}
+                    style={{ width: '100%' }}
+                  >
+                    {applying ? 'Đang áp dụng...' : 'Áp dụng vào sự kiện'}
+                  </button>
+                </div>
+              );
+            })()}
+            <div ref={bottomRef} />
+          </div>
         </div>
 
-        <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
-          <input
-            type="text"
-            className="form-control"
-            placeholder={placeholder}
+        <div
+          style={{
+            padding: 12,
+            borderTop: '1px solid #eee',
+            display: 'flex',
+            gap: 8,
+            background: '#fff',
+            borderRadius: `16px`
+          }}
+        >
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            placeholder={placeholder}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 send();
               }
             }}
+            rows={2}
+            style={{
+              flex: 1,
+              border: '1px solid #d1d5db',
+              borderRadius: 10,
+              padding: '10px 12px',
+              resize: 'none',
+              fontSize: 14,
+            }}
+            disabled={loading}
           />
-          <button className="btn btn-danger" onClick={send} disabled={loading || !input.trim()}>
-            <i className="bi bi-send me-1"></i>Gửi
+          <button
+            onClick={send}
+            disabled={loading || !input.trim()}
+            type="button"
+            style={{
+              whiteSpace: 'nowrap',
+              background: loading || !input.trim() ? '#d1d5db' : '#dc2626',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading && input.trim()) {
+              e.currentTarget.style.backgroundColor = '#b91c1c';
+            }}}
+            onMouseLeave={(e) => {
+              if (!loading && input.trim()) {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+            }}}
+          >
+            <Send size={16} />
+            Gửi
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-

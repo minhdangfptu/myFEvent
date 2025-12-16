@@ -9,29 +9,7 @@ export const getCalendarByEventId = async (eventId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
-            }
-        })
-        .populate({
-            path: 'createdBy',
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: '_id'
-            }
-        })
-        .lean();
-};
-export const getCalendarByDepartmentId = async (departmentId) => {
-    return await Calendar.find({ departmentId })
-        .populate({
-            path: 'participants.member',
-            model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: 'fullName avatarUrl email'
+                select: 'fullName email'
             }
         })
         .populate({
@@ -46,32 +24,41 @@ export const getCalendarByDepartmentId = async (departmentId) => {
         .lean();
 };
 
-export const getCalendarsInEventScope = async (eventId) => {
+export const getCalendarsInEventScope = async (eventId, startDate = null, endDate = null) => {
     const deptIds = await Department.find({ eventId }).select('_id').lean();
     const departmentIdList = deptIds.map(d => d._id);
-    return await Calendar.find({
+
+    const query = {
         $or: [
             { eventId },
             { departmentId: { $in: departmentIdList } }
         ]
-    })
+    };
+
+    // Add date range filter if provided
+    if (startDate && endDate) {
+        query.startAt = {
+            $gte: startDate,
+            $lte: endDate
+        };
+    }
+
+    return await Calendar.find(query)
+        .select('name startAt endAt location locationType type participants createdBy eventId departmentId')
         .populate({
             path: 'participants.member',
             model: 'EventMember',
+            select: 'userId',
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                select: '_id email fullName'
             }
         })
         .populate({
             path: 'createdBy',
             model: 'EventMember',
-            populate: {
-                path: 'userId',
-                model: 'User',
-                select: '_id'
-            }
+            select: 'userId'
         })
         .lean();
 };
@@ -91,7 +78,7 @@ export const getCalendarById = async (calendarId) => {
             populate: {
                 path: 'userId',
                 model: 'User',
-                select: 'fullName avatarUrl email'
+                select: 'fullName email'
             }
         }).populate({
             path: 'createdBy',
@@ -103,4 +90,31 @@ export const getCalendarById = async (calendarId) => {
             }
         })
         .lean();
+};
+
+
+export const addParticipantsToCalendar = async (calendarId, newParticipants) => {
+  const calendar = await Calendar.findById(calendarId);
+  if (!calendar) return null;
+  
+  calendar.participants.push(...newParticipants);
+  await calendar.save();
+  
+  return calendar;
+};
+
+export const removeParticipantFromCalendar = async (calendarId, memberId) => {
+  const calendar = await Calendar.findById(calendarId);
+  if (!calendar) return null;
+  
+  const participantIndex = calendar.participants.findIndex(
+    p => p.member.toString() === memberId
+  );
+  
+  if (participantIndex === -1) return null;
+  
+  calendar.participants.splice(participantIndex, 1);
+  await calendar.save();
+  
+  return calendar;
 };

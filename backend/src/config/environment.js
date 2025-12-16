@@ -26,8 +26,20 @@ export const config = {
     BCRYPT_SALT_ROUNDS: Number(process.env.BCRYPT_SALT_ROUNDS || 10),
     
     // Frontend
-    FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+    FRONTEND_URL: process.env.FRONTEND_URL,
+    FRONTEND_URL1: process.env.FRONTEND_URL1,
     
     // CORS
-    CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000'
+    CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
+
+    // Cloudinary
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+    CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'myfevent',
+
+    // AI Agent
+    AI_AGENT_BASE_URL: process.env.AI_AGENT_BASE_URL,
+    SELF_BASE_URL: process.env.SELF_BASE_URL,
+    BACKEND_BASE_URL: process.env.BACKEND_BASE_URL, // Thêm dòng này
 };

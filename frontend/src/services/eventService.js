@@ -17,26 +17,26 @@ const unwrapResponse = (payload) => {
 };
 
 export const eventService = {
-    fetchAllPublicEvents: async () => {
+    fetchAllPublicEvents: async ({ page = 1, limit = 8, search = '', status = '' } = {}) => {
         try {
-            const response = await eventApi.getAllPublicEvents();
+            const response = await eventApi.getAllPublicEvents({ page, limit, search, status });
+            return response; // Return full response including pagination
+        } catch (error) {
+            throw error;
+        }
+    },
+    fetchEventById: async (eventId, config = {}) => {
+        try {
+            const response = await eventApi.getEventById(eventId, config);
             return unwrapResponse(response);
         } catch (error) {
             throw error;
         }
     },
-    fetchEventById: async (eventId) => {
+    listMyEvents: async ({ page = 1, limit = 8, search = '' } = {}) => {
         try {
-            const response = await eventApi.getEventById(eventId);
-            return unwrapResponse(response);
-        } catch (error) {
-            throw error;
-        }
-    },
-    listMyEvents: async () => {
-        try {
-            const response = await eventApi.listMyEvents();
-            return unwrapResponse(response);
+            const response = await eventApi.listMyEvents({ page, limit, search });
+            return response; // Return full response including pagination
         } catch (error) {
             throw error;
         }
@@ -60,6 +60,14 @@ export const eventService = {
     getCoreTeamList: async (eventId) => {
         try {
             const response = await eventApi.getCoreTeamList(eventId);
+            return response;
+        } catch (error) {
+            throw error;
+        }
+    },
+    removeMemberFromEvent: async (eventId, memberId) => {
+        try {
+            const response = await eventApi.removeMemberFromEvent(eventId, memberId);
             return response;
         } catch (error) {
             throw error;

@@ -1,7 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../contexts/EventContext";
 import Loading from "./Loading";
+import { APP_VERSION } from "~/config/index";
+import { Calendar, Grid, ChevronUp, ChevronDown, Users, User, FileText, Coins, Bug, Bell, Settings, HelpCircle, Database, Menu, Home, MessageSquareText } from "lucide-react";
+import { currentEventStorage } from "../utils/currentEventStorage";
 
 export default function HoOCSidebar({
   sidebarOpen,
@@ -10,54 +13,149 @@ export default function HoOCSidebar({
   eventId, // Nhận eventId qua props
   
 }) {
+  const STORAGE_KEY = 'sidebar_state_hooc';
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // UI state cho menu
   const [workOpen, setWorkOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [risksOpen, setRisksOpen] = useState(false);
+  const [exportsOpen, setExportsOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 76 });
   const sidebarRef = useRef(null);
 
-  // Sử dụng eventId từ props
-  const { events, loading } = useEvents();
-  const event = events.find(e => (e._id || e.id) === eventId);
+  // Load state từ localStorage khi component mount (chỉ một lần)
+  useEffect(() => {
+    if (isInitialized) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore state từ localStorage
+        if (parsed.sidebarOpen !== undefined) {
+          setSidebarOpen(parsed.sidebarOpen);
+        }
+        if (parsed.workOpen !== undefined) {
+          setWorkOpen(parsed.workOpen);
+        }
+        if (parsed.financeOpen !== undefined) {
+          setFinanceOpen(parsed.financeOpen);
+        }
+        if (parsed.overviewOpen !== undefined) {
+          setOverviewOpen(parsed.overviewOpen);
+        }
+        if (parsed.risksOpen !== undefined) {
+          setRisksOpen(parsed.risksOpen);
+        }
+        if (parsed.exportsOpen !== undefined) {
+          setExportsOpen(parsed.exportsOpen);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sidebar state:', error);
+    } finally {
+      setIsInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu state vào localStorage khi có thay đổi (sau khi đã initialize)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const stateToSave = {
+      sidebarOpen,
+      workOpen,
+      financeOpen,
+      overviewOpen,
+      risksOpen,
+      exportsOpen
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error('Error saving sidebar state:', error);
+    }
+  }, [isInitialized, sidebarOpen, workOpen, financeOpen, overviewOpen, risksOpen, exportsOpen]);
+
+  // Sử dụng eventId từ props - Tối ưu: không block UI khi đã có events cached
+  const { events, loading, error: eventError } = useEvents();
+  const event = useMemo(() => {
+    // Tìm event từ context
+    const foundEvent = events.find(e => (e._id || e.id) === eventId);
+
+    // Nếu không tìm thấy, lấy từ cache
+    if (!foundEvent && eventId) {
+      const cachedEvent = currentEventStorage.get();
+      if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
+        return cachedEvent;
+      }
+    }
+
+    return foundEvent;
+  }, [events, eventId]);
   const hasEvent = !!event;
+  const isEventCompleted = hasEvent && ['completed', 'ended', 'finished'].includes((event?.status || '').toLowerCase());
+
+  // Show loading when currently loading or when first loading with no events
+  const showLoading = loading || (loading && events.length === 0);
   const navigate = useNavigate();
 
   // Submenu Tổng quan - HoOC có đầy đủ quyền
   const overviewSubItems = [
     { id: "overview-dashboard", label: "Dashboard tổng", path: `/hooc-dashboard?eventId=${eventId}` },
     { id: "overview-detail", label: "Chi tiết sự kiện", path: `/events/${eventId || ''}/hooc-event-detail` },
-    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` },
+    { id: "overview-timeline", label: "Timeline sự kiện", path: `/events/${eventId || ''}/milestones` }
   ];
 
   const workSubItems = [
     { id: "work-board", label: "Danh sách công việc", path: `/events/${eventId || ''}/tasks` },
     { id: "work-gantt", label: "Biểu đồ Gantt", path: `/events/${eventId}/tasks/gantt` },
-    { id: "work-statitics", label: "Thống kê tiến độ", path: "/task" },
+    { id: "work-statitics", label: "Thống kê tiến độ", path: `/events/${eventId}/tasks/hooc-statistic` },
   ];
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: "/task" },
-    { id: "expenses", label: "Chi tiêu", path: "/task" },
-    { id: "income", label: "Thu nhập", path: "/task" },
-    { id: "finance-stats", label: "Thống kê thu chi", path: "/task" },
+    { id: "finance-budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
+    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/statistics` },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },
     { id: "risk-analysis", label: "Phân tích rủi ro", path: `/events/${eventId || ''}/risks/analysis` },
   ];
+  const exportSubItems = [
+    { id: "export-all", label: "Dữ liệu sự kiện", path: `/events/${eventId}/export/data` },
+    { id: "export-example", label: "Mẫu tài liệu", path: `/events/${eventId}/export/templates` },
+  ];
+
+  // Đóng các submenu khi sidebar đóng
+  useEffect(() => {
+    if (!sidebarOpen) {
+      setWorkOpen(false);
+      setFinanceOpen(false);
+      setOverviewOpen(false);
+      setRisksOpen(false);
+      setExportsOpen(false);
+    }
+  }, [sidebarOpen]);
+
+  // Cleanup hover timeout
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    };
+  }, [hoverTimeout]);
 
   // Hover handlers giữ nguyên
   const handleMouseEnter = (menuType, e) => {
     if (hoverTimeout) { clearTimeout(hoverTimeout); setHoverTimeout(null); }
-    if (sidebarRef.current && e?.currentTarget) {
+    if (e?.currentTarget) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const sidebarRect = sidebarRef.current.getBoundingClientRect();
-      const top = rect.top - sidebarRect.top;
-      const left = rect.right - sidebarRect.left + 8;
+      const top = rect.top;
+      const left = rect.right + 8;
       setHoverPos({ top, left });
     }
     setHoveredMenu(menuType);
@@ -70,14 +168,33 @@ export default function HoOCSidebar({
   const handlePopupMouseLeave = () => { setHoveredMenu(null); };
 
   return (
-    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.3s ease", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
+    <div ref={sidebarRef} className={`shadow-sm ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`} style={{ width: sidebarOpen ? "230px" : "70px", height: "100vh", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "fixed", left: 0, top: 0, zIndex: 1000, display: "flex", flexDirection: "column", background: "white", borderRadius: "0" }}>
       <style>{`
         .sidebar-logo { font-family:'Brush Script MT',cursive;font-size:1.5rem;font-weight:bold;color:#dc2626; }
-        .group-title { font-size:.75rem;font-weight:600;letter-spacing:.05em;color:#374151;margin:16px 0 8px;text-transform:uppercase; }
+        .group-title {
+          font-size:.75rem;
+          font-weight:600;
+          letter-spacing:.05em;
+          color:#374151;
+          margin:16px 0 8px;
+          text-transform:uppercase;
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .group-title {
+          opacity: 0;
+        }
         .btn-nav{ border:0;background:transparent;color:#374151;border-radius:8px;padding:10px 12px;text-align:left;
           transition:all .2s ease;width:100%;display:flex;align-items:center;justify-content:space-between;}
         .btn-nav:hover{ background:#e9ecef; }
         .btn-nav.active{ background:#e9ecef;color:#111827; }
+        .btn-nav span {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .btn-nav span {
+          opacity: 0;
+        }
         .menu-item-hover:hover .btn-nav{ background:#e9ecef; }
         .btn-submenu{ border:0;background:transparent;color:#6b7280;border-radius:6px;padding:8px 12px 8px 24px;
           text-align:left;transition:all .2s ease;width:100%;font-size:.9rem;}
@@ -88,10 +205,41 @@ export default function HoOCSidebar({
           align-items:center;justify-content:center;gap:6px;font-size:.85rem;color:#6b7280;transition:all .2s;}
         .theme-option.active{ background:#fff;color:#374151;box-shadow:0 1px 3px rgba(0,0,0,.1); }
 
+        .menu-button {
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #030303;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .menu-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+        }
+        .menu-button:active {
+          background-color: rgba(0, 0, 0, 0.1);
+          transform: scale(0.95);
+        }
+        .menu-button svg {
+          transition: transform 0.2s ease;
+        }
+
+        .fade-content {
+          opacity: 1;
+          transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-closed .fade-content {
+          opacity: 0;
+          pointer-events: none;
+        }
+
         .hover-submenu{
-          position: absolute;
-          left: 50px;
-          top: 0;
+          position: fixed;
           background:#fff;
           border-radius:12px;
           box-shadow:0 4px 24px rgba(0,0,0,0.12);
@@ -123,26 +271,44 @@ export default function HoOCSidebar({
       {/* Header */}
       <div className="p-3 pb-0" style={{ flexShrink: 0, paddingBottom: "0px" }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <div
-            className="logo-container"
-            onClick={() => !sidebarOpen && setSidebarOpen(true)}
-            style={{ cursor: !sidebarOpen ? "pointer" : "default" }}
-          >
-            <div className="logo-content d-flex align-items-center ">
-              <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                <img className="hover-rotate" src="/website-icon-fix@3x.png" alt="myFEvent" style={{ width: 40, height: 40 }} />
+          {sidebarOpen ? (
+            <>
+              <div
+                className="logo-container"
+                style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
+              >
+                <img
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="hover-rotate"
+                  src="/website-icon-fix@3x.png"
+                  alt="myFEvent"
+                  style={{ width: 40, height: 40 }}
+                />
+                <img
+                  className="fade-content"
+                  onClick={() => navigate("/home-page")}
+                  src="/logo-03.png"
+                  alt="myFEvent"
+                  style={{ width: "auto", height: 40 }}
+                />
               </div>
-              {sidebarOpen &&  <img
-              src="/logo-03.png"
-              alt="myFEvent"
-              style={{ width: "auto", height: 40 }}
-            />}
-            </div>
-          </div>
 
-          {sidebarOpen && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setSidebarOpen(false)} style={{ padding: "4px 8px" }}>
-              <i className="bi bi-arrow-left"></i>
+              <button
+                className="menu-button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Đóng sidebar"
+              >
+                <Menu size={20} />
+              </button>
+            </>
+          ) : (
+            <button
+              className="menu-button"
+              onClick={() => setSidebarOpen(true)}
+              style={{ width: "100%" }}
+              aria-label="Mở sidebar"
+            >
+              <Menu size={20} />
             </button>
           )}
         </div>
@@ -152,7 +318,7 @@ export default function HoOCSidebar({
           <div className="mb-3" style={{ paddingBottom: 0 }}>
             <div className="group-title">SỰ KIỆN HIỆN TẠI</div>
             <div className="d-flex align-items-center" style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", background: "white", color: "#dc2626", fontWeight: "bold", minHeight: 40, overflow: "hidden" }}>
-              <i className="bi bi-calendar-event me-2"></i>
+              <Calendar size={18} className="me-2" />
               <span
                 style={{ overflow: "hidden", wordWrap: "break-word", whiteSpace: "normal", lineHeight: "1.2" }}
                 title={event?.name || "(Chưa có sự kiện)"}
@@ -167,7 +333,7 @@ export default function HoOCSidebar({
 
       {/* Nội dung cuộn */}
       <div className="sidebar-content">
-        {loading ? (
+        {showLoading ? (
           <div
             style={{
               position: "absolute",
@@ -175,12 +341,50 @@ export default function HoOCSidebar({
               background: "rgba(255,255,255,1)",
               zIndex: 2000,
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               width: "100%",
+              gap: 16,
             }}
           >
-            <Loading size={100} />
+            <Loading size={60} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Đang tải...</span>
+          </div>
+        ) : eventError ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,1)",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+              gap: 16,
+              padding: "20px",
+            }}
+          >
+            <div style={{ color: "#ef4444", fontSize: 16, fontWeight: 600 }}>Lỗi tải dữ liệu</div>
+            <span style={{ color: "#6b7280", fontSize: 14, textAlign: "center" }}>{eventError}</span>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: 8,
+                padding: "8px 16px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Tải lại
+            </button>
           </div>
         ) : (
           <>
@@ -189,7 +393,7 @@ export default function HoOCSidebar({
               <div className="d-flex flex-column gap-1">
                 <button className={`btn-nav ${activePage === "home" ? "active" : ""}`} onClick={() => navigate("/home-page")} title="Trang chủ">
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-list me-3" style={{ width: 20 }} />
+                    <Home className="me-3" size={18} style={{ width: 20 }} />
                     {sidebarOpen && <span>Trang chủ</span>}
                   </div>
                 </button>
@@ -212,18 +416,18 @@ export default function HoOCSidebar({
                   title="Tổng quan"
                 >
                   <div className="d-flex align-items-center">
-                    <i className="bi bi-grid me-3" style={{ width: 20 }} />
+                    <Grid size={20} className="me-3" />
                     {sidebarOpen && <span>Tổng quan</span>}
                   </div>
                   {sidebarOpen && (
-                    <i className={`bi ${overviewOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                    overviewOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                   )}
                 </button>
 
                 {!sidebarOpen && hoveredMenu === "overview" && (
                   <div
                     className="hover-submenu"
-                    style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                    style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                     onMouseEnter={handlePopupMouseEnter}
                     onMouseLeave={handlePopupMouseLeave}
                   >
@@ -231,7 +435,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -245,7 +449,7 @@ export default function HoOCSidebar({
                       <button
                         key={item.id}
                         className={`btn-submenu${activePage === item.id ? " active" : ""}`}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
                       >
                         {item.label}
                       </button>
@@ -264,7 +468,7 @@ export default function HoOCSidebar({
               title="Ban sự kiện"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-people me-3" style={{ width: 20 }} />
+                <Users size={20} className="me-3" />
                 {sidebarOpen && <span>Ban sự kiện</span>}
               </div>
             </button>
@@ -278,7 +482,7 @@ export default function HoOCSidebar({
               title="Thành viên"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-person me-3" style={{ width: 20 }} />
+                <User size={20} className="me-3" />
                 {sidebarOpen && <span>Thành viên</span>}
               </div>
             </button>
@@ -292,7 +496,7 @@ export default function HoOCSidebar({
               title="Lịch sự kiện"
             >
               <div className="d-flex align-items-center">
-                <i className="bi bi-calendar me-3" style={{ width: 20 }} />
+                <Calendar size={20} className="me-3" />
                 {sidebarOpen && <span>Lịch sự kiện</span>}
               </div>
             </button>
@@ -300,6 +504,18 @@ export default function HoOCSidebar({
             {/* Các menu khác - Chỉ hiển thị khi có sự kiện */}
             {hasEvent && (
               <>
+                {/* Phản hồi - Hiển thị luôn khi có sự kiện */}
+                <button
+                  className={`btn-nav ${activePage === "feedback" ? "active" : ""}`}
+                  onClick={() => navigate(`/events/${eventId || ''}/feedback`)}
+                  title="Phản hồi sự kiện"
+                >
+                  <div className="d-flex align-items-center">
+                    <MessageSquareText size={20} className="me-3" />
+                    {sidebarOpen && <span>Phản hồi</span>}
+                  </div>
+                </button>
+
                 <div
                   className="menu-item-hover"
                   onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("work", e)}
@@ -312,18 +528,18 @@ export default function HoOCSidebar({
                     title="Công việc"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-file-text me-3" style={{ width: 20 }} />
+                      <FileText size={20} className="me-3" />
                       {sidebarOpen && <span>Công việc</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${workOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      workOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "work" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -366,18 +582,18 @@ export default function HoOCSidebar({
                     title="Tài chính"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-camera me-3" style={{ width: 20 }} />
+                      <Coins size={20} className="me-3" />
                       {sidebarOpen && <span>Tài chính</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${financeOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      financeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "finance" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -421,18 +637,18 @@ export default function HoOCSidebar({
                     title="Rủi ro"
                   >
                     <div className="d-flex align-items-center">
-                      <i className="bi bi-bug me-3" style={{ width: 20 }} />
+                      <Bug size={20} className="me-3" />
                       {sidebarOpen && <span>Rủi ro</span>}
                     </div>
                     {sidebarOpen && (
-                      <i className={`bi ${risksOpen ? "bi-chevron-up" : "bi-chevron-down"}`} />
+                      risksOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
                     )}
                   </button>
 
                   {!sidebarOpen && hoveredMenu === "risk" && (
                     <div
                       className="hover-submenu"
-                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px`, position: "absolute" }}
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
                       onMouseEnter={handlePopupMouseEnter}
                       onMouseLeave={handlePopupMouseLeave}
                     >
@@ -462,6 +678,61 @@ export default function HoOCSidebar({
                     </div>
                   )}
                 </div>
+                {/* Xuất */}
+                <div
+                  className="menu-item-hover"
+                  onMouseEnter={(e) => !sidebarOpen && handleMouseEnter("export", e)}
+                  onMouseLeave={() => !sidebarOpen && handleMouseLeave()}
+                >
+                  <button
+                    className={`btn-nav${activePage.startsWith("export") ? " active" : ""}`}
+                    onClick={() => sidebarOpen && setExportsOpen((prev) => !prev)}
+                    style={{ cursor: "pointer", background: hoveredMenu === "export" && !sidebarOpen ? "#e7ebef" : undefined }}
+                    title="Tải xuống"
+                  >
+                    <div className="d-flex align-items-center">
+                      <Database size={20} className="me-3" />
+                      {sidebarOpen && <span>Tải xuống</span>}
+                    </div>
+                    {sidebarOpen && (
+                      exportsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+                    )}
+                  </button>
+
+                  {!sidebarOpen && hoveredMenu === "export" && (
+                    <div
+                      className="hover-submenu"
+                      style={{ left: `${hoverPos.left}px`, top: `${hoverPos.top}px` }}
+                      onMouseEnter={handlePopupMouseEnter}
+                      onMouseLeave={handlePopupMouseLeave}
+                    >
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`hover-submenu-item${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {exportsOpen && sidebarOpen && (
+                    <div className="ms-2">
+                      {exportSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`btn-submenu${activePage === item.id ? " active" : ""}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
               </>
             )}
           </div>
@@ -473,14 +744,20 @@ export default function HoOCSidebar({
           <div className="d-flex flex-column gap-1">
             <button className={`btn-nav ${activePage === "notifications" ? "active" : ""}`} onClick={() => navigate("/notifications")} title="Thông báo">
               <div className="d-flex align-items-center">
-                <i className="bi bi-bell me-3" style={{ width: 20 }} />
+                <Bell size={20} className="me-3" />
                 {sidebarOpen && <span>Thông báo</span>}
               </div>
             </button>
             <button className={`btn-nav ${activePage === "settings" ? "active" : ""}`} onClick={() => navigate("/setting")} title="Cài đặt">
               <div className="d-flex align-items-center">
-                <i className="bi bi-gear me-3" style={{ width: 20 }} />
+                <Settings size={20} className="me-3" />
                 {sidebarOpen && <span>Cài đặt</span>}
+              </div>
+            </button>
+            <button className={`btn-nav ${activePage === "support" ? "active" : ""}`} onClick={() => navigate("/support")} title="Hỗ trợ">
+              <div className="d-flex align-items-center">
+                <HelpCircle size={20} className="me-3" />
+                {sidebarOpen && <span>Hỗ trợ</span>}
               </div>
             </button>
           </div>
@@ -489,25 +766,88 @@ export default function HoOCSidebar({
         )}
       </div>
 
-      {/* Theme toggle hoặc Expand button */}
-      <div className="p-2" style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}>
+      {/* Footer: Version & Logo Bộ Công Thương */}
+      <div
+        className="p-2"
+        style={{ flexShrink: 0, borderTop: "1px solid #e5e7eb" }}
+      >
         {sidebarOpen ? (
-          <div className="theme-toggle" style={{ paddingBottom: 10, margin: 0 }}>
-            <button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
-              <i className="bi bi-sun"></i>
-              <span>Sáng</span>
-            </button>
-            <button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
-              <i className="bi bi-moon"></i>
-              <span>Tối</span>
-            </button>
+          <div style={{  margin: 0 }}>
+            {/* Theme toggle - Commented out
+            <div className="theme-toggle">
+              <button
+                className={`theme-option ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <Sun size={18} />
+                <span>Sáng</span>
+              </button>
+              <button
+                className={`theme-option ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <Moon size={18} />
+                <span>Tối</span>
+              </button>
+            </div>
+            */}
+
+            {/* App Version + Dev info + Logo Bộ Công Thương */}
+            <div
+              className="fade-content"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                 Phiên bản {APP_VERSION}
+                </div>
+                <div
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "11px",
+                  }}
+                >
+                  Phát triển bởi <span style={{ fontWeight: 600 }}>myFEteam</span>
+                </div>
+              </div>
+
+              <img
+                src="/gov.png"
+                alt="FPTU - FEVENT TEAM"
+                style={{ height: "30px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm w-100" onClick={() => setSidebarOpen(true)} style={{ padding: "5px", margin: "0 1.5px 0 2px" }} title="Mở rộng" aria-label="Mở/đóng thanh bên">
-            <i className="bi bi-list"></i>
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
+            <img
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover-rotate"
+              src="/website-icon-fix@3x.png"
+              alt="myFEvent"
+              style={{ width: 40, height: 40, cursor: "pointer" }}
+            />
+          </div>
         )}
       </div>
+
     </div>
   );
 }

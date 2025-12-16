@@ -8,9 +8,9 @@ const calendarService = {
         throw error;
     }
   },
-  getMyCalendarInEvent: async (eventId) => {
+  getMyCalendarInEvent: async (eventId, month = null, year = null) => {
     try {
-        const response = await calendarApi.getMyCalendarInEvent(eventId);
+        const response = await calendarApi.getMyCalendarInEvent(eventId, month, year);
         return response.data;
     } catch (error) {
         throw error;
@@ -51,6 +51,46 @@ const calendarService = {
   updateCalendar: async (eventId, calendarId, data) => {
     try {
         const response = await calendarApi.updateCalendar(eventId, calendarId, data);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  getAvailableMembers: async (eventId, calendarId) => {
+    try {
+        const response = await calendarApi.getAvailableMembers(eventId, calendarId);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  addParticipants: async (eventId, calendarId, memberIds) => {
+    try {
+        const response = await calendarApi.addParticipants(eventId, calendarId, memberIds);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  removeParticipant: async (eventId, calendarId, memberId) => {
+    try {
+        const response = await calendarApi.removeParticipant(eventId, calendarId, memberId);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  sendReminder: async (eventId, calendarId, target) => {
+    try {
+        const response = await calendarApi.sendReminder(eventId, calendarId, target);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+  },
+  deleteCalendarEvent: async (eventId, calendarId) => {
+    try {
+        const response = await calendarApi.deleteCalendarEvent(eventId, calendarId);
         return response.data;
     } catch (error) {
         throw error;

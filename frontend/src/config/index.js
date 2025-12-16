@@ -1,8 +1,13 @@
 // API Configuration
-export const baseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+// Remove trailing slash and trim whitespace to prevent //api issues
+const rawBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+export const baseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
 
 // Google OAuth Configuration
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+//App Version Em Minh Dang code
+export const APP_VERSION = '1.6.3';
 
 // App Configuration
 export const appConfig = {

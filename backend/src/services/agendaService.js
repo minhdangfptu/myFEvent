@@ -1,4 +1,6 @@
 import Agenda from '../models/agenda.js';
+import Milestone from '../models/milestone.js';
+import Event from '../models/event.js';
 import mongoose from 'mongoose';
 
 // Validate role function - COMMENTED OUT
@@ -9,31 +11,99 @@ import mongoose from 'mongoose';
 //     }
 // }
 
+// Validate agenda time constraints
+const validateAgendaTime = async (milestoneId, agendaDate) => {
+    // Get milestone to find eventId
+    const milestone = await Milestone.findById(milestoneId);
+    if (!milestone) {
+        throw new Error('Milestone không tồn tại');
+    }
+
+    // Get event to check time constraints
+    const event = await Event.findById(milestone.eventId);
+    if (!event) {
+        throw new Error('Sự kiện không tồn tại');
+    }
+
+    const agendaDateTime = new Date(agendaDate);
+    const eventCreatedAt = new Date(event.createdAt);
+
+    // Validate: agenda date must be after event creation time
+    if (agendaDateTime < eventCreatedAt) {
+        throw new Error('Thời gian agenda phải sau thời gian tạo sự kiện');
+    }
+
+    // Calculate 6 months after event end date
+    if (event.eventEndDate) {
+        const eventEndDate = new Date(event.eventEndDate);
+        const sixMonthsAfterEnd = new Date(eventEndDate);
+        sixMonthsAfterEnd.setMonth(sixMonthsAfterEnd.getMonth() + 6);
+
+        // Validate: agenda date must be before 6 months after event end date
+        if (agendaDateTime > sixMonthsAfterEnd) {
+            throw new Error('Thời gian agenda phải trước 6 tháng sau thời gian kết thúc DDAY sự kiện');
+        }
+    }
+
+    return true;
+};
+
 // Lấy agenda theo milestoneId (không cần validate role - chỉ đọc)
 export const getAgendaByMilestoneId = async (milestoneId) => {
     const agendaDoc = await Agenda.findOne({ milestoneId }).lean();
-    
     if (!agendaDoc) {
         return null;
     }
-    
-    // Sort các items trong mỗi agenda date theo startTime
     if (agendaDoc.agenda && agendaDoc.agenda.length > 0) {
         agendaDoc.agenda.forEach(dateAgenda => {
             if (dateAgenda.items && dateAgenda.items.length > 0) {
                 dateAgenda.items.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
             }
         });
-        
-        // Sort dates
         agendaDoc.agenda.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-    
     return agendaDoc;
 }
 
+export const getAgendaByEvent = async (eventId) => {
+    const agendas = await Agenda.find({})
+        .populate({
+            path: 'milestoneId',
+            select: 'eventId name description targetDate status isDeleted',
+            match: { eventId }
+        })
+        .lean();
+
+    if (!agendas || agendas.length === 0) {
+        return [];
+    }
+    if (agendas.agenda && agendas.agenda.length > 0) {
+        agendas.agenda.forEach(dateAgenda => {
+            if (dateAgenda.items && dateAgenda.items.length > 0) {
+                dateAgenda.items.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+            }
+        });
+        agendas.agenda.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    return agendas;
+}
+export const getNameAgendaWithMilestone = async (eventId) => {
+    const agendas = await Agenda.find({})
+        .populate({
+            path: 'milestoneId',
+            select: 'eventId name',
+            match: { eventId }
+        })
+        .select('_id')
+        .lean();
+    if (!agendas || agendas.length === 0) {
+        return [];
+    }
+    return agendas;
+}
+
 // Tạo agenda document mới
-export const createAgendaDoc = async (payload, userRole) => {
+export const createAgendaDoc = async (payload) => {
     // validateRole(userRole);
     
     // Check if agenda for this milestone already exists
@@ -54,16 +124,19 @@ export const createAgendaDoc = async (payload, userRole) => {
 // === QUẢN LÝ DATE LEVEL ===
 
 // Thêm một date mới vào agenda
-export const addDateToAgenda = async (milestoneId, date, userRole) => {
+export const addDateToAgenda = async (milestoneId, date) => {
     // validateRole(userRole);
-    
+
+    // Validate agenda time constraints
+    await validateAgendaTime(milestoneId, date);
+
     const dateObj = new Date(date);
     const newDateAgenda = {
         _id: new mongoose.Types.ObjectId(),
         date: dateObj,
         items: []
     };
-    
+
     return await Agenda.findOneAndUpdate(
         { milestoneId },
         { $push: { agenda: newDateAgenda } },
@@ -72,12 +145,17 @@ export const addDateToAgenda = async (milestoneId, date, userRole) => {
 }
 
 // Update thông tin date trong agenda (by ID)
-export const updateDateInAgendaById = async (milestoneId, dateId, updates, userRole) => {
+export const updateDateInAgendaById = async (milestoneId, dateId, updates) => {
     // validateRole(userRole);
-    
+
+    // Validate agenda time if date is being updated
+    if (updates.date) {
+        await validateAgendaTime(milestoneId, updates.date);
+    }
+
     return await Agenda.findOneAndUpdate(
         { milestoneId, "agenda._id": dateId },
-        { 
+        {
             $set: Object.keys(updates).reduce((acc, key) => {
                 acc[`agenda.$.${key}`] = updates[key];
                 return acc;
@@ -88,7 +166,7 @@ export const updateDateInAgendaById = async (milestoneId, dateId, updates, userR
 }
 
 // Xóa một date khỏi agenda (by ID)
-export const removeDateFromAgendaById = async (milestoneId, dateId, userRole) => {
+export const removeDateFromAgendaById = async (milestoneId, dateId) => {
     // validateRole(userRole);
     
     return await Agenda.findOneAndUpdate(
@@ -100,15 +178,19 @@ export const removeDateFromAgendaById = async (milestoneId, dateId, userRole) =>
 
 // === QUẢN LÝ ITEM LEVEL ===
 // Thêm item vào date bằng dateId
-export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem, userRole) => {
+export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem) => {
     // validateRole(userRole);
-    
+
+    // Validate agenda item time constraints
+    await validateAgendaTime(milestoneId, agendaItem.startTime);
+    await validateAgendaTime(milestoneId, agendaItem.endTime);
+
     const itemWithDuration = {
         _id: new mongoose.Types.ObjectId(),
         ...agendaItem,
         duration: new Date(agendaItem.endTime) - new Date(agendaItem.startTime)
     };
-    
+
     return await Agenda.findOneAndUpdate(
         { milestoneId, "agenda._id": dateId },
         { $push: { "agenda.$.items": itemWithDuration } },
@@ -117,7 +199,7 @@ export const addItemToAgendaDateById = async (milestoneId, dateId, agendaItem, u
 }
 
 // Xóa item khỏi agenda (by index)
-export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex, userRole) => {
+export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex) => {
     // validateRole(userRole);
     
     const agendaDoc = await Agenda.findOne({ milestoneId });
@@ -140,9 +222,17 @@ export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex, us
 
 
 // Update một item cụ thể (by index)
-export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, updates, userRole) => {
+export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, updates) => {
     // validateRole(userRole);
-    
+
+    // Validate agenda item time if startTime or endTime is being updated
+    if (updates.startTime) {
+        await validateAgendaTime(milestoneId, updates.startTime);
+    }
+    if (updates.endTime) {
+        await validateAgendaTime(milestoneId, updates.endTime);
+    }
+
     // Tính duration nếu có update startTime hoặc endTime
     if (updates.startTime || updates.endTime) {
         const agendaDoc = await Agenda.findOne({ milestoneId });
@@ -153,12 +243,12 @@ export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, upda
             updates.duration = endTime - startTime;
         }
     }
-    
+
     const updateFields = {};
     Object.keys(updates).forEach(key => {
         updateFields[`agenda.${dateIndex}.items.${itemIndex}.${key}`] = updates[key];
     });
-    
+
     return await Agenda.findOneAndUpdate(
         { milestoneId },
         { $set: updateFields },
@@ -228,92 +318,5 @@ export const findDateById = async (milestoneId, dateId) => {
     return null;
 }
 
-// === BATCH OPERATIONS ===
-// Batch thêm nhiều items vào date bằng dateId
-export const batchCreateItemsForDateById = async (milestoneId, dateId, itemsArray, userRole) => {
-    // validateRole(userRole);
-    
-    const itemsWithDuration = itemsArray.map(item => ({
-        _id: new mongoose.Types.ObjectId(),
-        ...item,
-        duration: new Date(item.endTime) - new Date(item.startTime)
-    }));
-    
-    return await Agenda.findOneAndUpdate(
-        { milestoneId, "agenda._id": dateId },
-        { $push: { "agenda.$.items": { $each: itemsWithDuration } } },
-        { new: true }
-    ).lean();
-}
-
-// Batch update nhiều items (by index)
-export const batchUpdateItems = async (milestoneId, itemUpdates, userRole) => {
-    // validateRole(userRole);
-    
-    const updateFields = {};
-    itemUpdates.forEach(({ dateIndex, itemIndex, updates }) => {
-        // Tính duration nếu cần
-        if (updates.startTime && updates.endTime) {
-            updates.duration = new Date(updates.endTime) - new Date(updates.startTime);
-        }
-        
-        Object.keys(updates).forEach(key => {
-            updateFields[`agenda.${dateIndex}.items.${itemIndex}.${key}`] = updates[key];
-        });
-    });
-    
-    return await Agenda.findOneAndUpdate(
-        { milestoneId },
-        { $set: updateFields },
-        { new: true }
-    ).lean();
-}
-
-// Batch xóa nhiều items (by index)
-export const batchRemoveItems = async (milestoneId, itemsToRemove, userRole) => {
-    // validateRole(userRole);
-    
-    const agendaDoc = await Agenda.findOne({ milestoneId });
-    if (!agendaDoc) {
-        throw new Error('Agenda not found');
-    }
-    
-    // Group by dateIndex và sort itemIndex giảm dần để xóa từ cuối
-    const groupedByDate = {};
-    itemsToRemove.forEach(({ dateIndex, itemIndex }) => {
-        if (!groupedByDate[dateIndex]) {
-            groupedByDate[dateIndex] = [];
-        }
-        groupedByDate[dateIndex].push(itemIndex);
-    });
-    
-    // Xóa items và dates rỗng
-    const datesToRemove = [];
-    Object.keys(groupedByDate).forEach(dateIndexStr => {
-        const dateIndex = parseInt(dateIndexStr);
-        const itemIndexes = groupedByDate[dateIndex].sort((a, b) => b - a); // Giảm dần
-        
-        if (agendaDoc.agenda[dateIndex]) {
-            itemIndexes.forEach(itemIndex => {
-                if (agendaDoc.agenda[dateIndex].items[itemIndex]) {
-                    agendaDoc.agenda[dateIndex].items.splice(itemIndex, 1);
-                }
-            });
-            
-            // Đánh dấu date để xóa nếu không còn items
-            if (agendaDoc.agenda[dateIndex].items.length === 0) {
-                datesToRemove.push(dateIndex);
-            }
-        }
-    });
-    
-    // Xóa dates rỗng (từ cuối để tránh thay đổi index)
-    datesToRemove.sort((a, b) => b - a).forEach(dateIndex => {
-        agendaDoc.agenda.splice(dateIndex, 1);
-    });
-    
-    await agendaDoc.save();
-    return agendaDoc.toObject();
-}
 
 

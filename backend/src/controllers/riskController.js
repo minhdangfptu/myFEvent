@@ -1,8 +1,64 @@
 import { validationResult } from 'express-validator';
 import * as RiskService from '../services/riskService.js';
 import ensureEventRole from '../utils/ensureEventRole.js';
+import {
+  notifyRiskCreated,
+  notifyRiskUpdated,
+  notifyRiskOccurred,
+  notifyOccurredRiskUpdated,
+  notifyRiskStatusChanged,
+} from '../services/notificationService.js';
 
 // ====== HELPER FUNCTIONS ======
+
+/**
+ * Check if a member has permission to manage a risk
+ * @param {Object} member - Event member object
+ * @param {Object} risk - Risk object (can be null for create operation)
+ * @param {string} riskDepartmentId - Department ID for the risk (used when risk object doesn't exist yet)
+ * @param {string} riskScope - Risk scope ('event' or 'department')
+ * @returns {boolean} - true if member has permission
+ */
+const checkRiskPermission = (member, risk = null, riskDepartmentId = null, riskScope = null) => {
+    // HoOC has full permission
+    if (member.role === 'HoOC') {
+        return true;
+    }
+
+    // For HoD
+    if (member.role === 'HoD') {
+        // Get risk details
+        const scope = risk ? (risk.scope || 'department') : riskScope;
+        let deptId = risk ? risk.departmentId : riskDepartmentId;
+
+        // Allow event-level risks (toàn BTC)
+        if (scope === 'event') {
+            return true;
+        }
+
+        // Extract _id if departmentId is an object (populated)
+        if (deptId && typeof deptId === 'object' && deptId._id) {
+            deptId = deptId._id;
+        }
+
+        // Extract _id from member.departmentId if it's an object
+        let memberDeptId = member.departmentId;
+        if (memberDeptId && typeof memberDeptId === 'object' && memberDeptId._id) {
+            memberDeptId = memberDeptId._id;
+        }
+
+        // Allow if risk belongs to HoD's department
+        if (deptId && memberDeptId) {
+            return deptId.toString() === memberDeptId.toString();
+        }
+
+        // If creating new risk without department (shouldn't happen, but deny by default)
+        return false;
+    }
+
+    // Other roles don't have permission
+    return false;
+};
 
 const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
     try {
@@ -17,12 +73,9 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
         const occurredRisks = risk.occurred_risk || [];
         let newStatus = 'not_yet'; // Default status
 
-        // console.log(`🔍 Processing risk ${riskId} with ${occurredRisks.length} occurred risks`);
-
         if (occurredRisks.length === 0) {
             // BR: occurred = 0 → risk status = not_yet
             newStatus = 'not_yet';
-            console.log(`📋 No occurred risks → setting status to 'not_yet'`);
         } else {
             // BR: occurred > 0, check the statuses
             // Count different statuses
@@ -34,22 +87,19 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
                 occ.occurred_status === 'resolved'
             ).length;
 
-            // console.log(`📊 Status breakdown: resolving/pending=${resolvingOrPendingCount}, resolved=${resolvedCount}, total=${occurredRisks.length}`);
+           
 
             // BR: Nếu có bất kỳ occurred nào là pending/resolving → risk status = resolving
             if (resolvingOrPendingCount > 0) {
                 newStatus = 'resolving';
-                // console.log(`⚡ Found ${resolvingOrPendingCount} unresolved occurred risks → setting status to 'resolving'`);
             }
             // BR: Nếu tất cả occurred đều là resolved → risk status = resolved
             else if (resolvedCount === occurredRisks.length && occurredRisks.length > 0) {
                 newStatus = 'resolved';
-                // console.log(`✅ All ${resolvedCount} occurred risks are resolved → setting status to 'resolved'`);
             }
             // Edge case: nếu có occurred nhưng không có status hợp lệ
             else {
                 newStatus = 'resolving'; // Default to resolving if there are occurred risks
-                // console.log(`⚠️ Edge case: occurred risks exist but no valid status found → defaulting to 'resolving'`);
             }
         }
         // Only update if status has changed
@@ -60,6 +110,14 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
 
             if (updateResult.success) {
                 // console.log(`✅ Auto-updated risk ${riskId} status: ${risk.risk_status} → ${newStatus}`);
+                
+                // Send notification about status change
+                try {
+                  await notifyRiskStatusChanged(eventId, riskId, risk.risk_status, newStatus, risk.scope || 'department', risk.departmentId);
+                } catch (notifError) {
+                  console.error('Error sending risk status changed notification:', notifError);
+                  // Don't fail the request if notification fails
+                }
             } else {
                 // console.warn(`❌ Failed to auto-update risk ${riskId} status:`, updateResult.message);
             }
@@ -82,30 +140,6 @@ const updateRiskStatusBasedOnOccurred = async (eventId, riskId) => {
             error: error.message
         };
     }
-};
-
-export const getOccurredRisksByDepartmentController = async (req, res) => {
-   try {
-       const { eventId, departmentId } = req.params;
-
-       // Gọi service: không truyền filter/search gì cả
-       const result = await RiskService.getOccurredRisksByDepartment(eventId, departmentId);
-
-       if (!result || result.success === false) {
-           return res.status(400).json({
-               success: false,
-               message: result?.message || 'Failed to get occurred risks by department',
-           });
-       }
-
-       return res.status(200).json(result);
-   } catch (error) {
-       console.error('Error in getOccurredRisksByDepartmentController:', error);
-       return res.status(500).json({
-           success: false,
-           message: 'Internal server error while getting occurred risks by department',
-       });
-   }
 };
 
 export const getAllOccurredRisksByEventController = async (req, res) => {
@@ -164,12 +198,31 @@ export const createRisk = async (req, res) => {
             });
         }
 
+        // Check permission for HoD: can only create risks for their department or event-level
+        const riskScope = req.body.scope || 'department';
+        const riskDepartmentId = req.body.departmentId;
+
+        if (!checkRiskPermission(member, null, riskDepartmentId, riskScope)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được tạo risk cho ban mình hoặc toàn BTC'
+            });
+        }
+
         const riskData = { ...req.body, updated_personId: member._id };
 
         const result = await RiskService.createRisk(eventId, riskData);
 
         if (!result.success) {
             return res.status(400).json(result);
+        }
+
+        // Send notification
+        try {
+          await notifyRiskCreated(eventId, result.data._id, riskScope, riskDepartmentId);
+        } catch (notifError) {
+          console.error('Error sending risk created notification:', notifError);
+          // Don't fail the request if notification fails
         }
 
         return res.status(201).json({
@@ -380,6 +433,23 @@ export const updateRisk = async (req, res) => {
             });
         }
 
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được sửa risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         const updateData = { ...req.body, updated_personId: member._id };
 
         const result = await RiskService.updateRisk(eventId, riskId, updateData);
@@ -387,6 +457,15 @@ export const updateRisk = async (req, res) => {
         if (!result.success) {
             const statusCode = result.message === 'Risk not found' ? 404 : 400;
             return res.status(statusCode).json(result);
+        }
+
+        // Send notification
+        try {
+          const risk = result.data;
+          await notifyRiskUpdated(eventId, riskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending risk updated notification:', notifError);
+          // Don't fail the request if notification fails
         }
 
         return res.status(200).json({
@@ -428,6 +507,23 @@ export const deleteRisk = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 message: 'Chỉ HoOC hoặc HoD được xóa risk'
+            });
+        }
+
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được xóa risk của ban mình hoặc toàn BTC'
             });
         }
 
@@ -484,6 +580,23 @@ export const addOccurredRisk = async (req, res) => {
             });
         }
 
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được thêm occurred risk cho risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         const occurredData = { ...req.body, update_personId: member._id };
 
         const result = await RiskService.addOccurredRisk(eventId, riskId, occurredData);
@@ -495,6 +608,19 @@ export const addOccurredRisk = async (req, res) => {
 
         // Auto-update risk status based on occurred risks
         const statusUpdateResult = await updateRiskStatusBasedOnOccurred(eventId, riskId);
+
+        // Send notification
+        try {
+          const risk = currentRiskResult.data;
+          // Get the newly created occurred risk (last one in the array)
+          const occurredRisks = result.data.occurred_risk || [];
+          const newOccurredRisk = occurredRisks.length > 0 ? occurredRisks[occurredRisks.length - 1] : null;
+          const occurredRiskId = newOccurredRisk?._id || newOccurredRisk?.id;
+          await notifyRiskOccurred(eventId, riskId, occurredRiskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending risk occurred notification:', notifError);
+          // Don't fail the request if notification fails
+        }
 
         return res.status(201).json({
             success: true,
@@ -539,6 +665,23 @@ export const updateOccurredRisk = async (req, res) => {
             });
         }
 
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được sửa occurred risk cho risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         const updateData = { ...req.body, update_personId: member._id };
 
         const result = await RiskService.updateOccurredRisk(eventId, riskId, occurredRiskId, updateData);
@@ -550,6 +693,15 @@ export const updateOccurredRisk = async (req, res) => {
 
         // Auto-update risk status based on occurred risks
         const statusUpdateResult = await updateRiskStatusBasedOnOccurred(eventId, riskId);
+
+        // Send notification
+        try {
+          const risk = currentRiskResult.data;
+          await notifyOccurredRiskUpdated(eventId, riskId, occurredRiskId, risk.scope || 'department', risk.departmentId);
+        } catch (notifError) {
+          console.error('Error sending occurred risk updated notification:', notifError);
+          // Don't fail the request if notification fails
+        }
 
         return res.status(200).json({
             success: true,
@@ -593,6 +745,24 @@ export const removeOccurredRisk = async (req, res) => {
                 message: 'Chỉ HoOC hoặc HoD được xóa occurred risk'
             });
         }
+
+        // Get current risk to check permission
+        const currentRiskResult = await RiskService.getRiskById(eventId, riskId);
+        if (!currentRiskResult.success) {
+            return res.status(404).json({
+                success: false,
+                message: 'Risk not found'
+            });
+        }
+
+        // Check permission for HoD
+        if (!checkRiskPermission(member, currentRiskResult.data)) {
+            return res.status(403).json({
+                success: false,
+                message: 'HoD chỉ được xóa occurred risk cho risk của ban mình hoặc toàn BTC'
+            });
+        }
+
         // Update update_personId trước khi xóa occurred risk
         await RiskService.updateOccurredRisk(eventId, riskId, occurredRiskId, { update_personId: member._id });
         const result = await RiskService.removeOccurredRisk(eventId, riskId, occurredRiskId);
@@ -663,71 +833,6 @@ export const getRisksByDepartment = async (req, res) => {
 
     } catch (error) {
         console.error('Error in getRisksByDepartment controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-// ====== UTILITY ENDPOINTS ======
-
-/**
- * Bulk update risk statuses
- * PATCH /api/events/:eventId/risks/bulk-status
- */
-export const bulkUpdateRiskStatus = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: chỉ HoOC hoặc HoD mới được bulk update status
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Chỉ HoOC hoặc HoD được bulk update risk status'
-            });
-        }
-
-        const { riskIds, status } = req.body;
-
-        if (!Array.isArray(riskIds) || riskIds.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'riskIds array is required and cannot be empty'
-            });
-        }
-
-        if (!status) {
-            return res.status(400).json({
-                success: false,
-                message: 'status is required'
-            });
-        }
-
-        const result = await RiskService.bulkUpdateRiskStatus(eventId, riskIds, status);
-
-        if (!result.success) {
-            return res.status(400).json(result);
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: result.data,
-            message: result.message
-        });
-
-    } catch (error) {
-        console.error('Error in bulkUpdateRiskStatus controller:', error);
         return res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -829,78 +934,6 @@ export const updateRiskStatusManually = async (req, res) => {
     }
 };
 
-/**
- * Batch update all risk statuses in an event
- * POST /api/events/:eventId/risks/batch-update-status
- */
-export const batchUpdateRiskStatuses = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { eventId } = req.params;
-
-        // Check role: chỉ HoOC hoặc HoD mới được batch update statuses
-        const member = await ensureEventRole(req.user.id, eventId, ['HoOC', 'HoD']);
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'Chỉ HoOC hoặc HoD được batch update risk statuses'
-            });
-        }
-
-        // Get all risks for the event
-        const allRisksResult = await RiskService.getAllRisksByEventWithoutPagination(eventId);
-        if (!allRisksResult.success) {
-            return res.status(400).json(allRisksResult);
-        }
-
-        const risks = allRisksResult.data;
-        const statusUpdates = [];
-
-        // Update status for each risk
-        for (const risk of risks) {
-            const oldStatus = risk.risk_status;
-            const updateResult = await updateRiskStatusBasedOnOccurred(eventId, risk._id);
-
-            if (updateResult.success) {
-                statusUpdates.push({
-                    riskId: risk._id,
-                    riskName: risk.name,
-                    from: oldStatus,
-                    to: updateResult.newStatus,
-                    changed: updateResult.changed
-                });
-            }
-        }
-
-        const changedCount = statusUpdates.filter(update => update.changed).length;
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                totalRisks: risks.length,
-                updatedCount: changedCount,
-                statusUpdates: statusUpdates
-            },
-            message: `Batch status update completed. ${changedCount} risks had status changes.`
-        });
-
-    } catch (error) {
-        console.error('Error in batchUpdateRiskStatuses controller:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
 /**
  * Get risk statistics by category for pie charts
  * GET /api/events/:eventId/risks/category-statistics

@@ -1,17 +1,50 @@
 import axiosClient from './axiosClient';
 
 export const userApi = {
-  getUserRoleByEvent: async (eventId) => {
-    try {
-      const response = await axiosClient.get(`/api/user/events/${eventId}/role`);
-      return response.data;
-    } catch (error) {
-      return error.response?.data || { error: 'Lỗi khi lấy role sự kiện' };
-    }
+  getUserRoleByEvent: async (eventId, config = {}) => {
+    const axiosConfig = {
+      ...config,
+      skipGlobal404: config.skipGlobal404 || false,
+      skipGlobal403: config.skipGlobal403 || false
+    };
+    const response = await axiosClient.get(`/api/user/events/${eventId}/role`, axiosConfig);
+    return response.data;
   },
   checkPassword: async (password) => {
     try {
       const response = await axiosClient.post('/api/user/check-password', { password });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await axiosClient.post('/api/user/change-password', { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  getProfile: async () => {
+    try {
+      const response = await axiosClient.get('/api/user/profile');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  updateProfile: async (payload) => {
+    try {
+      const response = await axiosClient.put('/api/user/profile', payload);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+  removeTag: async (value) => {
+    try {
+      const response = await axiosClient.delete('/api/user/profile/tag', { data: { value } });
       return response.data;
     } catch (error) {
       throw error;

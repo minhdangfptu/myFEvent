@@ -47,10 +47,25 @@ export default function ProtectedRoute({ children, requiredRole = null, required
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Wait for user data to be loaded before checking role
+  // This prevents race condition when user just logged in
+  if (requiredRole && !user) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border" role="status" aria-hidden="true"></div>
+      </div>
+    );
+  }
+
   // Check user role if required
-  if (requiredRole && user?.role !== requiredRole) {
-    // Redirect to unauthorized page or home
-    return <Navigate to="/unauthorized" replace />;
+  // Admin can access all routes, including user-only routes
+  if (requiredRole) {
+    const isAdmin = user?.role === 'admin';
+    const hasRequiredRole = user?.role === requiredRole;
+    
+    if (!isAdmin && !hasRequiredRole) {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   // Check event role if required

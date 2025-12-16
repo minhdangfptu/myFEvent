@@ -1,8 +1,7 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./AgendaPage.css";
 import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useEvents } from "~/contexts/EventContext";
 import { useParams } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -14,14 +13,13 @@ import {
   addDateToAgenda,
   updateDateById,
   removeDateById,
-  findDateById,
   addItemToDateById,
-  batchCreateItemsForDateById,
   updateDayItem,
   removeDayItem,
-  createDateWithItems,
 } from "~/apis/agendaApi";
 import ConfirmModal from "~/components/ConfirmModal";
+import { AlertTriangle, CheckCircle, Pencil, Plus, RotateCw, Trash, XCircle } from "lucide-react";
+
 
 export default function AgendaPage({ milestoneName = "" }) {
   // API data states
@@ -44,15 +42,18 @@ export default function AgendaPage({ milestoneName = "" }) {
     content: "",
   });
 
-  const [newDate, setNewDate] = useState("");
-  const [showAddDateModal, setShowAddDateModal] = useState(false);
-  const [newDateInput, setNewDateInput] = useState("");
+const [newDate, setNewDate] = useState("");
+const [showAddDateModal, setShowAddDateModal] = useState(false);
+const [newDateInput, setNewDateInput] = useState("");
   
   // Confirm modal states
   const [showDeleteScheduleModal, setShowDeleteScheduleModal] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState(null);
   const [showDeleteDateModal, setShowDeleteDateModal] = useState(false);
   const [dateToDelete, setDateToDelete] = useState(null);
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
+  const [isDeletingDate, setIsDeletingDate] = useState(false);
 
   // Context and params
   const { fetchEventRole } = useEvents();
@@ -102,58 +103,6 @@ export default function AgendaPage({ milestoneName = "" }) {
       return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
     return `${diffMins} phút`;
-  };
-
-  const buildUpdatedSchedule = (schedule, updates) => {
-    const finalStart = updates.startTime || schedule.startTime;
-    const finalEnd = updates.endTime || schedule.endTime;
-    const finalContent = updates.content ?? schedule.content;
-    const session = getSessionFromHour(new Date(finalStart).getHours());
-    return {
-      ...schedule,
-      ...updates,
-      content: finalContent,
-      startTime: finalStart,
-      endTime: finalEnd,
-      duration: calculateDuration(finalStart, finalEnd),
-      session,
-      originalStartTime: finalStart,
-      originalContent: finalContent
-    };
-  };
-
-  const applyScheduleUpdateLocally = (scheduleId, dateId, itemIndex, updates) => {
-    setSchedules((prev) =>
-      prev.map((schedule) =>
-        schedule.id === scheduleId
-          ? buildUpdatedSchedule(schedule, updates)
-          : schedule
-      )
-    );
-
-    setAgendaData((prev) => {
-      if (!prev || !Array.isArray(prev.agenda)) return prev;
-      return {
-        ...prev,
-        agenda: prev.agenda.map((dateAgenda) => {
-          const currentDateId = (dateAgenda._id || dateAgenda.id || "").toString();
-          if (currentDateId !== dateId) return dateAgenda;
-
-          const updatedItems = (dateAgenda.items || []).map((item, idx) => {
-            if (idx !== itemIndex) return item;
-            return {
-              ...item,
-              ...updates
-            };
-          });
-
-          return {
-            ...dateAgenda,
-            items: updatedItems
-          };
-        })
-      };
-    });
   };
 
   // Transform agenda data to UI format
@@ -262,8 +211,10 @@ export default function AgendaPage({ milestoneName = "" }) {
         setFlattenedItems([]);
       }
     } catch (err) {
-      setError(err.message || "Failed to fetch agenda data");
+      const errorMessage = err.response?.data?.message || err.message || "Không thể tải dữ liệu agenda";
+      setError(errorMessage);
       console.error("❌ Error fetching agenda:", err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -282,14 +233,17 @@ export default function AgendaPage({ milestoneName = "" }) {
       return { valid: false, message: "Định dạng thời gian không hợp lệ" };
     }
 
-    if (start >= end) {
+    // Thời gian kết thúc phải sau thời gian bắt đầu (không cho phép overnight)
+    if (end <= start) {
       return { valid: false, message: "Thời gian kết thúc phải sau thời gian bắt đầu" };
     }
 
     return { valid: true };
   };
 
-  const validateDate = (dateString) => {
+const todayISODate = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+const validateDate = (dateString) => {
     if (!dateString || !dateString.trim()) {
       return { valid: false, message: "Vui lòng chọn ngày" };
     }
@@ -299,6 +253,7 @@ export default function AgendaPage({ milestoneName = "" }) {
       return { valid: false, message: "Định dạng ngày không hợp lệ" };
     }
 
+    // Bỏ validate 6 tháng - cho phép chọn bất kỳ ngày nào
     return { valid: true };
   };
 
@@ -336,6 +291,7 @@ export default function AgendaPage({ milestoneName = "" }) {
   const handleDeleteSchedule = async () => {
     if (!scheduleToDelete) return;
 
+    setIsDeletingSchedule(true);
     try {
       // Use index-based API for deleting items (since items don't have _id)
       await removeDayItem(
@@ -350,11 +306,14 @@ export default function AgendaPage({ milestoneName = "" }) {
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
     } catch (err) {
-      setError(err.message || "Failed to delete schedule");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa lịch trình";
+      setError(errorMessage);
       console.error("❌ Error deleting schedule:", err);
-      toast.error(err.message || "Lỗi khi xóa lịch trình");
+      toast.error(errorMessage);
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
+    } finally {
+      setIsDeletingSchedule(false);
     }
   };
 
@@ -364,7 +323,7 @@ export default function AgendaPage({ milestoneName = "" }) {
       toast.error("Vui lòng nhập nội dung lịch trình");
       return;
     }
-  
+
     if (!selectedDateId) {
       toast.error("Vui lòng chọn ngày để thêm lịch trình");
       return;
@@ -376,21 +335,23 @@ export default function AgendaPage({ milestoneName = "" }) {
       toast.error(timeValidation.message);
       return;
     }
-  
+
+    setIsAddingSchedule(true);
     try {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
- 
+
       if (!selectedDate || !selectedDate.dateId) {
         debugLog("Add schedule aborted: selected date missing", { selectedDateId, selectedDate });
         toast.error("Không tìm thấy dateId cho ngày được chọn");
         return;
       }
-  
+
       // Use proper date construction
       const selectedRawDate = selectedDate.rawDate;
       debugLog("Adding schedule", { selectedDate, selectedRawDate, newSchedule });
       const dateOnly = selectedRawDate.split("T")[0]; // Get YYYY-MM-DD part
 
+      // Handle overnight schedule (e.g., 23:30 to 6:00 next day)
       const startTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.startTime);
       const endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
 
@@ -402,7 +363,8 @@ export default function AgendaPage({ milestoneName = "" }) {
       const startTime = new Date(startTimeISO);
       const endTime = new Date(endTimeISO);
 
-      if (endTime - startTime <= 0) {
+      // Thời gian kết thúc phải sau thời gian bắt đầu
+      if (endTime <= startTime) {
         toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
         return;
       }
@@ -413,7 +375,7 @@ export default function AgendaPage({ milestoneName = "" }) {
         duration: endTime - startTime, // milliseconds
         content: newSchedule.content.trim(),
       };
-  
+
       // Use ID-based API for adding items to existing dates
       const response = await addItemToDateById(
         eventId,
@@ -426,10 +388,13 @@ export default function AgendaPage({ milestoneName = "" }) {
       await fetchAgendaData(); // Refresh data
       toast.success("Thêm lịch trình thành công!");
     } catch (err) {
-      setError(err.message || "Failed to add schedule");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm lịch trình";
+      setError(errorMessage);
       console.error("❌ Error adding schedule:", err);
       debugLog("Error when adding schedule", { err, newSchedule, selectedDateId });
-      toast.error(err.message || "Lỗi khi thêm lịch trình");
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSchedule(false);
     }
   };
 
@@ -443,14 +408,26 @@ export default function AgendaPage({ milestoneName = "" }) {
       return;
     }
 
-    const newDateKey = getLocalDateKey(dateToAdd);
-    debugLog("Attempting to add date", { dateToAdd, newDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
+    // Ensure date is in ISO string format (YYYY-MM-DD)
+    let dateString = dateToAdd;
+    if (dateToAdd instanceof Date) {
+      dateString = dateToAdd.toISOString().split('T')[0];
+    } else if (typeof dateToAdd === 'string') {
+      // If it's already a string, ensure it's in YYYY-MM-DD format
+      const dateObj = new Date(dateToAdd);
+      if (!isNaN(dateObj.getTime())) {
+        dateString = dateObj.toISOString().split('T')[0];
+      }
+    }
+
+    const newDateKey = getLocalDateKey(dateString);
+    debugLog("Attempting to add date", { dateToAdd, dateString, newDateKey, existingKeys: dates.map(d => ({ id: d.id, rawDate: d.rawDate, key: getLocalDateKey(d.rawDate) })) });
     const isDuplicateDate = dates.some(
       (d) => getLocalDateKey(d.rawDate) === newDateKey
     );
 
     if (isDuplicateDate) {
-      debugLog("Duplicate date detected", { dateToAdd, newDateKey });
+      debugLog("Duplicate date detected", { dateToAdd, dateString, newDateKey });
       toast.error("Ngày này đã tồn tại trong agenda");
       return;
     }
@@ -462,8 +439,8 @@ export default function AgendaPage({ milestoneName = "" }) {
         await createAgenda(eventId, milestoneId, {});
       }
 
-      // Add date to agenda using new API
-      const response = await addDateToAgenda(eventId, milestoneId, dateToAdd);
+      // Add date to agenda using new API - ensure dateString is in correct format
+      const response = await addDateToAgenda(eventId, milestoneId, dateString);
       debugLog("Add date API response", response);
 
       setNewDate("");
@@ -471,10 +448,11 @@ export default function AgendaPage({ milestoneName = "" }) {
       await fetchAgendaData(); // Refresh data
       toast.success("Thêm ngày thành công!");
     } catch (err) {
-      setError(err.message || "Failed to add new date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm ngày";
+      setError(errorMessage);
       console.error("❌ Error adding date:", err);
       debugLog("Error when adding date", err);
-      toast.error(err.message || "Lỗi khi thêm ngày");
+      toast.error(errorMessage);
     }
   };
 
@@ -489,6 +467,7 @@ export default function AgendaPage({ milestoneName = "" }) {
   const handleDeleteDate = async () => {
     if (!dateToDelete) return;
 
+    setIsDeletingDate(true);
     try {
       if (dateToDelete.dateId) {
         // Use ID-based API for deleting dates
@@ -507,11 +486,14 @@ export default function AgendaPage({ milestoneName = "" }) {
       setShowDeleteDateModal(false);
       setDateToDelete(null);
     } catch (err) {
-      setError(err.message || "Failed to delete date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa ngày";
+      setError(errorMessage);
       console.error("❌ Error deleting date:", err);
-      toast.error(err.message || "Lỗi khi xóa ngày");
+      toast.error(errorMessage);
       setShowDeleteDateModal(false);
       setDateToDelete(null);
+    } finally {
+      setIsDeletingDate(false);
     }
   };
 
@@ -558,10 +540,11 @@ export default function AgendaPage({ milestoneName = "" }) {
       await fetchAgendaData();
       toast.success("Cập nhật ngày thành công!");
     } catch (err) {
-      setError(err.message || "Failed to update date");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật ngày";
+      setError(errorMessage);
       console.error("❌ Error updating date:", err);
       debugLog("Error when updating date", err);
-      toast.error(err.message || "Lỗi khi cập nhật ngày");
+      toast.error(errorMessage);
     }
   };
 
@@ -571,7 +554,7 @@ export default function AgendaPage({ milestoneName = "" }) {
 
   // Modal handlers
   const handleShowAddDateModal = () => {
-    setNewDateInput("");
+  setNewDateInput(todayISODate);
     setShowAddDateModal(true);
   };
 
@@ -580,11 +563,21 @@ export default function AgendaPage({ milestoneName = "" }) {
   };
 
   const handleConfirmAddDate = async () => {
+    // Validate date input
+    if (!newDateInput || !newDateInput.trim()) {
+      toast.error("Vui lòng chọn ngày");
+      return;
+    }
+
+    const dateValidation = validateDate(newDateInput);
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
     setNewDate(newDateInput);
     setShowAddDateModal(false);
-    if (newDateInput) {
       await handleAddDate(newDateInput);
-    }
   };
 
   const handleStartEditing = (schedule) => {
@@ -655,7 +648,8 @@ export default function AgendaPage({ milestoneName = "" }) {
       const startTime = new Date(startTimeISO);
       const endTime = new Date(endTimeISO);
 
-      if (endTime - startTime <= 0) {
+      // Thời gian kết thúc phải sau thời gian bắt đầu
+      if (endTime <= startTime) {
         toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
         return;
       }
@@ -692,20 +686,16 @@ export default function AgendaPage({ milestoneName = "" }) {
       if (!response?.success) {
         throw new Error(response?.message || "Cập nhật lịch trình thất bại");
       }
- 
+
       setEditingSchedule(null);
-      applyScheduleUpdateLocally(
-        editingSchedule.id,
-        freshScheduleMeta.dateId,
-        freshScheduleMeta.itemIndex,
-        updates
-      );
+      await fetchAgendaData(); // Fetch fresh data to get correct indices after server-side sorting
       toast.success("Cập nhật lịch trình thành công!");
     } catch (err) {
-      setError(err.message || "Failed to save edit");
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật lịch trình";
+      setError(errorMessage);
       console.error("❌ Error saving edit:", err);
       debugLog("Error saving edit", { err, editingSchedule });
-      toast.error(err.message || "Lỗi khi cập nhật");
+      toast.error(errorMessage);
     }
   };
 
@@ -724,7 +714,7 @@ export default function AgendaPage({ milestoneName = "" }) {
     if (eventId) {
       fetchEventRole(eventId).then((role) => {
         setEventRole(role);
-        setHasPermission(role === "HoD" || role === "HoOC");
+        setHasPermission( role === "HoOC");
       });
     }
   }, [eventId, fetchEventRole]);
@@ -742,7 +732,7 @@ export default function AgendaPage({ milestoneName = "" }) {
   const currentSchedules = getSchedulesForSelectedDate();
   if (loading) {
     return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()}>
+      <UserLayout title="Agenda" sidebarType={getSidebarType()} eventId={eventId}>
         <div className="agenda-page__container">
           <div className="text-center">
             <div className="spinner-border text-primary" role="status">
@@ -755,41 +745,23 @@ export default function AgendaPage({ milestoneName = "" }) {
     );
   }
 
-  if (error) {
-    return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()}>
-        <div className="agenda-page__container">
-          <div className="alert alert-danger">
-            <h4>Lỗi tải dữ liệu</h4>
-            <p>{error}</p>
-            <button
-              className="btn btn-outline-danger"
-              onClick={fetchAgendaData}
-            >
-              Thử lại
-            </button>
-          </div>
-        </div>
-      </UserLayout>
-    );
-  }
-
   return (
     <UserLayout
-      title={`Agenda ${milestoneTitle}`}
+      title="Agenda"
       sidebarType={getSidebarType()}
       activePage="overview & overview-timeline"
+      eventId={eventId}
     >
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="agenda-page__container">
         <h2 className="agenda-page__title">
-          Agenda {selectedDate ? `${selectedDate.date}` : ""}
+          Agenda
         </h2>
 
         {/* Permission Notice
         {!hasPermission && (
           <div className="alert alert-warning">
-            <i className="bi bi-exclamation-triangle"></i>
+            <AlertTriangle size={18} />
             Bạn chỉ có quyền xem agenda. Không thể chỉnh sửa.
           </div>
         )} */}
@@ -812,6 +784,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                       <input
                         type="date"
                         value={editingDate.date}
+                      min={todayISODate}
                         onChange={(e) =>
                           setEditingDate({
                             ...editingDate,
@@ -826,13 +799,13 @@ export default function AgendaPage({ milestoneName = "" }) {
                           className="agenda-page__action-button agenda-page__action-button--confirm"
                           onClick={handleSaveDateEdit}
                         >
-                          <i className="bi bi-check-circle"></i>
+                          <CheckCircle size={18} />
                         </button>
                         <button
                           className="agenda-page__action-button agenda-page__action-button--delete"
                           onClick={handleCancelDateEdit}
                         >
-                          <i className="bi bi-x-circle"></i>
+                          <XCircle size={18} />
                         </button>
                       </div>
                     </div>
@@ -878,7 +851,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                   className="agenda-page__add-date-button"
                   onClick={handleShowAddDateModal}
                 >
-                  <i className="bi bi-plus"></i> Thêm ngày mới
+                  <Plus size={18} /> Thêm ngày mới
                 </button>
                 <ConfirmModal
                   show={showAddDateModal}
@@ -891,6 +864,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                         type="date"
                         className="form-control mt-2"
                         value={newDateInput}
+                        min={todayISODate}
                         onChange={(e) => setNewDateInput(e.target.value)}
                         style={{ maxWidth: 250 }}
                       />
@@ -908,6 +882,140 @@ export default function AgendaPage({ milestoneName = "" }) {
             <h5 className="agenda-page__section-title">
               Chi tiết lịch trình - {selectedDate.date}
             </h5>
+
+            {/* Add New Schedule Form - Moved to top */}
+            {hasPermission && (
+              <div className="agenda-page__add-schedule-section" style={{ marginBottom: '20px', border: '2px solid #dc2626', borderRadius: '8px', backgroundColor: '#fef2f2', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', borderBottom: '1px solid #dc2626' }}>
+                  <h6 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#111827' }}>Thêm lịch trình mới</h6>
+                </div>
+                <div style={{ padding: '0' }}>
+                  <div className="agenda-page__schedule-table-wrapper">
+                    <table className="agenda-page__schedule-table" style={{ marginBottom: 0 }}>
+                      <thead className="agenda-page__schedule-table-head">
+                        <tr className="agenda-page__schedule-table-header-row">
+                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '100px' }}>
+                            Buổi
+                          </th>
+                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '140px' }}>
+                            Bắt đầu
+                          </th>
+                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '140px' }}>
+                            Kết thúc
+                          </th>
+                          <th className="agenda-page__schedule-table-header-cell">
+                            Nội dung
+                          </th>
+                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '120px' }}>
+                            Thời lượng
+                          </th>
+                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '120px' }}>
+                            Thao tác
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="agenda-page__schedule-table-body">
+                        <tr className="agenda-page__schedule-table-row">
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-session-cell">
+                            <select className="agenda-page__session-select" disabled style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}>
+                              <option>Tự động</option>
+                            </select>
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
+                            <input
+                              type="time"
+                              className="agenda-page__time-input"
+                              value={newSchedule.startTime}
+                              onChange={(e) =>
+                                setNewSchedule({
+                                  ...newSchedule,
+                                  startTime: e.target.value,
+                                })
+                              }
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
+                            <input
+                              type="time"
+                              className="agenda-page__time-input"
+                              value={newSchedule.endTime}
+                              onChange={(e) =>
+                                setNewSchedule({
+                                  ...newSchedule,
+                                  endTime: e.target.value,
+                                })
+                              }
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-content-cell">
+                            <input
+                              type="text"
+                              className="agenda-page__content-input"
+                              placeholder="Nhập nội dung lịch trình"
+                              value={newSchedule.content}
+                              onChange={(e) =>
+                                setNewSchedule({
+                                  ...newSchedule,
+                                  content: e.target.value,
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-duration-cell">
+                            <input
+                              type="text"
+                              className="agenda-page__duration-input-sm"
+                              placeholder="Tự động"
+                              readOnly
+                              value={
+                                newSchedule.startTime && newSchedule.endTime
+                                  ? calculateDuration(
+                                      new Date(`2000-01-01 ${newSchedule.startTime}`),
+                                      new Date(`2000-01-01 ${newSchedule.endTime}`)
+                                    )
+                                  : ""
+                              }
+                              style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}
+                            />
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-actions-cell">
+                            <div className="agenda-page__action-buttons">
+                              <button
+                                className="agenda-page__action-button agenda-page__action-button--confirm"
+                                onClick={handleAddSchedule}
+                                disabled={isAddingSchedule}
+                                title="Lưu"
+                              >
+                                {isAddingSchedule ? (
+                                  <i className="bi bi-arrow-clockwise spin-animation"></i>
+                                ) : (
+                                  <CheckCircle size={18} />
+                                )}
+                              </button>
+                              <button
+                                className="agenda-page__action-button agenda-page__action-button--delete"
+                                onClick={() =>
+                                  setNewSchedule({
+                                    startTime: "",
+                                    endTime: "",
+                                    content: "",
+                                  })
+                                }
+                                title="Hủy"
+                              >
+                                <XCircle size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="agenda-page__schedule-table-wrapper">
               <table className="agenda-page__schedule-table">
@@ -1012,13 +1120,13 @@ export default function AgendaPage({ milestoneName = "" }) {
                                   className="agenda-page__action-button agenda-page__action-button--confirm"
                                   onClick={handleSaveEdit}
                                 >
-                                  <i className="bi bi-check-circle"></i>
+                                  <CheckCircle size={18} />
                                 </button>
                                 <button
                                   className="agenda-page__action-button agenda-page__action-button--delete"
                                   onClick={handleCancelEdit}
                                 >
-                                  <i className="bi bi-x-circle"></i>
+                                  <XCircle size={18} />
                                 </button>
                               </div>
                             ) : (
@@ -1027,7 +1135,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                                   className="agenda-page__action-button agenda-page__action-button--edit"
                                   onClick={() => handleStartEditing(schedule)}
                                 >
-                                  <i className="bi bi-pencil"></i>
+                                  <Pencil size={18} />
                                 </button>
                                 <button
                                   className="agenda-page__action-button agenda-page__action-button--delete"
@@ -1035,7 +1143,7 @@ export default function AgendaPage({ milestoneName = "" }) {
                                     handleDeleteScheduleClick(schedule.id)
                                   }
                                 >
-                                  <i className="bi bi-trash"></i>
+                                  <Trash size={18} />
                                 </button>
                               </div>
                             )}
@@ -1048,89 +1156,11 @@ export default function AgendaPage({ milestoneName = "" }) {
               </table>
             </div>
 
-            {/* Add New Schedule Row */}
-            {hasPermission && (
-              <div className="agenda-page__add-schedule-section">
-                <div className="agenda-page__add-schedule-inputs">
-                  <select className="agenda-page__session-select" disabled>
-                    <option>Tự động</option>
-                  </select>
-                  <input
-                    type="time"
-                    className="agenda-page__time-input-sm"
-                    value={newSchedule.startTime}
-                    onChange={(e) =>
-                      setNewSchedule({
-                        ...newSchedule,
-                        startTime: e.target.value,
-                      })
-                    }
-                  />
-                  <span className="agenda-page__time-separator-sm">-</span>
-                  <input
-                    type="time"
-                    className="agenda-page__time-input-sm"
-                    value={newSchedule.endTime}
-                    onChange={(e) =>
-                      setNewSchedule({
-                        ...newSchedule,
-                        endTime: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    type="text"
-                    className="agenda-page__content-input-lg"
-                    placeholder="Nhập nội dung lịch trình"
-                    value={newSchedule.content}
-                    onChange={(e) =>
-                      setNewSchedule({
-                        ...newSchedule,
-                        content: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    type="text"
-                    className="agenda-page__duration-input-sm"
-                    placeholder="Tự động"
-                    readOnly
-                    value={
-                      newSchedule.startTime && newSchedule.endTime
-                        ? calculateDuration(
-                            new Date(`2000-01-01 ${newSchedule.startTime}`),
-                            new Date(`2000-01-01 ${newSchedule.endTime}`)
-                          )
-                        : ""
-                    }
-                  />
-                  <button
-                    className="agenda-page__action-button agenda-page__action-button--confirm"
-                    onClick={handleAddSchedule}
-                  >
-                    <i className="bi bi-check-circle"></i>
-                  </button>
-                  <button
-                    className="agenda-page__action-button agenda-page__action-button--delete"
-                    onClick={() =>
-                      setNewSchedule({
-                        startTime: "",
-                        endTime: "",
-                        content: "",
-                      })
-                    }
-                  >
-                    <i className="bi bi-x-circle"></i>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Add Activity Button */}
             {hasPermission && currentSchedules.length === 0 && (
               <div className="text-center mt-4">
                 <button className="agenda-page__add-activity-button">
-                  <i className="bi bi-plus"></i> Thêm lịch trình đầu tiên
+                  <Plus size={18} /> Thêm lịch trình đầu tiên
                 </button>
               </div>
             )}
@@ -1145,9 +1175,6 @@ export default function AgendaPage({ milestoneName = "" }) {
               style={{ fontSize: "3rem", color: "#6c757d" }}
             ></i>
             <h4 className="text-muted mt-3">Chưa có agenda nào</h4>
-            <p className="text-muted">
-              Hãy thêm ngày sự kiện đầu tiên để bắt đầu!
-            </p>
           </div>
         )}
 
@@ -1160,6 +1187,7 @@ export default function AgendaPage({ milestoneName = "" }) {
           }}
           onConfirm={handleDeleteSchedule}
           message="Bạn có chắc chắn muốn xóa lịch trình này?"
+          isLoading={isDeletingSchedule}
         />
 
         <ConfirmModal
@@ -1170,6 +1198,7 @@ export default function AgendaPage({ milestoneName = "" }) {
           }}
           onConfirm={handleDeleteDate}
           message="Bạn có chắc chắn muốn xóa ngày này và tất cả lịch trình?"
+          isLoading={isDeletingDate}
         />
       </div>
     </UserLayout>

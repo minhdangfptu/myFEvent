@@ -6,6 +6,17 @@ import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
 import Loading from '../../components/Loading';
 import { useEvents } from '../../contexts/EventContext';
+import { ArrowDown, ArrowUp, Eye, Menu, RotateCw, Trash, X } from "lucide-react";
+
+
+const formatDateLocal = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 10); // Only date, no time
+};
 
 export default function CreateFeedbackForm() {
   const { eventId, formId } = useParams();
@@ -16,6 +27,7 @@ export default function CreateFeedbackForm() {
   const [submitting, setSubmitting] = useState(false);
   const [eventRole, setEventRole] = useState('');
   const [event, setEvent] = useState(null);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -25,6 +37,63 @@ export default function CreateFeedbackForm() {
     questions: []
   });
   const [showPreview, setShowPreview] = useState(false);
+  const [formStatus, setFormStatus] = useState('draft');
+  const [currentMinDate, setCurrentMinDate] = useState(formatDateLocal(new Date()));
+
+  const getDefaultCloseTime = () => {
+    const now = new Date();
+    const plusOneDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return formatDateLocal(plusOneDay);
+  };
+
+  const clampToFuture = (value) => {
+    if (!value) return currentMinDate;
+    const date = new Date(value);
+    const minDate = new Date(currentMinDate);
+    minDate.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    if (date < minDate) {
+      toast.info('Ngày mở không được trước hiện tại, đã tự động điều chỉnh.');
+      return currentMinDate;
+    }
+    return value;
+  };
+  const clampCloseTime = (value) => {
+    if (!value) return getDefaultCloseTime();
+    const closeDate = new Date(value);
+    closeDate.setHours(0, 0, 0, 0);
+    const openDate = formData.openTime ? new Date(formData.openTime) : new Date(currentMinDate);
+    openDate.setHours(0, 0, 0, 0);
+    if (closeDate <= openDate) {
+      const nextDay = new Date(openDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      toast.info('Ngày đóng phải sau ngày mở, đã tự động điều chỉnh.');
+      return formatDateLocal(nextDay);
+    }
+    return value;
+  };
+
+  const handleOpenTimeChange = (value) => {
+    const adjusted = clampToFuture(value);
+    setFormData(prev => ({
+      ...prev,
+      openTime: adjusted,
+      closeTime: clampCloseTime(prev.closeTime)
+    }));
+  };
+
+  const handleCloseTimeChange = (value) => {
+    const adjusted = clampCloseTime(value);
+    setFormData(prev => ({ ...prev, closeTime: adjusted }));
+  };
+
+  const closeTimeMinimum = formData.openTime
+    ? (() => {
+        const openDate = new Date(formData.openTime);
+        openDate.setDate(openDate.getDate() + 1);
+        return formatDateLocal(openDate);
+      })()
+    : getDefaultCloseTime();
 
   useEffect(() => {
     if (eventId) {
@@ -35,9 +104,14 @@ export default function CreateFeedbackForm() {
           if (isEdit && formId) {
             await loadForm();
           } else {
-            // For new form, set loading to false after role and event are loaded
-            // Auto-set targetAudience to Member and HoD
-            setFormData(prev => ({ ...prev, targetAudience: ['Member', 'HoD'] }));
+            const nowLocal = formatDateLocal(new Date());
+            const defaultClose = getDefaultCloseTime();
+            setFormData(prev => ({
+              ...prev,
+              targetAudience: ['Member', 'HoD'],
+              openTime: nowLocal,
+              closeTime: defaultClose
+            }));
             setLoading(false);
           }
         } catch (error) {
@@ -85,11 +159,12 @@ export default function CreateFeedbackForm() {
       setLoading(true);
       const res = await feedbackApi.getFormDetail(eventId, formId);
       const form = res.data;
+      setFormStatus(form.status || 'draft');
       setFormData({
         name: form.name || '',
         description: form.description || '',
-        openTime: form.openTime ? new Date(form.openTime).toISOString().slice(0, 16) : '',
-        closeTime: form.closeTime ? new Date(form.closeTime).toISOString().slice(0, 16) : '',
+        openTime: formatDateLocal(form.openTime),
+        closeTime: formatDateLocal(form.closeTime),
         targetAudience: ['Member', 'HoD'], // Luôn set cho Member và HoD
         questions: form.questions || []
       });
@@ -308,7 +383,21 @@ export default function CreateFeedbackForm() {
   };
 
 
+  const isReadOnly = isEdit && formStatus !== 'draft';
+  const canEditCloseTime = isEdit && (formStatus === 'open' || formStatus === 'closed');
+
   const handleSubmit = async (publish = false) => {
+    // Allow updating closeTime for published forms
+    if (isReadOnly && !canEditCloseTime) {
+      toast.error('Biểu mẫu đã xuất bản, không thể chỉnh sửa');
+      return;
+    }
+    
+    // If only updating closeTime for published form
+    if (canEditCloseTime && publish) {
+      toast.error('Biểu mẫu đã xuất bản, chỉ có thể cập nhật thời gian đóng');
+      return;
+    }
     // Validation
     if (!formData.name.trim()) {
       toast.error('Vui lòng nhập tên biểu mẫu');
@@ -316,14 +405,56 @@ export default function CreateFeedbackForm() {
     }
 
     if (!formData.openTime || !formData.closeTime) {
-      toast.error('Vui lòng chọn thời gian mở và đóng');
+      toast.error('Vui lòng chọn ngày mở và đóng');
       return;
     }
 
-    if (new Date(formData.openTime) >= new Date(formData.closeTime)) {
-      toast.error('Thời gian đóng phải sau thời gian mở');
+    // Parse dates properly to avoid timezone issues
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    
+    // Parse date string (YYYY-MM-DD) in local timezone
+    const parseLocalDate = (dateString) => {
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+    
+    const openTimeDate = parseLocalDate(formData.openTime);
+    const closeTimeDate = parseLocalDate(formData.closeTime);
+
+    // So sánh ngày (không so sánh giờ)
+    if (openTimeDate.getTime() >= closeTimeDate.getTime()) {
+      toast.error('Ngày đóng phải sau ngày mở');
       return;
     }
+
+    // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
+    if (openTimeDate.getTime() < now.getTime()) {
+      toast.error('Ngày mở phải ở hiện tại hoặc tương lai');
+      return;
+    }
+
+    // Ngày đóng phải sau ngày mở
+    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+    // So sánh bằng cách so sánh timestamp của ngày (không có giờ)
+    const openTimeTimestamp = openTimeDate.getTime();
+    const nowTimestamp = now.getTime();
+    
+    if (openTimeTimestamp === nowTimestamp) {
+      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const tomorrowTimestamp = tomorrow.getTime();
+      
+      if (closeTimeDate.getTime() <= tomorrowTimestamp) {
+        toast.error('Ngày đóng phải sau ngày mở (ít nhất 1 ngày)');
+        return;
+      }
+    }
+    // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở (đã kiểm tra ở trên)
 
     if (formData.questions.length === 0) {
       toast.error('Vui lòng thêm ít nhất một câu hỏi');
@@ -341,11 +472,18 @@ export default function CreateFeedbackForm() {
           toast.error(`Câu hỏi ${i + 1} (lựa chọn nhiều) phải có ít nhất 2 lựa chọn`);
           return;
         }
-        // Check for duplicate options (case-insensitive, trim whitespace)
-        const trimmedOptions = q.options.map(opt => opt.trim().toLowerCase()).filter(opt => opt !== '');
-        const uniqueOptions = new Set(trimmedOptions);
-        if (trimmedOptions.length !== uniqueOptions.size) {
+        const trimmedNonEmpty = q.options.map(opt => opt.trim()).filter(opt => opt !== '');
+        if (trimmedNonEmpty.length < 2) {
+          toast.error(`Câu hỏi ${i + 1} cần ít nhất 2 lựa chọn hợp lệ`);
+          return;
+        }
+        const uniqueOptions = new Set(trimmedNonEmpty.map(opt => opt.toLowerCase()));
+        if (trimmedNonEmpty.length !== uniqueOptions.size) {
           toast.error(`Câu hỏi ${i + 1} có lựa chọn trùng lặp. Vui lòng sửa lại.`);
+          return;
+        }
+        if (trimmedNonEmpty.length !== q.options.length) {
+          toast.error(`Câu hỏi ${i + 1} không được để trống lựa chọn`);
           return;
         }
       }
@@ -353,11 +491,40 @@ export default function CreateFeedbackForm() {
 
     try {
       setSubmitting(true);
+      
+      // If updating only closeTime for published form
+      if (canEditCloseTime) {
+        const closeTimeEnd = new Date(closeTimeDate);
+        closeTimeEnd.setHours(23, 59, 59, 999);
+        const submitData = {
+          closeTime: closeTimeEnd.toISOString()
+        };
+        await feedbackApi.updateForm(eventId, formId, submitData);
+        toast.success('Cập nhật thời gian đóng thành công');
+        navigate(`/events/${eventId}/feedback`);
+        return;
+      }
+      
+      const normalizedQuestions = formData.questions.map((q) => {
+        if (q.questionType !== 'multiple-choice') return q;
+        return {
+          ...q,
+          options: q.options.map(opt => opt.trim()).filter(opt => opt !== '')
+        };
+      });
+      
+      // Set openTime to start of day, closeTime to end of day
+      const openTimeStart = new Date(openTimeDate);
+      openTimeStart.setHours(0, 0, 0, 0);
+      const closeTimeEnd = new Date(closeTimeDate);
+      closeTimeEnd.setHours(23, 59, 59, 999);
+      
       const submitData = {
         ...formData,
         targetAudience: ['Member', 'HoD'], // Luôn set cho Member và HoD
-        openTime: new Date(formData.openTime).toISOString(),
-        closeTime: new Date(formData.closeTime).toISOString()
+        openTime: openTimeStart.toISOString(),
+        closeTime: closeTimeEnd.toISOString(),
+        questions: normalizedQuestions
       };
 
       let createdFormId = formId;
@@ -415,37 +582,53 @@ export default function CreateFeedbackForm() {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
+                  gap: '8px',
+                  opacity: isReadOnly ? 0.6 : 1
                 }}
+                disabled={isReadOnly}
               >
-                <i className="bi bi-eye"></i>
+                <Eye size={18} />
                 Xem trước
               </button>
-              <button
-                onClick={() => handleSubmit(true)}
-                disabled={submitting}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  opacity: submitting ? 0.6 : 1
-                }}
-              >
-                <i className="bi bi-box-arrow-up"></i>
-                Xuất bản
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={() => handleSubmit(true)}
+                  disabled={submitting}
+                  style={{
+                    backgroundColor: '#dc2626',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: submitting ? 0.6 : 1
+                  }}
+                >
+                  {submitting ? (
+                    <i className="bi bi-arrow-clockwise spin-animation"></i>
+                  ) : (
+                    <i className="bi bi-box-arrow-up"></i>
+                  )}
+                  {submitting ? 'Đang xuất bản...' : 'Xuất bản'}
+                </button>
+              )}
             </div>
           </div>
 
+          {isReadOnly && (
+            <div style={{ padding: '12px 16px', backgroundColor: '#fff7ed', borderRadius: '8px', color: '#c2410c', marginBottom: '16px' }}>
+              {canEditCloseTime 
+                ? 'Biểu mẫu đã được xuất bản. Bạn chỉ có thể thay đổi thời gian đóng.'
+                : 'Biểu mẫu đã được xuất bản hoặc đóng. Bạn chỉ có thể xem nội dung mà không thể chỉnh sửa.'}
+            </div>
+          )}
+
           {!showPreview ? (
-            <>
+            <fieldset disabled={isReadOnly} style={{ border: 'none', padding: 0, margin: 0 }}>
               {/* Basic Information */}
               <div style={{ marginBottom: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
@@ -498,35 +681,43 @@ export default function CreateFeedbackForm() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                        Thời gian mở
+                        Ngày mở
                       </label>
-                      <input
-                        type="datetime-local"
-                        value={formData.openTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, openTime: e.target.value }))}
+                    <input
+                      type="date"
+                      value={formData.openTime}
+                      onChange={(e) => handleOpenTimeChange(e.target.value)}
+                      min={currentMinDate}
+                      disabled={isReadOnly}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '8px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isReadOnly ? 0.6 : 1,
+                          cursor: isReadOnly ? 'not-allowed' : 'text'
                         }}
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                        Thời gian đóng
+                        Ngày đóng
                       </label>
-                      <input
-                        type="datetime-local"
-                        value={formData.closeTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, closeTime: e.target.value }))}
+                    <input
+                      type="date"
+                      value={formData.closeTime}
+                      onChange={(e) => handleCloseTimeChange(e.target.value)}
+                      min={closeTimeMinimum}
+                      disabled={isReadOnly && !canEditCloseTime}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '8px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: (isReadOnly && !canEditCloseTime) ? 0.6 : 1,
+                          cursor: (isReadOnly && !canEditCloseTime) ? 'not-allowed' : 'text'
                         }}
                       />
                     </div>
@@ -538,7 +729,7 @@ export default function CreateFeedbackForm() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px' }}>
-                    <i className="bi bi-list"></i>
+                    <Menu size={18} />
                   </div>
                   <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Câu hỏi phản hồi</h2>
                 </div>
@@ -568,20 +759,20 @@ export default function CreateFeedbackForm() {
                             disabled={index === 0}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                           >
-                            <i className="bi bi-arrow-up"></i>
+                            <ArrowUp size={18} />
                           </button>
                           <button
                             onClick={() => handleMoveQuestion(index, 'down')}
                             disabled={index === formData.questions.length - 1}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                           >
-                            <i className="bi bi-arrow-down"></i>
+                            <ArrowDown size={18} />
                           </button>
                           <button
                             onClick={() => handleRemoveQuestion(index)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#ef4444' }}
                           >
-                            <i className="bi bi-trash"></i>
+                            <Trash size={18} />
                           </button>
                         </div>
                       </div>
@@ -662,7 +853,7 @@ export default function CreateFeedbackForm() {
                                       fontSize: '18px'
                                     }}
                                   >
-                                    <i className="bi bi-x"></i>
+                                    <X size={18} />
                                   </button>
                                 </div>
                               );
@@ -718,26 +909,31 @@ export default function CreateFeedbackForm() {
                 </div>
               </div>
 
-              {/* Save button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button
-                  onClick={() => handleSubmit(false)}
-                  disabled={submitting}
-                  style={{
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 24px',
-                    fontSize: '14px',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    opacity: submitting ? 0.6 : 1
-                  }}
-                >
-                  {submitting ? 'Đang lưu...' : 'Lưu nháp'}
-                </button>
-              </div>
-            </>
+              {(!isReadOnly || canEditCloseTime) && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                  <button
+                    onClick={() => handleSubmit(false)}
+                    disabled={submitting}
+                    style={{
+                      backgroundColor: canEditCloseTime ? '#2563eb' : '#6b7280',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                      opacity: submitting ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {submitting && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                    {submitting ? 'Đang lưu...' : canEditCloseTime ? 'Cập nhật thời gian đóng' : 'Lưu'}
+                  </button>
+                </div>
+              )}
+            </fieldset>
           ) : (
             <div style={{ padding: '24px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
               <h2 style={{ marginBottom: '16px' }}>Xem trước biểu mẫu</h2>

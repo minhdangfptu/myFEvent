@@ -1,17 +1,22 @@
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom"; // Thêm Link
 import { useEffect, useState } from "react";
 import { formatDate } from "../../utils/formatDate";
 import { eventService } from "../../services/eventService";
 import { getEventImage } from "../../utils/getEventImage";
 import { deriveEventStatus } from "../../utils/getEventStatus";
 import Loading from "~/components/Loading";
+import { 
+  CalendarDays, MapPin, User, FileText, AlignLeft, 
+  Zap, ExternalLink, Info, AlertCircle, ArrowLeft 
+} from "lucide-react"; // Thêm icon AlertCircle, ArrowLeft
 
 export default function EventDetailPage() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // Đặt mặc định là true để tránh flash màn hình "không tìm thấy" khi mới vào
+  const [loading, setLoading] = useState(true); 
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -21,28 +26,78 @@ export default function EventDetailPage() {
       try {
         const res = await eventService.fetchEventById(id);
         const payload = res?.data ?? res;
-        setEvent(payload);
+        
+        // Kiểm tra kỹ hơn: nếu payload rỗng hoặc null
+        if (!payload) {
+            setEvent(null);
+        } else {
+            setEvent(payload);
+        }
       } catch (err) {
         console.error("fetch event detail error", err);
         setError("Không thể tải chi tiết sự kiện");
+        setEvent(null);
       } finally {
         setLoading(false);
       }
     };
 
-    loadDetail();
+    if (id) {
+        loadDetail();
+    } else {
+        setLoading(false);
+    }
   }, [id]);
 
+  // --- LOGIC XỬ LÝ KHI KHÔNG TÌM THẤY SỰ KIỆN ---
+  if (!loading && (!event || error)) {
+    return (
+      <>
+        <Header />
+        <div 
+          className="d-flex flex-column align-items-center justify-content-center" 
+          style={{ minHeight: "60vh", background: "#f8fafc", padding: "20px" }}
+        >
+          <div className="text-center p-5 bg-white shadow-sm rounded-4" style={{ maxWidth: "500px", width: "100%" }}>
+            <div className="mb-4 d-inline-flex align-items-center justify-content-center rounded-circle" 
+                 style={{ width: "80px", height: "80px", background: "#fee2e2", color: "#ef4444" }}>
+              <AlertCircle size={40} />
+            </div>
+            <h3 className="fw-bold text-dark mb-2">Không tìm thấy sự kiện</h3>
+            <p className="text-muted mb-4">
+              Sự kiện bạn đang tìm kiếm không tồn tại, đã bị xóa hoặc đường dẫn không chính xác.
+            </p>
+            <Link to="/events" className="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill fw-semibold">
+              <ArrowLeft size={18} />
+              Quay về danh sách sự kiện
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  // --- LOGIC HIỂN THỊ DỮ LIỆU KHI CÓ EVENT ---
   const defaultImg = "/default-events.jpg";
   const imageUrl = getEventImage(event ?? {}, defaultImg);
   const title = event?.name || "Sự kiện";
-  const dateText = formatDate(event?.eventDate);
-  const address = event?.location || "";
-  const statusText = deriveEventStatus(event).text;
+  const dateText = event?.eventStartDate && event?.eventEndDate
+    ? `${formatDate(event.eventStartDate)} - ${formatDate(event.eventEndDate)}`
+    : formatDate(event?.eventDate);
+  const address = event?.location || "Chưa cập nhật";
+  const status = deriveEventStatus(event);
+  const statusConfig = {
+    text: status.text,
+    color: status.badgeColor || "#ef4444",
+    bg: status.badgeBg || "#fee2e2",
+  };
 
   return (
     <>
       <Header />
+      
+      {/* Loading Overlay */}
       {loading && (
         <div
           style={{
@@ -58,80 +113,157 @@ export default function EventDetailPage() {
           <Loading size={80} />
         </div>
       )}
-      <div className="container-xl py-4">
-        <div className="bg-white rounded-3 shadow-sm overflow-hidden">
-          {/* Banner ảnh */}
-          <div
-            style={{
-              width: "100%",
-              height: 320,
-              backgroundImage: `url(${imageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundColor: "#a0a0a0",
-            }}
-          />
 
-          <div className="p-4 p-md-5">
-            <h2 className="fw-bold text-danger mb-4" style={{ fontSize: 28 }}>
-              {title}
-            </h2>
-            <div className="d-flex gap-2 flex-wrap mb-4">
-              {event?.status && (
-                <span className={`event-chip chip-status-${event.status}`}>
-                  <i className="bi bi-lightning-charge-fill me-1" />
-                  {event.status === "scheduled" ? "Sắp diễn ra" : event.status === "ongoing" ? "Đang diễn ra" : event.status === "completed" ? "Đã kết thúc" : event.status === "cancelled" ? "Đã hủy" : event.status}
+      {/* Main Content - Chỉ hiện khi event tồn tại (đã được handle bởi if ở trên, nhưng giữ logic render an toàn) */}
+      {event && (
+        <div className="public-event-wrapper container-xl py-4">
+          <div className="public-event-hero shadow-sm">
+            <div
+              className="public-event-image"
+              style={{ backgroundImage: `url(${imageUrl})` }}
+            />
+            <div className="public-event-overlay" />
+            <div className="public-event-content">
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                <span className="public-chip" style={{ background: statusConfig.bg, color: statusConfig.color }}>
+                  <Zap size={16} />
+                  {statusConfig.text}
                 </span>
-              )}
-              {event?.eventStartDate && event?.eventEndDate ? (
-                <span className="event-chip chip-date">
-                  <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventStartDate)} - {formatDate(event.eventEndDate)}
-                </span>
-              ) : event?.eventDate ? (
-                <span className="event-chip chip-date">
-                  <i className="bi bi-calendar-event me-1" /> {formatDate(event.eventDate)}
-                </span>
-              ) : null}
-              {event?.location && (
-                <span className="event-chip chip-location">
-                  <i className="bi bi-geo-alt me-1" />{event.location}
-                </span>
-              )}
+                {address && (
+                  <span className="public-chip" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
+                    <MapPin size={16} />
+                    {address}
+                  </span>
+                )}
+              </div>
+              <h1 className="public-title">{title}</h1>
+              <p className="public-date">
+                <CalendarDays size={18} className="me-2" />
+                {dateText || "Đang cập nhật"}
+              </p>
             </div>
-            {error && <div className="text-danger mb-3">{error}</div>}
-            {event && (
-              <>
-                <div className="mb-3">
-                  <span className="fw-bold" style={{ fontSize: '15px', color:'#222'}}>Đơn vị tổ chức: </span>
-                  <span className="badge" style={{ backgroundColor: "#ffe0e0", color: "#ff5757" }}>{event?.organizerName || event?.organizer || "FPT"}</span>
+          </div>
+
+          <div className="row g-4 mt-4">
+            <div className="col-12 col-lg-8">
+              <div className="info-card shadow-sm">
+                <InfoRow icon={FileText} label="Tên sự kiện" value={title} />
+                <InfoRow icon={User} label="Đơn vị tổ chức" value={event?.organizerName || event?.organizer || "FPT University"} />
+                <InfoRow icon={CalendarDays} label="Thời gian" value={dateText || "Chưa cập nhật"} />
+                <InfoRow icon={MapPin} label="Địa điểm" value={address} />
+                <InfoRow icon={AlignLeft} label="Mô tả" value={event?.description || "Chưa có mô tả chi tiết."} multiline />
+              </div>
+            </div>
+            <div className="col-12 col-lg-4">
+              <div className="info-card shadow-sm" style={{ background: "#f8fafc" }}>
+                <div className="d-flex align-items-center gap-3 mb-4">
+                  <div className="info-card-icon" style={{ background: "#fee2e2", color: "#b91c1c" }}>
+                    <ExternalLink size={18} />
+                  </div>
+                  <div>
+                    <p className="text-muted mb-1">Chia sẻ sự kiện</p>
+                    <h5 className="mb-0">Lan tỏa đến bạn bè</h5>
+                  </div>
                 </div>
-                <div className="mt-4 pt-4 border-top">
-                  <h5 className="fw-bold mb-3" style={{ fontSize: 18 }}>
-                    Chi tiết sự kiện
-                  </h5>
-                  <p
-                    className="text-secondary"
-                    style={{ fontSize: 15, lineHeight: 1.8 }}
-                  >
-                    {event?.description || "Không có mô tả chi tiết."}
-                  </p>
+                <p className="text-muted small mb-2">Đường dẫn sự kiện</p>
+                <div className="input-group">
+                  <input className="form-control" value={window.location.href} readOnly />
+                  <button className="btn btn-outline-secondary" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                    Sao chép
+                  </button>
                 </div>
-              </>
-            )}
+                <p className="text-muted small mt-3 mb-0">
+                  Hoặc lưu lại sự kiện để khám phá nhiều chương trình thú vị khác trên myFEvent.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <Footer />
       <style>{`
-  .event-chip { border-radius:999px; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; }
-  .chip-status-scheduled { background:#dcfce7 !important; color:#22c55e !important; border:1px solid #bbf7d0; }
-  .chip-status-ongoing   { background:#fff7ed !important; color:#f59e42 !important; border:1px solid #fed7aa; }
-  .chip-status-completed { background:#f3f4f6 !important; color:#6b7280 !important; border:1px solid #e5e7eb; }
-  .chip-status-cancelled { background:#fef2f2 !important; color:#dc2626 !important; border:1px solid #fecaca; }
-  .chip-date             { background:#eff6ff !important; color:#2563eb !important; border:1px solid #bae6fd; }
-  .chip-location         { background:#f3e8ff !important; color:#9333ea !important; border:1px solid #e9d5ff; }
-`}</style>
+        .public-event-wrapper {
+          min-height: calc(100vh - 160px);
+        }
+        .public-event-hero {
+          position: relative;
+          border-radius: 24px;
+          overflow: hidden;
+          min-height: 340px;
+          background: #111;
+        }
+        .public-event-image {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          filter: brightness(0.75);
+        }
+        .public-event-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(15,23,42,0.8), rgba(220,38,38,0.65));
+        }
+        .public-event-content {
+          position: relative;
+          padding: 2.5rem;
+          color: #fff;
+        }
+        .public-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          background: rgba(255,255,255,0.1);
+        }
+        .public-title {
+          font-size: clamp(1.8rem, 4vw, 2.6rem);
+          font-weight: 800;
+          margin-bottom: 0.75rem;
+        }
+        .public-date {
+          font-size: 1rem;
+          opacity: 0.9;
+          display: flex;
+          align-items: center;
+        }
+        .info-card {
+          background: #fff;
+          border-radius: 20px;
+          padding: 2rem;
+        }
+        .info-card-icon {
+          width: 52px;
+          height: 52px;
+          border-radius: 16px;
+          background: #fee2e2;
+          color: #b91c1c;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.25rem;
+        }
+      `}</style>
     </>
   );
 }
+
+const InfoRow = ({ icon: Icon = FileText, label, value, multiline }) => (
+  <div className="d-flex align-items-start gap-3 mb-3">
+    <div className="rounded-3" style={{ width: 44, height: 44, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Icon size={18} style={{ color: "#ef4444" }} />
+    </div>
+    <div>
+      <div className="text-muted small text-uppercase fw-semibold">{label}</div>
+      {multiline ? (
+        <p className="text-muted mb-0" style={{ lineHeight: 1.6 }}>{value}</p>
+      ) : (
+        <div className="fw-semibold fs-6">{value}</div>
+      )}
+    </div>
+  </div>
+);

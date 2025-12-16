@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
@@ -7,6 +7,8 @@ import { riskApiWithErrorHandling } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
+import Loading from "../../components/Loading";
+import { UmbrellaOff } from "lucide-react";
 
 export default function ListRiskPage() {
   const { t } = useTranslation();
@@ -20,7 +22,9 @@ export default function ListRiskPage() {
   const [filterCategory, setFilterCategory] = useState("Tất cả");
   const [filterDepartment, setFilterDepartment] = useState("Tất cả");
   const [eventRole, setEventRole] = useState("");
-  const { fetchEventRole } = useEvents();
+  const [memberInfo, setMemberInfo] = useState({ role: "", departmentId: null });
+  const { fetchEventRole, getEventMember } = useEvents();
+  const mountedRef = useRef(true);
 
   // ====== Pagination States ======
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,8 +55,10 @@ export default function ListRiskPage() {
   const [submitting, setSubmitting] = useState(false);
   const [newRisk, setNewRisk] = useState({
     name: "",
+    scope: "department",
     departmentId: "",
-    risk_category: "others",
+    risk_category: "infrastructure",
+    custom_category: "", // For custom category input when "others" is selected
     impact: "medium",
     likelihood: "medium",
     risk_mitigation_plan: "",
@@ -62,6 +68,7 @@ export default function ListRiskPage() {
   // ====== Delete Confirmation Modal ======
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [riskToDelete, setRiskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ====== Risk Category Mappings ======
   const categoryLabels = {
@@ -118,7 +125,8 @@ export default function ListRiskPage() {
   const transformApiRiskToComponent = (apiRisk) => ({
     id: apiRisk._id,
     name: apiRisk.name,
-    owner: apiRisk.departmentId?.name || "Chưa phân công",
+    scope: apiRisk.scope || "department",
+    owner: apiRisk.scope === "event" || !apiRisk.departmentId ? "Toàn BTC" : (apiRisk.departmentId?.name || "Chưa phân công"),
     ownerId: apiRisk.departmentId?._id,
     status: getDisplayStatus(apiRisk),
     statusKey: apiRisk.risk_status,
@@ -279,12 +287,17 @@ export default function ListRiskPage() {
 
   const fetchRisks = useCallback(async () => {
     try {
-      setLoading(true);
+      if (mountedRef.current) {
+        setLoading(true);
+      }
 
       const response = await riskApiWithErrorHandling.getAllRisksByEvent(
         eventId,
         {}
       );
+
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
 
       if (response.success) {
         const apiRisks = response.data || [];
@@ -292,65 +305,125 @@ export default function ListRiskPage() {
         setAllRisks(transformedRisks);
       } else {
         console.error("Failed to fetch risks:", response.error);
-        toast.error("Không thể tải danh sách rủi ro");
+        toast.error("Không thể tải danh sách rủi ro. Vui lòng thử lại.", {
+          position: "top-right",
+          autoClose: 4000,
+        });
         setAllRisks([]);
       }
     } catch (error) {
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
+      
       console.error("Error fetching risks:", error);
-      toast.error("Lỗi khi tải dữ liệu");
+      toast.error("Lỗi khi tải dữ liệu. Vui lòng kiểm tra kết nối.", {
+        position: "top-right",
+        autoClose: 4000,
+      });
       setAllRisks([]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [eventId]);
 
   const fetchDepartments = useCallback(async () => {
     try {
-      setLoadingDepartments(true);
+      if (mountedRef.current) {
+        setLoadingDepartments(true);
+      }
       const response = await departmentApi.getDepartments(eventId);
+
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
 
       const departmentsList = response?.data || [];
       setDepartments(departmentsList);
 
-      if (departmentsList.length > 0) {
-        setNewRisk((prev) => ({
-          ...prev,
-          departmentId: departmentsList[0]._id,
-        }));
-      }
+      // Don't auto-select first department - let user choose manually
     } catch (error) {
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (!mountedRef.current) return;
+      
       console.error("Error fetching departments:", error);
-      toast.error("Lỗi khi tải dữ liệu ban");
+      toast.error("Lỗi khi tải danh sách ban. Vui lòng thử lại.", {
+        position: "top-right",
+        autoClose: 4000,
+      });
       setDepartments([]);
     } finally {
-      setLoadingDepartments(false);
+      if (mountedRef.current) {
+        setLoadingDepartments(false);
+      }
     }
   }, [eventId]);
 
   const createRisk = async () => {
-    if (
-      !newRisk.name ||
-      !newRisk.risk_mitigation_plan ||
-      !newRisk.departmentId
-    ) {
-      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+    // Check required fields
+    const missingFields = [];
+    if (!newRisk.name) missingFields.push("tên rủi ro");
+    if (!newRisk.risk_mitigation_plan) missingFields.push("kế hoạch giảm thiểu");
+    if (!newRisk.risk_response_plan) missingFields.push("Phương án giải quyết");
+
+    // Only require departmentId when scope is "department"
+    if (newRisk.scope === "department" && !newRisk.departmentId) {
+      missingFields.push("ban phụ trách");
+    }
+
+    // Require custom category when "others" is selected
+    if (newRisk.risk_category === "others" && !newRisk.custom_category?.trim()) {
+      missingFields.push("danh mục tùy chỉnh");
+    }
+
+    if (missingFields.length > 0) {
+      toast.error(`Vui lòng điền đầy đủ thông tin cho: ${missingFields.join(", ")}`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
+    // Show loading toast
+    const loadingToast = toast.loading("Đang tạo rủi ro...", {
+      position: "top-right",
+    });
+
     try {
       setSubmitting(true);
+
+      // Prepare payload - exclude departmentId if scope is "event"
+      const payload = { ...newRisk };
+      if (payload.scope === "event") {
+        delete payload.departmentId;
+      }
+
+      // If "others" is selected, use custom_category as risk_category
+      if (payload.risk_category === "others" && payload.custom_category) {
+        payload.risk_category = payload.custom_category.trim();
+      }
+      // Remove custom_category from payload
+      delete payload.custom_category;
+
       const response = await riskApiWithErrorHandling.createRisk(
         eventId,
-        newRisk
+        payload
       );
 
       if (response.success) {
-        toast.success("Thêm rủi ro thành công!");
+        toast.update(loadingToast, {
+          render: `Đã thêm rủi ro "${newRisk.name}" thành công!`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
         setShowAddModal(false);
         setNewRisk({
           name: "",
-          departmentId: departments.length > 0 ? departments[0]._id : "",
-          risk_category: "others",
+          scope: "department",
+          departmentId: "",
+          risk_category: "infrastructure",
+          custom_category: "",
           impact: "medium",
           likelihood: "medium",
           risk_mitigation_plan: "",
@@ -358,11 +431,21 @@ export default function ListRiskPage() {
         });
         fetchRisks();
       } else {
-        toast.error(response.error || "Không thể tạo rủi ro");
+        toast.update(loadingToast, {
+          render: response.error || "Không thể tạo rủi ro. Vui lòng thử lại.",
+          type: "error",
+          isLoading: false,
+          autoClose: 4000,
+        });
       }
     } catch (error) {
       console.error("Error creating risk:", error);
-      toast.error("Lỗi khi tạo rủi ro");
+      toast.update(loadingToast, {
+        render: "Lỗi khi tạo rủi ro. Vui lòng kiểm tra kết nối và thử lại.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -376,22 +459,44 @@ export default function ListRiskPage() {
   const deleteRisk = async () => {
     if (!riskToDelete) return;
 
+    const loadingToast = toast.loading(`Đang xóa rủi ro "${riskToDelete.name}"...`, {
+      position: "top-right",
+    });
+
+    setIsDeleting(true);
     try {
       const response = await riskApiWithErrorHandling.deleteRisk(
         eventId,
         riskToDelete.originalData._id
       );
       if (response.success) {
-        toast.success("Xóa rủi ro thành công!");
+        toast.update(loadingToast, {
+          render: `✅ Đã xóa rủi ro "${riskToDelete.name}" thành công!`,
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
         setShowDeleteModal(false);
         setRiskToDelete(null);
         fetchRisks();
       } else {
-        toast.error(response.error || "Không thể xóa rủi ro");
+        toast.update(loadingToast, {
+          render: response.error || "Không thể xóa rủi ro. Vui lòng thử lại.",
+          type: "error",
+          isLoading: false,
+          autoClose: 4000,
+        });
       }
     } catch (error) {
       console.error("Error deleting risk:", error);
-      toast.error("Lỗi khi xóa rủi ro");
+      toast.update(loadingToast, {
+        render: "Lỗi khi xóa rủi ro. Vui lòng kiểm tra kết nối và thử lại.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -414,6 +519,15 @@ export default function ListRiskPage() {
     if (departments.length === 0) {
       fetchDepartments();
     }
+
+    // Auto-select department for HoD
+    if (memberInfo.role === "HoD" && memberInfo.departmentId) {
+      setNewRisk((prev) => ({
+        ...prev,
+        departmentId: memberInfo.departmentId,
+      }));
+    }
+
     setShowAddModal(true);
   };
 
@@ -421,8 +535,10 @@ export default function ListRiskPage() {
     setShowAddModal(false);
     setNewRisk({
       name: "",
-      departmentId: departments.length > 0 ? departments[0]._id : "",
-      risk_category: "others",
+      scope: "department",
+      departmentId: "",
+      risk_category: "infrastructure",
+      custom_category: "",
       impact: "medium",
       likelihood: "medium",
       risk_mitigation_plan: "",
@@ -443,26 +559,41 @@ export default function ListRiskPage() {
   // ====== Effects ======
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (eventId) {
       fetchDepartments();
-    }
-  }, [eventId, fetchDepartments]);
-
-  useEffect(() => {
-    if (eventId && departments.length > 0) {
       fetchRisks();
     }
-  }, [eventId, departments.length, fetchRisks]);
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [eventId, fetchDepartments, fetchRisks]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [search, filterLevel, filterCategory, filterDepartment, filterLikelihood]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     fetchEventRole(eventId).then((role) => {
-      setEventRole(role);
+      // Chỉ cập nhật state nếu component vẫn còn mounted
+      if (mountedRef.current) {
+        setEventRole(role);
+        // Also get full member info including departmentId
+        const member = getEventMember(eventId);
+        setMemberInfo(member);
+      }
     });
-  }, [eventId, fetchEventRole]);
+
+    // Cleanup function: đánh dấu component đã unmount
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [eventId, fetchEventRole, getEventMember]);
 
   // ====== UI Logic ======
 
@@ -613,6 +744,7 @@ export default function ListRiskPage() {
       title={t("riskPage.title")}
       activePage={"risk" && "risk-list"}
       sidebarType={getSidebarType()}
+      eventId={eventId}
     >
       <style>{`
         .task-header { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
@@ -968,14 +1100,13 @@ export default function ListRiskPage() {
                 {loading ? (
                   <tr>
                     <td colSpan="6" className="text-center py-5">
-                      <div className="loading-spinner"></div>
-                      <div className="mt-2 text-muted">Đang tải...</div>
+                      <Loading />
                     </td>
                   </tr>
                 ) : risks.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="text-center py-5 text-muted">
-                      <div style={{ fontSize: 48 }}>🫙</div>
+                      <div style={{ fontSize: 48 }}><UmbrellaOff size="48px"/></div>
                       <div className="mt-2">
                         {pagination.totalCount === 0
                           ? "Chưa có rủi ro nào"
@@ -1172,29 +1303,68 @@ export default function ListRiskPage() {
               <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Ban phụ trách *</label>
+                    <label>Phạm vi rủi ro *</label>
+                    <select
+                      className="form-select"
+                      value={newRisk.scope}
+                      onChange={(e) => {
+                        const newScope = e.target.value;
+                        setNewRisk({
+                          ...newRisk,
+                          scope: newScope,
+                          // Clear departmentId if scope changes to event
+                          departmentId: newScope === "event" ? "" : newRisk.departmentId
+                        });
+                      }}
+                    >
+                      <option value="department">Theo ban</option>
+                      <option value="event">Toàn BTC</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Ban phụ trách {newRisk.scope === "department" ? "*" : ""}</label>
                     <select
                       className="form-select"
                       value={newRisk.departmentId}
                       onChange={(e) =>
                         setNewRisk({ ...newRisk, departmentId: e.target.value })
                       }
-                      disabled={loadingDepartments}
+                      disabled={loadingDepartments || newRisk.scope === "event" || (memberInfo.role === "HoD" && memberInfo.departmentId)}
                     >
-                      <option value="">Chọn ban phụ trách</option>
-                      {departments.map((dept) => (
-                        <option key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </option>
-                      ))}
+                      <option value="">{newRisk.scope === "event" ? "Không áp dụng" : "Chọn ban phụ trách"}</option>
+                      {departments
+                        .filter((dept) => {
+                          // HoOC can see all departments
+                          if (memberInfo.role === "HoOC") return true;
+                          // HoD can only see their department
+                          if (memberInfo.role === "HoD" && memberInfo.departmentId) {
+                            return dept._id === memberInfo.departmentId;
+                          }
+                          return true;
+                        })
+                        .map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
                     </select>
                     {loadingDepartments && (
                       <small className="text-muted">
                         Đang tải danh sách ban...
                       </small>
                     )}
+                    {newRisk.scope === "event" && (
+                      <small className="text-muted">
+                        Rủi ro này áp dụng cho toàn bộ BTC
+                      </small>
+                    )}
                   </div>
                 </div>
+              </div>
+
+              <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>Danh mục</label>
@@ -1205,6 +1375,7 @@ export default function ListRiskPage() {
                         setNewRisk({
                           ...newRisk,
                           risk_category: e.target.value,
+                          custom_category: e.target.value !== "others" ? "" : newRisk.custom_category,
                         })
                       }
                     >
@@ -1216,6 +1387,26 @@ export default function ListRiskPage() {
                     </select>
                   </div>
                 </div>
+                {newRisk.risk_category === "others" && (
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Danh mục tùy chỉnh *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={newRisk.custom_category}
+                        onChange={(e) =>
+                          setNewRisk({
+                            ...newRisk,
+                            custom_category: e.target.value,
+                          })
+                        }
+                        placeholder="Nhập tên danh mục tùy chỉnh..."
+                      />
+                      <small className="text-muted">Ví dụ: Âm thanh, Ánh sáng, An ninh, ...</small>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="row">
@@ -1272,7 +1463,7 @@ export default function ListRiskPage() {
               </div>
 
               <div className="form-group">
-                <label>Kế hoạch ứng phó</label>
+                <label>Phương án giải quyết *</label>
                 <textarea
                   className="form-control"
                   rows={4}
@@ -1283,7 +1474,7 @@ export default function ListRiskPage() {
                       risk_response_plan: e.target.value,
                     })
                   }
-                  placeholder="Mô tả kế hoạch ứng phó khi rủi ro xảy ra…"
+                  placeholder="Mô tả phương án giải quyết khi rủi ro xảy ra…"
                 />
               </div>
             </div>
@@ -1306,17 +1497,20 @@ export default function ListRiskPage() {
                 Hủy
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary d-flex align-items-center justify-content-center"
                 onClick={createRisk}
-                disabled={submitting || !newRisk.departmentId}
+                disabled={submitting || (newRisk.scope === "department" && !newRisk.departmentId)}
               >
                 {submitting ? (
                   <>
-                    <div className="loading-spinner me-2"></div>
+                    <i className="bi bi-arrow-clockwise spin-animation me-2"></i>
                     Đang thêm...
                   </>
                 ) : (
-                  "Thêm rủi ro"
+                  <>
+                    <i className="bi bi-plus-lg me-2"></i>
+                    Thêm rủi ro
+                  </>
                 )}
               </button>
             </div>
@@ -1333,6 +1527,7 @@ export default function ListRiskPage() {
         }}
         onConfirm={deleteRisk}
         message="Bạn có chắc muốn xóa rủi ro này?"
+        isLoading={isDeleting}
       />
     </UserLayout>
   );

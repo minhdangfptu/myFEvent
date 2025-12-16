@@ -24,13 +24,34 @@ const calendarApi = {
     const url = `/api/events/${eventId}/calendars/${calendarId}`;
     return axiosClient.delete(url);
   },
-  getMyCalendarInEvent: (eventId) => {
+  getMyCalendarInEvent: (eventId, month = null, year = null) => {
     const url = `/api/events/${eventId}/calendars/my-event-calendars`;
-    return axiosClient.get(url);
+    const params = {};
+    if (month !== null && year !== null) {
+      params.month = month;
+      params.year = year;
+    }
+    return axiosClient.get(url, { params });
   },
   updateParticipateStatus: (eventId, calendarId, data) => {
     const url = `/api/events/${eventId}/calendars/${calendarId}/participate-status`;
     return axiosClient.patch(url, data);
+  },
+  getAvailableMembers: (eventId, calendarId) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/available-members`;
+    return axiosClient.get(url);
+  },
+  addParticipants: (eventId, calendarId, memberIds) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/participants`;
+    return axiosClient.post(url, { memberIds });
+  },
+  removeParticipant: (eventId, calendarId, memberId) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/participants/${memberId}`;
+    return axiosClient.delete(url);
+  },
+  sendReminder: (eventId, calendarId, target) => {
+    const url = `/api/events/${eventId}/calendars/${calendarId}/reminders`;
+    return axiosClient.post(url, { target });
   }
 
 };

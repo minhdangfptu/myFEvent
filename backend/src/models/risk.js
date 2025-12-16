@@ -10,30 +10,21 @@ const OccurredRiskSchema = new Schema({
     update_personId: { type: Types.ObjectId, ref: 'EventMember' },
 })
 const RiskSchema = new Schema({
-    eventId: { type: Types.ObjectId, ref: 'Event', required: true },
-    departmentId: { type: Types.ObjectId, ref: 'Department', required: true },
+    eventId: { type: Types.ObjectId, ref: 'Event', required: true }, 
+    scope: {
+        type: String,
+        enum: ["event", "department"],
+        default: "department",
+    },
+    departmentId: {
+        type: Types.ObjectId,
+        ref: "Department",
+        required: function () {
+            return this.scope === "department";
+        },
+    },
     risk_category: {
         type: String,
-        enum: [
-            'infrastructure',      // Cơ sở vật chất
-            'mc-guests',           // MC & Khách mời
-            'communication',       // Truyền thông
-            'players',             // Người chơi
-            'staffing',            // Nhân sự
-            'communication_post',  // Tuyến bài
-            'attendees',           // Người tham gia
-            'weather',             // Thời tiết
-            'time',                // Thời gian
-            'timeline',            // Timeline
-            'tickets',             // Vé
-            'collateral',          // Ấn phẩm (design/printing collateral)
-            'game',                // Game
-            'sponsorship',         // Nhà tài trợ
-            'finance',             // Tài chính
-            'transportation',      // Vận chuyển
-            'decor',               // Đồ trang trí
-            'others',              // Khác
-        ],
         required: true
     },
     name: { type: String, required: true },
