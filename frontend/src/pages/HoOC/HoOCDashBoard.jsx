@@ -854,7 +854,7 @@ export default function HoOCDashBoard() {
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền dự trù (HoD)
+                            Tiền dự trù
                           </span>
                         </div>
                         <div className="d-flex align-items-center gap-1">
@@ -867,7 +867,7 @@ export default function HoOCDashBoard() {
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền thực tế (Member)
+                            Tiền thực tế
                           </span>
                         </div>
                       </div>

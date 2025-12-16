@@ -1103,12 +1103,13 @@ const DepartmentDetail = () => {
           }}
         >
           <div
-            className="bg-white rounded-3 p-4"
+            className="bg-white rounded-3 p-4 d-flex flex-column"
             style={{
               minWidth: "600px",
               maxWidth: "800px",
               maxHeight: "80vh",
               border: "1px solid #e5e7eb",
+              overflow: "auto",
             }}
           >
             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -1171,10 +1172,11 @@ const DepartmentDetail = () => {
                     return (
                       <div
                         key={memberId}
-                        className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(memberId)
-                          ? "bg-light border-primary"
-                          : "border-light"
-                          }`}
+                        className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${
+                          selectedMembers.includes(memberId)
+                            ? "bg-light border-primary"
+                            : "border-light"
+                        }`}
                         onClick={() => handleMemberSelect(memberId)}
                         style={{
                           cursor: "pointer",
@@ -1190,30 +1192,42 @@ const DepartmentDetail = () => {
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center">
                             <div
-                              className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                              className="rounded-circle overflow-hidden d-flex align-items-center justify-content-center me-3"
                               style={{
                                 width: "40px",
                                 height: "40px",
                                 backgroundColor: "#f3f4f6",
-                                fontSize: "1.2rem",
-                                fontWeight: "600",
-                                color: "#6b7280",
                               }}
                             >
-                              {member.userId?.fullName?.charAt(0) || "?"}
+                              <img
+                                src={getMemberAvatar(member)}
+                                alt={getMemberDisplayName(member)}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = `https://i.pravatar.cc/100?u=${encodeURIComponent(
+                                    getMemberEmail(member) ||
+                                      String(member?._id || member?.id || "")
+                                  )}`;
+                                }}
+                              />
                             </div>
                             <div>
                               <h6
                                 className="mb-1"
                                 style={{ color: "#1f2937", fontWeight: "500" }}
                               >
-                                {member.userId?.fullName || "Unknown"}
+                                {getMemberDisplayName(member)}
                               </h6>
                               <p
                                 className="mb-0"
                                 style={{ color: "#6b7280", fontSize: "0.9rem" }}
                               >
-                                {member.userId?.email || ""}
+                                {getMemberEmail(member)}
                               </p>
                             </div>
                           </div>

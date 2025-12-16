@@ -150,11 +150,13 @@ export default function UserHeader({
     }
 
     if (n.eventId && n.category === 'LỊCH HỌP') {
+      // Ưu tiên đi đến đúng lịch họp cụ thể nếu có relatedCalendarId
       if (n.relatedCalendarId) {
-        return `/events/${n.eventId}/my-calendar`;
+        return `/events/${n.eventId}/my-calendar/${n.relatedCalendarId}`;
       }
+      // Nếu không có calendarId nhưng có agenda + milestone thì fallback về trang lịch họp chung
       if (n.relatedAgendaId && n.relatedMilestoneId) {
-        return `/events/${n.eventId}/milestones/${n.relatedMilestoneId}/agenda/${n.relatedAgendaId}`;
+        return `/events/${n.eventId}/my-calendar`;
       }
       return `/events/${n.eventId}/my-calendar`;
     }
