@@ -10,7 +10,7 @@ const aiAxiosClient = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  timeout: 180000, // 180 giây (3 phút) cho AI xử lý
+  timeout: 180000,
 });
 
 // Interceptor để thêm token

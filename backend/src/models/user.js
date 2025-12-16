@@ -54,5 +54,7 @@ UserSchema.index({ status: 1 }); // Filter users by status
 UserSchema.index({ role: 1 }); // Filter by role (admin/user)
 UserSchema.index({ verified: 1 }); // Filter by verified status
 UserSchema.index({ authProvider: 1 }); // Filter by auth provider
+UserSchema.index({ fullName: 1 }); // Optimize fullName search
+UserSchema.index({ email: 1 }); // Optimize email search
 
 export default mongoose.model('User', UserSchema);
