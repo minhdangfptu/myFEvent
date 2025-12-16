@@ -65,17 +65,61 @@ const DepartmentDetail = () => {
   const { fetchEventRole, getEventMember } = useEvents();
   const { user } = useAuth();
 
-  const getMemberDisplayName = (member) =>
-    (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
-  const getMemberEmail = (member) =>
-    (member?.userId?.email) || member?.email || ""
-  const getMemberAvatar = (member) =>
-    member?.userId?.avatarUrl || member?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(getMemberEmail(member) || String(member?._id || member?.id || ""))}`
+  const getMemberDisplayName = (member) => {
+    // Check nested userId object first for consistency
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.fullName || member.userId.email || member?.name || "Unknown"
+    }
+    // Fallback to direct properties
+    return member?.name || member?.email || "Unknown"
+  }
+
+  const getMemberEmail = (member) => {
+    // Check nested userId object first
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.email || member?.email || ""
+    }
+    return member?.email || ""
+  }
+
+  const getMemberAvatar = (member) => {
+    // Check nested userId object first (unassigned members)
+    if (member?.userId && typeof member.userId === 'object' && member.userId.avatarUrl) {
+      return member.userId.avatarUrl
+    }
+    // Check direct properties (members in department)
+    if (member?.avatar) {
+      return member.avatar
+    }
+    // Fallback
+    const email = member?.email || member?.userId?.email || ""
+    return `https://i.pravatar.cc/100?u=${encodeURIComponent(email || String(member?._id || member?.id || ""))}`
+  }
 
   const getLeaderDisplayName = (leader) => {
     if (!leader) return 'Chưa có'
     if (typeof leader === 'string') return leader
-    return leader.fullName || 'Chưa có'
+    return leader.fullName || leader.name || 'Chưa có'
+  }
+
+  const getLeaderAvatar = (leader) => {
+    if (!leader) return ''
+
+    // Try to find the HoD in the members array to get their actual avatar
+    const hodMember = members.find(m => m.role === 'HoD')
+
+    // If found HoD in members, use getMemberAvatar for consistency
+    if (hodMember) {
+      return getMemberAvatar(hodMember)
+    }
+
+    // Otherwise, use leader's own avatar
+    const avatarUrl = leader.avatar || leader.avatarUrl
+    if (avatarUrl) return avatarUrl
+
+    // Fallback to ui-avatars with name
+    const displayName = leader.fullName || leader.name || leader.email || 'User'
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`
   }
 
   // Normalize sidebar type for UserLayout
@@ -432,12 +476,19 @@ const DepartmentDetail = () => {
     }
   };
 
-  const filteredMembers = members.filter((member) => {
-    const name = String(getMemberDisplayName(member)).toLowerCase()
-    const email = String(getMemberEmail(member)).toLowerCase()
-    const q = searchQuery.toLowerCase()
-    return name.includes(q) || email.includes(q)
-  })
+  const filteredMembers = members
+    .filter((member) => {
+      const name = String(getMemberDisplayName(member)).toLowerCase()
+      const email = String(getMemberEmail(member)).toLowerCase()
+      const q = searchQuery.toLowerCase()
+      return name.includes(q) || email.includes(q)
+    })
+    .sort((a, b) => {
+      // Trưởng ban (HoD) luôn hiển thị ở đầu
+      if (a.role === 'HoD' && b.role !== 'HoD') return -1
+      if (a.role !== 'HoD' && b.role === 'HoD') return 1
+      return 0
+    })
 
   const filteredUnassignedMembers = unassignedMembers.filter(
     (member) =>
@@ -649,7 +700,7 @@ const DepartmentDetail = () => {
             </div>
 
             {/* Members Table */}
-            <div className="table-responsive">
+            <div className="table-responsive" style={{ maxHeight: "400px", overflowY: "auto" }}>
               <table className="table">
                 <thead>
                   <tr>
@@ -660,6 +711,7 @@ const DepartmentDetail = () => {
                         fontWeight: "600",
                         color: "#374151",
                         width: "80px",
+                        verticalAlign: "middle",
                       }}
                     >
                       STT
@@ -670,6 +722,20 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        width: "100px",
+                        whiteSpace: "nowrap",
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      Hình ảnh
+                    </th>
+                    <th
+                      style={{
+                        border: "none",
+                        padding: "15px",
+                        fontWeight: "600",
+                        color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Tên
@@ -680,6 +746,7 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Vai trò
@@ -690,6 +757,7 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Email
@@ -701,6 +769,7 @@ const DepartmentDetail = () => {
                           padding: "15px",
                           fontWeight: "600",
                           color: "#374151",
+                          verticalAlign: "middle",
                         }}
                       >
                         Hành động
@@ -716,23 +785,37 @@ const DepartmentDetail = () => {
                           padding: "15px",
                           fontWeight: "500",
                           color: "#6b7280",
+                          verticalAlign: "middle",
                         }}
                       >
                         {index + 1}
+                      </td>
+                      <td style={{ padding: "15px", verticalAlign: "middle" }}>
+                        <img
+                          src={getMemberAvatar(member)}
+                          alt={getMemberDisplayName(member)}
+                          className="rounded-circle"
+                          style={{
+                            width: "40px",
+                            height: "40px",
+                            objectFit: "cover",
+                          }}
+                        />
                       </td>
                       <td
                         style={{
                           padding: "15px",
                           fontWeight: "500",
                           color: "#374151",
+                          verticalAlign: "middle",
                         }}
                       >
                         {getMemberDisplayName(member)}
                       </td>
-                      <td style={{ padding: "15px", color: "#6b7280" }}>
+                      <td style={{ padding: "15px", color: "#6b7280", verticalAlign: "middle" }}>
                         {member.role === 'HoD' ? 'Trưởng ban' : member.role === 'Member' ? 'Thành viên' : member.role}
                       </td>
-                      <td style={{ padding: "15px", color: "#6b7280" }}>
+                      <td style={{ padding: "15px", color: "#6b7280", verticalAlign: "middle" }}>
                         {getMemberEmail(member)}
                       </td>
                       {canManageThisDepartment() && (() => {
@@ -747,7 +830,7 @@ const DepartmentDetail = () => {
                         }
                         
                         return (
-                          <td style={{ padding: "15px" }}>
+                          <td style={{ padding: "15px", verticalAlign: "middle" }}>
                             <div className="dropdown">
                               <button
                                 className="btn btn-link text-decoration-none"
@@ -912,13 +995,15 @@ const DepartmentDetail = () => {
                     >
                       {department.leader ? (
                         <img
-                          src={
-                            department.leader.avatarUrl ||
-                            `https://i.pravatar.cc/100?u=${department.leader.email}`
-                          }
-                          alt={department.leader.fullName}
+                          src={getLeaderAvatar(department.leader)}
+                          alt={getLeaderDisplayName(department.leader)}
                           className="rounded-circle"
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            const displayName = department.leader.fullName || department.leader.name || department.leader.email || 'User';
+                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`;
+                          }}
                         />
                       ) : (
                         "?"
@@ -1168,6 +1253,10 @@ const DepartmentDetail = () => {
                 <div className="d-flex flex-column gap-2">
                   {filteredUnassignedMembers.map((member) => {
                     const memberId = member._id || member.id;
+                    const avatarUrl = member?.userId?.avatarUrl || member?.avatar;
+                    const displayName = member?.userId?.fullName || member?.name || "Unknown";
+                    const email = member?.userId?.email || member?.email || "";
+
                     return (
                       <div
                         key={memberId}
@@ -1189,31 +1278,45 @@ const DepartmentDetail = () => {
                         />
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center">
-                            <div
-                              className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                              style={{
-                                width: "40px",
-                                height: "40px",
-                                backgroundColor: "#f3f4f6",
-                                fontSize: "1.2rem",
-                                fontWeight: "600",
-                                color: "#6b7280",
-                              }}
-                            >
-                              {member.userId?.fullName?.charAt(0) || "?"}
-                            </div>
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={displayName}
+                                className="rounded-circle me-3"
+                                style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  objectFit: "cover",
+                                }}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=40`;
+                                }}
+                              />
+                            ) : (
+                              <img
+                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=40`}
+                                alt={displayName}
+                                className="rounded-circle me-3"
+                                style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            )}
                             <div>
                               <h6
                                 className="mb-1"
                                 style={{ color: "#1f2937", fontWeight: "500" }}
                               >
-                                {member.userId?.fullName || "Unknown"}
+                                {displayName}
                               </h6>
                               <p
                                 className="mb-0"
                                 style={{ color: "#6b7280", fontSize: "0.9rem" }}
                               >
-                                {member.userId?.email || ""}
+                                {email}
                               </p>
                             </div>
                           </div>
@@ -1225,44 +1328,48 @@ const DepartmentDetail = () => {
               )}
             </div>
 
-            {/* Selected Count */}
-            {selectedMembers.length > 0 && (
-              <div className="mb-3">
+            {/* Selected Count and Action Buttons */}
+            <div className="d-flex justify-content-between align-items-center">
+              {/* Selected Count on the left */}
+              {selectedMembers.length > 0 ? (
                 <p className="text-primary mb-0" style={{ fontWeight: "500" }}>
                   Đã chọn {selectedMembers.length} thành viên
                 </p>
-              </div>
-            )}
+              ) : (
+                <div></div>
+              )}
 
-            <div className="d-flex justify-content-end gap-2">
-              <button
-                type="button"
-                className="btn btn-outline-secondary d-inline-flex align-items-center"
-                onClick={handleCancelAddMember}
-                style={{ borderRadius: "8px" }}
-              >
-                <X size={14} className="me-1" />
-                Huỷ
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger d-inline-flex align-items-center"
-                onClick={handleAddSelectedMembers}
-                disabled={isAddingMembers || selectedMembers.length === 0}
-                style={{ borderRadius: "8px" }}
-              >
-                {isAddingMembers ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Đang thêm...
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} className="me-2" />
-                    Thêm {selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên
-                  </>
-                )}
-              </button>
+              {/* Buttons on the right */}
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary d-inline-flex align-items-center"
+                  onClick={handleCancelAddMember}
+                  style={{ borderRadius: "8px" }}
+                >
+                  <X size={14} className="me-1" />
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger d-inline-flex align-items-center"
+                  onClick={handleAddSelectedMembers}
+                  disabled={isAddingMembers || selectedMembers.length === 0}
+                  style={{ borderRadius: "8px" }}
+                >
+                  {isAddingMembers ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Đang thêm...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} className="me-2" />
+                      Thêm {selectedMembers.length > 0 ? `(${selectedMembers.length})` : ""} thành viên
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
