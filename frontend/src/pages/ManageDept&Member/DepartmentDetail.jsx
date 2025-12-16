@@ -1188,12 +1188,13 @@ const DepartmentDetail = () => {
           }}
         >
           <div
-            className="bg-white rounded-3 p-4"
+            className="bg-white rounded-3 p-4 d-flex flex-column"
             style={{
               minWidth: "600px",
               maxWidth: "800px",
               maxHeight: "80vh",
               border: "1px solid #e5e7eb",
+              overflow: "auto",
             }}
           >
             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -1260,10 +1261,11 @@ const DepartmentDetail = () => {
                     return (
                       <div
                         key={memberId}
-                        className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${selectedMembers.includes(memberId)
-                          ? "bg-light border-primary"
-                          : "border-light"
-                          }`}
+                        className={`d-flex align-items-center p-3 rounded-3 border cursor-pointer ${
+                          selectedMembers.includes(memberId)
+                            ? "bg-light border-primary"
+                            : "border-light"
+                        }`}
                         onClick={() => handleMemberSelect(memberId)}
                         style={{
                           cursor: "pointer",

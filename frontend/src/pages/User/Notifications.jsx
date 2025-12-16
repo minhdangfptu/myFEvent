@@ -62,10 +62,10 @@ export default function NotificationsPage() {
 
     if (n.eventId && n.category === 'LỊCH HỌP') {
       if (n.relatedCalendarId) {
-        return `/events/${n.eventId}/my-calendar`;
+        return `/events/${n.eventId}/my-calendar/${n.relatedCalendarId}`;
       }
       if (n.relatedAgendaId && n.relatedMilestoneId) {
-        return `/events/${n.eventId}/milestones/${n.relatedMilestoneId}/agenda/${n.relatedAgendaId}`;
+        return `/events/${n.eventId}/my-calendar`;
       }
       return `/events/${n.eventId}/my-calendar`;
     }

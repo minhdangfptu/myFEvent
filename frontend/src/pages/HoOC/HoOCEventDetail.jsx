@@ -1587,7 +1587,18 @@ const handleImageUpload = async () => {
                 </div>
 
                 <div className="action-buttons">
-                  <button className="btn-modern btn-success-modern" onClick={handleChangeType} disabled={(event.type === "public" && event.status === "cancelled") || event.status === "completed"}>
+                  <button
+                    className="btn-modern btn-success-modern"
+                    onClick={handleChangeType}
+                    // Disable khi:
+                    // - Sự kiện đã công khai (type === "public")
+                    // - Hoặc sự kiện đã hủy / đã hoàn thành
+                    disabled={
+                      event.type === "public" ||
+                      event.status === "cancelled" ||
+                      event.status === "completed"
+                    }
+                  >
                     <Eye size={18} />
                     Công khai sự kiện
                   </button>
