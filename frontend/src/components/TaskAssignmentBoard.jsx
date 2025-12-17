@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { taskApi } from '~/apis/taskApi';
 import { toast } from 'react-toastify';
+import { Calendar } from 'lucide-react';
 
 export default function TaskAssignmentBoard({ 
   tasks, 
@@ -289,7 +290,7 @@ export default function TaskAssignmentBoard({
         )}
         {task.due && (
           <div className="mb-1 small">
-            <span className="text-muted">📅 {task.due}</span>
+            <span className="text-muted d-flex align-items-center gap-1"><Calendar size={14} /> {task.due}</span>
           </div>
         )}
         {task.status && (

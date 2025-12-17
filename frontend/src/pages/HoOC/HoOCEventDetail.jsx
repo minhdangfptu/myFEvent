@@ -495,6 +495,30 @@ const handleImageUpload = async () => {
     return configs[status] || configs.scheduled;
   };
 
+  const getMemberDisplayName = (member) => {
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.fullName || member.userId.email || member?.name || "Unknown"
+    }
+    return member?.name || member?.email || "Unknown"
+  }
+
+  const getMemberAvatar = (member) => {
+    // Priority 1: userId.avatarUrl (must be valid non-empty string)
+    if (member?.userId && typeof member.userId === 'object') {
+      const avatarUrl = member.userId.avatarUrl;
+      if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim() !== '') {
+        return avatarUrl;
+      }
+    }
+    // Priority 2: member.avatar (must be valid non-empty string)
+    if (member?.avatar && typeof member.avatar === 'string' && member.avatar.trim() !== '') {
+      return member.avatar;
+    }
+    // Fallback: only use ui-avatars if no valid avatarUrl exists
+    const displayName = getMemberDisplayName(member)
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=56`
+  }
+
   // ========== RENDER ==========
   const sidebarType = eventRole === "Member" ? "member" : eventRole === "HoD" ? "hod" : "hooc";
 
@@ -620,7 +644,6 @@ const handleImageUpload = async () => {
           font-size: 0.95rem;
           color: #64748b;
           cursor: pointer;
-          transition: all 0.3s ease;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -650,13 +673,8 @@ const handleImageUpload = async () => {
           padding: 2rem;
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
           margin-bottom: 1.5rem;
-          transition: all 0.3s ease;
         }
 
-        .card-modern:hover {
-          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-          transform: translateY(-2px);
-        }
 
         .card-header {
           display: flex;
@@ -747,7 +765,6 @@ const handleImageUpload = async () => {
           border: 2px solid #e2e8f0;
           border-radius: 12px;
           font-size: 0.9375rem;
-          transition: all 0.3s ease;
           background: white;
         }
 
@@ -776,7 +793,6 @@ const handleImageUpload = async () => {
           font-size: 0.9375rem;
           border: none;
           cursor: pointer;
-          transition: all 0.3s ease;
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
@@ -789,10 +805,6 @@ const handleImageUpload = async () => {
           box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
-        .btn-primary-modern:hover {
-          box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-          transform: translateY(-2px);
-        }
 
         .btn-secondary-modern {
           background: #f1f5f9;
@@ -841,12 +853,6 @@ const handleImageUpload = async () => {
           border-radius: 50%;
           overflow: hidden;
           border: 3px solid #f1f5f9;
-          transition: all 0.3s ease;
-        }
-
-        .member-card:hover .member-avatar-wrapper {
-          border-color: #ef4444;
-          transform: scale(1.1);
         }
 
         .member-avatar-wrapper img {
@@ -935,22 +941,25 @@ const handleImageUpload = async () => {
         }
 
         .copy-btn-modern {
-          width: 44px;
-          height: 44px;
+          width: 45px;
+          height: 45px;
           background: rgba(255,255,255,0.2);
           border: 2px solid rgba(255,255,255,0.3);
           border-radius: 10px;
           color: white;
           cursor: pointer;
-          transition: all 0.3s ease;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
+        .copy-btn-modern svg {
+          width: 28px;
+          height: 28px;
+        }
+
         .copy-btn-modern:hover {
           background: rgba(255,255,255,0.3);
-          transform: scale(1.1);
         }
 
         .image-upload-area {
@@ -959,7 +968,6 @@ const handleImageUpload = async () => {
           padding: 2rem;
           text-align: center;
           background: #f8fafc;
-          transition: all 0.3s ease;
           cursor: pointer;
         }
 
@@ -1027,16 +1035,6 @@ const handleImageUpload = async () => {
           animation: modalSlide 0.3s ease;
         }
 
-        @keyframes modalSlide {
-          from {
-            opacity: 0;
-            transform: translateY(-30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
 
         .modal-header {
           display: flex;
@@ -1100,7 +1098,6 @@ const handleImageUpload = async () => {
           font-weight: 700;
           border: 2px solid #e2e8f0;
           border-radius: 12px;
-          transition: all 0.3s ease;
           box-sizing: border-box;
           padding: 0;
         }
@@ -1323,9 +1320,21 @@ const handleImageUpload = async () => {
                   {members.slice(0, 12).map((member, index) => (
                     <div key={index} className="member-card">
                       <div className="member-avatar-wrapper">
-                        <img src={member.userId?.avatarUrl || "/website-icon-fix@3x.png"} alt={member.userId?.fullName || "Member"} />
+                        <img
+                          src={getMemberAvatar(member)}
+                          alt={getMemberDisplayName(member)}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => {
+                            // Only fallback if the current src is not already a fallback
+                            if (!e.target.src.includes('ui-avatars.com')) {
+                              e.target.onerror = null;
+                              const displayName = getMemberDisplayName(member);
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=56`;
+                            }
+                          }}
+                        />
                       </div>
-                      <div className="member-name">{member.userId?.fullName || "Member"}</div>
+                      <div className="member-name">{getMemberDisplayName(member)}</div>
                     </div>
                   ))}
                   {members.length > 12 && (
@@ -1345,15 +1354,21 @@ const handleImageUpload = async () => {
                   <Link size={20} />
                   Mã mời tham gia
                 </h3>
+                <div style={{ marginBottom: "1rem" }}>
+                  <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
+                  <div className="join-code-input-group">
+                    <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
+                    <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
+                      <Copy size={24} />
+                    </button>
+                  </div>
+                </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">
-                    <div className="join-code-icon">
-                      <Hash size={16} />
-                    </div>
                     <input type="text" className="join-code-input" value={event.joinCode} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(event.joinCode)}>
-                      <Copy size={18} />
+                      <Copy size={24} />
                     </button>
                   </div>
                 </div>
@@ -1587,7 +1602,18 @@ const handleImageUpload = async () => {
                 </div>
 
                 <div className="action-buttons">
-                  <button className="btn-modern btn-success-modern" onClick={handleChangeType} disabled={(event.type === "public" && event.status === "cancelled") || event.status === "completed"}>
+                  <button
+                    className="btn-modern btn-success-modern"
+                    onClick={handleChangeType}
+                    // Disable khi:
+                    // - Sự kiện đã công khai (type === "public")
+                    // - Hoặc sự kiện đã hủy / đã hoàn thành
+                    disabled={
+                      event.type === "public" ||
+                      event.status === "cancelled" ||
+                      event.status === "completed"
+                    }
+                  >
                     <Eye size={18} />
                     Công khai sự kiện
                   </button>

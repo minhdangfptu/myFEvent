@@ -63,7 +63,7 @@ const isValidUrl = (string) => {
         return false;
     }
 };
-import { Users, UserPlus, Bell, Search, X } from "lucide-react";
+import { Users, UserPlus, Bell, Search, X, Ban, User } from "lucide-react";
 
 export default function UpdateEventCalendarPage() {
     const navigate = useNavigate();
@@ -527,7 +527,7 @@ export default function UpdateEventCalendarPage() {
             <UserLayout sidebarType={eventRole} eventId={eventId}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb' }}>
                     <div style={{ textAlign: 'center', padding: '24px' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚫</div>
+                        <Ban size={48} style={{ marginBottom: '16px', color: '#ef4444' }} />
                         <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#1f2937', marginBottom: '8px' }}>
                             Không có quyền truy cập
                         </h2>
@@ -1460,7 +1460,7 @@ export default function UpdateEventCalendarPage() {
                                                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                             />
                                                         ) : (
-                                                            <span style={{ fontSize: '18px' }}>👤</span>
+                                                            <User size={18} />
                                                         )}
                                                     </div>
                                                     <div style={{ flex: 1 }}>
@@ -1597,7 +1597,7 @@ export default function UpdateEventCalendarPage() {
                                                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                                     />
                                                                 ) : (
-                                                                    <span style={{ fontSize: '18px' }}>👤</span>
+                                                                    <User size={18} />
                                                                 )}
                                                             </div>
                                                             <div>

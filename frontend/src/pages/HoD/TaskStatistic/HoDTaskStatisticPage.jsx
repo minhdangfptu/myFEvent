@@ -6,7 +6,7 @@ import { taskApi } from "~/apis/taskApi";
 import { milestoneApi } from "~/apis/milestoneApi";
 import { departmentApi } from "~/apis/departmentApi";
 import Loading from "~/components/Loading";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Calendar, Pin, BarChart3, Clock } from "lucide-react";
 
 
 export default function HoDTaskStatisticPage() {
@@ -142,7 +142,7 @@ export default function HoDTaskStatisticPage() {
           {/* Filter Controls */}
           <div className="hod-task-statistic-page__filters">
             <div className="hod-task-statistic-page__filter-item">
-              <span className="hod-task-statistic-page__filter-label">📍 Milestone:</span>
+              <span className="hod-task-statistic-page__filter-label d-flex align-items-center gap-1"><Pin size={14} /> Milestone:</span>
               <select
                 className="hod-task-statistic-page__milestone-select"
                 value={selectedMilestoneId}
@@ -164,7 +164,7 @@ export default function HoDTaskStatisticPage() {
               <>
                 <div className="hod-task-statistic-page__filter-item">
                   <span className="hod-task-statistic-page__filter-info">
-                    📅 {formatDate(selectedMilestone.startDate)} → {formatDate(selectedMilestone.targetDate)} (Deadline)
+                    <span className="d-flex align-items-center gap-1"><Calendar size={14} /> {formatDate(selectedMilestone.startDate)} → {formatDate(selectedMilestone.targetDate)} (Deadline)</span>
                   </span>
                 </div>
 
@@ -172,14 +172,14 @@ export default function HoDTaskStatisticPage() {
                  statistics?.milestone?.remainingDays !== undefined && (
                   <div className="hod-task-statistic-page__filter-item">
                     <span className="hod-task-statistic-page__filter-info hod-task-statistic-page__filter-info--days">
-                      ⏰ Còn {statistics.milestone.remainingDays} ngày
+                      <span className="d-flex align-items-center gap-1"><Clock size={14} /> Còn {statistics.milestone.remainingDays} ngày</span>
                     </span>
                   </div>
                 )}
 
                 <div className="hod-task-statistic-page__filter-item">
                   <span className="hod-task-statistic-page__filter-info hod-task-statistic-page__filter-info--progress">
-                    📊 Tiến độ tổng: {statistics?.milestone?.overallProgress || 0}%
+                    <span className="d-flex align-items-center gap-1"><BarChart3 size={14} /> Tiến độ tổng: {statistics?.milestone?.overallProgress || 0}%</span>
                   </span>
                 </div>
               </>
@@ -393,7 +393,7 @@ export default function HoDTaskStatisticPage() {
 
                     <div className="hod-task-statistic-page__legend-note">
                       <div className="hod-task-statistic-page__legend-milestone">
-                        <span className="hod-task-statistic-page__legend-milestone-icon">📍</span>
+                        <Pin size={14} className="hod-task-statistic-page__legend-milestone-icon" />
                         Nếu đường xanh lá nằm trên đường nét đứt → Tiến độ nhanh hơn dự kiến.<br />
                         Nếu nằm dưới → Chậm tiến độ.
                       </div>

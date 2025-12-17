@@ -10,10 +10,10 @@
   },
   "scripts": {
     "lint": "eslint src --ext js --report-unused-disable-directives --max-warnings 0",
-    "clean": "rm -rf build && mkdir build",
-    "build-babel": "npx babel ./src -d ./build/src && npx babel ./server.js -o ./build/server.js",
+    "clean": "rimraf build && mkdir build",
+    "build-babel": "babel ./src -d ./build/src",
     "build": "npm run clean && npm run build-babel",
-    "start": "node --no-warnings ./build/server.js",
+    "start": "node --no-warnings ./build/src/server.js",
     "production": "npm run build && npm run start",
     "dev": "nodemon --no-warnings ./server.js",
     "test": "vitest run",

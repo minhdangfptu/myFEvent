@@ -24,13 +24,22 @@ export function NotificationsProvider({ children }) {
       setLoading(true)
       const response = await notificationApi.getNotifications()
       const notificationsData = response?.data || []
+      
+      // Helper function to format notification title - remove one set of outer brackets if present
+      const formatNotificationTitle = (title) => {
+        if (!title || typeof title !== 'string') return title || '';
+        // Replace all occurrences of [[...]] with [...] using regex
+        // This handles cases like "[[Event]] Some text" or "[[Event]]"
+        return title.replace(/\[\[([^\]]+)\]\]/g, '[$1]');
+      };
+      
       // Map backend format to frontend format
       const mapped = notificationsData.map(n => ({
         id: n._id || n.id,
         category: n.category || 'KHÁC',
         icon: n.icon || 'bi bi-bell',
         avatarUrl: n.avatarUrl || '/logo-03.png',
-        title: n.title || '',
+        title: formatNotificationTitle(n.title || ''),
         createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         unread: n.unread !== undefined ? n.unread : true,
         color: n.color || '#ef4444',

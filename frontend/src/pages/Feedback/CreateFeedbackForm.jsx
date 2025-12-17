@@ -448,8 +448,8 @@ export default function CreateFeedbackForm() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
       const tomorrowTimestamp = tomorrow.getTime();
-      
-      if (closeTimeDate.getTime() <= tomorrowTimestamp) {
+
+      if (closeTimeDate.getTime() < tomorrowTimestamp) {
         toast.error('Ngày đóng phải sau ngày mở (ít nhất 1 ngày)');
         return;
       }

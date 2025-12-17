@@ -31,6 +31,20 @@ export default function UserSidebar({
   // Chỉ show loading khi chưa có events VÀ đang loading
   const showLoading = loading && events.length === 0;
 
+  // Load sidebar state từ localStorage khi component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('userSidebarOpen');
+    if (savedState !== null) {
+      setSidebarOpen(savedState === 'true');
+    }
+  }, [setSidebarOpen]);
+
+  // Helper function để toggle và save state
+  const handleToggleSidebar = (newState) => {
+    setSidebarOpen(newState);
+    localStorage.setItem('userSidebarOpen', String(newState));
+  };
+
   useEffect(() => {
     if (!sidebarOpen) {
       setWorkOpen(false);
@@ -176,7 +190,7 @@ export default function UserSidebar({
                 style={{cursor: "pointer", display: "flex", alignItems: "center", gap: "10px"}}
               >
                 <img
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  onClick={() => handleToggleSidebar(!sidebarOpen)}
                   className="hover-rotate"
                   src="/website-icon-fix@3x.png"
                   alt="myFEvent"
@@ -193,7 +207,7 @@ export default function UserSidebar({
 
               <button
                 className="menu-button"
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => handleToggleSidebar(false)}
                 aria-label="Đóng sidebar"
               >
                 <Menu size={20} />
@@ -202,7 +216,7 @@ export default function UserSidebar({
           ) : (
             <button
               className="menu-button"
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => handleToggleSidebar(true)}
               style={{ width: "100%" }}
               aria-label="Mở sidebar"
             >
@@ -380,7 +394,7 @@ export default function UserSidebar({
         ) : (
           <div style={{ display: "flex", justifyContent: "center", padding: "5px" }}>
             <img
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={() => handleToggleSidebar(!sidebarOpen)}
               className="hover-rotate"
               src="/website-icon-fix@3x.png"
               alt="myFEvent"

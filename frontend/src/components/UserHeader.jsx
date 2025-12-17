@@ -111,6 +111,14 @@ export default function UserHeader({
     return () => window.removeEventListener('user-updated', handleUserUpdate);
   }, [setUser]);
 
+  // Helper function to format notification title - remove one set of outer brackets if present
+  const formatNotificationTitle = (title) => {
+    if (!title || typeof title !== 'string') return title;
+    // Replace all occurrences of [[...]] with [...] using regex
+    // This handles cases like "[[Event]] Some text" or "[[Event]]"
+    return title.replace(/\[\[([^\]]+)\]\]/g, '[$1]');
+  };
+
   const getNotificationTargetUrl = (n) => {
     if (n.targetUrl) {
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
@@ -150,11 +158,13 @@ export default function UserHeader({
     }
 
     if (n.eventId && n.category === 'LỊCH HỌP') {
+      // Ưu tiên đi đến đúng lịch họp cụ thể nếu có relatedCalendarId
       if (n.relatedCalendarId) {
-        return `/events/${n.eventId}/my-calendar`;
+        return `/events/${n.eventId}/my-calendar/${n.relatedCalendarId}`;
       }
+      // Nếu không có calendarId nhưng có agenda + milestone thì fallback về trang lịch họp chung
       if (n.relatedAgendaId && n.relatedMilestoneId) {
-        return `/events/${n.eventId}/milestones/${n.relatedMilestoneId}/agenda/${n.relatedAgendaId}`;
+        return `/events/${n.eventId}/my-calendar`;
       }
       return `/events/${n.eventId}/my-calendar`;
     }
@@ -579,7 +589,7 @@ export default function UserHeader({
                           className="fw-semibold"
                           style={{ color: "#111827" }}
                         >
-                          {n.title}
+                          {formatNotificationTitle(n.title)}
                         </span>
                       </div>
                       <div className="text-secondary small">

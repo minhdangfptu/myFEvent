@@ -265,7 +265,24 @@ const ViewDeptBudgetDetailHoOC = () => {
   const handleRejectItem = (itemId) => {
     console.log("handleRejectItem called with itemId:", itemId);
     setRejectItemId(itemId);
-    setRejectReason("");
+
+    // Nếu đã có phản hồi ở ô "Phản hồi từ trưởng ban tổ chức" thì tự động
+    // lấy lại nội dung này đưa vào modal, tránh bắt user nhập lại lần nữa.
+    let existingReason = itemFeedbacks[itemId] || "";
+    if (!existingReason && budget?.items?.length) {
+      const item = budget.items.find((it) => {
+        const id =
+          it.itemId?.toString() ||
+          it._id?.toString() ||
+          it.itemId?._id?.toString();
+        return id === itemId;
+      });
+      if (item?.feedback) {
+        existingReason = String(item.feedback);
+      }
+    }
+
+    setRejectReason(existingReason || "");
     setShowRejectModal(true);
     console.log("showRejectModal should be set to true");
   };

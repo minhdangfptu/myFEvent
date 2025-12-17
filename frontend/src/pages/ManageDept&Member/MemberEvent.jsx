@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import { useEvents } from "~/contexts/EventContext";
-import { currentEventStorage } from "~/utils/currentEventStorage";
 
 function MemberCard({
   name = "Thành viên",
@@ -14,22 +13,72 @@ function MemberCard({
   eventName,
   onClick,
 }) {
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=56`;
+
   return (
-    <div 
+    <div
       className="d-flex align-items-center gap-3"
       onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{ cursor: onClick ? 'pointer' : 'default', minWidth: 0 }}
     >
       <img
-        src={avatar || "https://i.pravatar.cc/100?img=12"}
+        src={avatar || defaultAvatar}
         className="rounded-circle"
-        style={{ width: 56, height: 56 }}
+        style={{ width: 56, height: 56, objectFit: 'cover', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = defaultAvatar;
+        }}
       />
-      <div className="lh-sm">
-        <div className="fw-semibold text-dark">{name}</div>
-        <div className="small text-muted">{role}</div>
-        {department && <div className="small text-muted">{department}</div>}
-        {eventName && <div className="small text-muted">{eventName}</div>}
+      <div className="lh-sm" style={{ minWidth: 0, flex: 1 }}>
+        <div
+          className="fw-semibold text-dark"
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={name}
+        >
+          {name}
+        </div>
+        <div
+          className="small text-muted"
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={role}
+        >
+          {role}
+        </div>
+        {department && (
+          <div
+            className="small text-muted"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={department}
+          >
+            {department}
+          </div>
+        )}
+        {eventName && (
+          <div
+            className="small text-muted"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={eventName}
+          >
+            {eventName}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -73,84 +122,26 @@ export default function MemberPage() {
   const [search, setSearch] = useState("");
   const [eventRole, setEventRole] = useState('');
   const { fetchEventRole } = useEvents();
-  const mountedRef = useRef(true);
 
   // Load members once when component mounts
   useEffect(() => {
-    mountedRef.current = true;
-    
     const loadMembers = async () => {
       if (!eventId) return;
 
-      if (mountedRef.current) {
-        setLoading(true);
-        setError("");
-      }
+      setLoading(true);
+      setError("");
       try {
-        // Fetch members and event data in parallel
-        const [membersResponse, eventResponse] = await Promise.all([
-          eventApi.getMembersByEvent(eventId),
-          eventApi.getById(eventId).catch((err) => {
-            console.warn("Failed to fetch event separately, will try from members response:", err);
-            return null;
-          })
-        ]);
-        
-        // Chỉ cập nhật state nếu component vẫn còn mounted
-        if (mountedRef.current) {
-          // Handle members data - check multiple possible response structures
-          const membersData = membersResponse?.data || membersResponse || {};
-          setAllMembersByDepartment(membersData);
-          
-          // Handle event data - check multiple possible response structures
-          let eventData = eventResponse?.data?.event || 
-                         eventResponse?.data || 
-                         eventResponse?.event || 
-                         eventResponse ||
-                         membersResponse?.event || 
-                         null;
-          
-          // Nếu vẫn chưa có event data, thử lấy từ cache
-          if (!eventData && eventId) {
-            const cachedEvent = currentEventStorage.get();
-            if (cachedEvent && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
-              eventData = cachedEvent;
-            }
-          }
-          
-          // CRITICAL: Lưu event vào currentEventStorage để sidebar có thể sử dụng
-          // Lưu ngay cả khi lấy từ cache để đảm bảo sidebar có data
-          if (eventData) {
-            currentEventStorage.set(eventData);
-            setEvent(eventData);
-          } else {
-            // Nếu không có event data, vẫn set null để tránh hiển thị undefined
-            setEvent(null);
-          }
-        }
+        const response = await eventApi.getMembersByEvent(eventId);
+        setAllMembersByDepartment(response.data || {});
+        setEvent(response.event);
       } catch (err) {
         console.error("Error loading members:", err.message);
-        // Chỉ cập nhật state nếu component vẫn còn mounted
-        if (mountedRef.current) {
-          // Thử lấy event từ cache nếu có lỗi
-          const cachedEvent = currentEventStorage.get();
-          if (cachedEvent && eventId && (cachedEvent._id === eventId || cachedEvent.id === eventId)) {
-            setEvent(cachedEvent);
-          }
-          setError("Không thể tải danh sách thành viên");
-        }
+        setError("Không thể tải danh sách thành viên");
       } finally {
-        if (mountedRef.current) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
     loadMembers();
-
-    // Cleanup function: đánh dấu component đã unmount
-    return () => {
-      mountedRef.current = false;
-    };
   }, [eventId]);
 
   // Filter members based on search term
@@ -181,20 +172,10 @@ export default function MemberPage() {
   }, [search, allMembersByDepartment]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
-    fetchEventRole(eventId).then(role => {
-      // Chỉ cập nhật state nếu component vẫn còn mounted
-      if (mountedRef.current) {
+      fetchEventRole(eventId).then(role => {
         setEventRole(role);
-      }
-    });
-
-    // Cleanup function: đánh dấu component đã unmount
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [eventId, fetchEventRole]);
+      });
+    }, [eventId]);
     
   const getSidebarType = () => {
     if (eventRole === 'HoOC') return 'HoOC';
@@ -230,7 +211,7 @@ export default function MemberPage() {
 
   return (
     <UserLayout
-      title={`Thành viên - Sự kiện ${event?.name || 'Đang tải...'}`}
+      title={`Thành viên - Sự kiện ${event?.name}`}
       activePage="members"
       sidebarType={getSidebarType()}
       eventId={eventId}

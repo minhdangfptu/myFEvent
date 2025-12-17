@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import UserLayout from "~/components/UserLayout";
 import adminService from "~/services/adminService";
+import { Calendar, User, Users, Ban } from "lucide-react";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("moi-tao");
@@ -157,7 +158,7 @@ export default function AdminDashboard() {
           }}
         >
           <StatCard
-            icon="📅"
+            icon={<Calendar size={20} />}
             iconBg="#dbeafe"
             title="Tổng sự kiện"
             value={stats.totalEvents.value}
@@ -165,7 +166,7 @@ export default function AdminDashboard() {
             changeColor={getChangeColor(stats.totalEvents.changeThisWeek)}
           />
           <StatCard
-            icon="🚫"
+            icon={<Ban size={20} />}
             iconBg="#fee2e2"
             title="Sự kiện bị cấm"
             value={stats.bannedEvents.value}
@@ -173,7 +174,7 @@ export default function AdminDashboard() {
             changeColor={getChangeColor(stats.bannedEvents.changeThisWeek)}
           />
           <StatCard
-            icon="👥"
+            icon={<Users size={20} />}
             iconBg="#e9d5ff"
             title="Tổng người dùng"
             value={stats.totalUsers.value}
@@ -181,7 +182,7 @@ export default function AdminDashboard() {
             changeColor={getChangeColor(stats.totalUsers.changeThisWeek)}
           />
           <StatCard
-            icon="👤"
+            icon={<User size={20} />}
             iconBg="#f3f4f6"
             title="Người dùng bị cấm"
             value={stats.bannedUsers.value}
@@ -484,7 +485,7 @@ export default function AdminDashboard() {
                           gap: "4px",
                         }}
                       >
-                        <span>👤</span>
+                        <User size={14} />
                         <span>Người tổ chức: {event.organizer}</span>
                       </div>
                       <div
@@ -497,7 +498,7 @@ export default function AdminDashboard() {
                           marginTop: "2px",
                         }}
                       >
-                        <span>📅</span>
+                        <Calendar size={14} />
                         <span>{event.date}</span>
                       </div>
                     </div>

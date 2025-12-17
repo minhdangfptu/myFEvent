@@ -258,7 +258,7 @@ export const eventService = {
         return ensureAutoStatusForDoc(eventRaw);
       })(),
       EventMember.find({ eventId: eventRaw._id, status: { $ne: 'deactive' } })
-        .populate('userId', 'fullName email')
+        .populate('userId', 'fullName email avatarUrl')
         .lean()
     ]);
 
@@ -536,16 +536,16 @@ export const getPaginatedEvents = async (page, limit, search, status, eventDate)
     }
   }
 
-  if (eventDate) {
-    // Build a full-day window to avoid timezone offsets hiding events on exact dates
-    const date = new Date(eventDate);
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    // An event is included if it overlaps the selected day
-    filter.eventStartDate = { $lte: endOfDay };
-    filter.eventEndDate = { $gte: startOfDay };
+  if (eventDate && eventDate.trim() !== '') {
+    const selectedDate = new Date(eventDate);
+    const startOfSelectedDay = new Date(selectedDate);
+    startOfSelectedDay.setHours(0, 0, 0, 0);
+    const endOfSelectedDay = new Date(selectedDate);
+    endOfSelectedDay.setHours(23, 59, 59, 999);
+    
+   
+    filter.eventStartDate = { $lte: endOfSelectedDay };
+    filter.eventEndDate = { $gte: startOfSelectedDay };
   }
 
   const skip = (page - 1) * limit;

@@ -6,6 +6,7 @@ import UserLayout from '../../components/UserLayout';
 import { eventApi } from '../../apis/eventApi';
 import { userApi } from '../../apis/userApi';
 import ConfirmModal from '../../components/ConfirmModal';
+import { Calendar, User } from 'lucide-react';
 
 export default function MemberLandingPage() {
   const { user, loading: authLoading } = useAuth();
@@ -322,8 +323,8 @@ export default function MemberLandingPage() {
                   <div className="blog-title">{blog.title}</div>
                   <div className="blog-meta">
                     <span className="badge-soft">{blog.topic}</span>
-                    <span className="badge-soft">👤 {blog.user}</span>
-                    <span className="badge-soft">📅 {blog.date}</span>
+                    <span className="badge-soft d-flex align-items-center gap-1"><User size={14} /> {blog.user}</span>
+                    <span className="badge-soft d-flex align-items-center gap-1"><Calendar size={14} /> {blog.date}</span>
                   </div>
                 </div>
               </div>

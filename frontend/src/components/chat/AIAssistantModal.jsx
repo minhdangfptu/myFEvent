@@ -5,9 +5,9 @@ import { aiAgentApi } from '../../apis/aiAgentApi.js';
 const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là Trợ lý feAI của myFEvent.
 
 Tôi có thể giúp bạn:
-• Lên ý tưởng và mô tả sự kiện
-• Phân tích phạm vi, đối tượng và phòng ban cần thiết
-• Đề xuất các bước triển khai hoặc checklist sơ bộ
+• Tạo sự kiện theo yêu cầu của bạn 
+• Tạo công việc cho sự kiện của bạn 
+• Tóm tắt và tra cứu thông tin về sự kiện của bạn 
 
 Hãy mô tả nhanh sự kiện bạn đang chuẩn bị nhé!`;
 

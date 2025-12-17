@@ -11,7 +11,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { useAuth } from "../../contexts/AuthContext"
-import { Calendar, Sparkles, Goal, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, CheckCircle2, PinOff } from "lucide-react";
+import { Calendar, Sparkles, Goal, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, CheckCircle2, PinOff, MapPin } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -812,11 +812,11 @@ export default function MemberDashBoard() {
                         
                         let chipConfig = {}
                         if (hasMilestone && hasCalendar) {
-                          chipConfig = { icon: "⭐", label: "Cột mốc & Lịch họp", bgColor: "#fef3c7", borderColor: "#fcd34d", textColor: "#92400e" }
+                          chipConfig = { icon: "sparkles", label: "Cột mốc & Lịch họp", bgColor: "#fef3c7", borderColor: "#fcd34d", textColor: "#92400e" }
                         } else if (hasMilestone) {
-                          chipConfig = { icon: "🎯", label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc", bgColor: "#fef2f2", borderColor: "#dc2626", textColor: "#dc2626" }
+                          chipConfig = { icon: "goal", label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc", bgColor: "#fef2f2", borderColor: "#dc2626", textColor: "#dc2626" }
                         } else {
-                          chipConfig = { icon: "📅", label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp", bgColor: "#eff6ff", borderColor: "#3b82f6", textColor: "#1e40af" }
+                          chipConfig = { icon: "calendar", label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp", bgColor: "#eff6ff", borderColor: "#3b82f6", textColor: "#1e40af" }
                         }
                         
                         const eventNames = hoveredEvents.map(e => e?.name || (e.itemType === 'milestone' ? 'Cột mốc' : 'Lịch họp')).filter(Boolean)
@@ -826,7 +826,7 @@ export default function MemberDashBoard() {
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
                                 <span style={{ fontSize: "16px", flexShrink: 0 }}>
-                                  {chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}
+                                  {chipConfig.icon === "sparkles" ? <Sparkles size={16} /> : chipConfig.icon === "goal" ? <Goal size={16} /> : chipConfig.icon === "calendar" ? <Calendar size={16} /> : chipConfig.icon}
                                 </span>
                                 <div style={{ flex: 1 }}>
                                   <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: chipConfig.bgColor === "#fef3c7" ? "#fef3c7" : chipConfig.bgColor, color: chipConfig.textColor, padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4, border: `1px solid ${chipConfig.borderColor}` }}>{chipConfig.label}</span>
@@ -847,7 +847,7 @@ export default function MemberDashBoard() {
                                 <div key={index} className={index > 0 ? "mt-3" : ""}>
                                   <div style={{ backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", borderLeft: "3px solid #dc2626" }}>
                                     <div className="d-flex align-items-start gap-2">
-                                      <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+                                      <Goal size={16} style={{ flexShrink: 0 }} />
                                       <div style={{ flex: 1 }}>
                                         <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: "#fee2e2", color: "#991b1b", padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4 }}>Cột mốc</span>
                                         <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#dc2626" }}>{item?.name || "Cột mốc"}</div>
@@ -868,12 +868,12 @@ export default function MemberDashBoard() {
                               <div key={index} className={index > 0 ? "mt-3" : ""}>
                                 <div style={{ backgroundColor: "#eff6ff", padding: "10px", borderRadius: "6px", borderLeft: "3px solid #3b82f6" }}>
                                   <div className="d-flex align-items-start gap-2">
-                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📅</span>
+                                    <Calendar size={16} style={{ flexShrink: 0 }} />
                                     <div style={{ flex: 1 }}>
                                       <span style={{ display: "inline-block", fontSize: "10px", backgroundColor: "#dbeafe", color: "#1e40af", padding: "2px 7px", borderRadius: "4px", fontWeight: 600, marginBottom: 4 }}>Lịch họp</span>
                                       <div className="fw-semibold mb-1" style={{ fontSize: "13px", color: "#1e40af" }}>{item?.name || "Lịch họp"}</div>
-                                      {timeDisplay && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}><span>⏰</span><span>{timeDisplay}</span></div>)}
-                                      {item?.location && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}><span>📍</span><span>{item.location}</span></div>)}
+                                      {timeDisplay && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}><span><Clock size={12} style={{ flexShrink: 0 }} /></span><span>{timeDisplay}</span></div>)}
+                                      {item?.location && (<div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}><MapPin size={12} style={{ flexShrink: 0 }} /><span>{item.location}</span></div>)}
                                     </div>
                                   </div>
                                 </div>

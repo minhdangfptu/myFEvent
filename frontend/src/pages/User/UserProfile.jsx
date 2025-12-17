@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Loading from '~/components/Loading';
 import { useAuth } from '../../contexts/AuthContext';
 import authStorage from '../../utils/authStorage';
+import { User, Mail, Phone, FileText, Target } from 'lucide-react';
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
@@ -411,13 +412,13 @@ export default function UserProfilePage() {
 
                   <div className="mt-3">
                     {[
-                      { key: 'fullName', label: 'Họ và tên', value: display(form.fullName), icon: '👤' },
-                      { key: 'email', label: 'Email', value: display(profile?.email), icon: '✉️' },
-                      { key: 'phone', label: 'Số điện thoại', value: display(form.phone), icon: '📱' }
+                      { key: 'fullName', label: 'Họ và tên', value: display(form.fullName), icon: <User size={16} /> },
+                      { key: 'email', label: 'Email', value: display(profile?.email), icon: <Mail size={16} /> },
+                      { key: 'phone', label: 'Số điện thoại', value: display(form.phone), icon: <Phone size={16} /> }
                     ].map((row, i) => (
                       <div key={i} className="mp-info-row mb-3">
                         <div className="d-flex align-items-center gap-2 mb-1">
-                          <span>{row.icon}</span>
+                          <span style={{ display: 'flex', alignItems: 'center' }}>{row.icon}</span>
                           <div className="small text-muted fw-medium">{row.label}</div>
                         </div>
                         {editing && row.key === 'fullName' && (
@@ -452,7 +453,7 @@ export default function UserProfilePage() {
 
                     <div className="mp-info-row">
                       <div className="d-flex align-items-center gap-2 mb-2">
-                        <span>📝</span>
+                        <FileText size={16} />
                         <div className="small text-muted fw-medium">Bio</div>
                       </div>
                       {editing ? (
@@ -516,7 +517,7 @@ export default function UserProfilePage() {
 
                   <div>
                     <div className="d-flex align-items-center gap-2 mb-2">
-                      <span>🎯</span>
+                      <Target size={16} />
                       <div className="small text-muted fw-medium">Tổng số sự kiện đã tham gia</div>
                     </div>
                     <div className="mp-info-row d-flex align-items-center justify-content-between" style={{ minHeight: 100 }}>

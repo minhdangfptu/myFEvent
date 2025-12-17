@@ -1270,7 +1270,7 @@ export default function HoDTaskPage() {
                                   title="Thêm công việc"
                                 >
                                   <i className="bi bi-plus-lg" />
-                                  <span className="d-none d-md-inline">+ Công việc</span>
+                                  <span className="d-none d-md-inline">Công việc</span>
                                 </button>
                               )}
                               <i className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"} text-muted`} />

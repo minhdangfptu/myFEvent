@@ -159,7 +159,7 @@ export const getActiveEventMembers = async (eventId) => {
     eventId: eventId,
     status: 'active'
   })
-    .populate('userId', 'fullName email') // Removed avatarUrl (base64 images cause timeout)
+    .populate('userId', 'fullName email avatarUrl') // Cloudinary URL, không còn base64
     .lean();
 };
 
