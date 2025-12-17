@@ -26,6 +26,14 @@ export default function NotificationsPage() {
     }
   }, [])
 
+  // Helper function to format notification title - remove one set of outer brackets if present
+  const formatNotificationTitle = (title) => {
+    if (!title || typeof title !== 'string') return title;
+    // Replace all occurrences of [[...]] with [...] using regex
+    // This handles cases like "[[Event]] Some text" or "[[Event]]"
+    return title.replace(/\[\[([^\]]+)\]\]/g, '[$1]');
+  };
+
   const getNotificationTargetUrl = (n) => {
     if (n.targetUrl) {
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
@@ -308,7 +316,7 @@ export default function NotificationsPage() {
                   <div className="d-flex align-items-center gap-2 mb-1">
                     <span className="tag" style={{ background:n.color+'22', color:n.color }}>{n.category}</span>
                   </div>
-                  <div className="fw-semibold" style={{ color:'#111827' }}>{n.title}</div>
+                  <div className="fw-semibold" style={{ color:'#111827' }}>{formatNotificationTitle(n.title)}</div>
                   <div className="text-secondary small">{timeAgo(n.createdAt)}</div>
                 </div>
                 {n.unread && <div className="dot mt-2" />}

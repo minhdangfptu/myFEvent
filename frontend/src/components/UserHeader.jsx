@@ -111,6 +111,14 @@ export default function UserHeader({
     return () => window.removeEventListener('user-updated', handleUserUpdate);
   }, [setUser]);
 
+  // Helper function to format notification title - remove one set of outer brackets if present
+  const formatNotificationTitle = (title) => {
+    if (!title || typeof title !== 'string') return title;
+    // Replace all occurrences of [[...]] with [...] using regex
+    // This handles cases like "[[Event]] Some text" or "[[Event]]"
+    return title.replace(/\[\[([^\]]+)\]\]/g, '[$1]');
+  };
+
   const getNotificationTargetUrl = (n) => {
     if (n.targetUrl) {
       let url = n.targetUrl.startsWith('/') ? n.targetUrl : `/${n.targetUrl}`;
@@ -581,7 +589,7 @@ export default function UserHeader({
                           className="fw-semibold"
                           style={{ color: "#111827" }}
                         >
-                          {n.title}
+                          {formatNotificationTitle(n.title)}
                         </span>
                       </div>
                       <div className="text-secondary small">

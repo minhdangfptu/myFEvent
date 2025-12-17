@@ -935,8 +935,8 @@ const handleImageUpload = async () => {
         }
 
         .copy-btn-modern {
-          width: 44px;
-          height: 44px;
+          width: 45px;
+          height: 45px;
           background: rgba(255,255,255,0.2);
           border: 2px solid rgba(255,255,255,0.3);
           border-radius: 10px;
@@ -946,6 +946,11 @@ const handleImageUpload = async () => {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+
+        .copy-btn-modern svg {
+          width: 28px;
+          height: 28px;
         }
 
         .copy-btn-modern:hover {
@@ -1345,15 +1350,21 @@ const handleImageUpload = async () => {
                   <Link size={20} />
                   Mã mời tham gia
                 </h3>
+                <div style={{ marginBottom: "1rem" }}>
+                  <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
+                  <div className="join-code-input-group">
+                    <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
+                    <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
+                      <Copy size={24} />
+                    </button>
+                  </div>
+                </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">
-                    <div className="join-code-icon">
-                      <Hash size={16} />
-                    </div>
                     <input type="text" className="join-code-input" value={event.joinCode} readOnly />
                     <button className="copy-btn-modern" onClick={() => copyToClipboard(event.joinCode)}>
-                      <Copy size={18} />
+                      <Copy size={24} />
                     </button>
                   </div>
                 </div>

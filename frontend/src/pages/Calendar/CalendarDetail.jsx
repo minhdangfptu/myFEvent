@@ -4,6 +4,7 @@ import UserLayout from "~/components/UserLayout";
 import { useEvents } from "~/contexts/EventContext";
 import { useAuth } from "~/contexts/AuthContext";
 import calendarService from "~/services/calendarService";
+import { eventApi } from "~/apis/eventApi";
 import { CheckCircle2Icon, Clock, Delete, Edit, FileText, MapPin, Paperclip, Search, Trash, Users, X, XCircle } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import Loading from "~/components/Loading";
@@ -17,6 +18,7 @@ export default function CalendarDetail() {
     const [calendar, setCalendar] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [membersMap, setMembersMap] = useState({}); // Map memberId -> member data from members API
 
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState(null);
@@ -56,12 +58,38 @@ export default function CalendarDetail() {
         }
     }, [eventId, fetchEventRole]);
 
+    // Fetch members data to get avatar mapping (same source as members page)
+    useEffect(() => {
+        const fetchMembers = async () => {
+            if (!eventId) return;
+            try {
+                const membersResponse = await eventApi.getMembersByEvent(eventId);
+                const membersData = membersResponse.data || {};
+                // Create a map: memberId -> member data (with avatar)
+                const map = {};
+                Object.values(membersData).forEach((members) => {
+                    if (Array.isArray(members)) {
+                        members.forEach((member) => {
+                            const memberId = member.id || member._id;
+                            if (memberId) {
+                                map[memberId] = member;
+                            }
+                        });
+                    }
+                });
+                setMembersMap(map);
+            } catch (error) {
+                console.error('Error fetching members for avatar mapping:', error);
+            }
+        };
+        fetchMembers();
+    }, [eventId]);
+
     useEffect(() => {
         const fetchEventDetails = async () => {
             try {
                 const response = await calendarService.getCalendarEventDetail(eventId, calendarId);
                 setCalendar(response.data);
-                console.log(calendar);
                 const currentDate = new Date();
                 if (new Date(response?.data.endAt).getTime() < currentDate.getTime()) {
                     setIsPastMeeting(true);
@@ -78,7 +106,6 @@ export default function CalendarDetail() {
             fetchEventDetails();
         }
     }, [eventId, calendarId]);
-    console.log(calendar);
     if (loading) {
         return (
             <UserLayout eventId={eventId} sidebarType={eventRole}>
@@ -130,33 +157,98 @@ export default function CalendarDetail() {
         return `${hours} giờ ${minutes > 0 ? minutes + ' phút' : ''}`;
     };
 
+    // Helper function to get member avatar URL - EXACTLY same as members page
+    // Members page uses: member.avatar || "https://i.pravatar.cc/100?img=12"
+    // But calendar API might return avatar in member.userId.avatarUrl, so check both
+    const getMemberAvatar = (member) => {
+        // First priority: member.avatar (same as members page uses)
+        if (member?.avatar) {
+            return member.avatar;
+        }
+        // Second priority: member.userId.avatarUrl (in case calendar API returns it here)
+        if (member?.userId?.avatarUrl) {
+            return member.userId.avatarUrl;
+        }
+        // Fallback to pravatar (same as members page fallback)
+        return "https://i.pravatar.cc/100?img=12";
+    };
+
+    // Helper function to get member initial
+    const getMemberInitial = (member) => {
+        const fullName = member?.userId?.fullName || member?.name || '';
+        if (fullName) {
+            return fullName.charAt(0).toUpperCase();
+        }
+        const email = member?.userId?.email || member?.email || '';
+        if (email) {
+            return email.charAt(0).toUpperCase();
+        }
+        return '?';
+    };
+
+    // Helper to get avatar from membersMap (same source as members page)
+    const getAvatarFromMembersMap = (memberId) => {
+        const memberFromMap = membersMap[memberId];
+        if (memberFromMap?.avatar) {
+            return memberFromMap.avatar;
+        }
+        return null;
+    };
+
     const attendees = calendar.participants
         .filter(p => p.participateStatus === 'confirmed')
-        .map(p => ({
-            id: p.member._id,
-            name: p.member.userId.fullName,
-            avatar: p.member.userId.avatarUrl || '👤',
-            email: p.member.userId.email
-        }));
+        .map(p => {
+            const memberId = p.member._id || p.member.id;
+            // Get avatar from membersMap (same source as members page)
+            // Fallback to calendar API data if membersMap doesn't have it
+            const memberAvatar = getAvatarFromMembersMap(memberId) 
+                || p.member?.avatar 
+                || p.member?.userId?.avatarUrl;
+            return {
+                id: memberId,
+                name: p.member.userId.fullName,
+                avatar: memberAvatar || "https://i.pravatar.cc/100?img=12",
+                initial: getMemberInitial(p.member),
+                email: p.member.userId.email
+            };
+        });
 
     const notAttending = calendar.participants
         .filter(p => p.participateStatus === 'absent')
-        .map(p => ({
-            id: p.member._id,
-            name: p.member.userId.fullName,
-            avatar: p.member.userId.avatarUrl || '👤',
-            email: p.member.userId.email,
-            reasonAbsent: p.reasonAbsent || 'Không có lý do'
-        }));
+        .map(p => {
+            const memberId = p.member._id || p.member.id;
+            // Get avatar from membersMap (same source as members page)
+            // Fallback to calendar API data if membersMap doesn't have it
+            const memberAvatar = getAvatarFromMembersMap(memberId) 
+                || p.member?.avatar 
+                || p.member?.userId?.avatarUrl;
+            return {
+                id: memberId,
+                name: p.member.userId.fullName,
+                avatar: memberAvatar || "https://i.pravatar.cc/100?img=12",
+                initial: getMemberInitial(p.member),
+                email: p.member.userId.email,
+                reasonAbsent: p.reasonAbsent || 'Không có lý do'
+            };
+        });
 
     const pending = calendar.participants
         .filter(p => p.participateStatus === 'unconfirmed')
-        .map(p => ({
-            id: p.member._id,
-            name: p.member.userId.fullName,
-            avatar: p.member.userId.avatarUrl || '👤',
-            email: p.member.userId.email
-        }));
+        .map(p => {
+            const memberId = p.member._id || p.member.id;
+            // Get avatar from membersMap (same source as members page)
+            // Fallback to calendar API data if membersMap doesn't have it
+            const memberAvatar = getAvatarFromMembersMap(memberId) 
+                || p.member?.avatar 
+                || p.member?.userId?.avatarUrl;
+            return {
+                id: memberId,
+                name: p.member.userId.fullName,
+                avatar: memberAvatar || "https://i.pravatar.cc/100?img=12",
+                initial: getMemberInitial(p.member),
+                email: p.member.userId.email
+            };
+        });
 
     const handleViewReason = (person) => {
         setSelectedPerson(person);
@@ -192,7 +284,7 @@ export default function CalendarDetail() {
         return '';
     };
 
-    const getCurrentUserParticipateStatus = () => {
+    const getCurrentUserParticipant = () => {
         if (!user || !calendar) return null;
         const userIdCandidates = [user?._id, user?.id].filter(Boolean).map(v => v?.toString());
         const userEmail = user?.email?.toLowerCase?.();
@@ -210,13 +302,24 @@ export default function CalendarDetail() {
             const emailMatch = participantEmail && userEmail && participantEmail === userEmail;
             return Boolean(idMatch || emailMatch);
         });
-        console.log('currentUserParticipant:', currentUserParticipant);
-        return currentUserParticipant?.participateStatus || null;
+        return currentUserParticipant || null;
+    };
+
+    const getCurrentUserParticipateStatus = () => {
+        const participant = getCurrentUserParticipant();
+        return participant?.participateStatus || null;
     };
 
     const currentUserStatus = getCurrentUserParticipateStatus();
+    const isUserParticipant = getCurrentUserParticipant() !== null;
 
     const handleParticipate = async (status, reason = "") => {
+        // Check if user is a participant before allowing participation
+        if (!isUserParticipant) {
+            toast.error('Bạn không được mời tham gia cuộc họp này');
+            return;
+        }
+
         setIsParticipating(true);
         try {
             const payload = { participateStatus: status };
@@ -233,7 +336,11 @@ export default function CalendarDetail() {
             }
         } catch (error) {
             console.error('Error updating participation status:', error);
-            alert('Có lỗi xảy ra khi cập nhật trạng thái tham gia');
+            if (error.response?.status === 403 || error.response?.status === 401) {
+                toast.error('Bạn không có quyền tham gia cuộc họp này. Bạn không được mời tham gia.');
+            } else {
+                toast.error('Có lỗi xảy ra khi cập nhật trạng thái tham gia');
+            }
         } finally {
             setIsParticipating(false);
         }
@@ -426,12 +533,19 @@ export default function CalendarDetail() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     {attendees.slice(0, 3).map(person => (
                                         <div key={person.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', overflow: 'hidden' }}>
-                                                {person.avatar.startsWith('http') ? (
-                                                    <img src={person.avatar} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                ) : (
-                                                    <span>{person.avatar}</span>
-                                                )}
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280', overflow: 'hidden', flexShrink: 0 }}>
+                                                <img 
+                                                    src={person.avatar} 
+                                                    alt={person.name} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                                <span style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {person.initial}
+                                                </span>
                                             </div>
                                             <span style={{ fontSize: '14px', color: '#1f2937' }}>{person.name}</span>
                                         </div>
@@ -477,12 +591,19 @@ export default function CalendarDetail() {
                                     {notAttending.slice(0, 3).map(person => (
                                         <div key={person.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', overflow: 'hidden' }}>
-                                                    {person.avatar.startsWith('http') ? (
-                                                        <img src={person.avatar} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    ) : (
-                                                        <span>{person.avatar}</span>
-                                                    )}
+                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280', overflow: 'hidden', flexShrink: 0 }}>
+                                                    <img 
+                                                        src={person.avatar} 
+                                                        alt={person.name} 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                    />
+                                                    <span style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                                        {person.initial}
+                                                    </span>
                                                 </div>
                                                 <span style={{ fontSize: '14px', color: '#1f2937' }}>{person.name}</span>
                                             </div>
@@ -542,12 +663,19 @@ export default function CalendarDetail() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     {pending.slice(0, 3).map(person => (
                                         <div key={person.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', overflow: 'hidden' }}>
-                                                {person.avatar.startsWith('http') ? (
-                                                    <img src={person.avatar} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                ) : (
-                                                    <span>{person.avatar}</span>
-                                                )}
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280', overflow: 'hidden', flexShrink: 0 }}>
+                                                <img 
+                                                    src={person.avatar} 
+                                                    alt={person.name} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                                <span style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {person.initial}
+                                                </span>
                                             </div>
                                             <span style={{ fontSize: '14px', color: '#1f2937' }}>{person.name}</span>
                                         </div>
@@ -642,7 +770,24 @@ export default function CalendarDetail() {
                         {/* Action Buttons */}
                         {!isPastMeeting && (
                             <>
-                                {currentUserStatus === 'confirmed' ? (
+                                {!isUserParticipant ? (
+                                    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '20px' }}>
+                                        <div style={{
+                                            backgroundColor: '#fef3c7',
+                                            color: '#92400e',
+                                            border: '2px solid #fbbf24',
+                                            padding: '12px 32px',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <span>⚠</span> Bạn không được mời tham gia cuộc họp này
+                                        </div>
+                                    </div>
+                                ) : currentUserStatus === 'confirmed' ? (
                                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '20px', alignItems: 'center' }}>
                                         <div style={{
                                             backgroundColor: '#d1fae5',
@@ -845,17 +990,24 @@ export default function CalendarDetail() {
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                overflow: 'hidden'
+                                                fontSize: '14px',
+                                                fontWeight: '600',
+                                                color: '#6b7280',
+                                                overflow: 'hidden',
+                                                flexShrink: 0
                                             }}>
-                                                {person.avatar && person.avatar.startsWith('http') ? (
-                                                    <img
-                                                        src={person.avatar}
-                                                        alt={person.name}
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                    />
-                                                ) : (
-                                                    <span style={{ fontSize: '18px' }}>👤</span>
-                                                )}
+                                                <img 
+                                                    src={person.avatar} 
+                                                    alt={person.name} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                                <span style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {person.initial}
+                                                </span>
                                             </div>
                                             <div style={{ flex: 1 }}>
                                                 <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>
@@ -967,17 +1119,24 @@ export default function CalendarDetail() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                overflow: 'hidden'
+                                fontSize: '18px',
+                                fontWeight: '600',
+                                color: '#6b7280',
+                                overflow: 'hidden',
+                                flexShrink: 0
                             }}>
-                                {selectedPerson.avatar && selectedPerson.avatar.startsWith('http') ? (
-                                    <img
-                                        src={selectedPerson.avatar}
-                                        alt={selectedPerson.name}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    />
-                                ) : (
-                                    <span style={{ fontSize: '20px' }}>👤</span>
-                                )}
+                                <img 
+                                    src={selectedPerson.avatar} 
+                                    alt={selectedPerson.name} 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                />
+                                <span style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                    {selectedPerson.initial}
+                                </span>
                             </div>
                             <div>
                                 <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
