@@ -12,7 +12,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { userApi } from "../../apis/userApi"
-import { Calendar, Sparkles, Goal, User, Users, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, PinOff, MapPin } from "lucide-react";
+import { Calendar, Sparkles, Goal, User, Users, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, PinOff, MapPin, Clock } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {

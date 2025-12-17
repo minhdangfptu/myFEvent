@@ -7,7 +7,7 @@ export const baseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
 export const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 //App Version Em Minh Dang code
-export const APP_VERSION = '1.6.3';
+export const APP_VERSION = '1.6.4';
 
 // App Configuration
 export const appConfig = {

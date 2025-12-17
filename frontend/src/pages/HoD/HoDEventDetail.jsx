@@ -413,16 +413,17 @@ export default function HoDEventDetail() {
           backdrop-filter: blur(10px);
         }
         .copy-btn-modern {
-          width: 44px;
-          height: 44px;
+          width: 52px;
+          height: 52px;
           background: rgba(255,255,255,0.2);
           border: 2px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
+          border-radius: 12px;
           color: white;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-size: 14px;
         }
         .action-buttons {
           display: flex;

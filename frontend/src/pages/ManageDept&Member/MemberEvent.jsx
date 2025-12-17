@@ -4,6 +4,7 @@ import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import Loading from "~/components/Loading";
 import { useEvents } from "~/contexts/EventContext";
+import { Search } from "lucide-react";
 
 function MemberCard({
   name = "Thành viên",
@@ -226,9 +227,11 @@ export default function MemberPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <span className="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
-              🔍
-            </span>
+            <Search
+              size={16}
+              className="position-absolute"
+              style={{ left: 10, top: 10, color: "#9ca3af" }}
+            />
           </div>
           {eventRole === 'HoOC' && (
             <div className="ms-auto d-flex align-items-center gap-2">

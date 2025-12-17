@@ -375,24 +375,9 @@ export default function DataExportPage() {
         "Xuất báo cáo tài chính: Hạng mục, Số lượng, Đơn giá, Thành tiền",
       subItems: [
         {
-          id: "budget-summary",
-          title: "Tổng quan ngân sách",
-          description: "Báo cáo tổng hợp chi phí",
-        },
-        {
-          id: "budget-expenses",
-          title: "Chi tiết chi phí",
-          description: "Từng khoản chi cụ thể",
-        },
-        {
-          id: "budget-revenue",
-          title: "Nguồn thu",
-          description: "Tài trợ và nguồn kinh phí",
-        },
-        {
-          id: "budget-comparison",
-          title: "So sánh dự kiến/thực tế",
-          description: "Đối chiếu ngân sách ban đầu",
+          id: "budget-all",
+          title: "Tất cả Kinh phí sự kiện",
+          description: "Xuất toàn bộ thông tin kinh phí sự kiện",
         },
       ],
     },
