@@ -561,7 +561,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                             : [];
                         return (
                           <li key={`${p.type}-${idx}`}>
-                            {`TASK cho EPIC "${p.epicTitle || ''}"`}: {tasks.length}{' '}
+                            {`Công việc cho công việc lớn "${p.epicTitle || ''}"`}: {tasks.length}{' '}
                             công việc
                           </li>
                         );
