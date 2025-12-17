@@ -1,5 +1,5 @@
 import * as React from "react";
-import offlineImage from "~/assets/errors/lost_connect.png";
+import { WifiOff } from "lucide-react";
 
 export default function ErrorPageOffline() {
   const handleReload = () => window.location.reload();
@@ -9,7 +9,11 @@ export default function ErrorPageOffline() {
         <div className="display-3 fw-bold">OOPSIE!</div>
         <div className="h4 fw-bold mt-2">ERROR - Bạn đang ngoại tuyến!</div>
         <div className="d-flex justify-content-center my-3">
-          <img src={offlineImage} alt="Offline illustration" style={{ width: '100%', maxWidth: 420, marginBottom: 12 }} />
+          <WifiOff
+            size={280}
+            strokeWidth={1}
+            style={{ color: '#dc3545', marginBottom: 12, opacity: 0.8 }}
+          />
         </div>
         <hr className="mx-auto" style={{ width: 120 }} />
         <div className="mb-2">Vui Lòng Chờ Hoặc Làm Mới Lại Trang</div>

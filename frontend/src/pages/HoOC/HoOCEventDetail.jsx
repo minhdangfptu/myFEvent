@@ -941,21 +941,22 @@ const handleImageUpload = async () => {
         }
 
         .copy-btn-modern {
-          width: 45px;
-          height: 45px;
+          width: 52px;
+          height: 52px;
           background: rgba(255,255,255,0.2);
           border: 2px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
+          border-radius: 12px;
           color: white;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-size: 14px;
         }
 
         .copy-btn-modern svg {
-          width: 28px;
-          height: 28px;
+          width: 26px;
+          height: 26px;
         }
 
         .copy-btn-modern:hover {

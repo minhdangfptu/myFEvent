@@ -7,7 +7,7 @@ import UserLayout from "../../components/UserLayout"
 import { milestoneApi } from "../../apis/milestoneApi"
 import { taskApi } from "../../apis/taskApi"
 import { useEvents } from "../../contexts/EventContext"
-import { CalendarX2 } from "lucide-react"
+import { CalendarX2, Loader2 } from "lucide-react"
 import Loading from "~/components/Loading"
 
 const styles = {
@@ -320,7 +320,7 @@ const animationStyles = `
       box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
     }
   }
-  
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -331,7 +331,7 @@ const animationStyles = `
       transform: translateY(0);
     }
   }
-  
+
   @keyframes slideUp {
     from {
       opacity: 0;
@@ -342,7 +342,16 @@ const animationStyles = `
       transform: translateY(0);
     }
   }
-  
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   @media (max-width: 768px) {
     .milestone-content-responsive {
       grid-template-columns: 1fr !important;
@@ -372,6 +381,7 @@ const Milestone = () => {
     targetDate: "",
   })
   const [loading, setLoading] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState("")
   const currentEvent = events.find((event) => event._id === eventId)
 
@@ -501,6 +511,7 @@ const Milestone = () => {
       return
     }
 
+    setIsCreating(true)
     try {
       await milestoneApi.createMilestone(eventId, {
         name: createForm.name.trim(),
@@ -514,7 +525,7 @@ const Milestone = () => {
       toast.success("Tạo cột mốc thành công!")
     } catch (err) {
       console.error("Error creating milestone:", err)
-      
+
       // Handle duplicate name error (409) with Vietnamese message
       if (err.response?.status === 409) {
         const vietnameseMessage = "Tên cột mốc này đã tồn tại trong sự kiện. Vui lòng chọn tên khác."
@@ -526,6 +537,8 @@ const Milestone = () => {
         setError(errorMessage)
         toast.error(errorMessage)
       }
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -571,9 +584,8 @@ const Milestone = () => {
           <div style={styles.content} className="milestone-content-responsive">
             <div style={styles.timelineSection}>
               {milestones.length > 0 ? (
-              <>
-                <div style={styles.timelineLine}></div>
-                <div style={styles.milestonesList}>
+                <>
+                  <div style={styles.timelineLine}></div>
                   {milestones.map((milestone, index) => (
                     <div
                       key={milestone.id}
@@ -607,9 +619,8 @@ const Milestone = () => {
                       </div>
                     </div>
                   ))}
-                </div>
-              </>
-            ) : (
+                </>
+              ) : (
               <div style={styles.emptyState}>
                 <CalendarX2 style={styles.emptyStateIcon} strokeWidth={1.5} />
                 <h3 style={styles.emptyStateTitle}>Chưa có cột mốc nào</h3>
@@ -763,22 +774,38 @@ const Milestone = () => {
                   </button>
                   <button
                     type="submit"
-                    style={styles.btnPrimary}
-                    disabled={loading}
+                    style={{
+                      ...styles.btnPrimary,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      opacity: isCreating ? 0.7 : 1,
+                      cursor: isCreating ? "not-allowed" : "pointer",
+                    }}
+                    disabled={isCreating}
                     onMouseEnter={(e) => {
-                      if (!loading) {
+                      if (!isCreating) {
                         e.target.style.transform = "translateY(-2px)"
                         e.target.style.boxShadow = "0 6px 16px rgba(239, 68, 68, 0.4)"
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!loading) {
+                      if (!isCreating) {
                         e.target.style.transform = "translateY(0)"
                         e.target.style.boxShadow = "0 4px 12px rgba(239, 68, 68, 0.3)"
                       }
                     }}
                   >
-                    {loading ? "Đang tạo..." : "Tạo"}
+                    {isCreating && (
+                      <Loader2
+                        size={18}
+                        style={{
+                          animation: "spin 1s linear infinite",
+                        }}
+                      />
+                    )}
+                    {isCreating ? "Đang tạo..." : "Tạo"}
                   </button>
                 </div>
               </form>

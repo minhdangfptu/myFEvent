@@ -4,7 +4,8 @@ import UserLayout from "~/components/UserLayout";
 import { useNavigate, useParams } from "react-router-dom";
 import DataExportPreviewModal from "~/components/DataExportPreviewModal";
 import { useEvents } from "~/contexts/EventContext";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Loading from "~/components/Loading";
 import {
   Eye,
@@ -42,7 +43,9 @@ export default function DataTemplatePage() {
       try {
         const role = await fetchEventRole(eventId);
         setEventRole(role);
-        if (role !== 'HoOC' || role !== "HoD") {
+        // Chỉ cho phép HoOC hoặc HoD truy cập
+        const isAllowed = role === 'HoOC' || role === 'HoD';
+        if (!isAllowed) {
           toast.error('Bạn không có quyền truy cập trang này');
           navigate('/home-page');
           return;
@@ -282,28 +285,31 @@ export default function DataTemplatePage() {
     );
   }
 
-  // Don't render content if not HoOC (will be redirected)
-  if (eventRole !== 'HoOC') {
+  // Không render nội dung nếu không phải HoOC hoặc HoD (đã được redirect ở trên)
+  if (eventRole !== 'HoOC' && eventRole !== 'HoD') {
     return null;
   }
 
   return (
     <UserLayout
-      sidebarType="hooc"
+      sidebarType={eventRole === 'HoD' ? 'HoD' : 'hooc'}
       title="Tài liệu dữ liệu mẫu"
       activePage="export-example"
       eventId={eventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="data-template-page">
         <div className="data-template-page__container">
-          {/* Back Link */}
-          <a
-            href="#"
-            onClick={handleBackClick}
-            className="data-template-page__back-link"
-          >
-            ← Quay lại Tùy chọn Xuất Dữ Liệu
-          </a>
+          {/* Back Link - chỉ hiển thị cho HoOC */}
+          {eventRole === 'HoOC' && (
+            <a
+              href="#"
+              onClick={handleBackClick}
+              className="data-template-page__back-link"
+            >
+              ← Quay lại Tùy chọn Xuất Dữ Liệu
+            </a>
+          )}
 
           {/* Header Section */}
           <div className="data-template-page__header">

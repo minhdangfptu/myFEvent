@@ -5,7 +5,8 @@ import { useEvents } from "~/contexts/EventContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { riskApiWithErrorHandling } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "../../components/Loading";
 import { UmbrellaOff } from "lucide-react";
@@ -746,6 +747,7 @@ export default function ListRiskPage() {
       sidebarType={getSidebarType()}
       eventId={eventId}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <style>{`
         .task-header { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 24px; }
         .stat-card { background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; transition: all 0.2s; }

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
 import { departmentApi } from "../../apis/departmentApi";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEvents } from "../../contexts/EventContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl";
@@ -16,6 +16,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  User,
 } from "lucide-react";
 
 function AddMemberModal({ open, onClose, onConfirm }) {
@@ -115,6 +117,7 @@ export default function ManageMemberPage() {
   const [showModal, setShowModal] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Tên");
+  const [deptFilter, setDeptFilter] = useState("Tất cả");
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -135,6 +138,8 @@ export default function ManageMemberPage() {
     member: null,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const navigate = useNavigate();
 
   const location = useLocation();
   const { events: myEvents, fetchEventRole } = useEvents();
@@ -284,17 +289,23 @@ export default function ManageMemberPage() {
     return role || "—";
   };
 
-  // Lọc + sort
+  // Lọc + sort + filter theo Ban (HoOC đầu tiên)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = members.filter((r) =>
-      r.name.toLowerCase().includes(q)
-    );
+    let list = members.filter((r) => r.name.toLowerCase().includes(q));
 
-    const compare = (a, b) =>
-      (a || "").localeCompare(b || "", "vi", { sensitivity: "base" });
+    // Filter theo ban nếu chọn khác 'Tất cả'
+    if (deptFilter !== "Tất cả") {
+      list = list.filter(r => (r.role === "HoOC" ? "Core Team" : r.dept) === deptFilter);
+    }
 
-    list.sort((a, b) => {
+    // Đưa HoOC lên đầu
+    const hoocList = list.filter(r => r.role === "HoOC");
+    const otherList = list.filter(r => r.role !== "HoOC");
+
+    const compare = (a, b) => (a || "").localeCompare(b || "", "vi", { sensitivity: "base" });
+
+    otherList.sort((a, b) => {
       if (sort === "Ban") {
         return compare(a.dept, b.dept);
       }
@@ -305,8 +316,8 @@ export default function ManageMemberPage() {
       return compare(a.name, b.name);
     });
 
-    return list;
-  }, [members, query, sort]);
+    return [...hoocList, ...otherList];
+  }, [members, query, sort, deptFilter]);
 
   // ==== Pagination tính toán từ filtered ====
   const totalRows = filtered.length;
@@ -494,10 +505,26 @@ export default function ManageMemberPage() {
             />
             <input
               className="form-control ps-4"
-              placeholder="Tìm kiếm"
+              placeholder="Tìm kiếm thành viên..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-secondary small">Ban:</span>
+            <select
+              className="form-select form-select-sm"
+              style={{ width: 140 }}
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+            >
+              <option value="Tất cả">Tất cả</option>
+              {Array.from(new Set(members.map(m => m.role === 'HoOC' ? 'Core Team' : m.dept)))
+                .filter(b => b && b !== '—')
+                .map(ban => (
+                  <option key={ban} value={ban}>{ban}</option>
+                ))}
+            </select>
           </div>
           <div className="ms-auto d-flex align-items-center gap-2">
             <span className="text-secondary small">Sắp xếp theo:</span>
@@ -624,7 +651,7 @@ export default function ManageMemberPage() {
                         >
                           {r.name}
                         </td>
-                        <td>{r.dept}</td>
+                        <td>{r.role === "HoOC" ? "Core Team" : r.dept}</td>
                         <td>{getRoleDisplayName(r.role)}</td>
                         <td className="cell-action text-end position-relative">
                           {canManage && (
@@ -651,7 +678,31 @@ export default function ManageMemberPage() {
                                   }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  {eventRole === "HoOC" && (
+                                  {/* Xem chi tiết thành viên */}
+                                  <button
+                                    className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                    style={{ fontSize: "14px" }}
+                                    onClick={() => {
+                                      setOpenDropdown(null);
+                                      const eventIdForNav =
+                                        currentEventId ||
+                                        currentEvent?._id ||
+                                        currentEvent?.id ||
+                                        selectedEvent;
+                                      if (!eventIdForNav || !r.id) {
+                                        toast.error("Không tìm thấy thông tin thành viên");
+                                        return;
+                                      }
+                                      navigate(`/events/${eventIdForNav}/members/${r.id}`);
+                                    }}
+                                  >
+                                    <Eye size={16} className="text-secondary" />
+                                    <span>Xem chi tiết thành viên</span>
+                                  </button>
+
+                                  <hr className="my-1" />
+
+                                  {eventRole === "HoOC" && r.role !== "HoD" && (
                                     <>
                                       <button
                                         className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
@@ -661,15 +712,11 @@ export default function ManageMemberPage() {
                                           showConfirmRemoveFromEvent(r);
                                         }}
                                       >
-                                        <UserX
-                                          size={16}
-                                          className="text-danger"
-                                        />
-                                        <span>
-                                          Xóa khỏi ban tổ chức
-                                        </span>
+                                        <UserX size={16} className="text-danger" />
+                                        <span>Xóa khỏi ban tổ chức</span>
                                       </button>
-                                      {hasDepartment && r.departmentId && (
+                                      {/* Thêm nút Xóa khỏi ban hiện tại nếu đã có ban */}
+                                      {hasDepartment && (
                                         <>
                                           <hr className="my-1" />
                                           <button
@@ -677,24 +724,19 @@ export default function ManageMemberPage() {
                                             style={{ fontSize: "14px" }}
                                             onClick={() => {
                                               setOpenDropdown(null);
-                                              showConfirmRemoveFromDepartment(
-                                                r
-                                              );
+                                              showConfirmRemoveFromDepartment(r);
                                             }}
                                           >
-                                            <LogOut
-                                              size={16}
-                                              className="text-warning"
-                                            />
-                                            <span>
-                                              Xóa khỏi ban "{r.dept}"
-                                            </span>
+                                            <LogOut size={16} className="text-warning" />
+                                            <span>Xóa khỏi ban hiện tại</span>
                                           </button>
                                         </>
                                       )}
                                     </>
                                   )}
+
                                   {eventRole === "HoD" &&
+                                    r.role !== "HoD" &&
                                     hasDepartment &&
                                     r.departmentId && (
                                       <button
@@ -705,15 +747,92 @@ export default function ManageMemberPage() {
                                           showConfirmRemoveFromDepartment(r);
                                         }}
                                       >
-                                        <LogOut
-                                          size={16}
-                                          className="text-warning"
-                                        />
-                                        <span>
-                                          Xóa khỏi ban "{r.dept}"
-                                        </span>
+                                        <LogOut size={16} className="text-warning" />
+                                        <span>Xóa khỏi ban hiện tại</span>
                                       </button>
                                     )}
+
+                                  {/* Nếu thành viên là Trưởng ban (HoD), thêm nút đi tới chi tiết ban */}
+                                  {r.role === "HoD"  && (
+                                    <>
+                                      <button
+                                        className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-0 bg-transparent w-100 text-start"
+                                        style={{ fontSize: "14px" }}
+                                        onClick={async () => {
+                                          setOpenDropdown(null);
+                                          const eventIdForNav =
+                                            currentEventId ||
+                                            currentEvent?._id ||
+                                            currentEvent?.id ||
+                                            selectedEvent;
+
+                                          if (!eventIdForNav) {
+                                            toast.error("Không tìm thấy thông tin sự kiện");
+                                            return;
+                                          }
+
+                                          // Nếu có departmentId thì navigate trực tiếp
+                                          if (r.departmentId) {
+                                            navigate(
+                                              `/events/${eventIdForNav}/department-detail/${r.departmentId}`,
+                                              {
+                                                state: {
+                                                  selectedMember: {
+                                                    id: r.id,
+                                                    name: r.name,
+                                                    avatar: r.avatar,
+                                                    role: r.role,
+                                                    dept: r.dept,
+                                                    departmentId: r.departmentId
+                                                  }
+                                                }
+                                              }
+                                            );
+                                            return;
+                                          }
+
+                                          // Nếu không có departmentId, fetch danh sách departments để tìm
+                                          try {
+                                            toast.info("Đang tải thông tin ban...");
+                                            const response = await departmentApi.getDepartments(eventIdForNav);
+                                            const departments = Array.isArray(response?.data) ? response.data : response;
+
+                                            // Tìm department có tên khớp với r.dept
+                                            const matchedDept = departments.find(d =>
+                                              (d.name || d.departmentName) === r.dept
+                                            );
+
+                                            if (matchedDept) {
+                                              const deptId = matchedDept._id || matchedDept.id;
+                                              navigate(
+                                                `/events/${eventIdForNav}/department-detail/${deptId}`,
+                                                {
+                                                  state: {
+                                                    selectedMember: {
+                                                      id: r.id,
+                                                      name: r.name,
+                                                      avatar: r.avatar,
+                                                      role: r.role,
+                                                      dept: r.dept,
+                                                      departmentId: deptId
+                                                    }
+                                                  }
+                                                }
+                                              );
+                                            } else {
+                                              toast.error("Không tìm thấy thông tin ban của thành viên");
+                                            }
+                                          } catch (error) {
+                                            console.error("Error fetching departments:", error);
+                                            toast.error("Không thể tải thông tin ban");
+                                          }
+                                        }}
+                                      >
+                                        <User size={16} className="text-secondary" />
+                                        <span>Thay đổi vai trò</span>
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </>

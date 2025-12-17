@@ -131,14 +131,15 @@ const MilestoneDetail = () => {
       try {
         const response = await milestoneService.deleteMilestone(eventId, id);
         toast.success("Xoá cột mốc thành công");
-        navigate(`/events/${eventId}/milestones`);
+        setTimeout(() => {
+          navigate(`/events/${eventId}/milestones`);
+        }, 1000);
       } catch (error) {
         const errorMessage = error.response?.data?.message || error.message || "Xoá cột mốc thất bại";
         toast.error(errorMessage);
         console.error("Error deleting milestone:", error);
         setShowDeleteModal(false);
         setDeleteConfirmName("");
-      } finally {
         setIsDeleting(false);
       }
     }
