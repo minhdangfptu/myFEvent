@@ -12,7 +12,7 @@ import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
 import { userApi } from "../../apis/userApi"
-import { Calendar, Sparkles, Goal, User, Users, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, PinOff } from "lucide-react";
+import { Calendar, Sparkles, Goal, User, Users, LaptopMinimalCheck, CircleCheckBig, FileExclamationPoint, PinOff, MapPin } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -970,7 +970,7 @@ export default function HoDDashBoard() {
                         let chipConfig = {}
                         if (hasMilestone && hasCalendar) {
                           chipConfig = {
-                            icon: "⭐", // Sparkles
+                            icon: "sparkles", // Sparkles
                             label: "Cột mốc & Lịch họp",
                             bgColor: "#fef3c7",
                             borderColor: "#fcd34d",
@@ -978,7 +978,7 @@ export default function HoDDashBoard() {
                           }
                         } else if (hasMilestone) {
                           chipConfig = {
-                            icon: "🎯", // Goal
+                            icon: "goal", // Goal
                             label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc",
                             bgColor: "#fef2f2",
                             borderColor: "#dc2626",
@@ -986,7 +986,7 @@ export default function HoDDashBoard() {
                           }
                         } else {
                           chipConfig = {
-                            icon: "📅", // Calendar
+                            icon: "calendar", // Calendar
                             label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp",
                             bgColor: "#eff6ff",
                             borderColor: "#3b82f6",
@@ -1001,7 +1001,7 @@ export default function HoDDashBoard() {
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
                                 <span style={{ fontSize: "16px", flexShrink: 0 }}>
-                                  {chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}
+                                  {chipConfig.icon === "sparkles" ? <Sparkles size={16} /> : chipConfig.icon === "goal" ? <Goal size={16} /> : chipConfig.icon === "calendar" ? <Calendar size={16} /> : chipConfig.icon}
                                 </span>
                                 <div style={{ flex: 1 }}>
                                   <div style={{
@@ -1079,12 +1079,12 @@ export default function HoDDashBoard() {
                                       </div>
                                       {timeDisplay && (
                                         <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}>
-                                          <span>⏰</span><span>{timeDisplay}</span>
+                                          <span><Clock size={12} style={{ flexShrink: 0 }} /></span><span>{timeDisplay}</span>
                                         </div>
                                       )}
                                       {item?.location && (
                                         <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}>
-                                          <span>📍</span><span>{item.location}</span>
+                                          <MapPin size={12} style={{ flexShrink: 0 }} /><span>{item.location}</span>
                                         </div>
                                       )}
                                     </div>
@@ -1218,12 +1218,39 @@ export default function HoDDashBoard() {
                     const today = new Date()
                     today.setHours(0, 0, 0, 0)
 
+                    // Check for ongoing milestone (today)
+                    const ongoingMilestone = milestones.find(m => {
+                      const targetDate = parseDate(m?.targetDate || m?.dueDate)
+                      if (!targetDate) return false
+                      const milestoneDay = new Date(targetDate)
+                      milestoneDay.setHours(0, 0, 0, 0)
+                      return !isCompletedStatus(m?.status) && milestoneDay.getTime() === today.getTime()
+                    })
+
+                    if (ongoingMilestone) {
+                      return (
+                        <div
+                          className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
+                          style={{ backgroundColor: "#fef2f2" }}
+                        >
+                          <span style={{ color: "#dc2626", fontSize: "16px" }}><Calendar style={{ color: "#dc2626" }} /></span>
+                          <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
+                            Đang diễn ra: {ongoingMilestone.name}
+                          </span>
+                          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                            (Hôm nay)
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    // Check for next milestone (future)
                     const nextMilestone = milestones.find(m => {
                       const targetDate = parseDate(m?.targetDate || m?.dueDate)
                       if (!targetDate) return false
                       const milestoneDay = new Date(targetDate)
                       milestoneDay.setHours(0, 0, 0, 0)
-                      return !isCompletedStatus(m?.status) && milestoneDay >= today
+                      return !isCompletedStatus(m?.status) && milestoneDay > today
                     })
 
                     if (nextMilestone) {

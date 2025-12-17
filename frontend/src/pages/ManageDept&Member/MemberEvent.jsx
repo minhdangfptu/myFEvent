@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
@@ -13,22 +13,72 @@ function MemberCard({
   eventName,
   onClick,
 }) {
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=56`;
+
   return (
-    <div 
+    <div
       className="d-flex align-items-center gap-3"
       onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{ cursor: onClick ? 'pointer' : 'default', minWidth: 0 }}
     >
       <img
-        src={avatar || "https://i.pravatar.cc/100?img=12"}
+        src={avatar || defaultAvatar}
         className="rounded-circle"
-        style={{ width: 56, height: 56 }}
+        style={{ width: 56, height: 56, objectFit: 'cover', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = defaultAvatar;
+        }}
       />
-      <div className="lh-sm">
-        <div className="fw-semibold text-dark">{name}</div>
-        <div className="small text-muted">{role}</div>
-        {department && <div className="small text-muted">{department}</div>}
-        {eventName && <div className="small text-muted">{eventName}</div>}
+      <div className="lh-sm" style={{ minWidth: 0, flex: 1 }}>
+        <div
+          className="fw-semibold text-dark"
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={name}
+        >
+          {name}
+        </div>
+        <div
+          className="small text-muted"
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={role}
+        >
+          {role}
+        </div>
+        {department && (
+          <div
+            className="small text-muted"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={department}
+          >
+            {department}
+          </div>
+        )}
+        {eventName && (
+          <div
+            className="small text-muted"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            title={eventName}
+          >
+            {eventName}
+          </div>
+        )}
       </div>
     </div>
   );

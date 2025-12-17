@@ -174,6 +174,30 @@ export default function MemberEventDetail() {
     return configs[status] || configs.scheduled;
   };
 
+  const getMemberDisplayName = (member) => {
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.fullName || member.userId.email || member?.name || "Unknown"
+    }
+    return member?.name || member?.email || "Unknown"
+  }
+
+  const getMemberAvatar = (member) => {
+    // Priority 1: userId.avatarUrl (must be valid non-empty string)
+    if (member?.userId && typeof member.userId === 'object') {
+      const avatarUrl = member.userId.avatarUrl;
+      if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim() !== '') {
+        return avatarUrl;
+      }
+    }
+    // Priority 2: member.avatar (must be valid non-empty string)
+    if (member?.avatar && typeof member.avatar === 'string' && member.avatar.trim() !== '') {
+      return member.avatar;
+    }
+    // Fallback: only use ui-avatars if no valid avatarUrl exists
+    const displayName = getMemberDisplayName(member)
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=56`
+  }
+
   const statusConfig = getStatusConfig(event.status);
   const memberCount = event.memberCount || members.length || 0;
   const sidebarType = "member";
@@ -636,11 +660,20 @@ export default function MemberEventDetail() {
                     <div key={member._id || member.id} className="member-card">
                       <div className="member-avatar-wrapper">
                         <img
-                          src={member.userId?.avatarUrl || "/website-icon-fix@3x.png"}
-                          alt={member.userId?.fullName || "Member"}
+                          src={getMemberAvatar(member)}
+                          alt={getMemberDisplayName(member)}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => {
+                            // Only fallback if the current src is not already a fallback
+                            if (!e.target.src.includes('ui-avatars.com')) {
+                              e.target.onerror = null;
+                              const displayName = getMemberDisplayName(member);
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=56`;
+                            }
+                          }}
                         />
                       </div>
-                      <div className="member-name">{member.userId?.fullName || "Member"}</div>
+                      <div className="member-name">{getMemberDisplayName(member)}</div>
                     </div>
                   ))}
                   {members.length > 12 && (

@@ -8,7 +8,7 @@ import { departmentApi } from "~/apis/departmentApi";
 import { toast } from "react-toastify";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "../../components/Loading";
-import { CircleCheckBig } from "lucide-react";
+import { CircleCheckBig, Calendar, Pin, DownloadCloud, User, Tag } from "lucide-react";
 
 export default function RiskDetailPage() {
   const { t } = useTranslation();
@@ -1191,11 +1191,11 @@ export default function RiskDetailPage() {
                           <div className="col-md-6">
                             <div className="info-section">
                               <div className="info-item mb-2">
-                                <span className="info-label">📍 Địa điểm:</span>
+                                <span className="info-label"><Pin size={14} /> Địa điểm:</span>
                                 <span className="info-value">{occurred.occurred_location || "Chưa xác định"}</span>
                               </div>
                               <div className="info-item mb-2">
-                                <span className="info-label">📅 Thời gian:</span>
+                                <span className="info-label d-flex align-items-center gap-1"><Calendar size={14} /> Thời gian:</span>
                                 <span className="info-value">
                                   {occurred.occurred_date
                                     ? new Date(occurred.occurred_date).toLocaleString("vi-VN")
@@ -1203,13 +1203,13 @@ export default function RiskDetailPage() {
                                 </span>
                               </div>
                               <div className="info-item mb-2">
-                                <span className="info-label">📝 Mô tả: </span>
+                                <span className="info-label"><DownloadCloud size={14} /> Mô tả: </span>
                                 <span className="info-value">
                                 {occurred.occurred_description}
                                 </span>
                               </div>
                               <div className="info-item mb-2">
-                                <span className="info-label">👤 Người cập nhật: </span>
+                                <span className="info-label d-flex align-items-center gap-1"><User size={14} /> Người cập nhật: </span>
                                 <span className="info-value">
                                 {occurred.update_personId.userId.fullName}
                                 </span>
@@ -1222,7 +1222,7 @@ export default function RiskDetailPage() {
                             <div className="resolution-section">
                               {/* Status Badge */}
                               <div className="d-flex align-items-center mb-3">
-                                <span className="info-label me-2">🏷️ Trạng thái:</span>
+                                <span className="info-label me-2 d-flex align-items-center gap-1"><Tag size={14} /> Trạng thái:</span>
                                 <span
                                   className="status-badge"
                                   style={{
@@ -1240,7 +1240,7 @@ export default function RiskDetailPage() {
                                 <div className="resolution-info">
                                   {occurred.resolve_personId && (
                                     <div className="d-flex align-items-center mb-3">
-                                      <span className="info-label me-2">👤 Người xử lý:</span>
+                                      <span className="info-label me-2 d-flex align-items-center gap-1"><User size={14} /> Người xử lý:</span>
                                       <span className="info-value fw-bold text-success">
                                         {occurred.resolve_personId?.userId?.fullName || 
                                          occurred.resolve_personId?.userId?.name || 

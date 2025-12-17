@@ -65,17 +65,55 @@ const DepartmentDetail = () => {
   const { fetchEventRole, getEventMember } = useEvents();
   const { user } = useAuth();
 
-  const getMemberDisplayName = (member) =>
-    (member?.userId?.fullName) || member?.name || (member?.userId?.email) || "Unknown"
-  const getMemberEmail = (member) =>
-    (member?.userId?.email) || member?.email || ""
-  const getMemberAvatar = (member) =>
-    member?.userId?.avatarUrl || member?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(getMemberEmail(member) || String(member?._id || member?.id || ""))}`
+  const getMemberDisplayName = (member) => {
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.fullName || member.userId.email || member?.name || "Unknown"
+    }
+    return member?.name || member?.email || "Unknown"
+  }
+
+  const getMemberEmail = (member) => {
+    if (member?.userId && typeof member.userId === 'object') {
+      return member.userId.email || member?.email || ""
+    }
+    return member?.email || ""
+  }
+
+  const getMemberAvatar = (member) => {
+    if (member?.userId && typeof member.userId === 'object' && member.userId.avatarUrl) {
+      return member.userId.avatarUrl
+    }
+    if (member?.avatar) {
+      return member.avatar
+    }
+    const displayName = getMemberDisplayName(member)
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=40`
+  }
 
   const getLeaderDisplayName = (leader) => {
     if (!leader) return 'Chưa có'
     if (typeof leader === 'string') return leader
-    return leader.fullName || 'Chưa có'
+    return leader.fullName || leader.name || 'Chưa có'
+  }
+
+  const getLeaderAvatar = (leader) => {
+    if (!leader) return ''
+
+    // Try to find the HoD in the members array to get their actual avatar
+    const hodMember = members.find(m => m.role === 'HoD')
+
+    // If found HoD in members, use getMemberAvatar for consistency
+    if (hodMember) {
+      return getMemberAvatar(hodMember)
+    }
+
+    // Otherwise, use leader's own avatar
+    const avatarUrl = leader.avatar || leader.avatarUrl
+    if (avatarUrl) return avatarUrl
+
+    // Fallback to ui-avatars with name
+    const displayName = leader.fullName || leader.name || leader.email || 'User'
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`
   }
 
   // Normalize sidebar type for UserLayout
@@ -432,12 +470,19 @@ const DepartmentDetail = () => {
     }
   };
 
-  const filteredMembers = members.filter((member) => {
-    const name = String(getMemberDisplayName(member)).toLowerCase()
-    const email = String(getMemberEmail(member)).toLowerCase()
-    const q = searchQuery.toLowerCase()
-    return name.includes(q) || email.includes(q)
-  })
+  const filteredMembers = members
+    .filter((member) => {
+      const name = String(getMemberDisplayName(member)).toLowerCase()
+      const email = String(getMemberEmail(member)).toLowerCase()
+      const q = searchQuery.toLowerCase()
+      return name.includes(q) || email.includes(q)
+    })
+    .sort((a, b) => {
+      // Trưởng ban (HoD) luôn hiển thị ở đầu
+      if (a.role === 'HoD' && b.role !== 'HoD') return -1
+      if (a.role !== 'HoD' && b.role === 'HoD') return 1
+      return 0
+    })
 
   const filteredUnassignedMembers = unassignedMembers.filter(
     (member) =>
@@ -649,7 +694,7 @@ const DepartmentDetail = () => {
             </div>
 
             {/* Members Table */}
-            <div className="table-responsive">
+            <div className="table-responsive" style={{ maxHeight: "400px", overflowY: "auto" }}>
               <table className="table">
                 <thead>
                   <tr>
@@ -660,6 +705,7 @@ const DepartmentDetail = () => {
                         fontWeight: "600",
                         color: "#374151",
                         width: "80px",
+                        verticalAlign: "middle",
                       }}
                     >
                       STT
@@ -670,6 +716,20 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        width: "100px",
+                        whiteSpace: "nowrap",
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      Hình ảnh
+                    </th>
+                    <th
+                      style={{
+                        border: "none",
+                        padding: "15px",
+                        fontWeight: "600",
+                        color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Tên
@@ -680,6 +740,7 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Vai trò
@@ -690,6 +751,7 @@ const DepartmentDetail = () => {
                         padding: "15px",
                         fontWeight: "600",
                         color: "#374151",
+                        verticalAlign: "middle",
                       }}
                     >
                       Email
@@ -701,6 +763,7 @@ const DepartmentDetail = () => {
                           padding: "15px",
                           fontWeight: "600",
                           color: "#374151",
+                          verticalAlign: "middle",
                         }}
                       >
                         Hành động
@@ -709,32 +772,66 @@ const DepartmentDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMembers.map((member, index) => (
-                    <tr key={member._id || member.id}>
+                  {filteredMembers.length === 0 ? (
+                    <tr>
                       <td
-                        style={{
-                          padding: "15px",
-                          fontWeight: "500",
-                          color: "#6b7280",
-                        }}
+                        colSpan={canManageThisDepartment() ? 6 : 5}
+                        style={{ padding: "40px", textAlign: "center" }}
                       >
-                        {index + 1}
+                        <div className="d-flex flex-column align-items-center gap-2">
+                          <Users size={48} className="text-muted" />
+                          <p className="text-muted mb-0" style={{ fontSize: "14px" }}>
+                            {searchQuery ? "Không tìm thấy thành viên phù hợp" : "Chưa có thành viên nào trong ban"}
+                          </p>
+                        </div>
                       </td>
-                      <td
-                        style={{
-                          padding: "15px",
-                          fontWeight: "500",
-                          color: "#374151",
-                        }}
-                      >
-                        {getMemberDisplayName(member)}
-                      </td>
-                      <td style={{ padding: "15px", color: "#6b7280" }}>
-                        {member.role === 'HoD' ? 'Trưởng ban' : member.role === 'Member' ? 'Thành viên' : member.role}
-                      </td>
-                      <td style={{ padding: "15px", color: "#6b7280" }}>
-                        {getMemberEmail(member)}
-                      </td>
+                    </tr>
+                  ) : (
+                    filteredMembers.map((member, index) => (
+                      <tr key={member._id || member.id}>
+                        <td
+                          style={{
+                            padding: "15px",
+                            fontWeight: "500",
+                            color: "#6b7280",
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {index + 1}
+                        </td>
+                        <td style={{ padding: "15px", verticalAlign: "middle" }}>
+                          <img
+                            src={getMemberAvatar(member)}
+                            alt={getMemberDisplayName(member)}
+                            className="rounded-circle"
+                            style={{
+                              width: "40px",
+                              height: "40px",
+                              objectFit: "cover",
+                            }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              const displayName = getMemberDisplayName(member);
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=40`;
+                            }}
+                          />
+                        </td>
+                        <td
+                          style={{
+                            padding: "15px",
+                            fontWeight: "500",
+                            color: "#374151",
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {getMemberDisplayName(member)}
+                        </td>
+                        <td style={{ padding: "15px", color: "#6b7280", verticalAlign: "middle" }}>
+                          {member.role === 'HoD' ? 'Trưởng ban' : member.role === 'Member' ? 'Thành viên' : member.role}
+                        </td>
+                        <td style={{ padding: "15px", color: "#6b7280", verticalAlign: "middle" }}>
+                          {getMemberEmail(member)}
+                        </td>
                       {canManageThisDepartment() && (() => {
                         // Check if this member is the current user
                         const currentUserId = user?._id || user?.id;
@@ -773,7 +870,8 @@ const DepartmentDetail = () => {
                         );
                       })()}
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -912,13 +1010,15 @@ const DepartmentDetail = () => {
                     >
                       {department.leader ? (
                         <img
-                          src={
-                            department.leader.avatarUrl ||
-                            `https://i.pravatar.cc/100?u=${department.leader.email}`
-                          }
-                          alt={department.leader.fullName}
+                          src={getLeaderAvatar(department.leader)}
+                          alt={getLeaderDisplayName(department.leader)}
                           className="rounded-circle"
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            const displayName = department.leader.fullName || department.leader.name || department.leader.email || 'User';
+                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`;
+                          }}
                         />
                       ) : (
                         "?"
@@ -1209,10 +1309,8 @@ const DepartmentDetail = () => {
                               }}
                                 onError={(e) => {
                                   e.target.onerror = null;
-                                  e.target.src = `https://i.pravatar.cc/100?u=${encodeURIComponent(
-                                    getMemberEmail(member) ||
-                                      String(member?._id || member?.id || "")
-                                  )}`;
+                                  const displayName = getMemberDisplayName(member);
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=40`;
                                 }}
                               />
                             </div>
@@ -1419,7 +1517,7 @@ const DepartmentDetail = () => {
                         <div className="fw-semibold">{getMemberDisplayName(member)}</div>
                         <div className="small text-muted">{getMemberEmail(member)}</div>
                         <div className="small">
-                          <span className="badge bg-secondary">{member.role}</span>
+                          <span className="badge bg-secondary">Thành viên</span>
                         </div>
                       </div>
                       {selectedNewLeader?._id === member._id && (

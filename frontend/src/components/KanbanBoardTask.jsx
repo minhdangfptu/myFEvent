@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { taskApi } from '~/apis/taskApi';
 import { toast } from 'react-toastify';
+import { Calendar, User } from 'lucide-react';
 
 const normalizeAssigneeId = (assignee) => {
   if (!assignee) return null;
@@ -277,8 +278,8 @@ export default function KanbanBoardTask({
           {task.name || task.title}
         </h6>
         {task.department && <div className="mb-1 small"><span className="badge text-bg-light">{task.department}</span></div>}
-        {task.assignee && <div className="mb-1 small"><span className="text-muted">👤 {task.assignee}</span></div>}
-        {task.due && <div className="mb-1 small"><span className="text-muted">📅 {task.due}</span></div>}
+        {task.assignee && <div className="mb-1 small"><span className="text-muted d-flex align-items-center gap-1"><User size={14} /> {task.assignee}</span></div>}
+        {task.due && <div className="mb-1 small"><span className="text-muted d-flex align-items-center gap-1"><Calendar size={14} /> {task.due}</span></div>}
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
 import { getEventIdFromUrl } from "../../utils/getEventIdFromUrl"
 import { useEvents } from "../../contexts/EventContext"
-import { Calendar, Sparkles, Goal, CircleCheckBig, Users, Coins, DollarSignIcon, PinOff, LayoutList, ClipboardList } from "lucide-react";
+import { Calendar, Sparkles, Goal, CircleCheckBig, Users, Coins, DollarSignIcon, PinOff, LayoutList, ClipboardList, Clock, MapPin } from "lucide-react";
 
 // Helper function to generate calendar days (week starts on Monday)
 function generateCalendarDays() {
@@ -894,12 +894,39 @@ export default function HoOCDashBoard() {
                     const today = new Date()
                     today.setHours(0, 0, 0, 0)
 
+                    // Check for ongoing milestone (today)
+                    const ongoingMilestone = milestones.find(m => {
+                      const targetDate = parseDate(m?.targetDate || m?.dueDate)
+                      if (!targetDate) return false
+                      const milestoneDay = new Date(targetDate)
+                      milestoneDay.setHours(0, 0, 0, 0)
+                      return !isCompletedStatus(m?.status) && milestoneDay.getTime() === today.getTime()
+                    })
+
+                    if (ongoingMilestone) {
+                      return (
+                        <div
+                          className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
+                          style={{ backgroundColor: "#fef2f2" }}
+                        >
+                          <Calendar style={{ color: "#dc2626" }} size={16} />
+                          <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
+                            Đang diễn ra: {ongoingMilestone.name}
+                          </span>
+                          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                            (Hôm nay)
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    // Check for next milestone (future)
                     const nextMilestone = milestones.find(m => {
                       const targetDate = parseDate(m?.targetDate || m?.dueDate)
                       if (!targetDate) return false
                       const milestoneDay = new Date(targetDate)
                       milestoneDay.setHours(0, 0, 0, 0)
-                      return !isCompletedStatus(m?.status) && milestoneDay >= today
+                      return !isCompletedStatus(m?.status) && milestoneDay > today
                     })
 
                     if (nextMilestone) {
@@ -908,7 +935,7 @@ export default function HoOCDashBoard() {
                           className="d-flex align-items-center gap-2 mb-4 p-3 rounded-2"
                           style={{ backgroundColor: "#fef2f2" }}
                         >
-                          <span style={{ color: "#dc2626", fontSize: "16px" }}>📅</span>
+                          <Calendar style={{ color: "#dc2626" }} size={16} />
                           <span className="flex-grow-1" style={{ fontSize: "14px", color: "#374151", fontWeight: 500 }}>
                             Tiếp theo: {nextMilestone.name}
                           </span>
@@ -1160,7 +1187,7 @@ export default function HoOCDashBoard() {
                         let chipConfig = {}
                         if (hasMilestone && hasCalendar) {
                           chipConfig = {
-                            icon: "⭐",
+                            icon: "sparkles",
                             label: "Cột mốc & Lịch họp",
                             bgColor: "#fef3c7",
                             borderColor: "#fcd34d",
@@ -1168,7 +1195,7 @@ export default function HoOCDashBoard() {
                           }
                         } else if (hasMilestone) {
                           chipConfig = {
-                            icon: "🎯",
+                            icon: "goal",
                             label: milestoneCount > 1 ? `${milestoneCount} Cột mốc` : "Cột mốc",
                             bgColor: "#fef2f2",
                             borderColor: "#dc2626",
@@ -1176,7 +1203,7 @@ export default function HoOCDashBoard() {
                           }
                         } else {
                           chipConfig = {
-                            icon: "📅",
+                            icon: "calendar",
                             label: calendarCount > 1 ? `${calendarCount} Lịch họp` : "Lịch họp",
                             bgColor: "#eff6ff",
                             borderColor: "#3b82f6",
@@ -1190,7 +1217,7 @@ export default function HoOCDashBoard() {
                           <div className="mt-4 pt-3 border-top">
                             <div style={{ backgroundColor: chipConfig.bgColor, padding: "10px", borderRadius: "6px", borderLeft: `3px solid ${chipConfig.borderColor}` }}>
                               <div className="d-flex align-items-start gap-2">
-                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "⭐" ? <Sparkles size={16} /> : chipConfig.icon === "🎯" ? <Goal size={16} /> : chipConfig.icon === "📅" ? <Calendar size={16} /> : chipConfig.icon}</span>
+                                <span style={{ fontSize: "16px", flexShrink: 0 }}>{chipConfig.icon === "sparkles" ? <Sparkles size={16} /> : chipConfig.icon === "goal" ? <Goal size={16} /> : chipConfig.icon === "calendar" ? <Calendar size={16} /> : chipConfig.icon}</span>
                                 <div style={{ flex: 1 }}>
                                   <div style={{
                                     display: "inline-block",
@@ -1233,7 +1260,7 @@ export default function HoOCDashBoard() {
                                     borderLeft: "3px solid #dc2626"
                                   }}>
                                     <div className="d-flex align-items-start gap-2">
-                                      <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+                                      <Goal size={16} style={{ flexShrink: 0 }} />
                                       <div style={{ flex: 1 }}>
                                         <div style={{
                                           display: "inline-block",
@@ -1294,7 +1321,7 @@ export default function HoOCDashBoard() {
                                   borderLeft: "3px solid #3b82f6"
                                 }}>
                                   <div className="d-flex align-items-start gap-2">
-                                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📅</span>
+                                    <Calendar size={16} style={{ flexShrink: 0 }} />
                                     <div style={{ flex: 1 }}>
                                       <div style={{
                                         display: "inline-block",
@@ -1313,13 +1340,13 @@ export default function HoOCDashBoard() {
                                       </div>
                                       {timeDisplay && (
                                         <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px" }}>
-                                          <span>⏰</span>
+                                          <span><Clock size={12} style={{ flexShrink: 0 }} /></span>
                                           <span>{timeDisplay}</span>
                                         </div>
                                       )}
                                       {item?.location && (
                                         <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: "11px", marginTop: "2px" }}>
-                                          <span>📍</span>
+                                          <MapPin size={12} style={{ flexShrink: 0 }} />
                                           <span>{item.location}</span>
                                         </div>
                                       )}
@@ -1373,7 +1400,7 @@ export default function HoOCDashBoard() {
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền dự trù (HoD)
+                            Tiền dự trù 
                           </span>
                         </div>
                         <div className="d-flex align-items-center gap-1">
@@ -1386,7 +1413,7 @@ export default function HoOCDashBoard() {
                             }}
                           ></span>
                           <span className="text-muted" style={{ fontSize: "13px" }}>
-                            Tiền thực tế (Member)
+                            Tiền thực tế 
                           </span>
                         </div>
                       </div>

@@ -62,7 +62,7 @@ const isValidUrl = (string) => {
         return false;
     }
 };
-import { Users, UserPlus, Bell, Search, X } from "lucide-react";
+import { Users, UserPlus, Bell, Search, X, User } from "lucide-react";
 
 export default function UpdateDepartmentCalendarPage() {
     const navigate = useNavigate();
@@ -1216,7 +1216,7 @@ export default function UpdateDepartmentCalendarPage() {
                                                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                             />
                                                         ) : (
-                                                            <span style={{ fontSize: '18px' }}>👤</span>
+                                                            <User size={18} />
                                                         )}
                                                     </div>
                                                     <div style={{ flex: 1 }}>
@@ -1353,7 +1353,7 @@ export default function UpdateDepartmentCalendarPage() {
                                                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                                     />
                                                                 ) : (
-                                                                    <span style={{ fontSize: '18px' }}>👤</span>
+                                                                    <User size={18} />
                                                                 )}
                                                             </div>
                                                             <div>

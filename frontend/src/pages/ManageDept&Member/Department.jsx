@@ -26,6 +26,8 @@ const Department = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const { fetchEventRole } = useEvents();
 
@@ -120,15 +122,54 @@ const Department = () => {
     navigate(`/events/${eventId}/department-detail/${departmentId}`);
   };
 
+  const handleSortChange = (newSortBy) => {
+    if (sortBy === newSortBy) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
   const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Sort departments
+  const sortedDepartments = [...filteredDepartments].sort((a, b) => {
+    let aValue, bValue;
+
+    switch (sortBy) {
+      case 'name':
+        aValue = a.name?.toLowerCase() || '';
+        bValue = b.name?.toLowerCase() || '';
+        break;
+      case 'leader':
+        aValue = a.leader?.toLowerCase() || '';
+        bValue = b.leader?.toLowerCase() || '';
+        break;
+      case 'memberCount':
+        aValue = a.memberCount || 0;
+        bValue = b.memberCount || 0;
+        break;
+      default:
+        aValue = a.name?.toLowerCase() || '';
+        bValue = b.name?.toLowerCase() || '';
+    }
+
+    if (sortOrder === 'asc') {
+      return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+    } else {
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+    }
+  });
+
   // Calculate pagination
-  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedDepartments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentDepartments = filteredDepartments.slice(startIndex, endIndex);
+  const currentDepartments = sortedDepartments.slice(startIndex, endIndex);
 
   // Reset to page 1 when search query changes
   useEffect(() => {
@@ -199,7 +240,7 @@ const Department = () => {
               <Loading />
               <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải danh sách ban...</div>
             </div>
-          ) : filteredDepartments.length === 0 ? (
+          ) : sortedDepartments.length === 0 ? (
             <div className="d-flex flex-column justify-content-center align-items-center py-4">
               <img src={NoDataImg} alt="Không có dữ liệu" style={{ width: 200, maxWidth: '50vw', opacity: 0.8 }} />
               <div className="text-muted mt-3" style={{ fontSize: 18 }}>Chưa có ban nào được tạo!</div>
@@ -209,20 +250,38 @@ const Department = () => {
               <table className="table table-hover">
                 <thead>
                   <tr>
-                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <ArrowUp className="text-success me-1" size={16} />
+                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151', width: '80px' }}>
+                      STT
+                    </th>
+                    <th
+                      style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSortChange('name')}
+                    >
+                      
                       Tên Ban
+                      <span style={{ marginLeft: 4, fontSize: 12, opacity: 0.6 }}>
+                        {sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
                     </th>
-                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <ArrowUp className="text-success me-1" size={16} />
+                    <th
+                      style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSortChange('leader')}
+                    >
                       Trưởng Ban
+                      <span style={{ marginLeft: 4, fontSize: 12, opacity: 0.6 }}>
+                        {sortBy === 'leader' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
                     </th>
-                    <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <ArrowUp className="text-success me-1" size={16} />
+                    <th
+                      style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151', cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSortChange('memberCount')}
+                    >
                       Số thành viên
+                      <span style={{ marginLeft: 4, fontSize: 12, opacity: 0.6 }}>
+                        {sortBy === 'memberCount' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
                     </th>
                     <th style={{ border: 'none', padding: '15px', fontWeight: '600', color: '#374151' }}>
-                      <ArrowUp className="text-success me-1" size={16} />
                       Hành động
                     </th>
                   </tr>
@@ -237,6 +296,9 @@ const Department = () => {
                       }}
                       onClick={() => handleViewDetails(dept.id)}
                     >
+                      <td style={{ padding: '15px', color: '#6b7280' }}>
+                        {startIndex + index + 1}
+                      </td>
                       <td style={{ padding: '15px', fontWeight: '500', color: '#374151' }}>
                         {dept.name}
                       </td>
@@ -247,7 +309,7 @@ const Department = () => {
                         {dept.memberCount}
                       </td>
                       <td style={{ padding: '15px' }}>
-                        <span 
+                        <span
                           className="text-primary"
                           style={{ cursor: 'pointer', fontWeight: '500' }}
                           onClick={(e) => {

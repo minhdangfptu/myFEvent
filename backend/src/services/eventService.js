@@ -258,7 +258,7 @@ export const eventService = {
         return ensureAutoStatusForDoc(eventRaw);
       })(),
       EventMember.find({ eventId: eventRaw._id, status: { $ne: 'deactive' } })
-        .populate('userId', 'fullName email')
+        .populate('userId', 'fullName email avatarUrl')
         .lean()
     ]);
 

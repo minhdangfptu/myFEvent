@@ -89,6 +89,10 @@ export default function CalendarDetail() {
         const fetchEventDetails = async () => {
             try {
                 const response = await calendarService.getCalendarEventDetail(eventId, calendarId);
+                console.log('Calendar API Response:', response);
+                console.log('Calendar data:', response.data);
+                console.log('Description:', response.data?.description);
+                console.log('Attachments:', response.data?.attachments);
                 setCalendar(response.data);
                 const currentDate = new Date();
                 if (new Date(response?.data.endAt).getTime() < currentDate.getTime()) {
@@ -712,7 +716,7 @@ export default function CalendarDetail() {
                                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Ghi chú cuộc họp</h4>
                                 </div>
                                 <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: '1.6' }}>
-                                    {calendar.description || 'Chưa có ghi chú cho cuộc họp này.'}
+                                    {calendar.notes || 'Chưa có ghi chú cho cuộc họp này.'}
                                 </p>
                             </div>
 
@@ -721,7 +725,7 @@ export default function CalendarDetail() {
                                     <Paperclip size={16} color="#5b45afff " />
                                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Tài liệu cuộc họp</h4>
                                 </div>
-                                {calendar.attachments.length > 0 ? (
+                                {calendar.attachments && Array.isArray(calendar.attachments) && calendar.attachments.length > 0 ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                         {calendar.attachments.map((att, index) => (
                                             <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>

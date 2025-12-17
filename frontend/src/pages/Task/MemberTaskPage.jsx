@@ -11,7 +11,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import KanbanBoardTask from "~/components/KanbanBoardTask";
 import { useAuth } from "~/contexts/AuthContext";
-import { ClipboardList, FileText, Users, User, Calendar, BarChart3 } from "lucide-react";
+import { ClipboardList, FileText, Users, User, Calendar, BarChart3, Lightbulb } from "lucide-react";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -637,7 +637,7 @@ export default function MemberTaskPage() {
                 className="alert alert-info d-flex align-items-start gap-2"
                 style={{ fontSize: 13, borderRadius: 12 }}
               >
-                <span style={{ fontSize: 18 }}>💡</span>
+                <Lightbulb size={18} style={{ flexShrink: 0 }} />
                 <div>
                   Bạn có thể đổi trạng thái công việc bằng cách bấm trực tiếp vào
                   badge trạng thái trong bảng danh sách hoặc kéo thả trong bảng Kanban
