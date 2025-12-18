@@ -53,5 +53,9 @@ export const departmentService = {
     removeMemberFromDepartment: async (eventId, departmentId, memberId) => {
         const response = await departmentApi.removeMemberFromDepartment(eventId, departmentId, memberId);
         return unwrapResponse(response);
+    },
+    getDepartmentAvailableMembers: async (eventId, departmentId) => {
+        const response = await departmentApi.getDepartmentAvailableMembers(eventId, departmentId);
+        return unwrapResponse(response);
     }
 };

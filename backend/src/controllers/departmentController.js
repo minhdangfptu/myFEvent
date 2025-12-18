@@ -481,3 +481,26 @@ export const removeMemberFromDepartment = async (req, res) => {
     return res.status(500).json({ message: 'Failed to remove member from department' });
   }
 };
+export const getDepartmentAvailableMembers = async (req, res) => {
+  try{
+    const { eventId, departmentId } = req.params;
+
+    if (!(await ensureEventExists(eventId))) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const department = await ensureDepartmentInEvent(eventId, departmentId);
+    if (!department) return res.status(404).json({ message: 'Department not found' });
+
+    const departmentMembers = await getMembersByDepartmentRaw(departmentId);
+    const departmentMemberIds = departmentMembers.map(member => member.userId.toString());
+
+    const availableMembers = departmentMembers.filter(member => 
+      member.role !== 'HoD'
+    );
+
+    return res.status(200).json({ data: availableMembers });
+  } catch (error) {
+    console.error('getDepartmentAvailableMembers error:', error);
+    return res.status(500).json({ message: error.message });
+  }
+}
