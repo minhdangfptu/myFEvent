@@ -120,7 +120,7 @@ export default function HoOCSidebar({
   ];
   const financeSubItems = [
     { id: "finance-budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets` },
-    { id: "finance-stats", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/statistics` },
+    { id: "finance-stats", label: "Thống kê chi tiêu", path: `/events/${eventId || ''}/budgets/statistics` },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },

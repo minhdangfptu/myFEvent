@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
 import { useAuth } from "../../contexts/AuthContext";
 import UserLayout from "../../components/UserLayout";
 import { eventApi } from "../../apis/eventApi";
@@ -465,23 +465,69 @@ const handleImageUpload = async () => {
 
   // ========== UTILITY FUNCTIONS ==========
   const copyToClipboard = async (text) => {
+    if (!text) {
+      toast.error("Không có nội dung để sao chép");
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Đã sao chép!");
-    } catch (err) {
+      // Thử dùng Clipboard API hiện đại trước
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        toast.success("Đã sao chép mã mời tham gia!");
+        return;
+      }
+      
+      // Fallback cho trình duyệt cũ
       const textArea = document.createElement("textarea");
       textArea.value = text;
       textArea.style.position = "fixed";
+      textArea.style.top = "0";
       textArea.style.left = "-999999px";
+      textArea.style.opacity = "0";
       document.body.appendChild(textArea);
+      textArea.focus();
       textArea.select();
+      
       try {
-        document.execCommand("copy");
-        toast.success("Đã sao chép!");
+        const successful = document.execCommand("copy");
+        if (successful) {
+          toast.success("Đã sao chép mã mời tham gia!");
+        } else {
+          toast.error("Không thể sao chép. Vui lòng thử lại.");
+        }
       } catch (e) {
-        toast.error("Không thể sao chép");
+        console.error("Copy failed:", e);
+        toast.error("Không thể sao chép. Vui lòng thử lại.");
+      } finally {
+        document.body.removeChild(textArea);
       }
-      document.body.removeChild(textArea);
+    } catch (err) {
+      console.error("Clipboard API error:", err);
+      // Fallback method
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "-999999px";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand("copy");
+        if (successful) {
+          toast.success("Đã sao chép mã mời tham gia!");
+        } else {
+          toast.error("Không thể sao chép. Vui lòng thử lại.");
+        }
+      } catch (e) {
+        console.error("Fallback copy failed:", e);
+        toast.error("Không thể sao chép. Vui lòng thử lại.");
+      } finally {
+        document.body.removeChild(textArea);
+      }
     }
   };
 
@@ -1752,6 +1798,7 @@ const handleImageUpload = async () => {
           </div>
         </div>
       )}
+      <ToastContainer position="top-right" autoClose={3000} />
     </UserLayout>
   );
 }

@@ -733,7 +733,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                 Chờ duyệt
               </span>
               <p className="text-muted mb-0 mt-2" style={{ fontSize: "14px" }}>
-                Trạng thái budget
+                Trạng thái ngân sách dự trù
               </p>
             </div>
           </div>

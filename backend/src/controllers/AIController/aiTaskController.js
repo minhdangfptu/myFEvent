@@ -67,10 +67,17 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
       });
     }
 
+    // Đảm bảo departmentId được convert đúng (có thể là ObjectId hoặc string từ lean())
+    const epicDepartmentId = epic.departmentId?._id || epic.departmentId;
+    if (!epicDepartmentId) {
+      return res.status(400).json({
+        message: 'Epic không có departmentId hợp lệ',
+      });
+    }
+
     // 4) Nếu là HoD, kiểm tra EPIC phải thuộc ban của HoD
     if (isHoD && userDepartmentId) {
-      const epicDepartmentId = String(epic.departmentId);
-      if (epicDepartmentId !== userDepartmentId) {
+      if (String(epicDepartmentId) !== userDepartmentId) {
         return res.status(403).json({ 
           message: 'HoD chỉ được tạo TASK trong EPIC của ban mình. EPIC này thuộc ban khác.' 
         });
@@ -132,11 +139,21 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
         dueDate = date;
       }
 
+      // Đảm bảo departmentId được convert đúng (có thể là ObjectId hoặc string)
+      const taskDepartmentId = epic.departmentId?._id || epic.departmentId || null;
+      if (!taskDepartmentId) {
+        errors.push(`TASK[#${index}] không thể xác định departmentId từ EPIC`);
+        return;
+      }
+
+      // Log để debug
+      console.log(`[aiBulkCreateTasksForEpic] Tạo TASK[${index}]: title="${title}", departmentId=${taskDepartmentId}, parentId=${epic._id}`);
+
       docsToCreate.push({
         title,
         description: desc,
         eventId: event._id,
-        departmentId: epic.departmentId,
+        departmentId: taskDepartmentId, // Đảm bảo departmentId được set đúng từ epic
         parentId: epic._id,
 
         taskType: 'normal',      // EPIC = 'epic', task con = 'normal'
@@ -228,9 +245,18 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
       await Task.bulkWrite(bulkOps);
     }
 
-    // Lấy lại danh sách task đã tạo (kèm dependencies)
+    // Lấy lại danh sách task đã tạo (kèm dependencies) với populate departmentId
     const finalTaskIds = createdTasks.map((t) => t._id);
-    const finalTasks = await Task.find({ _id: { $in: finalTaskIds } }).lean();
+    const finalTasks = await Task.find({ _id: { $in: finalTaskIds } })
+      .populate('departmentId', 'name _id')
+      .lean();
+    
+    // Log để debug
+    console.log(`[aiBulkCreateTasksForEpic] Đã tạo ${finalTasks.length} TASK cho epicId=${epicId}`);
+    finalTasks.forEach((task, idx) => {
+      const deptId = task.departmentId?._id || task.departmentId;
+      console.log(`[aiBulkCreateTasksForEpic] TASK[${idx}]: _id=${task._id}, title="${task.title}", departmentId=${deptId}`);
+    });
 
     return res.status(201).json({
       message: 'AI bulk create tasks for epic completed',

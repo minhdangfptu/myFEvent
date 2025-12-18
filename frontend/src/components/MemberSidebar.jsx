@@ -174,11 +174,14 @@ export default function MemberSidebar({
     // Không có work-stats (thống kê tiến độ)
   ];
 
-  // Submenu Tài chính - Member có đầy đủ quyền trừ thống kê thu chi
+  // Submenu Tài chính - Member có đầy đủ quyền, bao gồm Ngân sách và Thống kê chi tiêu
   const financeSubItems = [
     // Ngân sách: trang budget riêng cho member
-    { id: "budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets/member` },
-    // Không có finance-stats (thống kê thu chi)
+    // id khớp với activePage="finance-budget" để nút được highlight đúng
+    { id: "finance-budget", label: "Ngân sách", path: `/events/${eventId || ''}/budgets/member` },
+    // Thống kê chi tiêu: trang chi tiêu/expenses cho member
+    // id khớp với activePage="finance-statistics" trong MemberExpensePage
+    { id: "finance-statistics", label: "Thống kê chi tiêu", path: `/events/${eventId || ''}/expenses` },
   ];
   const risksSubItems = [
     { id: "risk-list", label: "Danh sách rủi ro", path: `/events/${eventId || ''}/risks` },

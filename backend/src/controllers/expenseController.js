@@ -300,7 +300,7 @@ export const submitExpense = async (req, res) => {
     const hasEvidence = expense.evidence && expense.evidence.length > 0;
 
     if (!hasActualAmount && !hasEvidence) {
-      return res.status(400).json({ message: 'Please provide actual amount or evidence before submitting' });
+      return res.status(400).json({ message: 'Vui lòng cung cấp số tiền thực tế hoặc bằng chứng trước khi nộp.' });
     }
 
     // Update submittedStatus

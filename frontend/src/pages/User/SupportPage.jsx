@@ -239,7 +239,7 @@ export default function SupportPage() {
         id: 29,
         question: "Làm sao để theo dõi và phân tích ngân sách?",
         answer:
-          "Trưởng ban Tổ chức và Trưởng ban vào 'Tài chính' > 'Thống kê thu chi'. Xem biểu đồ so sánh ngân sách dự kiến vs thực tế theo từng ban. Xem chi tiết từng hạng mục đã chi bao nhiêu. Phát hiện các hạng mục vượt ngân sách (màu đỏ cảnh báo). Xuất báo cáo chi tiết dưới dạng Excel để trình sponsor hoặc lãnh đạo.",
+          "Trưởng ban Tổ chức và Trưởng ban vào 'Tài chính' > 'Thống kê chi tiêu'. Xem biểu đồ so sánh ngân sách dự kiến vs thực tế theo từng ban. Xem chi tiết từng hạng mục đã chi bao nhiêu. Phát hiện các hạng mục vượt ngân sách (màu đỏ cảnh báo). Xuất báo cáo chi tiết dưới dạng Excel để trình sponsor hoặc lãnh đạo.",
       },
       {
         id: 30,

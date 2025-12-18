@@ -6,9 +6,12 @@ import User from '../models/user.js';
 
 // GET /api/notifications - Lấy tất cả notifications của user hiện tại
 export const getNotifications = async (req, res) => {
+  const startTime = Date.now();
   try {
     const userId = req.user.id;
     const { unread, limit = 50 } = req.query;
+
+    console.log(`[getNotifications] Bắt đầu lấy notifications cho userId=${userId}, unread=${unread}, limit=${limit}`);
 
     let filter = { userId };
     if (unread !== undefined) {
@@ -20,9 +23,22 @@ export const getNotifications = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
+    const duration = Date.now() - startTime;
+    console.log(`[getNotifications] Hoàn thành sau ${duration}ms, trả về ${notifications.length} notifications`);
+
     return res.status(200).json({ data: notifications });
   } catch (error) {
-    console.error('Error getting notifications:', error);
+    const duration = Date.now() - startTime;
+    console.error(`[getNotifications] Error sau ${duration}ms:`, error);
+    
+    // Kiểm tra nếu là timeout
+    if (error.name === 'MongoServerSelectionError' || error.message?.includes('timeout')) {
+      return res.status(504).json({ 
+        message: 'Database timeout. Vui lòng thử lại sau.',
+        error: 'Database connection timeout'
+      });
+    }
+    
     return res.status(500).json({ message: 'Lỗi lấy thông báo' });
   }
 };

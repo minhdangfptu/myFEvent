@@ -12,7 +12,7 @@ import { Coins, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign } fro
 const BudgetStatisticsHoD = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { fetchEventRole } = useEvents();
+  const { fetchEventRole, forceCheckEventAccess } = useEvents();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [statistics, setStatistics] = useState({
@@ -34,7 +34,9 @@ const BudgetStatisticsHoD = () => {
       setLoading(true);
       
       // Kiểm tra role và lấy department của HOD
-      const role = await fetchEventRole(eventId);
+      // Dùng forceCheckEventAccess để đảm bảo lấy role mới nhất từ server
+      // (quan trọng khi vừa được chuyển ban)
+      const role = await forceCheckEventAccess(eventId) || await fetchEventRole(eventId);
       
       if (role !== 'HoD' || !user) {
         toast.error("Bạn không có quyền truy cập trang này");
@@ -51,11 +53,6 @@ const BudgetStatisticsHoD = () => {
         return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
       });
       
-      if (!userDepartment) {
-        toast.error("Không tìm thấy ban mà bạn là trưởng ban");
-        setLoading(false);
-        return;
-      }
 
       const deptId = userDepartment._id || userDepartment.id;
       setHodDepartmentId(deptId);
@@ -165,14 +162,14 @@ const BudgetStatisticsHoD = () => {
   if (loading) {
     return (
       <UserLayout
-        title="Thống kê thu chi"
+        title="Thống kê chi tiêu"
         activePage="finance-statistics"
         sidebarType="hod"
         eventId={eventId}
       >
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
           <Loading />
-          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thống kê thu chi...</div>
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải Thống kê chi tiêu...</div>
         </div>
       </UserLayout>
     );
@@ -182,7 +179,7 @@ const BudgetStatisticsHoD = () => {
 
   return (
     <UserLayout
-      title="Thống kê thu chi"
+      title="Thống kê chi tiêu"
       activePage="finance-statistics"
       sidebarType="hod"
       eventId={eventId}
@@ -192,7 +189,7 @@ const BudgetStatisticsHoD = () => {
         <div className="mb-4 d-flex justify-content-between align-items-start">
           <div>
             <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-              Thống kê thu chi
+              Thống kê chi tiêu
             </h2>
             <p className="text-muted">Thống kê tổng hợp các đơn ngân sách của {departmentName}</p>
           </div>

@@ -5,6 +5,8 @@ import { toast } from "react-toastify";
 import UserLayout from "../../components/UserLayout";
 import { useTranslation } from "react-i18next";
 import { useEvents } from "~/contexts/EventContext";
+import { useAuth } from "~/contexts/AuthContext";
+import { userApi } from "~/apis/userApi";
 
 /** 
  * CustomGanttChart Component - FIXED VERSION
@@ -479,7 +481,8 @@ const customGanttCSS = `
 export default function GanttChartTaskPage() {
   const { t } = useTranslation();
   const { eventId } = useParams();
-  const { fetchEventRole } = useEvents();
+  const { fetchEventRole, getEventMember } = useEvents();
+  const { user } = useAuth();
 
   const [allTasks, setAllTasks] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -487,22 +490,49 @@ export default function GanttChartTaskPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("week");
   const [eventRole, setEventRole] = useState("");
+  const [memberId, setMemberId] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("Tất cả");
 
+  // Load role + memberId (đặc biệt quan trọng cho Member)
   useEffect(() => {
-    if (eventId) fetchEventRole(eventId).then(setEventRole);
+    if (!eventId) return;
+
+    // Cập nhật cache role trong EventContext (không chặn luồng chính)
+    fetchEventRole(eventId).catch(() => {});
+
+    (async () => {
+      try {
+        const roleResponse = await userApi.getUserRoleByEvent(eventId);
+        const role = roleResponse?.role || "";
+        setEventRole(role);
+
+        if (role === "Member") {
+          const memId =
+            roleResponse?.eventMemberId ||
+            roleResponse?.memberId ||
+            roleResponse?._id ||
+            null;
+          setMemberId(memId ? String(memId) : null);
+        } else {
+          setMemberId(null);
+        }
+      } catch {
+        setMemberId(null);
+      }
+    })();
   }, [eventId, fetchEventRole]);
 
   const getSidebarType = () => {
     if (eventRole === "HoOC") return "hooc";
-    if (eventRole === "HoD") return "HoD";
+    if (eventRole === "HoD") return "hod";
     if (eventRole === "Member") return "member";
     return "user";
   };
 
   useEffect(() => {
+    // Chỉ cần eventId để load dữ liệu; role/memberId dùng cho filter nhưng không được chặn việc load
     if (!eventId) return;
 
     (async () => {
@@ -511,9 +541,49 @@ export default function GanttChartTaskPage() {
         const apiRes = await taskApi.getTaskByEvent(eventId);
         const arr = apiRes?.data || [];
 
-        const normalTasks = arr.filter((task) => task.taskType === "normal" || !task.taskType);
-        
-        const mapped = normalTasks.map((task) => {
+        // Chỉ lấy task thường (taskType = normal)
+        const normalTasks = arr.filter(
+          (task) => task.taskType === "normal" || !task.taskType
+        );
+
+        // Lấy thông tin membership (role + departmentId + eventMemberId) từ context
+        const memberInfo = getEventMember(eventId) || {};
+        const currentDeptId = memberInfo.departmentId;
+        const currentEventMemberId = memberInfo.eventMemberId;
+
+        // Áp dụng phân quyền hiển thị:
+        // - HoOC: thấy tất cả task
+        // - HoD: chỉ thấy task của ban mình (departmentId khớp)
+        // - Member: chỉ thấy task được giao cho chính mình (logic giống MemberTaskPage)
+        let scopedTasks = [...normalTasks];
+
+        if (eventRole === "HoD" && currentDeptId) {
+          scopedTasks = normalTasks.filter((task) => {
+            const taskDeptId =
+              task.departmentId?._id ||
+              task.departmentId ||
+              task.department?._id ||
+              task.department;
+            return (
+              taskDeptId &&
+              String(taskDeptId) === String(currentDeptId)
+            );
+          });
+        } else if (eventRole === "Member" && memberId) {
+          const targetMemberId = String(memberId);
+          scopedTasks = normalTasks.filter((task) => {
+            // Giữ đúng logic filter như trang MemberTaskPage:
+            // taskAssigneeId = task.assigneeId?._id || task.assigneeId
+            const assigneeMemberId =
+              task.assigneeId?._id || task.assigneeId || null;
+            return (
+              assigneeMemberId &&
+              String(assigneeMemberId) === targetMemberId
+            );
+          });
+        }
+
+        const mapped = scopedTasks.map((task) => {
           const startDate = task.startDate ? new Date(task.startDate) : (task.createdAt ? new Date(task.createdAt) : new Date());
           let endDate = startDate;
 
@@ -637,7 +707,7 @@ export default function GanttChartTaskPage() {
 
   return (
     <UserLayout
-      title={(t("taskPage.title") || "Tasks") + ": Biểu đồ Gantt"}
+      title={ "Biểu đồ Gantt"}
       activePage="work-gantt"
       sidebarType={getSidebarType()}
       eventId={eventId}

@@ -38,7 +38,7 @@ export default function MemberProfilePage() {
   const [roleSaving, setRoleSaving] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
   const [userDepartmentId, setUserDepartmentId] = useState(null);
-  const { fetchEventRole, getEventMember } = useEvents();
+  const { fetchEventRole, getEventMember, invalidateEventCache, clearAllCache, forceCheckEventAccess } = useEvents();
   const { user } = useAuth();
 
   // Get member data from navigation state if available
@@ -216,11 +216,82 @@ export default function MemberProfilePage() {
     try {
       setDepartmentModalSaving(true);
       const response = await eventApi.changeMemberDepartment(eventId, memberObjectId, nextDepartmentId);
-      const updatedMember = response?.data || response;
-      if (updatedMember) {
-        setMember(prev => ({ ...prev, ...updatedMember }));
+      
+      // Invalidate cache để các component khác cũng thấy thay đổi
+      if (eventId) {
+        invalidateEventCache(eventId);
+        
+        // Kiểm tra xem có đang xem chính mình không
+        const currentUserId = user?._id || user?.id || null;
+        const memberUserId = member?.userId?._id || member?.userId?.id || member?.userId || null;
+        const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+        
+        if (isViewingSelf) {
+          // Đang xem chính mình và vừa được chuyển ban
+          // Cần clear toàn bộ cache và refetch để đảm bảo có dữ liệu mới nhất
+          
+          // Clear cache trước
+          clearAllCache();
+          
+          // Clear localStorage trực tiếp để đảm bảo không còn cache cũ
+          const currentUserId = user?._id || user?.id;
+          if (currentUserId) {
+            try {
+              const rolesKey = `eventRoles_${currentUserId}`;
+              const membersKey = `eventMembers_${currentUserId}`;
+              localStorage.removeItem(rolesKey);
+              localStorage.removeItem(membersKey);
+              localStorage.removeItem('eventRoles');
+              localStorage.removeItem('eventMembers');
+            } catch (err) {
+              console.error('Error clearing localStorage:', err);
+            }
+          }
+          
+          // Đợi một chút để đảm bảo cache đã được clear
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Force check từ server (không dùng cache)
+          const newRole = await forceCheckEventAccess(eventId);
+          
+          // Cập nhật eventRole state ngay lập tức để sidebar được cập nhật
+          if (newRole) {
+            setEventRole(newRole);
+          }
+          
+          // Reload page để đảm bảo tất cả components được refresh với role mới
+          // Đợi một chút để toast hiển thị trước khi reload
+          setTimeout(() => {
+            window.location.href = `/events/${eventId}`;
+          }, 1500);
+        }
       }
-      toast.success(response?.message || 'Cập nhật ban thành công!');
+      
+      // Refetch member data từ server để đảm bảo sync
+      try {
+        const refreshedMember = await eventService.getMemberDetail(eventId, memberObjectId);
+        if (refreshedMember) {
+          const memberData = refreshedMember.data?.member || refreshedMember.data || refreshedMember;
+          if (memberData) {
+            setMember(memberData);
+            if (refreshedMember.data?.stats) {
+              setMemberStats(refreshedMember.data.stats);
+            }
+          }
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing member data:', refreshError);
+        // Fallback: cập nhật từ response nếu có
+        // Response có thể là {message: '...', data: {...}} hoặc trực tiếp là data
+        const updatedMember = response?.data?.data || response?.data || response;
+        if (updatedMember && (updatedMember._id || updatedMember.id)) {
+          setMember(prev => ({ ...prev, ...updatedMember }));
+        }
+      }
+      
+      // Lấy message từ response (có thể nested)
+      const successMessage = response?.message || response?.data?.message || 'Cập nhật ban thành công!';
+      toast.success(successMessage);
       setShowDepartmentModal(false);
     } catch (error) {
       console.error('Error changing department:', error);
@@ -229,6 +300,11 @@ export default function MemberProfilePage() {
       setDepartmentModalSaving(false);
     }
   };
+
+  const roleOptions = [
+    { value: 'HoD', label: 'Trưởng ban', description: 'Điều phối kế hoạch và nhiệm vụ trong ban' },
+    { value: 'Member', label: 'Thành viên', description: 'Tham gia thực hiện nhiệm vụ được giao' },
+  ];
 
   const handleOpenRoleModal = () => {
     if (!member) return;
@@ -252,11 +328,82 @@ export default function MemberProfilePage() {
     try {
       setRoleSaving(true);
       const response = await eventApi.updateMemberRole(eventId, memberObjectId, selectedRole);
-      const updatedMember = response?.data || response;
-      if (updatedMember) {
-        setMember(prev => ({ ...prev, ...updatedMember }));
+      
+      // Invalidate cache để các component khác cũng thấy thay đổi
+      if (eventId) {
+        invalidateEventCache(eventId);
+        
+        // Kiểm tra xem có đang xem chính mình không
+        const currentUserId = user?._id || user?.id || null;
+        const memberUserId = member?.userId?._id || member?.userId?.id || member?.userId || null;
+        const isViewingSelf = currentUserId && memberUserId && String(currentUserId) === String(memberUserId);
+        
+        if (isViewingSelf) {
+          // Đang xem chính mình và vừa được thay đổi vai trò
+          // Cần clear toàn bộ cache và refetch để đảm bảo có dữ liệu mới nhất
+          
+          // Clear cache trước
+          clearAllCache();
+          
+          // Clear localStorage trực tiếp để đảm bảo không còn cache cũ
+          const currentUserId = user?._id || user?.id;
+          if (currentUserId) {
+            try {
+              const rolesKey = `eventRoles_${currentUserId}`;
+              const membersKey = `eventMembers_${currentUserId}`;
+              localStorage.removeItem(rolesKey);
+              localStorage.removeItem(membersKey);
+              localStorage.removeItem('eventRoles');
+              localStorage.removeItem('eventMembers');
+            } catch (err) {
+              console.error('Error clearing localStorage:', err);
+            }
+          }
+          
+          // Đợi một chút để đảm bảo cache đã được clear
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Force check từ server (không dùng cache)
+          const newRole = await forceCheckEventAccess(eventId);
+          
+          // Cập nhật eventRole state ngay lập tức để sidebar được cập nhật
+          if (newRole) {
+            setEventRole(newRole);
+          }
+          
+          // Reload page để đảm bảo tất cả components được refresh với role mới
+          // Đợi một chút để toast hiển thị trước khi reload
+          setTimeout(() => {
+            window.location.href = `/events/${eventId}`;
+          }, 1500);
+        }
       }
-      toast.success(response?.message || 'Cập nhật vai trò thành công!');
+      
+      // Refetch member data từ server để đảm bảo sync
+      try {
+        const refreshedMember = await eventService.getMemberDetail(eventId, memberObjectId);
+        if (refreshedMember) {
+          const memberData = refreshedMember.data?.member || refreshedMember.data || refreshedMember;
+          if (memberData) {
+            setMember(memberData);
+            if (refreshedMember.data?.stats) {
+              setMemberStats(refreshedMember.data.stats);
+            }
+          }
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing member data:', refreshError);
+        // Fallback: cập nhật từ response nếu có
+        // Response có thể là {message: '...', data: {...}} hoặc trực tiếp là data
+        const updatedMember = response?.data?.data || response?.data || response;
+        if (updatedMember && (updatedMember._id || updatedMember.id)) {
+          setMember(prev => ({ ...prev, ...updatedMember }));
+        }
+      }
+      
+      // Lấy message từ response (có thể nested)
+      const successMessage = response?.message || response?.data?.message || 'Cập nhật vai trò thành công!';
+      toast.success(successMessage);
       setShowRoleModal(false);
     } catch (error) {
       console.error('Error changing role:', error);
@@ -378,10 +525,6 @@ export default function MemberProfilePage() {
   // HoD can remove others in their department, but NOT themselves
   const canRemoveMember = canManage && !(isViewingSelf && (memberRole === 'HoOC' || memberRole === 'HoD'));
   const shouldShowDepartmentInfo = memberRole !== 'HoOC';
-  const roleOptions = [
-    { value: 'HoD', label: 'Trưởng ban', description: 'Điều phối kế hoạch và nhiệm vụ trong ban' },
-    { value: 'Member', label: 'Thành viên', description: 'Tham gia thực hiện nhiệm vụ được giao' },
-  ];
 
   return (
     <UserLayout
@@ -781,6 +924,133 @@ export default function MemberProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Department Change Modal */}
+      {showDepartmentModal && (
+        <div className="custom-modal-overlay" onClick={() => setShowDepartmentModal(false)}>
+          <div className="custom-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h5 className="mb-3">Chuyển ban</h5>
+            {departmentModalLoading ? (
+              <div className="text-center py-4">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Đang tải...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3">
+                  <label className="form-label">Chọn ban</label>
+                  <select
+                    className="form-select"
+                    value={selectedDepartmentId || ''}
+                    onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                    disabled={departmentModalSaving}
+                  >
+                    <option value="">Chưa có ban</option>
+                    {departmentOptions.map((dept) => (
+                      <option key={dept._id || dept.id} value={dept._id || dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {departmentModalError && (
+                  <div className="alert alert-danger mb-3" role="alert">
+                    {departmentModalError}
+                  </div>
+                )}
+                <div className="modal-actions">
+                  <button
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowDepartmentModal(false)}
+                    disabled={departmentModalSaving}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmChangeDepartment}
+                    disabled={departmentModalSaving}
+                  >
+                    {departmentModalSaving ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} className="me-1" />
+                        Xác nhận
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Role Change Modal */}
+      {showRoleModal && (
+        <div className="custom-modal-overlay" onClick={() => setShowRoleModal(false)}>
+          <div className="custom-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h5 className="mb-3">Thay đổi vai trò</h5>
+            <div className="mb-3">
+              <label className="form-label">Chọn vai trò mới</label>
+              <div className="d-flex flex-column gap-2">
+                {roleOptions.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`role-option ${selectedRole === option.value ? 'active' : ''}`}
+                    onClick={() => setSelectedRole(option.value)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <input
+                      type="radio"
+                      name="role"
+                      value={option.value}
+                      checked={selectedRole === option.value}
+                      onChange={() => setSelectedRole(option.value)}
+                      disabled={roleSaving}
+                    />
+                    <div className="flex-grow-1">
+                      <div className="fw-semibold">{option.label}</div>
+                      <div className="small text-muted">{option.description}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="btn btn-outline-secondary"
+                onClick={() => setShowRoleModal(false)}
+                disabled={roleSaving}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleConfirmChangeRole}
+                disabled={roleSaving}
+              >
+                {roleSaving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <Check size={16} className="me-1" />
+                    Xác nhận
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </UserLayout>
   );
 }
