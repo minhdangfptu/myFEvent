@@ -507,16 +507,6 @@ export const feedbackService = {
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log(`[getAvailableFormsForMember] Query result: Found ${allMatchingForms.length} forms for role ${member.role}`);
-    console.log(`[getAvailableFormsForMember] All matching forms:`, allMatchingForms.map(f => ({
-      _id: f._id,
-      name: f.name,
-      status: f.status,
-      targetAudience: f.targetAudience,
-      openTime: f.openTime,
-      closeTime: f.closeTime
-    })));
-
     // Check which forms user has already submitted
     const submittedFormIds = await FeedbackResponse.find({
       formId: { $in: allMatchingForms.map(f => f._id) },
@@ -529,23 +519,14 @@ export const feedbackService = {
       if (form.status === 'open') {
         // Show all open forms regardless of time window for visibility
         // Frontend will handle enabling/disabling based on time window
-        const openTime = new Date(form.openTime);
-        const closeTime = new Date(form.closeTime);
-        const isWithinTime = openTime <= now && closeTime >= now;
-        console.log(`Form ${form.name} (${form._id}): status=open, isWithinTime=${isWithinTime}, openTime=${openTime}, closeTime=${closeTime}, now=${now}`);
         return true; // Show all open forms
       } else if (form.status === 'closed') {
         // Show closed forms only if user has submitted
         const hasSubmitted = submittedFormIds.some(id => id.toString() === form._id.toString());
-        console.log(`Form ${form.name} (${form._id}): status=closed, hasSubmitted=${hasSubmitted}`);
         return hasSubmitted;
       }
       return false;
     });
-
-    console.log(`[getAvailableFormsForMember] eventId=${eventId}, userId=${userId}, member.role=${member.role}`);
-    console.log(`[getAvailableFormsForMember] Found ${allMatchingForms.length} matching forms, ${forms.length} after filter`);
-    console.log(`[getAvailableFormsForMember] Final forms:`, forms.map(f => ({ name: f.name, status: f.status, targetAudience: f.targetAudience, openTime: f.openTime, closeTime: f.closeTime })));
 
     const formsWithStatus = forms.map(form => ({
       ...form,

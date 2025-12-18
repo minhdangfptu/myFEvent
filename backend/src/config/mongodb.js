@@ -29,21 +29,16 @@ const connectDB = async () => {
 
   while (retries > 0) {
     try {
-      const conn = await mongoose.connect(config.MONGODB_URI, options);
-      console.log('✅ MongoDB Connected!');
-      console.log(`📦 Database: ${conn.connection.name}`);
+      await mongoose.connect(config.MONGODB_URI, options);
       lastError = null;
       break; // Kết nối thành công, thoát loop
     } catch (error) {
       lastError = error;
       retries--;
-      console.error(`❌ MongoDB connection attempt failed. Retries left: ${retries}`);
-      console.error('Error:', error.message);
 
       if (retries > 0) {
         // Đợi trước khi retry (exponential backoff)
         const waitTime = (4 - retries) * 3000; // 3s, 6s, 9s
-        console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
@@ -51,8 +46,6 @@ const connectDB = async () => {
 
   // Nếu sau khi retry hết vẫn lỗi
   if (lastError) {
-    console.error('\n❌ MongoDB connection failed after all retries!');
-    console.error('📋 Chi tiết lỗi:', lastError.message);
     throw lastError;
   }
 
@@ -60,23 +53,9 @@ const connectDB = async () => {
   if (!listenersRegistered) {
     listenersRegistered = true;
 
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected');
-      // KHÔNG tự connectDB() nữa, tránh vòng lặp vô hạn & spam
-    });
-
-    mongoose.connection.on('connected', () => {
-      console.log('MongoDB connected/reconnected');
-    });
-
-    const graceful = async (signal) => {
+    const graceful = async () => {
       try {
         await mongoose.connection.close();
-        console.log(`MongoDB connection closed (${signal})`);
       } finally {
         process.exit(0);
       }

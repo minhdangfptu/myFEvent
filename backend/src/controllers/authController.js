@@ -244,7 +244,7 @@ export const loginWithGoogle = async (req, res) => {
       if (existingLocalUser) {
         // Email đã được đăng ký với tài khoản local - YÊU CẦU người dùng đăng nhập bằng email/password
         return res.status(400).json({ 
-          message: 'Email này đã được đăng ký dưới dạng tài khoản địa phương. Vui lòng đăng nhập bằng email và mật khẩu.',
+          message: 'Email này đã được đăng ký dưới dạng tài khoản mật khẩu. Vui lòng đăng nhập bằng email và mật khẩu.',
           code: 'EMAIL_EXISTS_LOCAL'
         });
       }

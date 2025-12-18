@@ -69,7 +69,10 @@ export default function SignupPage() {
       await signup(registerData);
 
       setSuccess(true);
-
+      // Đặt mặc định tiếng Việt khi đăng ký thành công
+      import('../../i18n').then(module => {
+        module.default.changeLanguage('vi');
+      });
       navigate('/email-confirmation', { 
         state: { email: registerData.email } 
       });
@@ -103,6 +106,10 @@ export default function SignupPage() {
 
       if (userData) {
         window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } }));
+        // Đặt mặc định tiếng Việt khi đăng nhập Google
+        import('../../i18n').then(module => {
+          module.default.changeLanguage('vi');
+        });
       }
 
       navigate('/home-page', { replace: true });

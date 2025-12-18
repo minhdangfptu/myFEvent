@@ -48,7 +48,6 @@ export default async function recalcParentsUpward(parentId, eventId) {
     }
 
     await parent.save();
-    
+
     // Không đệ quy lên nữa vì chỉ có 1 cấp epic -> normal
-    console.log(`Recalculated Epic Task ${parent._id}: ${parent.status} (${parent.progressPct}%)`);
 }

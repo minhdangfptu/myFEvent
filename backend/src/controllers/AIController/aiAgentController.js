@@ -889,12 +889,6 @@ export const runEventPlannerAgent = async (req, res) => {
     }
 
     const apiUrl = `${AI_AGENT_BASE_URL}/agent/event-planner/turn`;
-    console.log(`[aiAgentController] Calling FastAPI:`, {
-      url: apiUrl,
-      baseURL: AI_AGENT_BASE_URL,
-      endpoint: '/agent/event-planner/turn',
-      historyMessagesCount: enrichedMessages.length,
-    });
 
     // Gửi eventId trong request để Python agent có thể trả về và lưu lịch sử đúng cách
     const pythonRes = await axios.post(
@@ -915,15 +909,6 @@ export const runEventPlannerAgent = async (req, res) => {
 
     const agentData = pythonRes.data || {};
     const assistantReply = agentData.assistant_reply || '';
-
-    // Debug: log plans từ Python
-    console.log('[aiAgentController] Python response:', {
-      hasPlans: !!agentData.plans,
-      plansType: typeof agentData.plans,
-      plansIsArray: Array.isArray(agentData.plans),
-      plansLength: Array.isArray(agentData.plans) ? agentData.plans.length : 'N/A',
-      plans: agentData.plans,
-    });
 
     // Xác định sessionId cho cuộc trò chuyện hiện tại
     const sessionId =
@@ -998,34 +983,19 @@ export const runEventPlannerAgent = async (req, res) => {
         if (firstUser && firstUser.content) {
           const newTitle = generateTitleFromText(firstUser.content);
           // Cập nhật title nếu chưa có hoặc nếu title hiện tại không hợp lệ
-          if (!conversation.title || 
-              conversation.title.trim() === '' || 
+          if (!conversation.title ||
+              conversation.title.trim() === '' ||
               conversation.title === 'Cuộc trò chuyện mới' ||
               conversation.title.length < 3) {
             conversation.title = newTitle;
-            console.log(`[aiAgentController] Set conversation title: "${newTitle}" for sessionId=${sessionId}`);
           }
         }
 
         conversation.updatedAt = new Date();
         await conversation.save();
-        console.log(`[aiAgentController] Saved conversation: sessionId=${sessionId}, eventId=${eventId || 'null'}, messagesCount=${conversation.messages.length}`);
       } catch (e) {
         console.error('runEventPlannerAgent: lỗi lưu ConversationHistory', e);
-        // Log chi tiết để debug
-        console.error('Error details:', {
-          userId,
-          eventId: eventId || 'null',
-          sessionId,
-          error: e.message,
-          stack: e.stack,
-        });
       }
-    } else {
-      console.warn('[aiAgentController] Cannot save conversation: missing userId', {
-        hasUserId: !!userId,
-        hasEventId: !!eventId,
-      });
     }
 
     // Bao luôn sessionId trong response cho FE
@@ -1169,17 +1139,7 @@ export const applyEventPlannerPlan = async (req, res) => {
           if (deptName && !epicTitle) {
             epicIdMap.set(key2, String(epic._id));
           }
-          
-          console.log('[applyEventPlannerPlan] Mapped epic:', {
-            epicId: String(epic._id),
-            department: deptName,
-            epicTitle,
-            key1,
-            key2,
-          });
         });
-
-        console.log('[applyEventPlannerPlan] Created epics and mapped:', Array.from(epicIdMap.entries()));
         } catch (e) {
           console.error('applyEventPlannerPlan: apply epics failed', e?.response?.data || e);
           summary.errors.push(
@@ -1213,23 +1173,13 @@ export const applyEventPlannerPlan = async (req, res) => {
         const key2 = deptName.toLowerCase().trim();
         
         epicId = epicIdMap.get(key1) || epicIdMap.get(key2);
-        
+
         if (!epicId) {
-          console.warn('[applyEventPlannerPlan] Cannot find epicId for tasks_plan:', {
-            department: deptName,
-            epicTitle,
-            originalEpicId: rawPlan.epicId,
-          });
           summary.errors.push(
             `Không tìm thấy EPIC cho tasks_plan: department="${deptName}", epicTitle="${epicTitle}". Có thể EPIC chưa được tạo hoặc không khớp.`
           );
           continue;
         }
-        console.log('[applyEventPlannerPlan] Mapped epicId for tasks_plan:', {
-          department: deptName,
-          epicTitle,
-          mappedEpicId: epicId,
-        });
       }
 
         const payload = {
@@ -1312,7 +1262,6 @@ export const applyEventPlannerPlan = async (req, res) => {
           if (updated) {
             conversation.updatedAt = new Date();
             await conversation.save();
-            console.log(`[applyEventPlannerPlan] Marked plans as applied in conversation: sessionId=${sessionId}, eventId=${eventId}`);
           }
         }
       } catch (e) {

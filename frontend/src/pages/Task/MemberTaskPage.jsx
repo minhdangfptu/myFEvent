@@ -736,15 +736,7 @@ export default function MemberTaskPage() {
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <label className="text-muted small mb-2">
-                      Ước tính thời gian thực hiện
-                    </label>
-                    <div className="d-flex align-items-center gap-2">
-                      <Calendar size={20} />
-                      <span>{selectedTask.estimate}</span>
-                    </div>
-                  </div>
+                 
                 </div>
 
                 <div className="border-top pt-3">

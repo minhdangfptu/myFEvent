@@ -6,7 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Loading from '~/components/Loading';
 import { useAuth } from '../../contexts/AuthContext';
 import authStorage from '../../utils/authStorage';
-import { User, Mail, Phone, FileText, Target } from 'lucide-react';
+import { User, Mail, Phone, FileText, Target, Sparkles, Settings, Lock, Check, Clock } from 'lucide-react';
 
 export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
@@ -69,6 +69,7 @@ export default function UserProfilePage() {
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);          // NEW: track khi ảnh bị lỗi
   const [unsavedAvatar, setUnsavedAvatar] = useState(false);      // NEW: cờ ảnh chưa lưu
   const objectUrlRef = useRef(null);                              // NEW: lưu URL để revoke
 
@@ -92,6 +93,7 @@ export default function UserProfilePage() {
         tags: Array.isArray(profile.tags) ? profile.tags : []
       });
       setAvatarPreview(profile?.avatarUrl || null);
+      setAvatarError(false); // Reset error state khi profile mới
       setUnsavedAvatar(false);
       cleanupObjectUrl();
     }
@@ -248,6 +250,20 @@ export default function UserProfilePage() {
     'Hậu cần', 'Văn hóa', 'HR', 'Tài chính', 'Truyền thông', 'Tổ chức', 'Kỹ thuật'
   ];
 
+  // Helper để lấy avatar URL với fallback
+  const getAvatarUrl = (size = 120) => {
+    // Nếu có ảnh mới chưa lưu (từ file upload), dùng preview
+    if (avatarFile && avatarPreview) {
+      return avatarPreview;
+    }
+    // Nếu ảnh bị lỗi hoặc không có URL, dùng fallback
+    if (avatarError || !profile?.avatarUrl) {
+      return `https://i.pravatar.cc/${size}?img=5`;
+    }
+    // Dùng URL từ server
+    return profile.avatarUrl;
+  };
+
   const handleAvatarChange = (file) => {
     if (!file) return;
     setAvatarFile(file);
@@ -255,6 +271,7 @@ export default function UserProfilePage() {
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setAvatarPreview(url);     // hiển thị ngay
+    setAvatarError(false);     // reset error state
     setUnsavedAvatar(true);    // đánh dấu chưa lưu
     notify('warning', 'Ảnh đại diện mới chưa được lưu.');
   };
@@ -371,10 +388,14 @@ export default function UserProfilePage() {
                       style={{ position: 'relative' }}
                     >
                       <img
-                        src={avatarPreview || display(profile?.avatarUrl) || 'https://i.pravatar.cc/120?img=5'}
+                        src={getAvatarUrl(120)}
                         alt="avatar"
                         className="rounded-circle"
                         style={{ width: 96, height: 96, objectFit: 'cover', marginTop: -40, border: '6px solid #fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          setAvatarError(true); // Đánh dấu ảnh bị lỗi
+                        }}
                       />
                       {showAvatarDropdown && (
                         <div className="mp-dropdown" onClick={(e) => e.stopPropagation()}>
@@ -446,7 +467,13 @@ export default function UserProfilePage() {
                           </>
                         )}
                         {(!editing || (row.key !== 'fullName' && row.key !== 'phone')) && (
-                          <div className="fw-medium">{row.value || <span className="text-muted">Chưa cập nhật</span>}</div>
+                          <div className="fw-medium">
+                            {row.key === 'phone' && row.value === 'google' ? (
+                              <span className="text-muted">Chưa cập nhật</span>
+                            ) : (
+                              row.value || <span className="text-muted">Chưa cập nhật</span>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -475,7 +502,7 @@ export default function UserProfilePage() {
               <div className="col-12 col-lg-6">
                 <div className="mp-card p-4 mb-3 mp-equal">
                   <div className="d-flex align-items-center gap-2 mb-3">
-                    <span>✨</span>
+                    <Sparkles size={16} />
                     <div className="fw-semibold">Thông tin chi tiết</div>
                   </div>
                   {editing ? (
@@ -525,26 +552,36 @@ export default function UserProfilePage() {
                         <div className="fs-3 fw-bold mp-primary">{display(profile?.totalEvents) || '0'}</div>
                         <div className="text-muted small">Sự kiện</div>
                       </div>
-                      <div className="mp-gear" style={{ fontSize: '40px' }}>⚙️</div>
+                      <div className="mp-gear"><Settings size={40} /></div>
                     </div>
                   </div>
 
                   <div className="mt-3">
                     <div className="d-flex align-items-center gap-2 mb-2">
-                      <span>🔐</span>
+                      <Lock size={16} />
                       <div className="small text-muted fw-medium">Trạng thái tài khoản</div>
                     </div>
                     <div className="mp-info-row d-flex align-items-center justify-content-between" style={{ minHeight: 80 }}>
                       <span className="fw-medium">Xác thực tài khoản</span>
                       <span
-                        className="badge px-3 py-2"
+                        className="badge px-3 py-2 d-flex align-items-center gap-1"
                         style={{
                           background: profile?.verified ? '#10B981' : '#9CA3AF',
                           color: '#fff',
                           borderRadius: 90
                         }}
                       >
-                        {profile?.verified ? '✓ Đã xác thực' : '⏳ Chưa xác thực'}
+                        {profile?.verified ? (
+                          <>
+                            <Check size={14} />
+                            Đã xác thực
+                          </>
+                        ) : (
+                          <>
+                            <Clock size={14} />
+                            Chưa xác thực
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -569,6 +606,7 @@ export default function UserProfilePage() {
                               });
                               setAvatarPreview(profile?.avatarUrl || null);
                               setAvatarFile(null);
+                              setAvatarError(false);
                               setUnsavedAvatar(false);
                               cleanupObjectUrl();
                             }
@@ -593,10 +631,14 @@ export default function UserProfilePage() {
       {unsavedAvatar && (
         <div className="mp-fab-banner">
           <img
-            src={avatarPreview}
+            src={getAvatarUrl(48)}
             alt="preview"
             className="rounded-circle"
             style={{ width: 48, height: 48, objectFit: 'cover' }}
+            onError={(e) => {
+              e.target.onerror = null;
+              setAvatarError(true);
+            }}
           />
           <div className="flex-grow-1">
             <div className="fw-semibold">Ảnh đại diện chưa lưu</div>
@@ -609,6 +651,7 @@ export default function UserProfilePage() {
                 // Bỏ thay đổi: revert về ảnh server
                 setAvatarPreview(profile?.avatarUrl || null);
                 setAvatarFile(null);
+                setAvatarError(false);
                 setUnsavedAvatar(false);
                 cleanupObjectUrl();
                 notify('warning', 'Đã bỏ thay đổi ảnh đại diện.');
@@ -653,10 +696,14 @@ export default function UserProfilePage() {
                 </div>
                 <div className="text-center">
                   <img
-                    src={avatarPreview || display(profile?.avatarUrl) || 'https://i.pravatar.cc/400?img=5'}
+                    src={getAvatarUrl(400)}
                     alt="avatar"
                     className="img-fluid rounded-4"
                     style={{ maxHeight: '70vh', objectFit: 'contain' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      setAvatarError(true);
+                    }}
                   />
                 </div>
               </div>
@@ -679,10 +726,14 @@ export default function UserProfilePage() {
                 <div className="modal-body">
                   <div className="d-flex align-items-center gap-3">
                     <img
-                      src={avatarPreview}
+                      src={getAvatarUrl(64)}
                       alt="preview"
                       className="rounded-circle"
                       style={{ width: 64, height: 64, objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        setAvatarError(true);
+                      }}
                     />
                     <div className="text-muted">Ảnh mới sẽ thay thế ảnh đại diện hiện tại.</div>
                   </div>

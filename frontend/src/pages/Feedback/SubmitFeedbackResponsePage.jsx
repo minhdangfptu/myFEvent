@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import UserLayout from '../../components/UserLayout';
 import Loading from '../../components/Loading';
 import { feedbackApi } from '../../apis/feedbackApi';
@@ -150,11 +150,13 @@ export default function SubmitFeedbackResponsePage() {
       setSubmitting(true);
       await feedbackApi.submitResponse(eventId, formId, payload);
       toast.success('Gửi phản hồi thành công');
-      navigate(`/events/${eventId}/feedback/member`, { replace: true });
+      // Delay để toast hiện ra trước khi chuyển trang
+      setTimeout(() => {
+        navigate(`/events/${eventId}/feedback/member`, { replace: true });
+      }, 1500);
     } catch (err) {
       console.error('Submit feedback error:', err);
       toast.error(err.response?.data?.message || 'Không thể gửi phản hồi');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -171,6 +173,7 @@ export default function SubmitFeedbackResponsePage() {
 
   return (
     <UserLayout title={form.name} sidebarType={getSidebarType(eventRole)} activePage="feedback" eventId={eventId}>
+      <ToastContainer position="top-right" autoClose={2000} />
       <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '24px' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', marginBottom: '16px' }}>

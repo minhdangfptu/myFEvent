@@ -10,44 +10,33 @@ export const ensureEventExists = async (eventId) => {
 };
 
 export const getMembersByEventRaw = async (eventId) => {
-  console.time('[getMembersByEventRaw] Total time');
-
   // WORKAROUND: populate userId bị chậm cực kỳ (54s!) → Query riêng và map
-  console.time('[getMembersByEventRaw] Find EventMembers');
   const members = await EventMember.find({
       eventId, status: { $ne: 'deactive' },
     })
     .sort({ createdAt: -1 })
     .lean();
-  console.timeEnd('[getMembersByEventRaw] Find EventMembers');
-  console.log(`[getMembersByEventRaw] Found ${members.length} members`);
 
   // Get unique userIds and departmentIds
   const userIds = [...new Set(members.map(m => m.userId).filter(Boolean))];
   const deptIds = [...new Set(members.map(m => m.departmentId).filter(Boolean))];
 
-  console.time('[getMembersByEventRaw] Query Users & Departments');
   const [users, departments] = await Promise.all([
     // Cloudinary URL (ngắn gọn) thay vì base64, không còn gây timeout
     User.find({ _id: { $in: userIds } }).select('fullName email avatarUrl').lean(),
     Department.find({ _id: { $in: deptIds } }).select('name').lean()
   ]);
-  console.timeEnd('[getMembersByEventRaw] Query Users & Departments');
 
   // Create maps for fast lookup
   const userMap = new Map(users.map(u => [u._id.toString(), u]));
   const deptMap = new Map(departments.map(d => [d._id.toString(), d]));
 
   // Map data manually
-  console.time('[getMembersByEventRaw] Map data');
   const result = members.map(member => ({
     ...member,
     userId: member.userId ? userMap.get(member.userId.toString()) || null : null,
     departmentId: member.departmentId ? deptMap.get(member.departmentId.toString()) || null : null
   }));
-  console.timeEnd('[getMembersByEventRaw] Map data');
-
-  console.timeEnd('[getMembersByEventRaw] Total time');
 
   return result;
 };

@@ -162,7 +162,6 @@ export const createCalendarForEvent = async (req, res) => {
                 let departmentIds;
                 if (Array.isArray(departments)) {
                     departmentIds = departments;
-                    console.log(departmentIds);
                 } else if (typeof departments === 'string') {
                     const trimmed = departments.trim();
                     if (!trimmed) {
@@ -322,7 +321,6 @@ export const createCalendarForDepartment = async (req, res) => {
         }
         const ownerMemberid = requesterMembership?._id;
 		let { name, startAt, endAt, locationType, location, meetingDate, startTime, endTime, participantType, members, notes, attachments } = req.body;
-        console.log(members);
         if (!startAt && meetingDate && startTime) {
             startAt = new Date(`${meetingDate}T${startTime}`).toISOString();
         }
@@ -944,8 +942,6 @@ export const getAvailableMembers = async (req, res) => {
     const availableMembers = allMembers.filter(
       member => !currentMemberIds.has(member._id.toString())
     );
-
-    console.log('Available members:', availableMembers.map(m => m._id.toString()));
 
     return res.status(200).json({
       message: 'Successfully get available members',
