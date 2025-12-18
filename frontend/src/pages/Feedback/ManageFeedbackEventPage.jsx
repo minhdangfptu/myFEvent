@@ -322,7 +322,7 @@ export default function ManageFeedbackEventPage() {
                             padding: '6px 12px'
                           }}
                         >
-                          Xem mẫu
+                          Xem biểu mẫu
                         </button>
                       )}
                       <button

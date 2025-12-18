@@ -173,8 +173,10 @@ export const feedbackService = {
     const parseLocalDate = (dateString) => {
       if (!dateString) return null;
       // If dateString is already a Date object, convert to string first
-      const date = typeof dateString === 'string' ? dateString : dateString.toISOString().split('T')[0];
-      const [year, month, day] = date.split('-').map(Number);
+      let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
+      // Extract date part from ISO string (YYYY-MM-DD)
+      dateStr = dateStr.split('T')[0];
+      const [year, month, day] = dateStr.split('-').map(Number);
       const localDate = new Date(year, month - 1, day);
       localDate.setHours(0, 0, 0, 0);
       return localDate;
@@ -305,8 +307,10 @@ export const feedbackService = {
     const parseLocalDate = (dateString) => {
       if (!dateString) return null;
       // If dateString is already a Date object, convert to string first
-      const date = typeof dateString === 'string' ? dateString : dateString.toISOString().split('T')[0];
-      const [year, month, day] = date.split('-').map(Number);
+      let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
+      // Extract date part from ISO string (YYYY-MM-DD)
+      dateStr = dateStr.split('T')[0];
+      const [year, month, day] = dateStr.split('-').map(Number);
       const localDate = new Date(year, month - 1, day);
       localDate.setHours(0, 0, 0, 0);
       return localDate;
@@ -336,6 +340,7 @@ export const feedbackService = {
       throw err;
     }
 
+    // Only validate openTime constraints when openTime is being updated
     if (openTime !== undefined) {
       // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
       // So sánh timestamp để tránh vấn đề timezone
@@ -344,24 +349,22 @@ export const feedbackService = {
         err.status = 400;
         throw err;
       }
-    }
 
-    // Ngày đóng phải sau ngày mở
-    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
-    // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
-    if (nextOpenTimeDateOnly.getTime() === nowDateOnly.getTime()) {
-      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
-      const tomorrow = new Date(nowDateOnly);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      if (nextCloseTimeDateOnly.getTime() <= tomorrow.getTime()) {
-        const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
-        err.status = 400;
-        throw err;
+      // Ngày đóng phải sau ngày mở
+      // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+      // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
+      if (nextOpenTimeDateOnly.getTime() === nowDateOnly.getTime()) {
+        // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+        const tomorrow = new Date(nowDateOnly);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        if (nextCloseTimeDateOnly.getTime() <= tomorrow.getTime()) {
+          const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
+          err.status = 400;
+          throw err;
+        }
       }
-    } else {
       // Ngày mở là tương lai - ngày đóng chỉ cần sau ngày mở (đã check ở trên)
-      // Không cần check thêm vì đã check nextOpenTime < nextCloseTime ở trên
     }
 
     if (name !== undefined) form.name = name.trim();

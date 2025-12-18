@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import "./AgendaPage.css";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import { useEvents } from "~/contexts/EventContext";
 import { useParams } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -19,6 +17,7 @@ import {
 } from "~/apis/agendaApi";
 import ConfirmModal from "~/components/ConfirmModal";
 import { AlertTriangle, CheckCircle, Pencil, Plus, RotateCw, Trash, XCircle } from "lucide-react";
+import { ToastContainer } from "react-toastify";
 
 
 export default function AgendaPage({ milestoneName = "" }) {
@@ -42,10 +41,10 @@ export default function AgendaPage({ milestoneName = "" }) {
     content: "",
   });
 
-const [newDate, setNewDate] = useState("");
-const [showAddDateModal, setShowAddDateModal] = useState(false);
-const [newDateInput, setNewDateInput] = useState("");
-  
+  const [newDate, setNewDate] = useState("");
+  const [showAddDateModal, setShowAddDateModal] = useState(false);
+  const [newDateInput, setNewDateInput] = useState("");
+
   // Confirm modal states
   const [showDeleteScheduleModal, setShowDeleteScheduleModal] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState(null);
@@ -56,6 +55,9 @@ const [newDateInput, setNewDateInput] = useState("");
   const [isDeletingDate, setIsDeletingDate] = useState(false);
   const [insertAfterIndex, setInsertAfterIndex] = useState(null);
 
+  // Message system state
+  const [message, setMessage] = useState(null); // { text: string, type: 'success' | 'error' }
+
   // Context and params
   const { fetchEventRole } = useEvents();
   const { eventId, milestoneId } = useParams();
@@ -63,6 +65,14 @@ const [newDateInput, setNewDateInput] = useState("");
   const milestoneTitle =
     (location.state && location.state.milestoneName) || milestoneName || "";
   const [eventRole, setEventRole] = useState("");
+
+  // Message helper functions
+  const showMessage = (text, type = 'success') => {
+    setMessage({ text, type });
+    setTimeout(() => {
+      setMessage(null);
+    }, 3000); // Auto hide after 3 seconds
+  };
 
   // Utility functions
   const formatTimeToHHMM = (isoString) => {
@@ -212,7 +222,7 @@ const [newDateInput, setNewDateInput] = useState("");
       const errorMessage = err.response?.data?.message || err.message || "Không thể tải dữ liệu agenda";
       setError(errorMessage);
       console.error("❌ Error fetching agenda:", err);
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -316,7 +326,7 @@ const validateDate = (dateString) => {
           selectedDate: dates.find(d => d.dateId === scheduleToDelete.dateId),
           agendaDataDates: agendaData?.agenda?.map(d => ({ _id: d._id, itemCount: d.items?.length }))
         });
-        toast.error("Không tìm thấy lịch trình cần xóa. Vui lòng refresh trang.");
+        showMessage("Không tìm thấy lịch trình cần xóa. Vui lòng refresh trang.", "error");
         setShowDeleteScheduleModal(false);
         setScheduleToDelete(null);
         return;
@@ -332,14 +342,14 @@ const validateDate = (dateString) => {
       );
 
       await fetchAgendaData(); // Refresh data
-      toast.success("Xóa lịch trình thành công!");
+      showMessage("Xóa lịch trình thành công!");
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa lịch trình";
       setError(errorMessage);
       console.error("❌ Error deleting schedule:", err);
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
       setShowDeleteScheduleModal(false);
       setScheduleToDelete(null);
     } finally {
@@ -350,19 +360,19 @@ const validateDate = (dateString) => {
   const handleAddSchedule = async () => {
     // Validate content
     if (!newSchedule.content || !newSchedule.content.trim()) {
-      toast.error("Vui lòng nhập nội dung lịch trình");
+      showMessage("Vui lòng nhập nội dung lịch trình", "error");
       return;
     }
 
     if (!selectedDateId) {
-      toast.error("Vui lòng chọn ngày để thêm lịch trình");
+      showMessage("Vui lòng chọn ngày để thêm lịch trình", "error");
       return;
     }
 
     // Validate time
     const timeValidation = validateTime(newSchedule.startTime, newSchedule.endTime);
     if (!timeValidation.valid) {
-      toast.error(timeValidation.message);
+      showMessage(timeValidation.message, "error");
       return;
     }
 
@@ -372,7 +382,7 @@ const validateDate = (dateString) => {
 
       if (!selectedDate || !selectedDate.dateId) {
         debugLog("Add schedule aborted: selected date missing", { selectedDateId, selectedDate });
-        toast.error("Không tìm thấy dateId cho ngày được chọn");
+        showMessage("Không tìm thấy dateId cho ngày được chọn", "error");
         return;
       }
 
@@ -386,7 +396,7 @@ const validateDate = (dateString) => {
       const endTimeISO = combineDateAndTimeToISO(dateOnly, newSchedule.endTime);
 
       if (!startTimeISO || !endTimeISO) {
-        toast.error("Định dạng thời gian không hợp lệ");
+        showMessage("Định dạng thời gian không hợp lệ", "error");
         return;
       }
 
@@ -395,7 +405,7 @@ const validateDate = (dateString) => {
 
       // Thời gian kết thúc phải sau thời gian bắt đầu
       if (endTime <= startTime) {
-        toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
+        showMessage("Thời gian kết thúc phải sau thời gian bắt đầu", "error");
         return;
       }
 
@@ -417,13 +427,13 @@ const validateDate = (dateString) => {
       setNewSchedule({ startTime: "", endTime: "", content: "" });
       setInsertAfterIndex(null);
       await fetchAgendaData(); // Refresh data
-      toast.success("Thêm lịch trình thành công!");
+      showMessage("Thêm lịch trình thành công!");
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm lịch trình";
       setError(errorMessage);
       console.error("❌ Error adding schedule:", err);
       debugLog("Error when adding schedule", { err, newSchedule, selectedDateId });
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
     } finally {
       setIsAddingSchedule(false);
     }
@@ -435,7 +445,7 @@ const validateDate = (dateString) => {
     // Validate date
     const dateValidation = validateDate(dateToAdd);
     if (!dateValidation.valid) {
-      toast.error(dateValidation.message);
+      showMessage(dateValidation.message, "error");
       return;
     }
 
@@ -459,7 +469,7 @@ const validateDate = (dateString) => {
 
     if (isDuplicateDate) {
       debugLog("Duplicate date detected", { dateToAdd, dateString, newDateKey });
-      toast.error("Ngày này đã tồn tại trong agenda");
+      showMessage("Ngày này đã tồn tại trong agenda", "error");
       return;
     }
 
@@ -477,13 +487,13 @@ const validateDate = (dateString) => {
       setNewDate("");
       setNewDateInput("");
       await fetchAgendaData(); // Refresh data
-      toast.success("Thêm ngày thành công!");
+      showMessage("Thêm ngày thành công!");
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi thêm ngày";
       setError(errorMessage);
       console.error("❌ Error adding date:", err);
       debugLog("Error when adding date", err);
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
     }
   };
 
@@ -504,7 +514,7 @@ const validateDate = (dateString) => {
         // Use ID-based API for deleting dates
         await removeDateById(eventId, milestoneId, dateToDelete.dateId);
         await fetchAgendaData(); // Refresh data
-        toast.success("Xóa ngày thành công!");
+        showMessage("Xóa ngày thành công!");
 
         // Reset selected date if deleted
         if (selectedDateId === dateToDelete.id) {
@@ -520,7 +530,7 @@ const validateDate = (dateString) => {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi xóa ngày";
       setError(errorMessage);
       console.error("❌ Error deleting date:", err);
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
       setShowDeleteDateModal(false);
       setDateToDelete(null);
     } finally {
@@ -542,7 +552,7 @@ const validateDate = (dateString) => {
     // Validate date
     const dateValidation = validateDate(editingDate.date);
     if (!dateValidation.valid) {
-      toast.error(dateValidation.message);
+      showMessage(dateValidation.message, "error");
       return;
     }
 
@@ -556,7 +566,7 @@ const validateDate = (dateString) => {
 
     if (hasDuplicate) {
       debugLog("Duplicate date detected on edit", { editingDate, editedDateKey });
-      toast.error("Ngày này đã tồn tại trong agenda");
+      showMessage("Ngày này đã tồn tại trong agenda", "error");
       return;
     }
 
@@ -569,13 +579,13 @@ const validateDate = (dateString) => {
       debugLog("Update date API response", response);
       setEditingDate(null);
       await fetchAgendaData();
-      toast.success("Cập nhật ngày thành công!");
+      showMessage("Cập nhật ngày thành công!");
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật ngày";
       setError(errorMessage);
       console.error("❌ Error updating date:", err);
       debugLog("Error when updating date", err);
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
     }
   };
 
@@ -596,13 +606,13 @@ const validateDate = (dateString) => {
   const handleConfirmAddDate = async () => {
     // Validate date input
     if (!newDateInput || !newDateInput.trim()) {
-      toast.error("Vui lòng chọn ngày");
+      showMessage("Vui lòng chọn ngày", "error");
       return;
     }
 
     const dateValidation = validateDate(newDateInput);
     if (!dateValidation.valid) {
-      toast.error(dateValidation.message);
+      showMessage(dateValidation.message, "error");
       return;
     }
 
@@ -631,7 +641,7 @@ const validateDate = (dateString) => {
 
     // Validate content
     if (!editingSchedule.content || !editingSchedule.content.trim()) {
-      toast.error("Vui lòng nhập nội dung lịch trình");
+      showMessage("Vui lòng nhập nội dung lịch trình", "error");
       return;
     }
 
@@ -639,7 +649,7 @@ const validateDate = (dateString) => {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
       if (!selectedDate) {
         debugLog("Save edit aborted: selected date missing", { selectedDateId });
-        toast.error("Không tìm thấy ngày được chọn");
+        showMessage("Không tìm thấy ngày được chọn", "error");
         return;
       }
 
@@ -658,7 +668,7 @@ const validateDate = (dateString) => {
           selectedDate,
           agendaDataDates: agendaData?.agenda?.map(d => ({ _id: d._id, itemCount: d.items?.length }))
         });
-        toast.error("Không tìm thấy lịch trình cần cập nhật. Vui lòng refresh trang.");
+        showMessage("Không tìm thấy lịch trình cần cập nhật. Vui lòng refresh trang.", "error");
         return;
       }
 
@@ -667,7 +677,7 @@ const validateDate = (dateString) => {
       // Validate time
       const timeValidation = validateTime(editingSchedule.startTime, editingSchedule.endTime);
       if (!timeValidation.valid) {
-        toast.error(timeValidation.message);
+        showMessage(timeValidation.message, "error");
         return;
       }
   
@@ -680,7 +690,7 @@ const validateDate = (dateString) => {
 
       if (!startTimeISO || !endTimeISO) {
         debugLog("Invalid time detected on save", { dateOnly, editingSchedule });
-        toast.error("Định dạng thời gian không hợp lệ");
+        showMessage("Định dạng thời gian không hợp lệ", "error");
         return;
       }
 
@@ -689,7 +699,7 @@ const validateDate = (dateString) => {
 
       // Thời gian kết thúc phải sau thời gian bắt đầu
       if (endTime <= startTime) {
-        toast.error("Thời gian kết thúc phải sau thời gian bắt đầu");
+        showMessage("Thời gian kết thúc phải sau thời gian bắt đầu", "error");
         return;
       }
  
@@ -701,8 +711,8 @@ const validateDate = (dateString) => {
       };
 
       debugLog("Updating schedule", {
-        dateIndex: currentDateIndex,
-        itemIndex: currentItemIndex,
+        dateIndex: dateIndex,
+        itemIndex: itemIndex,
         updates,
         editingSchedule
       });
@@ -710,15 +720,15 @@ const validateDate = (dateString) => {
       const response = await updateDayItem(
         eventId,
         milestoneId,
-        currentDateIndex,
-        currentItemIndex,
+        dateIndex,
+        itemIndex,
         updates
       );
 
       debugLog("Update schedule API response", {
         response,
-        usedDateIndex: currentDateIndex,
-        usedItemIndex: currentItemIndex,
+        usedDateIndex: dateIndex,
+        usedItemIndex: itemIndex,
         scheduleId: editingSchedule.id
       });
 
@@ -728,13 +738,13 @@ const validateDate = (dateString) => {
 
       setEditingSchedule(null);
       await fetchAgendaData(); // Fetch fresh data to get correct indices after server-side sorting
-      toast.success("Cập nhật lịch trình thành công!");
+      showMessage("Cập nhật lịch trình thành công!");
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || "Lỗi khi cập nhật lịch trình";
       setError(errorMessage);
       console.error("❌ Error saving edit:", err);
       debugLog("Error saving edit", { err, editingSchedule });
-      toast.error(errorMessage);
+      showMessage(errorMessage, "error");
     }
   };
 
@@ -771,7 +781,7 @@ const validateDate = (dateString) => {
   const currentSchedules = getSchedulesForSelectedDate();
   if (loading) {
     return (
-      <UserLayout title="Agenda" sidebarType={getSidebarType()} eventId={eventId}>
+      <UserLayout title="Agenda" sidebarType={getSidebarType()} activePage="overview-timeline" eventId={eventId}>
         <div className="agenda-page__container">
           <div className="text-center">
             <div className="spinner-border text-primary" role="status">
@@ -788,10 +798,38 @@ const validateDate = (dateString) => {
     <UserLayout
       title="Agenda"
       sidebarType={getSidebarType()}
-      activePage="overview & overview-timeline"
+      activePage="overview-timeline"
       eventId={eventId}
     >
-      <ToastContainer position="top-right" autoClose={3000} />
+      {/* Custom Message Notification */}
+      {message && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '80px',
+            right: '20px',
+            zIndex: 9999,
+            backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444',
+            color: 'white',
+            padding: '16px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontSize: '14px',
+            fontWeight: '500',
+            maxWidth: '400px',
+            animation: 'slideInRight 0.3s ease-out',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {message.type === 'success' ? (
+              <CheckCircle size={20} />
+            ) : (
+              <XCircle size={20} />
+            )}
+            <span>{message.text}</span>
+          </div>
+        </div>
+      )}
       <div className="agenda-page__container">
 
         {/* Permission Notice
