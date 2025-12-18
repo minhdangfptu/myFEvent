@@ -54,6 +54,7 @@ const [newDateInput, setNewDateInput] = useState("");
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
   const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
   const [isDeletingDate, setIsDeletingDate] = useState(false);
+  const [insertAfterIndex, setInsertAfterIndex] = useState(null);
 
   // Context and params
   const { fetchEventRole } = useEvents();
@@ -133,19 +134,16 @@ const [newDateInput, setNewDateInput] = useState("");
         dateAgenda.items.forEach((item, itemIndex) => {
           const processedItem = {
             ...item,
-            // 👈 FIX: Create unique, stable ID that includes both position AND content
-            id: `${dateAgenda._id}-${itemIndex}`, // Use dateId + itemIndex for stability
-            originalId: `${dateIndex}-${itemIndex}`, // Keep original for API calls
+            id: `${dateAgenda._id}-${itemIndex}`, // For UI stability
+            originalId: `${dateIndex}-${itemIndex}`, // Keep original for reference
+            itemId: item._id, // Store MongoDB item _id for matching
             dateId: dateAgenda._id,
             dateIndex: dateIndex,
             itemIndex: itemIndex,
             session: getSessionFromHour(new Date(item.startTime).getHours()),
             duration: calculateDuration(item.startTime, item.endTime),
             displayDate: dateDisplay,
-            rawDate: dateAgenda.date,
-            // 👈 ADD: Store original data for comparison
-            originalStartTime: item.startTime,
-            originalContent: item.content
+            rawDate: dateAgenda.date
           };
           allDays.push(processedItem);
         });
@@ -279,6 +277,16 @@ const validateDate = (dateString) => {
     }
   };
 
+  // === Utility: find index by _id from fresh agendaData ===
+  const findDateAndItemIndexById = (agendaDataObj, dateId, itemId) => {
+    if (!agendaDataObj || !agendaDataObj.agenda) return { dateIndex: -1, itemIndex: -1 };
+    const dateIndex = agendaDataObj.agenda.findIndex(d => d._id === dateId);
+    if (dateIndex === -1) return { dateIndex: -1, itemIndex: -1 };
+    const dateItems = agendaDataObj.agenda[dateIndex].items || [];
+    const itemIndex = dateItems.findIndex(item => item._id === itemId);
+    return { dateIndex, itemIndex };
+  };
+
   // CRUD Operations
   const handleDeleteScheduleClick = (scheduleId) => {
     const schedule = schedules.find((s) => s.id === scheduleId);
@@ -293,12 +301,34 @@ const validateDate = (dateString) => {
 
     setIsDeletingSchedule(true);
     try {
-      // Use index-based API for deleting items (since items don't have _id)
+      // === Quan trọng: tìm index chuẩn từ _id ===
+      const { dateIndex, itemIndex } = findDateAndItemIndexById(
+        agendaData,
+        scheduleToDelete.dateId,
+        scheduleToDelete.itemId
+      );
+
+      if (dateIndex === -1 || itemIndex === -1) {
+        debugLog("Delete aborted: could not find accurate indices", {
+          scheduleToDelete,
+          dateIndex,
+          itemIndex,
+          selectedDate: dates.find(d => d.dateId === scheduleToDelete.dateId),
+          agendaDataDates: agendaData?.agenda?.map(d => ({ _id: d._id, itemCount: d.items?.length }))
+        });
+        toast.error("Không tìm thấy lịch trình cần xóa. Vui lòng refresh trang.");
+        setShowDeleteScheduleModal(false);
+        setScheduleToDelete(null);
+        return;
+      }
+
+      debugLog("Deleting schedule by index resolved from _id", { dateIndex, itemIndex, itemId: scheduleToDelete.itemId });
+
       await removeDayItem(
         eventId,
         milestoneId,
-        scheduleToDelete.dateIndex,
-        scheduleToDelete.itemIndex
+        dateIndex,
+        itemIndex
       );
 
       await fetchAgendaData(); // Refresh data
@@ -385,6 +415,7 @@ const validateDate = (dateString) => {
       );
       debugLog("Add schedule API response", response);
       setNewSchedule({ startTime: "", endTime: "", content: "" });
+      setInsertAfterIndex(null);
       await fetchAgendaData(); // Refresh data
       toast.success("Thêm lịch trình thành công!");
     } catch (err) {
@@ -581,22 +612,16 @@ const validateDate = (dateString) => {
   };
 
   const handleStartEditing = (schedule) => {
-    
+
     setEditingSchedule({
       id: schedule.id,
+      itemId: schedule.itemId, // MongoDB item _id for matching
       content: schedule.content,
-      originalContent: schedule.content, // 👈 ADD: Store original for finding
       startTime: formatTimeToHHMM(schedule.startTime),
       endTime: formatTimeToHHMM(schedule.endTime),
       dateId: schedule.dateId,
       dateIndex: schedule.dateIndex,
-      itemIndex: schedule.itemIndex,
-      // 👈 ADD: Store indices for debugging
-      debugInfo: {
-        dateIndex: schedule.dateIndex,
-        itemIndex: schedule.itemIndex,
-        originalId: schedule.originalId
-      }
+      itemIndex: schedule.itemIndex
     });
   };
   
@@ -609,7 +634,7 @@ const validateDate = (dateString) => {
       toast.error("Vui lòng nhập nội dung lịch trình");
       return;
     }
-  
+
     try {
       const selectedDate = dates.find((d) => d.id === selectedDateId);
       if (!selectedDate) {
@@ -618,12 +643,26 @@ const validateDate = (dateString) => {
         return;
       }
 
-      const freshScheduleMeta = schedules.find((s) => s.id === editingSchedule.id);
-      if (!freshScheduleMeta) {
-        debugLog("Save edit aborted: schedule meta not found", { editingScheduleId: editingSchedule.id });
-        toast.error("Không tìm thấy lịch trình cần cập nhật");
+      // === Quan trọng: tìm index chuẩn từ _id ===
+      const { dateIndex, itemIndex } = findDateAndItemIndexById(
+        agendaData,
+        editingSchedule.dateId,
+        editingSchedule.itemId
+      );
+
+      if (dateIndex === -1 || itemIndex === -1) {
+        debugLog("Save edit aborted: could not find accurate indices", {
+          editingSchedule,
+          dateIndex,
+          itemIndex,
+          selectedDate,
+          agendaDataDates: agendaData?.agenda?.map(d => ({ _id: d._id, itemCount: d.items?.length }))
+        });
+        toast.error("Không tìm thấy lịch trình cần cập nhật. Vui lòng refresh trang.");
         return;
       }
+
+      debugLog("Found accurate indices by _id", { dateIndex, itemIndex, itemId: editingSchedule.itemId });
  
       // Validate time
       const timeValidation = validateTime(editingSchedule.startTime, editingSchedule.endTime);
@@ -660,10 +699,10 @@ const validateDate = (dateString) => {
         endTime: endTimeISO,
         duration: endTime - startTime
       };
-  
+
       debugLog("Updating schedule", {
-        dateIndex: freshScheduleMeta.dateIndex,
-        itemIndex: freshScheduleMeta.itemIndex,
+        dateIndex: currentDateIndex,
+        itemIndex: currentItemIndex,
         updates,
         editingSchedule
       });
@@ -671,15 +710,15 @@ const validateDate = (dateString) => {
       const response = await updateDayItem(
         eventId,
         milestoneId,
-        freshScheduleMeta.dateIndex,
-        freshScheduleMeta.itemIndex,
+        currentDateIndex,
+        currentItemIndex,
         updates
       );
 
       debugLog("Update schedule API response", {
         response,
-        usedDateIndex: freshScheduleMeta.dateIndex,
-        usedItemIndex: freshScheduleMeta.itemIndex,
+        usedDateIndex: currentDateIndex,
+        usedItemIndex: currentItemIndex,
         scheduleId: editingSchedule.id
       });
 
@@ -754,9 +793,6 @@ const validateDate = (dateString) => {
     >
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="agenda-page__container">
-        <h2 className="agenda-page__title">
-          Agenda
-        </h2>
 
         {/* Permission Notice
         {!hasPermission && (
@@ -879,181 +915,98 @@ const validateDate = (dateString) => {
         {/* Schedule Details Section */}
         {selectedDate && (
           <div className="agenda-page__schedule-section">
-            <h5 className="agenda-page__section-title">
-              Chi tiết lịch trình - {selectedDate.date}
-            </h5>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h5 className="agenda-page__section-title" style={{ marginBottom: 0 }}>
+                Chi tiết lịch trình - {selectedDate.date}
+              </h5>
+              {hasPermission && currentSchedules.length > 0 && (
+                <button
+                  className="agenda-page__action-button"
+                  onClick={() => {
+                    if (insertAfterIndex !== null) {
+                      // Cancel adding
+                      setInsertAfterIndex(null);
+                      setNewSchedule({
+                        startTime: "",
+                        endTime: "",
+                        content: "",
+                      });
+                    } else {
+                      // Start adding
+                      setInsertAfterIndex(currentSchedules.length - 1);
+                    }
+                  }}
+                  title={insertAfterIndex !== null ? "Hủy thêm" : "Thêm lịch trình mới"}
+                  style={{
+                    backgroundColor: insertAfterIndex !== null ? '#ef4444' : '#10b981',
+                    color: 'white',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  {insertAfterIndex !== null ? (
+                    <>
+                      <XCircle size={18} />
+                      Hủy
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={18} />
+                      Thêm lịch trình
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
 
-            {/* Add New Schedule Form - Moved to top */}
-            {hasPermission && (
-              <div className="agenda-page__add-schedule-section" style={{ marginBottom: '20px', border: '2px solid #dc2626', borderRadius: '8px', backgroundColor: '#fef2f2', overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', borderBottom: '1px solid #dc2626' }}>
-                  <h6 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#111827' }}>Thêm lịch trình mới</h6>
-                </div>
-                <div style={{ padding: '0' }}>
-                  <div className="agenda-page__schedule-table-wrapper">
-                    <table className="agenda-page__schedule-table" style={{ marginBottom: 0 }}>
-                      <thead className="agenda-page__schedule-table-head">
-                        <tr className="agenda-page__schedule-table-header-row">
-                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '100px' }}>
-                            Buổi
-                          </th>
-                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '140px' }}>
-                            Bắt đầu
-                          </th>
-                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '140px' }}>
-                            Kết thúc
-                          </th>
-                          <th className="agenda-page__schedule-table-header-cell">
-                            Nội dung
-                          </th>
-                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '120px' }}>
-                            Thời lượng
-                          </th>
-                          <th className="agenda-page__schedule-table-header-cell" style={{ width: '120px' }}>
-                            Thao tác
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="agenda-page__schedule-table-body">
-                        <tr className="agenda-page__schedule-table-row">
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-session-cell">
-                            <select className="agenda-page__session-select" disabled style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}>
-                              <option>Tự động</option>
-                            </select>
-                          </td>
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
-                            <input
-                              type="time"
-                              className="agenda-page__time-input"
-                              value={newSchedule.startTime}
-                              onChange={(e) =>
-                                setNewSchedule({
-                                  ...newSchedule,
-                                  startTime: e.target.value,
-                                })
-                              }
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
-                            <input
-                              type="time"
-                              className="agenda-page__time-input"
-                              value={newSchedule.endTime}
-                              onChange={(e) =>
-                                setNewSchedule({
-                                  ...newSchedule,
-                                  endTime: e.target.value,
-                                })
-                              }
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-content-cell">
-                            <input
-                              type="text"
-                              className="agenda-page__content-input"
-                              placeholder="Nhập nội dung lịch trình"
-                              value={newSchedule.content}
-                              onChange={(e) =>
-                                setNewSchedule({
-                                  ...newSchedule,
-                                  content: e.target.value,
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-duration-cell">
-                            <input
-                              type="text"
-                              className="agenda-page__duration-input-sm"
-                              placeholder="Tự động"
-                              readOnly
-                              value={
-                                newSchedule.startTime && newSchedule.endTime
-                                  ? calculateDuration(
-                                      new Date(`2000-01-01 ${newSchedule.startTime}`),
-                                      new Date(`2000-01-01 ${newSchedule.endTime}`)
-                                    )
-                                  : ""
-                              }
-                              style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}
-                            />
-                          </td>
-                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-actions-cell">
-                            <div className="agenda-page__action-buttons">
-                              <button
-                                className="agenda-page__action-button agenda-page__action-button--confirm"
-                                onClick={handleAddSchedule}
-                                disabled={isAddingSchedule}
-                                title="Lưu"
-                              >
-                                {isAddingSchedule ? (
-                                  <i className="bi bi-arrow-clockwise spin-animation"></i>
-                                ) : (
-                                  <CheckCircle size={18} />
-                                )}
-                              </button>
-                              <button
-                                className="agenda-page__action-button agenda-page__action-button--delete"
-                                onClick={() =>
-                                  setNewSchedule({
-                                    startTime: "",
-                                    endTime: "",
-                                    content: "",
-                                  })
-                                }
-                                title="Hủy"
-                              >
-                                <XCircle size={18} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="agenda-page__schedule-table-wrapper">
-              <table className="agenda-page__schedule-table">
-                <thead className="agenda-page__schedule-table-head">
-                  <tr className="agenda-page__schedule-table-header-row">
-                    <th className="agenda-page__schedule-table-header-cell">
-                      Buổi
-                    </th>
-                    <th className="agenda-page__schedule-table-header-cell">
-                      Thời gian
-                    </th>
-                    <th className="agenda-page__schedule-table-header-cell">
-                      Nội dung
-                    </th>
-                    <th className="agenda-page__schedule-table-header-cell">
-                      Thời lượng
-                    </th>
-                    {hasPermission && (
+            {currentSchedules.length > 0 && (
+              <div className="agenda-page__schedule-table-wrapper" style={{ position: 'relative' }}>
+                <table className="agenda-page__schedule-table">
+                  <thead className="agenda-page__schedule-table-head">
+                    <tr className="agenda-page__schedule-table-header-row">
                       <th className="agenda-page__schedule-table-header-cell">
-                        Thao tác
+                        Buổi
                       </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="agenda-page__schedule-table-body">
-                  {currentSchedules.map((schedule) => {
+                      <th className="agenda-page__schedule-table-header-cell">
+                        Thời gian
+                      </th>
+                      <th className="agenda-page__schedule-table-header-cell">
+                        Nội dung
+                      </th>
+                      <th className="agenda-page__schedule-table-header-cell">
+                        Thời lượng
+                      </th>
+                      {hasPermission && (
+                        <th className="agenda-page__schedule-table-header-cell">
+                          Thao tác
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="agenda-page__schedule-table-body">
+                    {currentSchedules.map((schedule, index) => {
                     const isEditing =
                       editingSchedule && editingSchedule.id === schedule.id;
+                    const showInsertRow = insertAfterIndex === index;
 
                     return (
-                      <tr
-                        key={schedule.id}
-                        className={`agenda-page__schedule-table-row ${
-                          isEditing
-                            ? "agenda-page__schedule-table-row--editing"
-                            : ""
-                        }`}
-                      >
+                      <>
+                        <tr
+                          key={schedule.id}
+                          className={`agenda-page__schedule-table-row ${
+                            isEditing
+                              ? "agenda-page__schedule-table-row--editing"
+                              : ""
+                          }`}
+                          style={{ position: 'relative' }}
+                        >
                         <td className="agenda-page__schedule-table-cell agenda-page__schedule-session-cell">
                           {schedule.session}
                         </td>
@@ -1150,18 +1103,223 @@ const validateDate = (dateString) => {
                           </td>
                         )}
                       </tr>
+
+                      {/* Insert new schedule row */}
+                      {showInsertRow && (
+                        <tr className="agenda-page__schedule-table-row agenda-page__schedule-table-row--adding" style={{ backgroundColor: '#fef2f2' }}>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-session-cell">
+                            <select className="agenda-page__session-select" disabled style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}>
+                              <option>Tự động</option>
+                            </select>
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
+                            <div className="agenda-page__time-input-group">
+                              <input
+                                type="time"
+                                className="agenda-page__time-input"
+                                value={newSchedule.startTime}
+                                onChange={(e) =>
+                                  setNewSchedule({
+                                    ...newSchedule,
+                                    startTime: e.target.value,
+                                  })
+                                }
+                              />
+                              <span className="agenda-page__time-separator">
+                                -
+                              </span>
+                              <input
+                                type="time"
+                                className="agenda-page__time-input"
+                                value={newSchedule.endTime}
+                                onChange={(e) =>
+                                  setNewSchedule({
+                                    ...newSchedule,
+                                    endTime: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-content-cell">
+                            <input
+                              type="text"
+                              className="agenda-page__content-input"
+                              placeholder="Nhập nội dung lịch trình"
+                              value={newSchedule.content}
+                              onChange={(e) =>
+                                setNewSchedule({
+                                  ...newSchedule,
+                                  content: e.target.value,
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="agenda-page__schedule-table-cell agenda-page__schedule-duration-cell">
+                            <input
+                              type="text"
+                              className="agenda-page__duration-input-sm"
+                              placeholder="Tự động"
+                              readOnly
+                              value={
+                                newSchedule.startTime && newSchedule.endTime
+                                  ? calculateDuration(
+                                      new Date(`2000-01-01 ${newSchedule.startTime}`),
+                                      new Date(`2000-01-01 ${newSchedule.endTime}`)
+                                    )
+                                  : ""
+                              }
+                              style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}
+                            />
+                          </td>
+                          {hasPermission && (
+                            <td className="agenda-page__schedule-table-cell agenda-page__schedule-actions-cell">
+                              <div className="agenda-page__action-buttons">
+                                <button
+                                  className="agenda-page__action-button agenda-page__action-button--confirm"
+                                  onClick={handleAddSchedule}
+                                  disabled={isAddingSchedule}
+                                  title="Lưu"
+                                >
+                                  {isAddingSchedule ? (
+                                    <RotateCw size={18} className="spin-animation" />
+                                  ) : (
+                                    <CheckCircle size={18} />
+                                  )}
+                                </button>
+                                <button
+                                  className="agenda-page__action-button agenda-page__action-button--delete"
+                                  onClick={() => {
+                                    setInsertAfterIndex(null);
+                                    setNewSchedule({
+                                      startTime: "",
+                                      endTime: "",
+                                      content: "",
+                                    });
+                                  }}
+                                  title="Hủy"
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      )}
+                      </>
                     );
                   })}
                 </tbody>
               </table>
             </div>
+            )}
 
-            {/* Add Activity Button */}
-            {hasPermission && currentSchedules.length === 0 && (
+            {/* Add First Schedule Button */}
+            {hasPermission && currentSchedules.length === 0 && insertAfterIndex === null && (
               <div className="text-center mt-4">
-                <button className="agenda-page__add-activity-button">
+                <button
+                  className="agenda-page__add-activity-button"
+                  onClick={() => setInsertAfterIndex(-1)}
+                >
                   <Plus size={18} /> Thêm lịch trình đầu tiên
                 </button>
+              </div>
+            )}
+
+            {/* Insert row when list is empty */}
+            {hasPermission && currentSchedules.length === 0 && insertAfterIndex === -1 && (
+              <div className="agenda-page__schedule-table-wrapper" style={{ marginTop: '20px' }}>
+                <table className="agenda-page__schedule-table">
+                  <thead className="agenda-page__schedule-table-head">
+                    <tr className="agenda-page__schedule-table-header-row">
+                      <th className="agenda-page__schedule-table-header-cell">Buổi</th>
+                      <th className="agenda-page__schedule-table-header-cell">Thời gian</th>
+                      <th className="agenda-page__schedule-table-header-cell">Nội dung</th>
+                      <th className="agenda-page__schedule-table-header-cell">Thời lượng</th>
+                      <th className="agenda-page__schedule-table-header-cell">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="agenda-page__schedule-table-body">
+                    <tr className="agenda-page__schedule-table-row agenda-page__schedule-table-row--adding" style={{ backgroundColor: '#fef2f2' }}>
+                      <td className="agenda-page__schedule-table-cell agenda-page__schedule-session-cell">
+                        <select className="agenda-page__session-select" disabled style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}>
+                          <option>Tự động</option>
+                        </select>
+                      </td>
+                      <td className="agenda-page__schedule-table-cell agenda-page__schedule-time-cell">
+                        <div className="agenda-page__time-input-group">
+                          <input
+                            type="time"
+                            className="agenda-page__time-input"
+                            value={newSchedule.startTime}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, startTime: e.target.value })}
+                            style={{ width: '100%' }}
+                          />
+                          <span className="agenda-page__time-separator">-</span>
+                          <input
+                            type="time"
+                            className="agenda-page__time-input"
+                            value={newSchedule.endTime}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, endTime: e.target.value })}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                      </td>
+                      <td className="agenda-page__schedule-table-cell agenda-page__schedule-content-cell">
+                        <input
+                          type="text"
+                          className="agenda-page__content-input"
+                          placeholder="Nhập nội dung lịch trình"
+                          value={newSchedule.content}
+                          onChange={(e) => setNewSchedule({ ...newSchedule, content: e.target.value })}
+                        />
+                      </td>
+                      <td className="agenda-page__schedule-table-cell agenda-page__schedule-duration-cell">
+                        <input
+                          type="text"
+                          className="agenda-page__duration-input-sm"
+                          placeholder="Tự động"
+                          readOnly
+                          value={
+                            newSchedule.startTime && newSchedule.endTime
+                              ? calculateDuration(
+                                  new Date(`2000-01-01 ${newSchedule.startTime}`),
+                                  new Date(`2000-01-01 ${newSchedule.endTime}`)
+                                )
+                              : ""
+                          }
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', backgroundColor: '#f9fafb' }}
+                        />
+                      </td>
+                      <td className="agenda-page__schedule-table-cell agenda-page__schedule-actions-cell">
+                        <div className="agenda-page__action-buttons">
+                          <button
+                            className="agenda-page__action-button agenda-page__action-button--confirm"
+                            onClick={handleAddSchedule}
+                            disabled={isAddingSchedule}
+                            title="Lưu"
+                          >
+                            {isAddingSchedule ? (
+                              <RotateCw size={18} className="spin-animation" />
+                            ) : (
+                              <CheckCircle size={18} />
+                            )}
+                          </button>
+                          <button
+                            className="agenda-page__action-button agenda-page__action-button--delete"
+                            onClick={() => {
+                              setInsertAfterIndex(null);
+                              setNewSchedule({ startTime: "", endTime: "", content: "" });
+                            }}
+                            title="Hủy"
+                          >
+                            <XCircle size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

@@ -91,15 +91,16 @@ export const getNameAgendaWithMilestone = async (eventId) => {
     const agendas = await Agenda.find({})
         .populate({
             path: 'milestoneId',
-            select: 'eventId name',
-            match: { eventId }
+            select: 'eventId name isDeleted',
+            match: { eventId, isDeleted: false }
         })
         .select('_id')
         .lean();
     if (!agendas || agendas.length === 0) {
         return [];
     }
-    return agendas;
+    // Filter out agendas where milestone was not populated (due to match condition)
+    return agendas.filter(agenda => agenda.milestoneId !== null);
 }
 
 // Tạo agenda document mới
