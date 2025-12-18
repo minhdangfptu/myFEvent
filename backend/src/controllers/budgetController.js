@@ -503,8 +503,6 @@ export const submitBudget = async (req, res) => {
     const { eventId, departmentId, budgetId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
 
-    console.log('submitBudget called:', { eventId, departmentId, budgetId, userId });
-
     // Validate budgetId
     if (!mongoose.Types.ObjectId.isValid(budgetId)) {
       return res.status(400).json({ message: 'Invalid budget ID format' });
@@ -530,12 +528,9 @@ export const submitBudget = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    console.log('Budget found:', { status: budget.status, itemsCount: budget.items?.length });
-
     // Cho phép submit từ draft, changes_requested, hoặc submitted (để gửi lại sau khi chỉnh sửa)
     // Nếu đang ở submitted, có nghĩa là đã chỉnh sửa và muốn gửi lại
     if (budget.status !== 'draft' && budget.status !== 'changes_requested' && budget.status !== 'submitted') {
-      console.log('Invalid status for submit:', budget.status);
       return res.status(400).json({ 
         message: `Only draft, changes_requested, or submitted budgets can be submitted. Current status: ${budget.status}` 
       });
@@ -703,23 +698,7 @@ export const submitBudget = async (req, res) => {
 
     // Validate trước khi save
     try {
-      // Log để debug
-      console.log('Budget before save:', {
-        status: budget.status,
-        itemsCount: budget.items?.length,
-        firstItem: budget.items?.[0] ? {
-          itemId: budget.items[0].itemId?.toString(),
-          name: budget.items[0].name,
-          qty: budget.items[0].qty?.toString(),
-          unitCost: budget.items[0].unitCost?.toString(),
-          total: budget.items[0].total?.toString(),
-          actualAmount: budget.items[0].actualAmount?.toString(),
-          evidence: budget.items[0].evidence
-        } : null
-      });
-      
       await budget.save();
-      console.log('Budget submitted successfully:', { budgetId: budget._id, status: budget.status });
     } catch (saveError) {
       console.error('Save error:', saveError);
       console.error('Save error name:', saveError.name);
@@ -995,10 +974,6 @@ export const completeReview = async (req, res) => {
     const { eventId, departmentId, budgetId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
 
-    if (!userId) {
-      console.warn('Warning: completeReview called without authenticated user');
-    }
-
     const { items } = req.body;
 
     await ensureEventExists(eventId);
@@ -1021,11 +996,6 @@ export const completeReview = async (req, res) => {
     // Allow review for submitted budgets or changes_requested budgets (if resubmitted)
     // Note: changes_requested budgets can be reviewed again if HoD has made changes and resubmitted
     if (budget.status !== 'submitted' && budget.status !== 'changes_requested') {
-      console.log('completeReview: Invalid budget status', {
-        budgetId: budget._id,
-        currentStatus: budget.status,
-        allowedStatuses: ['submitted', 'changes_requested']
-      });
       return res.status(400).json({ 
         message: `Only submitted or changes_requested budgets can be reviewed. Current status: ${budget.status}` 
       });
@@ -1033,23 +1003,10 @@ export const completeReview = async (req, res) => {
 
     // Validate items array
     if (!items || !Array.isArray(items)) {
-      console.log('completeReview: Invalid items format', {
-        budgetId: budget._id,
-        itemsType: typeof items,
-        isArray: Array.isArray(items)
-      });
       return res.status(400).json({ 
         message: 'Items must be an array' 
       });
     }
-
-    // Log for debugging
-    console.log('completeReview: Processing review', {
-      budgetId: budget._id,
-      status: budget.status,
-      itemsCount: items.length,
-      budgetItemsCount: budget.items?.length
-    });
 
     // Update items with review status and feedback
     if (items && Array.isArray(items)) {
@@ -1117,16 +1074,6 @@ export const completeReview = async (req, res) => {
     });
 
     const savedBudget = await budget.save();
-
-    console.log('Budget saved after review:', {
-      budgetId: savedBudget?._id,
-      departmentId: savedBudget?.departmentId,
-      status: savedBudget?.status,
-      itemsCount: savedBudget?.items?.length,
-      hasRejected,
-      allApproved,
-      hasPending
-    });
 
     try {
       if (newStatus === 'approved') {
@@ -1909,10 +1856,7 @@ export const assignItem = async (req, res) => {
     } catch (e) {
       searchItemId = String(itemId).trim();
     }
-    
-    console.log('Searching for itemId:', searchItemId);
-    console.log('Budget items count:', budget.items?.length || 0);
-    
+
     const itemIndex = budget.items.findIndex(it => {
       if (!it.itemId) return false;
       
@@ -1938,29 +1882,12 @@ export const assignItem = async (req, res) => {
         console.warn('Error converting itemId:', e);
         itItemId = String(it.itemId);
       }
-      
+
       const match = itItemId && String(itItemId).trim() === searchItemId;
-      if (match) {
-        console.log('Found matching item:', { itemId: itItemId, name: it.name });
-      }
       return match;
     });
 
     if (itemIndex === -1) {
-      console.error('Item not found. Searching for itemId:', searchItemId);
-      console.error('Available itemIds:', budget.items.map((it, idx) => {
-        let id = 'null';
-        try {
-          if (it.itemId instanceof mongoose.Types.ObjectId) {
-            id = it.itemId.toString();
-          } else if (it.itemId) {
-            id = String(it.itemId);
-          }
-        } catch (e) {
-          id = 'error';
-        }
-        return { index: idx, itemId: id, name: it.name };
-      }));
       return res.status(404).json({ 
         message: 'Item not found in budget',
         searchedItemId: searchItemId,
@@ -1978,7 +1905,6 @@ export const assignItem = async (req, res) => {
     }
 
     const item = budget.items[itemIndex];
-    console.log('Found item at index:', itemIndex, 'Item name:', item.name);
 
     // Validate memberId if provided (null/empty string is allowed to unassign)
     let memberIdObj = null;
@@ -2037,18 +1963,9 @@ export const assignItem = async (req, res) => {
       
       // Mark items array as modified
       budget.markModified('items');
-      
-      console.log('Updating item:', {
-        itemIndex,
-        itemName: item.name,
-        itemId: searchItemId,
-        assignedTo: memberIdObj ? memberIdObj.toString() : 'null',
-        assignedBy: userIdObj.toString()
-      });
 
       // Save the budget
       const savedBudget = await budget.save();
-      console.log('Assignment saved successfully');
 
       // Send notification to assigned member if memberIdObj is provided
       if (memberIdObj) {

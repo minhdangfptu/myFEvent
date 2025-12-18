@@ -150,7 +150,8 @@ export const getMilestoneDetail = async (req, res) => {
     const relatedTasks = (tasks || []).map(t => ({
       id: String(t._id),
       name: t.title || 'Không có tên',
-      status: mapTaskStatus(t.status)
+      status: mapTaskStatus(t.status),
+      departmentId: t.departmentId ? String(t.departmentId) : null
     }));
     
     const payload = {

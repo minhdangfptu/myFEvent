@@ -1034,34 +1034,36 @@ const DepartmentDetail = () => {
                     </div>
                   </div>
 
-                  {department.leader ? (
-                    <button
-                      className="btn btn-outline-danger d-flex align-items-center"
-                      style={{ borderRadius: "8px", fontWeight: "400" }}
-                      onClick={() => setShowChangeLeaderModal(true)}
-                      disabled={changingLeader}
-                    >
-                      {changingLeader ? (
-                        <RotateCw size={16} className="me-2 spin-animation" />
-                      ) : (
-                        <RotateCw size={16} className="me-2" />
-                      )}
-                      {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-success d-flex align-items-center"
-                      style={{ borderRadius: "8px", fontWeight: "400" }}
-                      onClick={openAssignLeaderModal}
-                      disabled={assigningLeader}
-                    >
-                      {assigningLeader ? (
-                        <RotateCw size={16} className="me-2 spin-animation" />
-                      ) : (
-                        <Users size={16} className="me-2" />
-                      )}
-                      {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
-                    </button>
+                  {eventRole === 'HoOC' && (
+                    department.leader ? (
+                      <button
+                        className="btn btn-outline-danger d-flex align-items-center"
+                        style={{ borderRadius: "8px", fontWeight: "400" }}
+                        onClick={() => setShowChangeLeaderModal(true)}
+                        disabled={changingLeader}
+                      >
+                        {changingLeader ? (
+                          <RotateCw size={16} className="me-2 spin-animation" />
+                        ) : (
+                          <RotateCw size={16} className="me-2" />
+                        )}
+                        {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-success d-flex align-items-center"
+                        style={{ borderRadius: "8px", fontWeight: "400" }}
+                        onClick={openAssignLeaderModal}
+                        disabled={assigningLeader}
+                      >
+                        {assigningLeader ? (
+                          <RotateCw size={16} className="me-2 spin-animation" />
+                        ) : (
+                          <Users size={16} className="me-2" />
+                        )}
+                        {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
+                      </button>
+                    )
                   )}
                 </div>
 

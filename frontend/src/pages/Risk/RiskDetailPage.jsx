@@ -5,7 +5,8 @@ import { useEvents } from "~/contexts/EventContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { riskApiWithErrorHandling, getFullMember } from "~/apis/riskApi";
 import { departmentApi } from "~/apis/departmentApi";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import ConfirmModal from "../../components/ConfirmModal";
 import Loading from "../../components/Loading";
 import { CircleCheckBig, Calendar, Pin, DownloadCloud, User, Tag } from "lucide-react";
@@ -369,18 +370,21 @@ export default function RiskDetailPage() {
 
       if (response.success) {
         toast.success(editingOccurred ? "Cập nhật sự cố thành công!" : "Báo cáo sự cố thành công!");
-        setShowOccurredModal(false);
-        setEditingOccurred(null);
-        setOccurredForm({
-          occurred_name: "",
-          occurred_location: "",
-          occurred_date: "",
-          occurred_description: "",
-          occurred_status: "resolving",
-          resolve_action: "",
-          resolve_personId: "",
-        });
-        await fetchRisk();
+        // Delay để toast hiện ra trước khi đóng modal và refresh
+        setTimeout(async () => {
+          setShowOccurredModal(false);
+          setEditingOccurred(null);
+          setOccurredForm({
+            occurred_name: "",
+            occurred_location: "",
+            occurred_date: "",
+            occurred_description: "",
+            occurred_status: "resolving",
+            resolve_action: "",
+            resolve_personId: "",
+          });
+          await fetchRisk();
+        }, 1000);
       } else {
         toast.error(response.error || "Không thể lưu sự cố");
       }
@@ -591,6 +595,7 @@ export default function RiskDetailPage() {
 
   return (
     <UserLayout title="Chi tiết rủi ro" activePage={"risk"} sidebarType={getSidebarType()} eventId={eventId}>
+      <ToastContainer position="top-right" autoClose={3000} />
       <style>{`
         .loading-spinner {
           display: inline-block;

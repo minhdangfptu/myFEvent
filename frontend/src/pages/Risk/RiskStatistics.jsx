@@ -649,7 +649,7 @@ export default function RiskStatisticsPage() {
             <div className="card chart-card">
               <div className="card-body">
                 <h5 className="chart-title">
-                  Tần suất xảy ra các rủi ro theo các ban
+                  Số lượng rủi ro theo các ban
                 </h5>
                 {loadingStatistics ? (
                   <div className="pie-chart-loading">

@@ -11,12 +11,13 @@ import Loading from "../../components/Loading";
 const MilestoneDetail = () => {
   const navigate = useNavigate();
   const { eventId, id } = useParams();
-  const { fetchEventRole, getEventRole } = useEvents();
+  const { fetchEventRole, getEventRole, getEventMember } = useEvents();
 
   const [milestone, setMilestone] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [eventRole, setEventRole] = useState("");
+  const [userDepartmentId, setUserDepartmentId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -54,26 +55,38 @@ const MilestoneDetail = () => {
     fetchMilestoneDetail();
   }, [id, eventId]);
 
-  // Load event role to decide sidebar and actions visibility
+  // Load event role and department info
   useEffect(() => {
     let mounted = true;
     const loadRole = async () => {
       if (!eventId) {
-        if (mounted) setEventRole("");
+        if (mounted) {
+          setEventRole("");
+          setUserDepartmentId(null);
+        }
         return;
       }
       try {
         const role = await fetchEventRole(eventId);
-        if (mounted) setEventRole(role);
+        const memberInfo = getEventMember(eventId);
+        const deptId = memberInfo?.departmentId || null;
+
+        if (mounted) {
+          setEventRole(role);
+          setUserDepartmentId(deptId);
+        }
       } catch (_) {
-        if (mounted) setEventRole("");
+        if (mounted) {
+          setEventRole("");
+          setUserDepartmentId(null);
+        }
       }
     };
     loadRole();
     return () => {
       mounted = false;
     };
-  }, [eventId, fetchEventRole]);
+  }, [eventId, fetchEventRole, getEventMember]);
 
   const getTaskStatusLabel = (status) => {
     switch (status) {
@@ -262,55 +275,90 @@ const MilestoneDetail = () => {
           </div>
         </div>
 
-        {/* Related Tasks */}
-        <div>
-          <h4
-            style={{
-              color: "#1f2937",
-              fontWeight: "600",
-              marginBottom: "20px",
-            }}
-          >
-            Công việc liên quan ({milestone?.relatedTasks?.length || 0})
-          </h4>
+        {/* Related Tasks - Only show for HoOC and HoD */}
+        {eventRole !== "Member" && (
+          <div>
+            <h4
+              style={{
+                color: "#1f2937",
+                fontWeight: "600",
+                marginBottom: "20px",
+              }}
+            >
+              Công việc liên quan ({(() => {
+                // Filter tasks based on role
+                if (eventRole === "HoOC") {
+                  return milestone?.relatedTasks?.length || 0;
+                } else if (eventRole === "HoD" && userDepartmentId) {
+                  // Only count tasks from HoD's department
+                  return milestone?.relatedTasks?.filter(task => {
+                    const taskDeptId = task.departmentId;
+                    return taskDeptId && String(taskDeptId) === String(userDepartmentId);
+                  }).length || 0;
+                }
+                return 0;
+              })()})
+            </h4>
 
-          <div className="d-flex flex-column gap-3">
-            {milestone?.relatedTasks && Array.isArray(milestone.relatedTasks) && milestone.relatedTasks.length > 0 ? (
-              milestone.relatedTasks.map((task, index) => {
-                const taskId = task.id || task._id || `task-${index}`;
-                const taskName = task.name || task.title || "Không có tên";
-                const taskStatus = task.status || "todo";
-                return (
-                  <div
-                    key={taskId}
-                    className="d-flex justify-content-between align-items-center p-3 border rounded-3"
-                    style={{ border: "1px solid #e5e7eb" }}
-                  >
-                    <span style={{ color: "#374151", fontWeight: "500" }}>
-                      {taskName}
-                    </span>
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: getTaskStatusColor(taskStatus),
-                        color: "white",
-                        fontSize: "0.9rem",
-                        borderRadius: "20px",
-                      }}
-                    >
-                      {getTaskStatusLabel(taskStatus)}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-muted text-center py-4">
-                <i className="bi bi-inbox me-2"></i>
-                Chưa có công việc nào được gán cho cột mốc này
-              </div>
-            )}
+            <div className="d-flex flex-column gap-3">
+              {(() => {
+                // Filter tasks based on role
+                let filteredTasks = [];
+
+                if (eventRole === "HoOC") {
+                  // HoOC sees all tasks
+                  filteredTasks = milestone?.relatedTasks || [];
+                } else if (eventRole === "HoD" && userDepartmentId) {
+                  // HoD only sees tasks from their department
+                  filteredTasks = (milestone?.relatedTasks || []).filter(task => {
+                    // departmentId should now be a string from backend
+                    const taskDeptId = task.departmentId;
+                    return taskDeptId && String(taskDeptId) === String(userDepartmentId);
+                  });
+                }
+
+                if (filteredTasks.length > 0) {
+                  return filteredTasks.map((task, index) => {
+                    const taskId = task.id || task._id || `task-${index}`;
+                    const taskName = task.name || task.title || "Không có tên";
+                    const taskStatus = task.status || "todo";
+                    return (
+                      <div
+                        key={taskId}
+                        className="d-flex justify-content-between align-items-center p-3 border rounded-3"
+                        style={{ border: "1px solid #e5e7eb" }}
+                      >
+                        <span style={{ color: "#374151", fontWeight: "500" }}>
+                          {taskName}
+                        </span>
+                        <span
+                          className="badge px-3 py-2"
+                          style={{
+                            backgroundColor: getTaskStatusColor(taskStatus),
+                            color: "white",
+                            fontSize: "0.9rem",
+                            borderRadius: "20px",
+                          }}
+                        >
+                          {getTaskStatusLabel(taskStatus)}
+                        </span>
+                      </div>
+                    );
+                  });
+                } else {
+                  return (
+                    <div className="text-muted text-center py-4">
+                      <i className="bi bi-inbox me-2"></i>
+                      {eventRole === "HoD"
+                        ? "Chưa có công việc nào của ban bạn được gán cho cột mốc này"
+                        : "Chưa có công việc nào được gán cho cột mốc này"}
+                    </div>
+                  );
+                }
+              })()}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import UserLayout from '../../components/UserLayout';
 import { feedbackApi } from '../../apis/feedbackApi';
 import { eventApi } from '../../apis/eventApi';
@@ -562,6 +562,7 @@ export default function CreateFeedbackForm() {
 
   return (
     <UserLayout title="Tạo form phản hồi" sidebarType="hooc" activePage="feedback" eventId={eventId}>
+      <ToastContainer position="top-right" autoClose={2000} />
       <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '24px' }}>
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px' }}>
           {/* Header */}
