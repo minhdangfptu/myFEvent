@@ -9,6 +9,7 @@ import {
   removeMemberFromDepartment,
   editDepartment,
   deleteDepartment,
+  getDepartmentAvailableMembers,
   
 } from '../controllers/departmentController.js';
 import {getMembersByDepartment} from "../controllers/eventMemberController.js"
@@ -30,8 +31,9 @@ router.patch('/:departmentId', authenticateToken, editDepartment);
 router.delete('/:departmentId', authenticateToken, deleteDepartment);
 // Calendar endpoints for a department (HoD)
 router.post('/:departmentId/calendars/create-calendar-for-department', authenticateToken, createCalendarForDepartment);
-
+router.get('/:departmentId/available-members', getDepartmentAvailableMembers);
 // Budget routes
 router.use('/:departmentId/budget', budgetRoute);
+
 
 export default router;

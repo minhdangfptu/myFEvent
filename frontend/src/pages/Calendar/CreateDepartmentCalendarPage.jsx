@@ -78,7 +78,7 @@ export default function CreateDepartmentCalendarPage() {
             if (!eventId || !departmentId) return;
             setLoadingMembers(true);
             try {
-                const res = await departmentService.getMembersByDepartment(eventId, departmentId);
+                const res = await departmentService.getDepartmentAvailableMembers(eventId, departmentId);
                 setMembersList(res || []);
             } catch (err) {
                 console.error(err);

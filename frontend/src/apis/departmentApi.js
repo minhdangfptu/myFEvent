@@ -65,6 +65,12 @@ export const departmentApi = {
       `/api/events/${eventId}/departments/${departmentId}/members/${memberId}`
     );
     return res.data;
+  },
+  getDepartmentAvailableMembers: async (eventId, departmentId) => {
+    const res = await axiosClient.get(
+      `/api/events/${eventId}/departments/${departmentId}/available-members`
+    );
+    return res.data;
   }
 };
 
