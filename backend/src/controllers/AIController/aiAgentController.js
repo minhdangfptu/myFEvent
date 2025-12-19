@@ -1432,7 +1432,19 @@ export const applyEventPlannerPlan = async (req, res) => {
           console.log(`[applyEventPlannerPlan] ❌ Không tìm thấy EPIC trong map với key="${key1}"`);
         }
 
-        // Nếu không tìm thấy trong map, thử tìm EPIC đã tồn tại trong database
+        // Nếu không tìm thấy trong map, thử tìm EPIC mới nhất được tạo trong lần apply này (nếu chỉ có 1 EPIC trong department)
+        if (!epicId && epicTitle && planEventId) {
+          // Thử tìm EPIC mới nhất trong department từ epicIdMap (nếu chỉ có 1 EPIC)
+          const epicIdsForDept = deptToEpicIdsMap.get(key2);
+          if (epicIdsForDept && epicIdsForDept.size === 1) {
+            epicId = Array.from(epicIdsForDept)[0];
+            console.log(`[applyEventPlannerPlan] Sử dụng EPIC mới nhất trong department từ map: ${epicId} (vì chỉ có 1 EPIC trong department "${deptName}")`);
+            // Lưu vào map với key hiện tại để dùng cho lần sau
+            epicIdMap.set(key1, String(epicId));
+          }
+        }
+
+        // Nếu vẫn không tìm thấy, thử tìm EPIC đã tồn tại trong database
         if (!epicId && epicTitle && planEventId) {
           try {
             // Tìm department ID từ tên department
@@ -1442,17 +1454,38 @@ export const applyEventPlannerPlan = async (req, res) => {
             }).lean();
 
             if (department) {
-              // Tìm EPIC với title và departmentId
-              const existingEpic = await Task.findOne({
+              // Tìm EPIC với title và departmentId (exact match hoặc contains)
+              let existingEpic = await Task.findOne({
                 eventId: planEventId,
                 taskType: 'epic',
                 title: { $regex: new RegExp(epicTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
                 departmentId: department._id,
               }).lean();
 
+              // Nếu không tìm thấy exact match, KHÔNG tự động match với EPIC khác
+              // Vì có thể dẫn đến match sai (ví dụ: "chuẩn bị đồ ăn" match với "truyền thông")
+              // Thay vào đó, sẽ tự động tạo EPIC mới nếu là HoOC (xử lý ở phần sau)
+              if (!existingEpic) {
+                console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong database. Sẽ tự động tạo EPIC mới nếu là HoOC.`);
+              }
+
+              // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (nếu chỉ có 1 EPIC)
+              if (!existingEpic) {
+                const allEpicsInDept = await Task.find({
+                  eventId: planEventId,
+                  taskType: 'epic',
+                  departmentId: department._id,
+                }).sort({ createdAt: -1 }).limit(1).lean();
+                
+                if (allEpicsInDept.length === 1) {
+                  existingEpic = allEpicsInDept[0];
+                  console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${existingEpic.title}`);
+                }
+              }
+
               if (existingEpic) {
                 epicId = existingEpic._id;
-                console.log(`[applyEventPlannerPlan] Tìm thấy EPIC đã tồn tại trong database: ${epicId} (title: "${epicTitle}", department: "${deptName}")`);
+                console.log(`[applyEventPlannerPlan] Tìm thấy EPIC đã tồn tại trong database: ${epicId} (title: "${existingEpic.title}", department: "${deptName}")`);
                 // Lưu vào map để dùng cho các tasks_plan khác (key1 đã được normalize ở trên)
                 epicIdMap.set(key1, String(epicId));
                 console.log(`[applyEventPlannerPlan] Đã lưu vào epicIdMap: key="${key1}" -> epicId="${epicId}"`);
@@ -1467,16 +1500,69 @@ export const applyEventPlannerPlan = async (req, res) => {
           }
         }
 
-        // Nếu vẫn không tìm thấy bằng key1 và có epicTitle, báo lỗi rõ ràng
-        if (!epicId && epicTitle) {
+        // Nếu vẫn không tìm thấy bằng key1 và có epicTitle, tự động tạo EPIC mới (nếu là HoOC)
+        if (!epicId && epicTitle && deptName) {
           const availableKeys = Array.from(epicIdMap.keys()).filter(k => k.startsWith(key2 + ':'));
-          summary.errors.push(
-            `Không tìm thấy EPIC cho tasks_plan với department="${deptName}", epicTitle="${epicTitle}". ` +
-            `Đã thử key: "${key1}". ` +
-            `Các EPIC có sẵn cho department này: ${availableKeys.length > 0 ? availableKeys.join(', ') : 'không có'}. ` +
-            `Lưu ý: EPIC cần được tạo trước khi tạo tasks. Nếu bạn là HoD, vui lòng yêu cầu HoOC tạo EPIC trước.`
-          );
-          continue;
+          
+          // Nếu là HoOC, tự động tạo EPIC mới
+          if (userRole === 'HoOC') {
+            try {
+              console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", tự động tạo EPIC mới cho department="${deptName}"`);
+              
+              // Tìm department
+              const department = await Department.findOne({
+                eventId: planEventId,
+                name: { $regex: new RegExp(deptName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+              }).lean();
+
+              if (!department) {
+                summary.errors.push(
+                  `Không tìm thấy department "${deptName}" trong event này. Không thể tạo EPIC tự động.`
+                );
+                continue;
+              }
+
+              // Tạo EPIC mới
+              const newEpic = await Task.create({
+                title: epicTitle,
+                description: `EPIC được tạo tự động từ tasks_plan`,
+                eventId: planEventId,
+                departmentId: department._id,
+                parentId: null,
+                assigneeId: null,
+                status: 'chua_bat_dau',
+                taskType: 'epic',
+                createdBy: userId,
+              });
+
+              epicId = newEpic._id;
+              console.log(`[applyEventPlannerPlan] Đã tạo EPIC mới: ${epicId} (title: "${epicTitle}", department: "${deptName}")`);
+              
+              // Lưu vào map
+              epicIdMap.set(key1, String(epicId));
+              if (!deptToEpicIdsMap.has(key2)) {
+                deptToEpicIdsMap.set(key2, new Set());
+              }
+              deptToEpicIdsMap.get(key2).add(String(epicId));
+              
+              summary.epicsCreated += 1; // Đếm EPIC được tạo tự động
+            } catch (createError) {
+              console.error(`[applyEventPlannerPlan] Lỗi khi tạo EPIC tự động:`, createError);
+              summary.errors.push(
+                `Không thể tạo EPIC tự động cho tasks_plan với department="${deptName}", epicTitle="${epicTitle}": ${createError.message}`
+              );
+              continue;
+            }
+          } else {
+            // Nếu không phải HoOC, báo lỗi
+            summary.errors.push(
+              `Không tìm thấy EPIC cho tasks_plan với department="${deptName}", epicTitle="${epicTitle}". ` +
+              `Đã thử key: "${key1}". ` +
+              `Các EPIC có sẵn cho department này: ${availableKeys.length > 0 ? availableKeys.join(', ') : 'không có'}. ` +
+              `Lưu ý: EPIC cần được tạo trước khi tạo tasks. Nếu bạn là HoD, vui lòng yêu cầu HoOC tạo EPIC trước.`
+            );
+            continue;
+          }
         }
 
         // Nếu không có epicTitle, thử dùng key2 (department) nhưng chỉ khi có đúng 1 EPIC
@@ -1560,17 +1646,39 @@ export const applyEventPlannerPlan = async (req, res) => {
                 }).lean();
 
                 if (department) {
-                  const foundEpic = await Task.findOne({
+                  // Tìm EPIC với title và departmentId (exact match hoặc contains)
+                  let foundEpic = await Task.findOne({
                     eventId: planEventId,
                     taskType: 'epic',
                     title: { $regex: new RegExp(epicTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
                     departmentId: department._id,
                   }).lean();
 
+                  // Nếu không tìm thấy exact match, KHÔNG tự động match với EPIC khác
+                  // Vì có thể dẫn đến match sai (ví dụ: "chuẩn bị đồ ăn" match với "truyền thông")
+                  // Thay vào đó, sẽ tự động tạo EPIC mới nếu là HoOC (xử lý ở phần sau)
+                  if (!foundEpic) {
+                    console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong database. Sẽ tự động tạo EPIC mới nếu là HoOC.`);
+                  }
+
+                  // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (nếu chỉ có 1 EPIC)
+                  if (!foundEpic) {
+                    const allEpicsInDept = await Task.find({
+                      eventId: planEventId,
+                      taskType: 'epic',
+                      departmentId: department._id,
+                    }).sort({ createdAt: -1 }).limit(1).lean();
+                    
+                    if (allEpicsInDept.length === 1) {
+                      foundEpic = allEpicsInDept[0];
+                      console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${foundEpic.title}`);
+                    }
+                  }
+
                   if (foundEpic) {
                     console.log(
                       `[applyEventPlannerPlan] Tìm thấy EPIC đúng trong event: ${foundEpic._id} ` +
-                      `(title: "${epicTitle}", department: "${deptName}"). Thay thế epicId.`
+                      `(title: "${foundEpic.title}", department: "${deptName}"). Thay thế epicId.`
                     );
                     epicId = foundEpic._id;
                     // Lưu vào map với key đã normalize
@@ -1584,12 +1692,53 @@ export const applyEventPlannerPlan = async (req, res) => {
                     }
                     deptToEpicIdsMap.get(key2).add(String(epicId));
                   } else {
-                    summary.errors.push(
-                      `EpicId ${epicIdStr} không tồn tại trong event này và không tìm thấy EPIC với ` +
-                      `department="${deptName}", epicTitle="${epicTitle}". ` +
-                      `Vui lòng đảm bảo EPIC đã được tạo trước khi tạo tasks.`
-                    );
-                    continue;
+                    // Nếu không tìm thấy EPIC và là HoOC, tự động tạo EPIC mới
+                    if (userRole === 'HoOC') {
+                      try {
+                        console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", tự động tạo EPIC mới cho department="${deptName}"`);
+                        
+                        const newEpic = await Task.create({
+                          title: epicTitle,
+                          description: `EPIC được tạo tự động từ tasks_plan`,
+                          eventId: planEventId,
+                          departmentId: department._id,
+                          parentId: null,
+                          assigneeId: null,
+                          status: 'chua_bat_dau',
+                          taskType: 'epic',
+                          createdBy: userId,
+                        });
+
+                        epicId = newEpic._id;
+                        console.log(`[applyEventPlannerPlan] Đã tạo EPIC mới: ${epicId} (title: "${epicTitle}", department: "${deptName}")`);
+                        
+                        // Lưu vào map
+                        const normalizedDeptName = deptName.toLowerCase().trim().replace(/\s+/g, ' ');
+                        const normalizedEpicTitle = epicTitle.toLowerCase().trim().replace(/\s+/g, ' ');
+                        const mapKey = `${normalizedDeptName}:${normalizedEpicTitle}`;
+                        epicIdMap.set(mapKey, String(epicId));
+                        const key2 = normalizedDeptName;
+                        if (!deptToEpicIdsMap.has(key2)) {
+                          deptToEpicIdsMap.set(key2, new Set());
+                        }
+                        deptToEpicIdsMap.get(key2).add(String(epicId));
+                        
+                        summary.epicsCreated += 1; // Đếm EPIC được tạo tự động
+                      } catch (createError) {
+                        console.error(`[applyEventPlannerPlan] Lỗi khi tạo EPIC tự động:`, createError);
+                        summary.errors.push(
+                          `Không thể tạo EPIC tự động cho tasks_plan với department="${deptName}", epicTitle="${epicTitle}": ${createError.message}`
+                        );
+                        continue;
+                      }
+                    } else {
+                      summary.errors.push(
+                        `EpicId ${epicIdStr} không tồn tại trong event này và không tìm thấy EPIC với ` +
+                        `department="${deptName}", epicTitle="${epicTitle}". ` +
+                        `Vui lòng đảm bảo EPIC đã được tạo trước khi tạo tasks.`
+                      );
+                      continue;
+                    }
                   }
                 } else {
                   summary.errors.push(

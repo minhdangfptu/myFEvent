@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
 import { departmentService } from "../../services/departmentService";
+import { eventApi } from "../../apis/eventApi";
 import { toast } from "react-toastify";
 import Loading from "../../components/Loading";
 import ConfirmModal from "../../components/ConfirmModal";
@@ -204,11 +205,16 @@ const ViewDepartmentBudget = () => {
         departmentService.getDepartmentDetail(eventId, departmentId),
       ]);
       
-      // Lazy load members chỉ khi cần (khi budget đã approved và là HoD)
+      // Lazy load members chỉ khi cần (khi budget đã approved / sent_to_members và là HoD)
       let membersData = [];
       if (budgetData && (budgetData.status === 'approved' || budgetData.status === 'sent_to_members')) {
         try {
-          membersData = await departmentService.getMembersByDepartment(eventId, departmentId);
+          // Nếu budget đã công khai (sent_to_members), cho phép giao cho cả thành viên ngoài ban
+          if (budgetData.status === 'sent_to_members') {
+            membersData = await eventApi.getMembersByEvent(eventId);
+          } else {
+            membersData = await departmentService.getMembersByDepartment(eventId, departmentId);
+          }
         } catch (error) {
           console.warn("Failed to load members, will load when needed:", error);
           membersData = [];
@@ -240,7 +246,8 @@ const ViewDepartmentBudget = () => {
           const membersArray = Array.isArray(membersData) ? membersData : [];
           const isMemberOfThisDept = membersArray.some(member => {
             const memberUserId = member.userId?._id || member.userId?.id || member.userId;
-            return String(memberUserId) === String(userId);
+            const memberDeptId = member.departmentId?._id || member.departmentId?.id || member.departmentId;
+            return String(memberUserId) === String(userId) && String(memberDeptId) === String(departmentId);
           });
           
           if (!isMemberOfThisDept) {
@@ -249,8 +256,9 @@ const ViewDepartmentBudget = () => {
             return;
           }
           
-          if (budgetData.status !== 'approved') {
-            toast.error("Budget này chưa được duyệt, bạn chỉ được xem các budget đã được duyệt");
+          // Cho phép member xem khi budget đã duyệt hoặc đã công khai (sent_to_members)
+          if (budgetData.status !== 'approved' && budgetData.status !== 'sent_to_members') {
+            toast.error("Budget này chưa được duyệt/công khai, bạn chỉ được xem các budget đã được duyệt hoặc công khai");
             navigate(`/events/${eventId}/budgets/member`);
             return;
           }
@@ -735,6 +743,13 @@ const ViewDepartmentBudget = () => {
 
   const handleSubmitExpense = async (item) => {
     if (!item || !budget) return;
+    
+    // Bắt buộc có bằng chứng trước khi nộp
+    const evidenceList = item.evidence || [];
+    if (!Array.isArray(evidenceList) || evidenceList.length === 0) {
+      toast.error("Vui lòng đính kèm ít nhất một bằng chứng trước khi nộp.");
+      return;
+    }
     
     try {
       setIsSubmitting(true);
@@ -1447,7 +1462,7 @@ const ViewDepartmentBudget = () => {
                       userSelect: "none",
                       whiteSpace: "nowrap"
                     }}>
-                      Phản hồi từ tưởng ban tổ chức
+                      Phản hồi từ trưởng ban tổ chức
                     </th>
                   </tr>
                 </thead>
@@ -2237,20 +2252,20 @@ const ViewDepartmentBudget = () => {
                                   }
                                 }
                                 
-                                const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
-                                
-                                const isMemberAssigned = !isHoD && 
-                                  assignedMemberId && 
-                                  currentMemberId && 
-                                  String(assignedMemberId) === String(currentMemberId);
-                                
-                                // Kiểm tra xem người được giao đã nộp expense chưa
-                                const hasExpenseSubmitted = actualAmount > 0;
-                                
-                                // HoD chỉ được chỉnh sửa nếu:
-                                // - Tự giao cho mình VÀ chưa có expense được nộp
-                                // Member được chỉnh sửa nếu được assign cho mình
-                                const canEditEvidence = (isHoDAssignedToSelf && !hasExpenseSubmitted) || isMemberAssigned;
+        const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
+        
+        const isMemberAssigned = !isHoD && 
+          assignedMemberId && 
+          currentMemberId && 
+          String(assignedMemberId) === String(currentMemberId);
+        
+        // Kiểm tra xem người được giao đã nộp expense chưa
+        const hasExpenseSubmitted = actualAmount > 0;
+        
+        // Cho phép HoD chỉnh sửa/đính kèm bằng chứng nếu budget đã approved/sent_to_members,
+        // ngay cả khi giao cho người ngoài ban (case đã mở rộng assign).
+        // Member được chỉnh sửa nếu được assign cho mình.
+        const canEditEvidence = (isHoD && (isApproved || isSentToMembers)) || isMemberAssigned;
                                 
                                 // Debug log để kiểm tra
                                 if (isHoD && assignedMemberId) {
