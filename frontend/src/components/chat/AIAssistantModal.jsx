@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, User, Bot, X } from 'lucide-react';
 import { aiAgentApi } from '../../apis/aiAgentApi.js';
+import { useEvents } from '../../contexts/EventContext.jsx';
 
 const WELCOME_MESSAGE = `Xin chào! 👋 Tôi là Trợ lý feAI của myFEvent.
 
@@ -77,6 +78,23 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
       'Ví dụ: "Workshop AI cho 200 người tại FU, cần gợi ý các ban tham gia và timeline"',
     []
   );
+
+  // Lấy event name (nếu có) từ EventContext hoặc từ danh sách session
+  const { eventsMap } = useEvents?.() || {};
+  const eventNameFromContext = useMemo(() => {
+    if (eventsMap && eventId && eventsMap[eventId]) {
+      return eventsMap[eventId]?.name || eventsMap[eventId]?.eventName || null;
+    }
+    return null;
+  }, [eventsMap, eventId]);
+
+  const eventNameFromSessions = useMemo(() => {
+    if (!eventId || !Array.isArray(sessions)) return null;
+    const found = sessions.find((s) => s.eventId === eventId);
+    return found?.eventName || found?.name || null;
+  }, [sessions, eventId]);
+
+  const resolvedEventName = eventNameFromContext || eventNameFromSessions;
 
   useEffect(() => {
     if (!isOpen) {
@@ -318,7 +336,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
           }}
         >
           <div>
-            <div style={{ fontWeight: 700 }}>Trợ lý feAI</div>
+            <div style={{ fontWeight: 700 }}>AI Assistant</div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Đồng hành lập kế hoạch sự kiện
             </div>
@@ -545,12 +563,15 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                           p.plan?.epics && Array.isArray(p.plan.epics)
                             ? p.plan.epics
                             : [];
+                        const eventLabel =
+                          p.eventName ||
+                          resolvedEventName ||
+                          p.eventId ||
+                          eventId ||
+                          'sự kiện này';
                         return (
                           <li key={`${p.type}-${idx}`}>
-                            {`EPIC cho sự kiện ${
-                              p.eventId || eventId || ''
-                            }`}:{' '}
-                            {epics.length} công việc lớn
+                            {`Công việc lớn cho sự kiện ${eventLabel}`}
                           </li>
                         );
                       }
@@ -582,9 +603,18 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                           eventId,
                           sessionId, // Gửi sessionId để backend có thể đánh dấu plans đã áp dụng
                         });
+                        const summary = res?.summary || {};
+                        const epicsCreated =
+                          summary.epicsCreated ??
+                          res?.epicsCreated ??
+                          0;
+                        const tasksCreated =
+                          summary.tasksCreated ??
+                          res?.tasksCreated ??
+                          0;
                         const msg =
-                          res?.message ||
-                          'Áp dụng kế hoạch EPIC/TASK từ AI Event Planner hoàn tất (xem chi tiết trong summary).';
+                          `Đã áp dụng các công việc lớn, các công việc từ MyFE-AI hoàn tất. ` +
+                          `Đã tạo ${epicsCreated} Công việc lớn và ${tasksCreated} Công việc vào Danh sách công việc.`;
                         
                         // Đánh dấu plans đã được áp dụng trong message
                         setMessages((prev) =>
