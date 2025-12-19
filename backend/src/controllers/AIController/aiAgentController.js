@@ -1505,19 +1505,93 @@ export const applyEventPlannerPlan = async (req, res) => {
               epicId = mappedEpicId;
             }
           } else {
-            // Không tìm thấy trong map, có thể epicId từ plan là từ lần apply trước
-            // Vẫn dùng epicId từ plan nhưng log để debug
-            console.log(
-              `[applyEventPlannerPlan] Sử dụng epicId từ plan (${epicIdStr}) cho department="${deptName}", epicTitle="${epicTitle}". ` +
-              `Không tìm thấy trong map (có thể là EPIC đã tồn tại từ trước hoặc từ event khác). ` +
-              `Sẽ thử tạo TASK với epicId này.`
-            );
+            // Không tìm thấy trong map, validate epicId có thuộc về event này không
+            try {
+              const existingEpic = await Task.findOne({
+                _id: epicIdStr,
+                eventId: planEventId,
+                taskType: 'epic',
+              }).lean();
+
+              if (!existingEpic) {
+                console.warn(
+                  `[applyEventPlannerPlan] EpicId ${epicIdStr} không tồn tại trong event ${planEventId}. ` +
+                  `Thử tìm EPIC bằng department và title...`
+                );
+                
+                // Thử tìm EPIC bằng department và title
+                const department = await Department.findOne({
+                  eventId: planEventId,
+                  name: { $regex: new RegExp(deptName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+                }).lean();
+
+                if (department) {
+                  const foundEpic = await Task.findOne({
+                    eventId: planEventId,
+                    taskType: 'epic',
+                    title: { $regex: new RegExp(epicTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+                    departmentId: department._id,
+                  }).lean();
+
+                  if (foundEpic) {
+                    console.log(
+                      `[applyEventPlannerPlan] Tìm thấy EPIC đúng trong event: ${foundEpic._id} ` +
+                      `(title: "${epicTitle}", department: "${deptName}"). Thay thế epicId.`
+                    );
+                    epicId = foundEpic._id;
+                    // Lưu vào map
+                    epicIdMap.set(key1, String(epicId));
+                    const key2 = deptName.toLowerCase().trim();
+                    if (!deptToEpicIdsMap.has(key2)) {
+                      deptToEpicIdsMap.set(key2, new Set());
+                    }
+                    deptToEpicIdsMap.get(key2).add(String(epicId));
+                  } else {
+                    summary.errors.push(
+                      `EpicId ${epicIdStr} không tồn tại trong event này và không tìm thấy EPIC với ` +
+                      `department="${deptName}", epicTitle="${epicTitle}". ` +
+                      `Vui lòng đảm bảo EPIC đã được tạo trước khi tạo tasks.`
+                    );
+                    continue;
+                  }
+                } else {
+                  summary.errors.push(
+                    `Không tìm thấy department "${deptName}" trong event này. ` +
+                    `EpicId ${epicIdStr} cũng không tồn tại trong event.`
+                  );
+                  continue;
+                }
+              } else {
+                console.log(
+                  `[applyEventPlannerPlan] EpicId ${epicIdStr} hợp lệ và thuộc về event ${planEventId}. ` +
+                  `Sẽ tạo TASK với epicId này.`
+                );
+              }
+            } catch (dbError) {
+              console.warn(`[applyEventPlannerPlan] Lỗi khi validate epicId:`, dbError);
+              // Vẫn thử tạo TASK, API sẽ validate lại
+            }
           }
         } else {
-          console.log(
-            `[applyEventPlannerPlan] Sử dụng epicId từ plan (${epicIdStr}) nhưng thiếu department hoặc epicTitle để verify. ` +
-            `Sẽ thử tạo TASK với epicId này.`
-          );
+          // Không có department hoặc epicTitle, validate epicId có thuộc về event này không
+          try {
+            const existingEpic = await Task.findOne({
+              _id: epicIdStr,
+              eventId: planEventId,
+              taskType: 'epic',
+            }).lean();
+
+            if (!existingEpic) {
+              summary.errors.push(
+                `EpicId ${epicIdStr} không tồn tại trong event ${planEventId}. ` +
+                `Thiếu thông tin department hoặc epicTitle để tìm EPIC thay thế.`
+              );
+              continue;
+            }
+          } catch (dbError) {
+            console.warn(`[applyEventPlannerPlan] Lỗi khi validate epicId:`, dbError);
+            // Vẫn thử tạo TASK, API sẽ validate lại
+          }
         }
       }
 
