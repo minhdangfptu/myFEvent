@@ -5,19 +5,16 @@ import UserLayout from "~/components/UserLayout";
 import { taskApi } from "~/apis/taskApi";
 import { milestoneApi } from "~/apis/milestoneApi";
 import Loading from "~/components/Loading";
-import HoOCTaskStatisticModal from "./HoOCTaskStatisticModal";
 import { ChartArea, ChartPie, CheckCircle, FileChartColumn, PinOff } from "lucide-react";
 
 
 export default function HoOCTaskStatisticPage() {
   const { eventId } = useParams();
-  const [selectedDept, setSelectedDept] = useState(null);
   const [milestones, setMilestones] = useState([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
   const [statistics, setStatistics] = useState(null);
   const [burnupData, setBurnupData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
   // Fetch milestones
   useEffect(() => {
@@ -142,69 +139,6 @@ export default function HoOCTaskStatisticPage() {
     (m) => (m._id || m.id) === selectedMilestoneId
   );
 
-  const handleRowClick = (dept) => {
-    // ✅ Map API data to modal expected format
-    const mappedDept = {
-      id: dept.departmentId,
-      name: dept.departmentName,
-
-      // Total tasks calculation
-      totalTasks: (dept.majorTasksTotal || 0) + (dept.assignedTasksTotal || 0),
-
-      // Completed tasks
-      completedTasks:
-        (dept.majorTasksCompleted || 0) + (dept.assignedTasksCompleted || 0),
-
-      // Total tasks detail (same as totalTasks for modal display)
-      totalTasksDetail:
-        (dept.majorTasksTotal || 0) + (dept.assignedTasksTotal || 0),
-
-      // Completion rate calculation
-      completionRate: Math.round(
-        (((dept.majorTasksCompleted || 0) +
-          (dept.assignedTasksCompleted || 0)) /
-          Math.max(
-            1,
-            (dept.majorTasksTotal || 0) + (dept.assignedTasksTotal || 0)
-          )) *
-          100
-      ),
-
-      // Remaining tasks calculation
-      remainingTasks: Math.max(
-        0,
-        (dept.majorTasksTotal || 0) +
-          (dept.assignedTasksTotal || 0) -
-          ((dept.majorTasksCompleted || 0) + (dept.assignedTasksCompleted || 0))
-      ),
-
-      // For modal's remaining section
-      remainingCompleted:
-        (dept.majorTasksCompleted || 0) + (dept.assignedTasksCompleted || 0),
-
-      // Remaining completion rate (same as overall completion rate)
-      remainingCompletionRate: Math.round(
-        (((dept.majorTasksCompleted || 0) +
-          (dept.assignedTasksCompleted || 0)) /
-          Math.max(
-            1,
-            (dept.majorTasksTotal || 0) + (dept.assignedTasksTotal || 0)
-          )) *
-          100
-      ),
-
-      // Keep original data for debugging
-      originalData: dept,
-    };
-
-    setSelectedDept(mappedDept);
-    setShowModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedDept(null); // ✅ Clear selected data
-  };
 
   // Calculate chart data from burnupData or generate from statistics
   const calculateChartData = () => {
@@ -705,9 +639,6 @@ export default function HoOCTaskStatisticPage() {
                       <th className="hooc-task-statistic-page__table-header-cell">
                         Công việc cá nhân
                       </th>
-                      <th className="hooc-task-statistic-page__table-header-cell">
-                        Hành động
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -751,23 +682,12 @@ export default function HoOCTaskStatisticPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="hooc-task-statistic-page__table-body-cell">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // ✅ Prevent event bubbling
-                                handleRowClick(dept); // ✅ Pass dept object with proper mapping
-                              }}
-                              className="hooc-task-statistic-page__detail-btn"
-                            >
-                              Xem chi tiết
-                            </button>
-                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan="5"
+                          colSpan="4"
                           style={{ textAlign: "center", padding: "40px" }}
                         >
                           Không có dữ liệu ban nào
@@ -1064,13 +984,6 @@ export default function HoOCTaskStatisticPage() {
               </div>
             </div>
           </>
-        )}
-        {showModal && selectedDept && (
-          <HoOCTaskStatisticModal
-            show={showModal}
-            dept={selectedDept} 
-            onClose={handleCloseModal}
-          />
         )}
       </div>
     </UserLayout>

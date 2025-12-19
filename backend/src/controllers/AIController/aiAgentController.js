@@ -1317,11 +1317,15 @@ export const applyEventPlannerPlan = async (req, res) => {
           }
 
           // Tạo key để map: "department:epicTitle"
-          const key1 = `${deptName}:${epicTitle}`.toLowerCase().trim();
-          const key2 = deptName.toLowerCase().trim();
+          // Normalize: lowercase, trim, và loại bỏ khoảng trắng thừa
+          const normalizedDeptName = deptName.toLowerCase().trim().replace(/\s+/g, ' ');
+          const normalizedEpicTitle = epicTitle.toLowerCase().trim().replace(/\s+/g, ' ');
+          const key1 = `${normalizedDeptName}:${normalizedEpicTitle}`;
+          const key2 = normalizedDeptName;
 
           // Luôn set key1 (department:epicTitle) để map chính xác
           epicIdMap.set(key1, epicIdStr);
+          console.log(`[applyEventPlannerPlan] Đã lưu vào epicIdMap: key="${key1}" -> epicId="${epicIdStr}"`);
 
           // Lưu vào map department -> Set<epicId> để xử lý trường hợp nhiều EPIC cùng department
           if (!deptToEpicIdsMap.has(key2)) {
@@ -1374,6 +1378,16 @@ export const applyEventPlannerPlan = async (req, res) => {
         : [];
       
       console.log(`[applyEventPlannerPlan] tasks_plan có ${tasks.length} tasks, epicId từ plan: ${epicId}, department: "${rawPlan.department}", epicTitle: "${rawPlan.epicTitle}"`);
+      console.log(`[applyEventPlannerPlan] Chi tiết tasks_plan:`, {
+        type: rawPlan.type,
+        department: rawPlan.department,
+        epicTitle: rawPlan.epicTitle,
+        epicId: rawPlan.epicId,
+        hasPlan: !!rawPlan.plan,
+        planKeys: rawPlan.plan ? Object.keys(rawPlan.plan) : [],
+        tasksCount: tasks.length,
+        tasksPreview: tasks.slice(0, 3).map(t => ({ title: t.title, description: t.description?.substring(0, 50) })),
+      });
       
       if (!tasks.length) {
         console.warn('[applyEventPlannerPlan] tasks_plan không có tasks nào, bỏ qua. Plan:', {
@@ -1382,6 +1396,7 @@ export const applyEventPlannerPlan = async (req, res) => {
           epicTitle: rawPlan.epicTitle,
           hasPlan: !!rawPlan.plan,
           planKeys: rawPlan.plan ? Object.keys(rawPlan.plan) : [],
+          planContent: JSON.stringify(rawPlan.plan, null, 2),
         });
         summary.errors.push(`tasks_plan không có tasks nào để tạo (department: "${rawPlan.department || 'N/A'}", epicTitle: "${rawPlan.epicTitle || 'N/A'}").`);
         continue;
@@ -1399,11 +1414,23 @@ export const applyEventPlannerPlan = async (req, res) => {
           continue;
         }
 
-        const key1 = `${deptName}:${epicTitle}`.toLowerCase().trim();
-        const key2 = deptName.toLowerCase().trim();
+        // Normalize: lowercase, trim, và loại bỏ khoảng trắng thừa (giống như khi tạo EPIC)
+        const normalizedDeptName = deptName.toLowerCase().trim().replace(/\s+/g, ' ');
+        const normalizedEpicTitle = epicTitle.toLowerCase().trim().replace(/\s+/g, ' ');
+        const key1 = `${normalizedDeptName}:${normalizedEpicTitle}`;
+        const key2 = normalizedDeptName;
+
+        console.log(`[applyEventPlannerPlan] Tìm EPIC với key="${key1}" (department="${deptName}", epicTitle="${epicTitle}")`);
+        console.log(`[applyEventPlannerPlan] Các keys có trong epicIdMap:`, Array.from(epicIdMap.keys()));
 
         // Thử tìm từ map: ưu tiên key1 (department:epicTitle)
         epicId = epicIdMap.get(key1);
+        
+        if (epicId) {
+          console.log(`[applyEventPlannerPlan] ✅ Tìm thấy EPIC trong map: key="${key1}" -> epicId="${epicId}"`);
+        } else {
+          console.log(`[applyEventPlannerPlan] ❌ Không tìm thấy EPIC trong map với key="${key1}"`);
+        }
 
         // Nếu không tìm thấy trong map, thử tìm EPIC đã tồn tại trong database
         if (!epicId && epicTitle && planEventId) {
@@ -1426,9 +1453,9 @@ export const applyEventPlannerPlan = async (req, res) => {
               if (existingEpic) {
                 epicId = existingEpic._id;
                 console.log(`[applyEventPlannerPlan] Tìm thấy EPIC đã tồn tại trong database: ${epicId} (title: "${epicTitle}", department: "${deptName}")`);
-                // Lưu vào map để dùng cho các tasks_plan khác
+                // Lưu vào map để dùng cho các tasks_plan khác (key1 đã được normalize ở trên)
                 epicIdMap.set(key1, String(epicId));
-                const key2 = deptName.toLowerCase().trim();
+                console.log(`[applyEventPlannerPlan] Đã lưu vào epicIdMap: key="${key1}" -> epicId="${epicId}"`);
                 if (!deptToEpicIdsMap.has(key2)) {
                   deptToEpicIdsMap.set(key2, new Set());
                 }
@@ -1492,7 +1519,14 @@ export const applyEventPlannerPlan = async (req, res) => {
         const epicTitle = (rawPlan.epicTitle || '').trim();
 
         if (deptName && epicTitle) {
-          const key1 = `${deptName}:${epicTitle}`.toLowerCase().trim();
+          // Normalize: lowercase, trim, và loại bỏ khoảng trắng thừa (giống như khi tạo EPIC)
+          const normalizedDeptName = deptName.toLowerCase().trim().replace(/\s+/g, ' ');
+          const normalizedEpicTitle = epicTitle.toLowerCase().trim().replace(/\s+/g, ' ');
+          const key1 = `${normalizedDeptName}:${normalizedEpicTitle}`;
+          
+          console.log(`[applyEventPlannerPlan] Tìm EPIC với epicId hợp lệ từ plan, key="${key1}" (department="${deptName}", epicTitle="${epicTitle}")`);
+          console.log(`[applyEventPlannerPlan] Các keys có trong epicIdMap:`, Array.from(epicIdMap.keys()));
+          
           const mappedEpicId = epicIdMap.get(key1);
           
           if (mappedEpicId) {
@@ -1539,9 +1573,12 @@ export const applyEventPlannerPlan = async (req, res) => {
                       `(title: "${epicTitle}", department: "${deptName}"). Thay thế epicId.`
                     );
                     epicId = foundEpic._id;
-                    // Lưu vào map
-                    epicIdMap.set(key1, String(epicId));
-                    const key2 = deptName.toLowerCase().trim();
+                    // Lưu vào map với key đã normalize
+                    const normalizedDeptName = deptName.toLowerCase().trim().replace(/\s+/g, ' ');
+                    const normalizedEpicTitle = epicTitle.toLowerCase().trim().replace(/\s+/g, ' ');
+                    const mapKey = `${normalizedDeptName}:${normalizedEpicTitle}`;
+                    epicIdMap.set(mapKey, String(epicId));
+                    const key2 = normalizedDeptName;
                     if (!deptToEpicIdsMap.has(key2)) {
                       deptToEpicIdsMap.set(key2, new Set());
                     }
