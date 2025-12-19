@@ -12,7 +12,7 @@ import ConfirmModal from "../../components/ConfirmModal";
 const DepartmentBudgetsListPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { fetchEventRole } = useEvents();
+  const { fetchEventRole, forceCheckEventAccess } = useEvents();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
@@ -30,14 +30,30 @@ const DepartmentBudgetsListPage = () => {
       setLoading(true);
       
       // Kiểm tra role và lấy department của HOD
-      const role = await fetchEventRole(eventId);
+      // Dùng forceCheckEventAccess để đảm bảo lấy role mới nhất từ server
+      // (quan trọng khi vừa được chuyển ban)
+      let role = await forceCheckEventAccess(eventId);
+      if (!role || role === '') {
+        role = await fetchEventRole(eventId);
+      }
       
-      if (role === 'HoD' && user) {
-        // Lấy department mà user là leader
+      // Đảm bảo có user trước khi tiếp tục
+      if (!user) {
+        setLoading(false);
+        navigate(`/events/${eventId}/hod-event-detail`, { replace: true });
+        return;
+      }
+      
+      if (role === 'HoD') {
+        // Lấy department mà user là leader (để biết ban của HoD)
+        // QUAN TRỌNG: Luôn fetch departments từ server để đảm bảo có dữ liệu mới nhất
+        // (đặc biệt quan trọng khi vừa được chuyển ban hoặc thay đổi role)
         const depts = await departmentService.getDepartments(eventId);
         const departmentsList = Array.isArray(depts) ? depts : (depts?.items || depts?.data || []);
         const userId = user._id || user.id;
         
+        // Tìm department mà user là leader
+        // Lưu ý: Có thể user vừa được chuyển ban nên cần tìm trong tất cả departments
         const userDepartment = departmentsList.find(dept => {
           const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
           return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
@@ -47,38 +63,80 @@ const DepartmentBudgetsListPage = () => {
           const deptId = userDepartment._id || userDepartment.id;
           setHodDepartmentId(deptId);
           
-          // Chỉ load summary của budgets (không load items để tối ưu)
-          const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, deptId, {
+          // Lấy tất cả budgets mà HoD được phép xem trong event:
+          // - Budget của ban mình
+          // - + tất cả budget được HoOC "Công khai" (isPublic = true)
+          const budgetsResponse = await budgetApi.getAllBudgetsForEvent(eventId, {
             page: 1,
-            limit: 100, // Giảm từ 1000 xuống 100
-            includeItems: false // Chỉ load summary, không load items
+            limit: 100,
+            includeItems: false,
           });
           
           const budgetsList = Array.isArray(budgetsResponse) 
             ? budgetsResponse 
             : (budgetsResponse?.data || budgetsResponse?.budgets || []);
           
-          // Format budgets để hiển thị
-          const formattedBudgets = budgetsList.map((budget) => ({
+          // Filter budgets: chỉ hiển thị budget của ban mình HOẶC budget công khai
+          const filteredBudgets = budgetsList.filter(budget => {
+            const budgetDeptId = budget.departmentId?._id || budget.departmentId;
+            const isOwnDepartment = budgetDeptId && String(budgetDeptId) === String(deptId);
+            const isPublic = !!budget.isPublic;
+            // Hiển thị nếu là budget của ban mình HOẶC là budget công khai
+            return isOwnDepartment || isPublic;
+          });
+          
+          // Format budgets để hiển thị (giữ cả thông tin isPublic)
+          const formattedBudgets = filteredBudgets.map((budget) => ({
             budgetId: budget._id || budget.id,
-            departmentId: budget.departmentId || deptId,
-            departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
-            requestName: (budget.name && budget.name.trim()) || "Budget Ban",
+            departmentId: budget.departmentId?._id || budget.departmentId,
+            departmentName: budget.departmentName || budget.departmentId?.name || "Không rõ ban",
+            requestName: (budget.name && budget.name.trim()) || "Ngân sách dự trù của Ban",
             creatorName: budget.creatorName || "",
             budgetStatus: budget.status || null,
             totalItems: budget.totalItems || 0,
             totalCost: budget.totalCost || 0,
             createdAt: budget.createdAt,
             submittedAt: budget.submittedAt,
+            isPublic: !!budget.isPublic,
           }));
           
           setDepartments(formattedBudgets);
+          setLoading(false);
         } else {
-          toast.error("Không tìm thấy ban mà bạn là trưởng ban");
-          setDepartments([]);
+          // Không tìm thấy ban - có thể là:
+          // 1. User vừa được chuyển ban nhưng backend chưa cập nhật leaderId
+          // 2. User chưa được gán làm leader của department nào
+          // 3. Cache chưa được cập nhật
+          
+          // Thử lại một lần nữa sau khi đợi một chút (có thể backend đang xử lý)
+          console.warn('Không tìm thấy department cho HoD, thử lại sau 500ms...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Fetch lại departments
+          const retryDepts = await departmentService.getDepartments(eventId);
+          const retryDepartmentsList = Array.isArray(retryDepts) ? retryDepts : (retryDepts?.items || retryDepts?.data || []);
+          
+          const retryUserDepartment = retryDepartmentsList.find(dept => {
+            const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+            return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
+          });
+          
+          if (retryUserDepartment) {
+            const deptId = retryUserDepartment._id || retryUserDepartment.id;
+            setHodDepartmentId(deptId);
+            setDepartments([]); // Hiển thị trang trống nhưng không redirect
+            setLoading(false);
+          } else {
+            // Vẫn không tìm thấy, redirect về trang chính
+            console.warn('Vẫn không tìm thấy department sau retry');
+            setLoading(false);
+            navigate(`/events/${eventId}/hod-event-detail`, { replace: true });
+            return;
+          }
         }
       } else {
         // Nếu không phải HoD, redirect về trang phù hợp
+        setLoading(false);
         if (role === 'Member') {
           navigate(`/events/${eventId}/budgets/member`, { replace: true });
         } else if (role === 'HoOC') {
@@ -154,7 +212,7 @@ const DepartmentBudgetsListPage = () => {
             <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
               Danh sách Ngân sách của Ban
             </h2>
-            <p className="text-muted">Danh sách tất cả các đơn budget của ban bạn</p>
+            <p className="text-muted">Danh sách tất cả các đơn budget của ban</p>
           </div>
           <button
             className="btn btn-primary"
@@ -243,7 +301,7 @@ const DepartmentBudgetsListPage = () => {
                       <tr key={budget.budgetId}>
                         <td style={{ padding: "12px", maxWidth: 240 }}>
                           <span className="fw-semibold" style={{ fontSize: "16px" }}>
-                            {budget.requestName || "Budget Ban"}
+                            {budget.requestName || "Ngân sách dự trù của Ban"}
                           </span>
                           {budget.creatorName && (
                             <div className="text-muted" style={{ fontSize: "13px" }}>
@@ -252,7 +310,14 @@ const DepartmentBudgetsListPage = () => {
                           )}
                         </td>
                         <td style={{ padding: "12px" }}>
-                          <span className="text-muted">{budget.departmentName}</span>
+                          <span className="text-muted">
+                            {budget.departmentName}
+                            {budget.isPublic && (
+                              <span className="badge ms-2" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>
+                                Công khai
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span
@@ -294,8 +359,8 @@ const DepartmentBudgetsListPage = () => {
                               <i className="bi bi-eye me-1"></i>
                               Chi tiết
                             </button>
-                            {/* Nút "Gửi cho HoOC" chỉ hiển thị cho draft */}
-                            {budget.budgetStatus === 'draft' && (
+                            {/* Nút "Gửi cho HoOC" chỉ hiển thị cho draft VÀ chỉ cho budget của ban mình */}
+                            {budget.budgetStatus === 'draft' && hodDepartmentId && String(budget.departmentId) === String(hodDepartmentId) && (
                               <button
                                 className="btn btn-success btn-sm"
                                 onClick={async () => {
@@ -313,8 +378,8 @@ const DepartmentBudgetsListPage = () => {
                                 Gửi
                               </button>
                             )}
-                            {/* Nút "Xóa" chỉ cho draft, không cho xóa khi status là submitted (chờ duyệt) */}
-                            {budget.budgetStatus === 'draft' && (
+                            {/* Nút "Xóa" chỉ cho draft của ban mình, không cho xóa khi status là submitted (chờ duyệt) */}
+                            {budget.budgetStatus === 'draft' && hodDepartmentId && String(budget.departmentId) === String(hodDepartmentId) && (
                               <button
                                 className="btn btn-danger btn-sm"
                                 onClick={() => {

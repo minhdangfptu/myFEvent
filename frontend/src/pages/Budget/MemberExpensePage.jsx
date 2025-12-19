@@ -406,17 +406,28 @@ const MemberExpensePage = () => {
     
     try {
       setLoading(true);
-      await budgetApi.reportExpense(
+      // Đảm bảo evidence là array và có format đúng
+      const evidenceToSave = Array.isArray(editFormData.evidence) 
+        ? editFormData.evidence.map(ev => ({
+            type: ev.type || 'image',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
+      const response = await budgetApi.reportExpense(
         eventId,
         editingBudget.departmentId,
         editingBudget._id,
         editingItem.itemId,
         {
           actualAmount: parseFloat(editFormData.actualAmount) || 0,
-          evidence: editFormData.evidence || [],
+          evidence: evidenceToSave,
           memberNote: editFormData.memberNote || "",
         }
       );
+      
+      console.log("Save response:", response);
       toast.success("Đã lưu thành công!");
       handleCloseEditModal();
       await fetchBudgets();
@@ -433,6 +444,16 @@ const MemberExpensePage = () => {
     
     try {
       setLoading(true);
+      
+      // Đảm bảo evidence là array và có format đúng
+      const evidenceToSave = Array.isArray(editFormData.evidence) 
+        ? editFormData.evidence.map(ev => ({
+            type: ev.type || 'image',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
       await budgetApi.reportExpense(
         eventId,
         editingBudget.departmentId,
@@ -440,7 +461,7 @@ const MemberExpensePage = () => {
         editingItem.itemId,
         {
           actualAmount: parseFloat(editFormData.actualAmount) || 0,
-          evidence: editFormData.evidence || [],
+          evidence: evidenceToSave,
           memberNote: editFormData.memberNote || "",
         }
       );
@@ -480,20 +501,43 @@ const MemberExpensePage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Kiểm tra kích thước file (tối đa 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error("File quá lớn. Vui lòng chọn file nhỏ hơn 10MB");
+      return;
+    }
+
     const reader = new FileReader();
+    
     reader.onload = (event) => {
-      const fileType = file.type.startsWith('image/') ? 'image' : 
-                      file.type === 'application/pdf' ? 'pdf' : 'doc';
-      setEditFormData(prev => ({
-        ...prev,
-        evidence: [...(prev.evidence || []), {
-          type: fileType,
-          url: event.target.result,
-          name: file.name
-        }]
-      }));
+      try {
+        const fileType = file.type.startsWith('image/') ? 'image' : 
+                        file.type === 'application/pdf' ? 'pdf' : 'doc';
+        setEditFormData(prev => ({
+          ...prev,
+          evidence: [...(prev.evidence || []), {
+            type: fileType,
+            url: event.target.result,
+            name: file.name
+          }]
+        }));
+        toast.success("Đã thêm bằng chứng thành công!");
+      } catch (error) {
+        console.error("Error processing file:", error);
+        toast.error("Không thể xử lý file. Vui lòng thử lại.");
+      }
     };
+    
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      toast.error("Không thể đọc file. Vui lòng thử lại.");
+    };
+    
     reader.readAsDataURL(file);
+    
+    // Reset input để có thể chọn lại cùng file
+    e.target.value = '';
   };
 
   const handleRemoveEvidence = (idx) => {
@@ -511,7 +555,7 @@ const MemberExpensePage = () => {
     return (
       <UserLayout
         title="Chi tiêu"
-        activePage="expenses"
+        activePage="finance-statistics"
         sidebarType="member"
         eventId={eventId}
       >
@@ -535,7 +579,7 @@ const MemberExpensePage = () => {
   return (
     <UserLayout
       title="Chi tiêu"
-      activePage="expenses"
+      activePage="finance-statistics"
       sidebarType="member"
       eventId={eventId}
     >

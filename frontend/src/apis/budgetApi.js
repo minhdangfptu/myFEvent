@@ -99,7 +99,7 @@ export const budgetApi = {
     return unwrapResponse(res.data);
   },
 
-  // Lấy thống kê thu chi
+  // Lấy Thống kê chi tiêu
   getBudgetStatistics: async (eventId, departmentId = null) => {
     const params = departmentId ? { departmentId } : {};
     const res = await axiosClient.get(`/api/events/${eventId}/budgets/statistics`, { params });

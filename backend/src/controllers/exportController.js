@@ -20,53 +20,65 @@ export const exportSingleItem = async (req, res) => {
     const { eventId, itemId } = req.params;
     const { subItems = [] } = req.body;
 
+    // Lấy thông tin event để có tên sự kiện
+    const eventData = await event.findById(eventId).select('name').lean();
+    if (!eventData) {
+      return res.status(404).json({ error: 'Không tìm thấy sự kiện' });
+    }
+
+    // Sanitize event name để dùng trong filename
+    const sanitizedEventName = eventData.name
+      .replace(/[^a-zA-Z0-9\u00C0-\u1EF9\s]/g, '') // Loại bỏ ký tự đặc biệt, giữ tiếng Việt
+      .replace(/\s+/g, '_') // Thay khoảng trắng bằng underscore
+      .substring(0, 50); // Giới hạn độ dài
+
     const workbook = new ExcelJS.Workbook();
     let filename;
 
     switch (itemId) {
       case 'team':
         await createDepartmentSheets(workbook, eventId, subItems);
-        filename = `Danh_sach_Ban_${eventId}_${Date.now()}.xlsx`;
+        filename = `Danh_sach_Ban_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'members':
         await createMemberSheets(workbook, eventId, subItems);
-        filename = `Danh_sach_Thanh_vien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Danh_sach_Thanh_vien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'agenda':
         await createAgendaSheets(workbook, eventId, subItems);
-        filename = `Agenda_Su_Kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Agenda_Su_Kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'tasks':
         await createTaskSheets(workbook, eventId, subItems);
-        filename = `Cong_viec_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Cong_viec_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'budget':
         await createBudgetSheets(workbook, eventId, subItems);
-        filename = `Kinh_phi_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Kinh_phi_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'risks':
         await createRiskSheets(workbook, eventId, subItems);
-        filename = `Rui_ro_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Rui_ro_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'timeline':
         await createTimelineSheets(workbook, eventId, subItems);
-        filename = `Timeline_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Timeline_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'feedback':
         await createFeedbackSheets(workbook, eventId, subItems);
-        filename = `Phan_hoi_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Phan_hoi_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       case 'incidents':
         await createIncidentSheets(workbook, eventId, subItems);
-        filename = `Su_co_Su_kien_${eventId}_${Date.now()}.xlsx`;
+        filename = `Su_co_Su_kien_${sanitizedEventName}_${Date.now()}.xlsx`;
         break;
 
       default:
@@ -85,17 +97,17 @@ export const exportSingleItem = async (req, res) => {
   }
 };
 
-const getItemExportConfig = (itemId, eventId) => {
+const getItemExportConfig = (itemId, eventName) => {
   const configMap = {
-    'team': { filename: `Danh_sach_Ban_${eventId}.xlsx`, createFn: createDepartmentSheets },
-    'members': { filename: `Danh_sach_Thanh_vien_${eventId}.xlsx`, createFn: createMemberSheets },
-    'timeline': { filename: `Timeline_Su_kien_${eventId}.xlsx`, createFn: createTimelineSheets },
-    'agenda': { filename: `Agenda_Su_Kien_${eventId}.xlsx`, createFn: createAgendaSheets },
-    'tasks': { filename: `Danh_sach_Cong_viec_${eventId}.xlsx`, createFn: createTaskSheets },
-    'budget': { filename: `Kinh_phi_Su_kien_${eventId}.xlsx`, createFn: createBudgetSheets },
-    'feedback': { filename: `Phan_hoi_Su_kien_${eventId}.xlsx`, createFn: createFeedbackSheets },
-    'risks': { filename: `Rui_ro_Su_kien_${eventId}.xlsx`, createFn: createRiskSheets },
-    'incidents': { filename: `Su_co_Su_kien_${eventId}.xlsx`, createFn: createIncidentSheets }
+    'team': { filename: `Danh_sach_Ban_${eventName}.xlsx`, createFn: createDepartmentSheets },
+    'members': { filename: `Danh_sach_Thanh_vien_${eventName}.xlsx`, createFn: createMemberSheets },
+    'timeline': { filename: `Timeline_Su_kien_${eventName}.xlsx`, createFn: createTimelineSheets },
+    'agenda': { filename: `Agenda_Su_Kien_${eventName}.xlsx`, createFn: createAgendaSheets },
+    'tasks': { filename: `Danh_sach_Cong_viec_${eventName}.xlsx`, createFn: createTaskSheets },
+    'budget': { filename: `Kinh_phi_Su_kien_${eventName}.xlsx`, createFn: createBudgetSheets },
+    'feedback': { filename: `Phan_hoi_Su_kien_${eventName}.xlsx`, createFn: createFeedbackSheets },
+    'risks': { filename: `Rui_ro_Su_kien_${eventName}.xlsx`, createFn: createRiskSheets },
+    'incidents': { filename: `Su_co_Su_kien_${eventName}.xlsx`, createFn: createIncidentSheets }
   };
   return configMap[itemId];
 };
@@ -104,19 +116,31 @@ export const exportAllItemsZip = async (req, res) => {
   try {
     const { eventId } = req.params;
 
+    // Lấy thông tin event để có tên sự kiện
+    const eventData = await event.findById(eventId).select('name').lean();
+    if (!eventData) {
+      return res.status(404).json({ error: 'Không tìm thấy sự kiện' });
+    }
+
+    // Sanitize event name để dùng trong filename
+    const sanitizedEventName = eventData.name
+      .replace(/[^a-zA-Z0-9\u00C0-\u1EF9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 50);
+
     const itemsToExport = [
-      { itemId: 'team', ...getItemExportConfig('team', eventId) },
-      { itemId: 'members', ...getItemExportConfig('members', eventId) },
-      { itemId: 'timeline', ...getItemExportConfig('timeline', eventId) },
-      { itemId: 'agenda', ...getItemExportConfig('agenda', eventId) },
-      { itemId: 'tasks', ...getItemExportConfig('tasks', eventId) },
-      { itemId: 'budget', ...getItemExportConfig('budget', eventId) },
-      { itemId: 'feedback', ...getItemExportConfig('feedback', eventId) },
-      { itemId: 'risks', ...getItemExportConfig('risks', eventId) },
-      { itemId: 'incidents', ...getItemExportConfig('incidents', eventId) }
+      { itemId: 'team', ...getItemExportConfig('team', sanitizedEventName) },
+      { itemId: 'members', ...getItemExportConfig('members', sanitizedEventName) },
+      { itemId: 'timeline', ...getItemExportConfig('timeline', sanitizedEventName) },
+      { itemId: 'agenda', ...getItemExportConfig('agenda', sanitizedEventName) },
+      { itemId: 'tasks', ...getItemExportConfig('tasks', sanitizedEventName) },
+      { itemId: 'budget', ...getItemExportConfig('budget', sanitizedEventName) },
+      { itemId: 'feedback', ...getItemExportConfig('feedback', sanitizedEventName) },
+      { itemId: 'risks', ...getItemExportConfig('risks', sanitizedEventName) },
+      { itemId: 'incidents', ...getItemExportConfig('incidents', sanitizedEventName) }
     ];
 
-    const zipFilename = `Tat_Ca_Du_Lieu_${eventId}.zip`;
+    const zipFilename = `Tat_Ca_Du_Lieu_${sanitizedEventName}.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
@@ -172,9 +196,21 @@ export const exportSelectedItemsZip = async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng chọn ít nhất một mục để xuất' });
     }
 
+    // Lấy thông tin event để có tên sự kiện
+    const eventData = await event.findById(eventId).select('name').lean();
+    if (!eventData) {
+      return res.status(404).json({ error: 'Không tìm thấy sự kiện' });
+    }
+
+    // Sanitize event name để dùng trong filename
+    const sanitizedEventName = eventData.name
+      .replace(/[^a-zA-Z0-9\u00C0-\u1EF9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 50);
+
     const itemsToExport = itemIds
       .map(itemId => {
-        const config = getItemExportConfig(itemId, eventId);
+        const config = getItemExportConfig(itemId, sanitizedEventName);
         if (!config) {
           console.warn(`⚠️ Unknown itemId: ${itemId}`);
           return null;
@@ -187,7 +223,7 @@ export const exportSelectedItemsZip = async (req, res) => {
       return res.status(400).json({ error: 'Không có mục hợp lệ để xuất' });
     }
 
-    const zipFilename = `Du_Lieu_Da_Chon_${eventId}.zip`;
+    const zipFilename = `Du_Lieu_Da_Chon_${sanitizedEventName}.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
@@ -272,6 +308,26 @@ const createDepartmentSheets = async (workbook, eventId, subItems) => {
         left: { style: 'thin' }, right: { style: 'thin' }
       };
     });
+
+    if (!departments || departments.length === 0) {
+      worksheet.mergeCells('B3:F3');
+      const emptyRow = worksheet.getRow(3);
+      emptyRow.height = 20;
+
+      const emptyCell = emptyRow.getCell(2);
+      emptyCell.value = 'Chưa có dữ liệu';
+      emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      for (let col = 1; col <= 6; col++) {
+        const cell = emptyRow.getCell(col);
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      return;
+    }
 
     let totalMembers = 0;
     departments.forEach((dept, index) => {
@@ -389,6 +445,26 @@ const createMemberSheets = async (workbook, eventId, subItems) => {
       };
     });
 
+    if (!members || members.length === 0) {
+      worksheet.mergeCells('B3:H3');
+      const emptyRow = worksheet.getRow(3);
+      emptyRow.height = 20;
+
+      const emptyCell = emptyRow.getCell(2);
+      emptyCell.value = 'Chưa có dữ liệu';
+      emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      for (let col = 1; col <= 8; col++) {
+        const cell = emptyRow.getCell(col);
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      return;
+    }
+
     members.forEach((member, index) => {
       const row = worksheet.getRow(index + 3);
       row.height = 20;
@@ -495,6 +571,26 @@ const createRiskSheets = async (workbook, eventId, subItems) => {
       };
     });
 
+    if (!risks || risks.length === 0) {
+      worksheet.mergeCells('B3:J3');
+      const emptyRow = worksheet.getRow(3);
+      emptyRow.height = 20;
+
+      const emptyCell = emptyRow.getCell(2);
+      emptyCell.value = 'Chưa có dữ liệu';
+      emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      for (let col = 1; col <= 10; col++) {
+        const cell = emptyRow.getCell(col);
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      return;
+    }
+
     let totalIncidents = 0;
     risks.forEach((risk, index) => {
       const row = worksheet.getRow(index + 3);
@@ -572,10 +668,11 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
   if (selectedMilestoneIds.length > 0) {
 
     const filteredAgendas = agendas.filter(agendaData => {
-      const milestoneIdStr = agendaData.milestoneId?._id?.toString();
-      const isMatch = milestoneIdStr && selectedMilestoneIds.includes(milestoneIdStr);
-
-      return isMatch;
+      if (!agendaData.milestoneId || agendaData.milestoneId.isDeleted) {
+        return false;
+      }
+      const milestoneIdStr = agendaData.milestoneId._id.toString();
+      return selectedMilestoneIds.includes(milestoneIdStr);
     });
 
     if (filteredAgendas.length === 0) {
@@ -598,7 +695,12 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
     await createMainAgendaSheet(workbook, filteredAgendas, "Agenda - Cac moc da chon");
     return;
   }
-  agendas.forEach((agendaData, idx) => {
+
+  const nonDeletedAgendas = agendas.filter(agendaData =>
+    agendaData.milestoneId && !agendaData.milestoneId.isDeleted
+  );
+
+  nonDeletedAgendas.forEach((agendaData, idx) => {
     let sheetName;
     if (agendaData.milestoneId && agendaData.milestoneId.name) {
       sheetName = agendaData.milestoneId.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '');
@@ -608,7 +710,7 @@ const createAgendaSheets = async (workbook, eventId, subItems) => {
     createSingleAgendaSheet(workbook, agendaData, sheetName);
   });
 
-  await createMainAgendaSheet(workbook, agendas, "Agenda Tong hop Su kien");
+  await createMainAgendaSheet(workbook, nonDeletedAgendas, "Agenda Tong hop Su kien");
 };
 
 const createSingleAgendaSheet = async (workbook, agendaData, sheetName) => {
@@ -649,32 +751,53 @@ const createSingleAgendaSheet = async (workbook, agendaData, sheetName) => {
 
   const agendaItems = processAgendaData(agendaData.agenda);
 
-  agendaItems.forEach((item, index) => {
-    const row = worksheet.getRow(index + 3);
-    row.height = 20;
+  if (agendaItems.length === 0) {
+    // Tạo row thông báo không có agenda
+    worksheet.mergeCells('B3:F3');
+    const emptyRow = worksheet.getRow(3);
+    emptyRow.height = 20;
 
-    row.getCell(1).value = index + 1;
-    row.getCell(2).value = formatDate(item.date);
-    row.getCell(3).value = item.timeRange || '';
-    row.getCell(4).value = item.duration || '';
-    row.getCell(5).value = item.content || '';
-    row.getCell(6).value = '';
+    const emptyCell = emptyRow.getCell(2);
+    emptyCell.value = 'Chưa có agenda nào cho cột mốc này';
+    emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+    emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
+    // Add borders cho tất cả cells trong row
     for (let col = 1; col <= 6; col++) {
-      const cell = row.getCell(col);
-      cell.font = { name: 'Roboto', size: 11 };
+      const cell = emptyRow.getCell(col);
       cell.border = {
         top: { style: 'thin' }, bottom: { style: 'thin' },
         left: { style: 'thin' }, right: { style: 'thin' }
       };
-
-      if (col === 1) {
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      } else {
-        cell.alignment = { horizontal: 'left', vertical: 'middle' };
-      }
     }
-  });
+  } else {
+    agendaItems.forEach((item, index) => {
+      const row = worksheet.getRow(index + 3);
+      row.height = 20;
+
+      row.getCell(1).value = index + 1;
+      row.getCell(2).value = formatDate(item.date);
+      row.getCell(3).value = item.timeRange || '';
+      row.getCell(4).value = item.duration || '';
+      row.getCell(5).value = item.content || '';
+      row.getCell(6).value = '';
+
+      for (let col = 1; col <= 6; col++) {
+        const cell = row.getCell(col);
+        cell.font = { name: 'Roboto', size: 11 };
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        };
+
+        if (col === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        }
+      }
+    });
+  }
 
 };
 
@@ -724,6 +847,26 @@ const createIncidentSheets = async (workbook, eventId, subItems) => {
         left: { style: 'thin' }, right: { style: 'thin' }
       };
     });
+
+    if (!incidents || incidents.length === 0) {
+      worksheet.mergeCells('B3:J3');
+      const emptyRow = worksheet.getRow(3);
+      emptyRow.height = 20;
+
+      const emptyCell = emptyRow.getCell(2);
+      emptyCell.value = 'Chưa có dữ liệu';
+      emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      for (let col = 1; col <= 10; col++) {
+        const cell = emptyRow.getCell(col);
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      return;
+    }
 
     incidents.forEach((incident, index) => {
       const row = worksheet.getRow(index + 3);
@@ -822,6 +965,25 @@ const createTimelineSheets = async (workbook, eventId, subItems) => {
         top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
       };
     });
+
+    if (!milestones || milestones.length === 0) {
+      worksheet.mergeCells('B3:F3');
+      const emptyRow = worksheet.getRow(3);
+      emptyRow.height = 20;
+
+      const emptyCell = emptyRow.getCell(2);
+      emptyCell.value = 'Chưa có dữ liệu';
+      emptyCell.font = { name: 'Roboto', size: 11, italic: true };
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      for (let col = 1; col <= 6; col++) {
+        const cell = emptyRow.getCell(col);
+        cell.border = {
+          top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      return;
+    }
 
     milestones.forEach((milestone, index) => {
       const row = worksheet.getRow(index + 3);

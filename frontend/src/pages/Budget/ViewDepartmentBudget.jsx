@@ -412,7 +412,7 @@ const ViewDepartmentBudget = () => {
 
   const handleRenameBudget = () => {
     if (!budget?._id) return;
-    const currentName = budget.name || "Budget Ban";
+    const currentName = budget.name || "Ngân sách dự trù của Ban";
     setRenameInput(currentName);
     setShowRenameModal(true);
   };
@@ -870,7 +870,7 @@ const ViewDepartmentBudget = () => {
     item.feedback && item.feedback.trim() !== "" && item.status === "rejected"
   ) || [];
   const hasRejectedItems = itemsWithFeedback.length > 0;
-  const budgetName = budget.name || "Budget Ban";
+  const budgetName = budget.name || "Ngân sách dự trù của Ban";
   const creatorName =
     budget.createdBy?.fullName ||
     budget.createdBy?.name ||
@@ -1035,7 +1035,7 @@ const ViewDepartmentBudget = () => {
                   </span>
                 </div>
                 <p className="text-muted mb-0" style={{ fontSize: "13px", lineHeight: "1.4" }}>
-                  Trạng thái budget
+                  Trạng thái ngân sách dự trù
                 </p>
               </div>
             </div>
@@ -1146,7 +1146,7 @@ const ViewDepartmentBudget = () => {
                 }}
               >
                 <Users size={18} />
-                Bảng kiểm soát Member
+                Ngân sách chi tiêu cho thành viên 
               </div>
             )}
           </div>
@@ -1927,7 +1927,7 @@ const ViewDepartmentBudget = () => {
                       userSelect: "none",
                       whiteSpace: "nowrap"
                     }}>
-                      Chú thích (member ghi)
+                      Chú thích của thành viên
                       <div
                         style={{
                           position: "absolute", 

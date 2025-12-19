@@ -60,7 +60,7 @@ export const listTasksByEventOrDepartmentService = async ({ eventId, query }) =>
         select: 'userId',
         populate: [{ path: 'userId', model: 'User', select: 'fullName' }],
       },
-      { path: 'departmentId', select: 'name' },
+      { path: 'departmentId', select: 'name _id' }, // Thêm _id để frontend có thể filter đúng
       { path: 'createdBy', model: 'User', select: 'fullName' },
     ])
     .lean();

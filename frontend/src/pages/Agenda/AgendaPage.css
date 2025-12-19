@@ -121,10 +121,16 @@
   
   .agenda-page__schedule-table-row {
     border-bottom: 1px solid #e0e0e0;
+    position: relative;
   }
-  
+
   .agenda-page__schedule-table-row--editing {
     background-color: #ffe6e6;
+  }
+
+  .agenda-page__schedule-table-row--adding {
+    background-color: #fef2f2;
+    border: 2px solid #dc2626;
   }
   
   .agenda-page__schedule-table-cell {
@@ -173,6 +179,7 @@
     border-radius: 4px;
     padding: 6px 8px;
     font-size: 13px;
+    max-width: 110px;
   }
   
   .agenda-page__content-input {
@@ -330,4 +337,15 @@
     display: flex;
     gap: 5px;
   }
-  
+
+  /* Message Notification Animation */
+  @keyframes slideInRight {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }

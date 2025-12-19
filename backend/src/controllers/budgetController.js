@@ -369,6 +369,24 @@ export const updateDepartmentBudget = async (req, res) => {
       return res.status(404).json({ message: 'Department not found' });
     }
 
+    // Kiểm tra quyền của user
+    const membership = await loadMembership(eventId, userId, 'updateDepartmentBudget');
+    if (!membership) {
+      return res.status(403).json({ message: 'Bạn không phải là thành viên của sự kiện này' });
+    }
+
+    const membershipDeptId = getIdString(membership?.departmentId);
+    const isHoOC = membership?.role === 'HoOC';
+    const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
+    
+    // Kiểm tra xem user có phải là HoD của department này không
+    let isHoD = false;
+    if (department.leaderId) {
+      const leaderIdStr = getIdString(department.leaderId);
+      const userIdStr = getIdString(userId);
+      isHoD = leaderIdStr === userIdStr;
+    }
+
     // Find budget
     const budget = await EventBudgetPlan.findOne({
       _id: new mongoose.Types.ObjectId(budgetId),
@@ -380,14 +398,68 @@ export const updateDepartmentBudget = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    // Cho phép update nếu status là draft, changes_requested, hoặc submitted (để chỉnh sửa và gửi lại)
-    // Khi update từ submitted, sẽ tự động chuyển về draft để có thể submit lại
-    if (budget.status !== 'draft' && budget.status !== 'changes_requested' && budget.status !== 'submitted') {
-      return res.status(400).json({ message: 'Cannot update budget that is not in draft, changes_requested, or submitted status' });
+    // Kiểm tra quyền update budget:
+    // - HoOC: có thể update bất kỳ budget nào
+    // - HoD: chỉ có thể update budget của department mình
+    // - Member: chỉ có thể update evidence của items được assign cho mình (khi budget đã được sent_to_members hoặc approved)
+    if (!isHoOC && !isSameDepartment) {
+      return res.status(403).json({ message: 'Bạn không có quyền cập nhật budget của ban này' });
+    }
+
+    // Nếu là Member (không phải HoD), chỉ cho phép update evidence của items được assign
+    if (!isHoOC && !isHoD && items && Array.isArray(items)) {
+      // Kiểm tra xem budget đã được sent_to_members hoặc approved chưa
+      if (budget.status !== 'sent_to_members' && budget.status !== 'approved') {
+        return res.status(403).json({ 
+          message: 'Chỉ có thể thêm bằng chứng khi budget đã được phê duyệt hoặc gửi xuống thành viên' 
+        });
+      }
+
+      // Kiểm tra từng item xem có được assign cho user này không
+      for (const item of items) {
+        const oldItem = budget.items?.find(old => 
+          old.itemId?.toString() === item.itemId?.toString()
+        );
+        
+        if (!oldItem) {
+          return res.status(400).json({ message: `Item ${item.itemId} không tồn tại trong budget` });
+        }
+
+        // Nếu item có assignedTo, phải khớp với user này
+        if (oldItem.assignedTo) {
+          const assignedToId = getIdString(oldItem.assignedTo);
+          const userMemberId = getIdString(membership._id);
+          if (assignedToId !== userMemberId) {
+            return res.status(403).json({ 
+              message: `Bạn không được assign cho item "${oldItem.name || item.itemId}"` 
+            });
+          }
+        }
+
+        // Member chỉ có thể update evidence, không được update các field khác
+        const allowedFields = ['evidence', 'itemId'];
+        const updatedFields = Object.keys(item).filter(key => !allowedFields.includes(key) && item[key] !== undefined);
+        if (updatedFields.length > 0) {
+          return res.status(403).json({ 
+            message: `Thành viên chỉ có thể cập nhật bằng chứng (evidence), không thể cập nhật các trường khác: ${updatedFields.join(', ')}` 
+          });
+        }
+      }
+    }
+
+    // Cho phép update nếu status là draft, changes_requested, submitted, sent_to_members, hoặc approved
+    // - draft/changes_requested/submitted: HoOC và HoD có thể chỉnh sửa và submit lại
+    // - sent_to_members/approved: HoD và Member có thể thêm evidence (không thay đổi status)
+    const allowedStatuses = ['draft', 'changes_requested', 'submitted', 'sent_to_members', 'approved'];
+    if (!allowedStatuses.includes(budget.status)) {
+      return res.status(400).json({ 
+        message: `Không thể cập nhật budget với trạng thái ${budget.status}. Chỉ có thể cập nhật khi budget ở trạng thái: ${allowedStatuses.join(', ')}` 
+      });
     }
     
-    // Nếu đang ở submitted và update, tự động chuyển về draft để có thể submit lại
-    if (budget.status === 'submitted' && items && Array.isArray(items)) {
+    // Nếu đang ở submitted và update bởi HoOC/HoD, tự động chuyển về draft để có thể submit lại
+    // Member không được phép thay đổi status
+    if (budget.status === 'submitted' && items && Array.isArray(items) && (isHoOC || isHoD)) {
       budget.status = 'draft';
     }
 
@@ -431,6 +503,32 @@ export const updateDepartmentBudget = async (req, res) => {
           (item.itemId && old.itemId?.toString() === new mongoose.Types.ObjectId(item.itemId).toString())
         );
         
+        if (!oldItem) {
+          // Nếu không tìm thấy item cũ và không phải HoOC/HoD, không cho phép tạo item mới
+          if (!isHoOC && !isHoD) {
+            throw new Error(`Không tìm thấy item ${item.itemId} trong budget`);
+          }
+        }
+        
+        // Nếu là Member và chỉ update evidence, giữ nguyên tất cả các field khác
+        if (!isHoOC && !isHoD && oldItem) {
+          return {
+            itemId: oldItem.itemId,
+            category: oldItem.category,
+            name: oldItem.name,
+            unit: oldItem.unit,
+            qty: oldItem.qty,
+            unitCost: oldItem.unitCost,
+            total: oldItem.total,
+            note: oldItem.note,
+            feedback: oldItem.feedback,
+            status: oldItem.status,
+            assignedTo: oldItem.assignedTo,
+            evidence: item.evidence !== undefined ? normalizeEvidenceArray(item.evidence) : oldItem.evidence,
+          };
+        }
+        
+        // HoOC và HoD có thể update tất cả các field
         // Nếu budget chưa được approved, không cho phép set item.status thành "approved"
         let itemStatus = item.status || oldItem?.status || 'pending';
         const currentBudgetStatus = budget.status || 'draft';
@@ -451,25 +549,28 @@ export const updateDepartmentBudget = async (req, res) => {
             inputEvidence: evidenceInput,
             normalizedEvidence: normalizedEvidence,
             inputLength: evidenceInput.length,
-            normalizedLength: normalizedEvidence.length
+            normalizedLength: normalizedEvidence.length,
+            userRole: isHoOC ? 'HoOC' : (isHoD ? 'HoD' : 'Member'),
+            budgetStatus: budget.status
           });
         }
         
-        const qty = parseFloat(item.qty) || 1;
-        const unitCost = parseFloat(item.unitCost) || 0;
+        const qty = parseFloat(item.qty) || (oldItem ? decimalToNumber(oldItem.qty) : 1);
+        const unitCost = parseFloat(item.unitCost) || (oldItem ? decimalToNumber(oldItem.unitCost) : 0);
         const total = item.total ? parseFloat(item.total) : (qty * unitCost);
         
         return {
-          itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
-          category: item.category || 'general',
-          name: item.name,
-          unit: item.unit?.trim() || 'cái',
+          itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : (oldItem?.itemId || new mongoose.Types.ObjectId()),
+          category: item.category || oldItem?.category || 'general',
+          name: item.name || oldItem?.name,
+          unit: item.unit?.trim() || oldItem?.unit || 'cái',
           qty: toDecimal128(qty, '1'),
           unitCost: toDecimal128(unitCost, '0'),
           total: toDecimal128(total, '0'),
-          note: item.note || '',
-          feedback: item.feedback || oldItem?.feedback || '', // Giữ lại feedback cũ nếu không có feedback mới
-          status: itemStatus, // Đảm bảo status hợp lệ
+          note: item.note !== undefined ? item.note : (oldItem?.note || ''),
+          feedback: item.feedback !== undefined ? item.feedback : (oldItem?.feedback || ''),
+          status: itemStatus,
+          assignedTo: item.assignedTo !== undefined ? item.assignedTo : oldItem?.assignedTo,
           evidence: normalizedEvidence
         };
       });
@@ -1107,13 +1208,30 @@ export const getAllBudgetsForDepartment = async (req, res) => {
     await ensureEventExists(eventId);
     await ensureDepartmentInEvent(eventId, departmentId);
 
+    // Kiểm tra quyền của user
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
+    const membership = await loadMembership(eventId, userId, 'getAllBudgetsForDepartment');
+    const isHoOC = membership?.role === 'HoOC';
+    const membershipDeptId = getIdString(membership?.departmentId);
+    const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
+
     const filter = {
       eventId: new mongoose.Types.ObjectId(eventId),
       departmentId: new mongoose.Types.ObjectId(departmentId)
     };
 
-    // Tối ưu: Chỉ select những trường cần thiết cho danh sách
-    const selectFields = '_id name status submittedAt createdAt updatedAt departmentId createdBy';
+    // Nếu không phải HoOC và không phải cùng department, chỉ xem budgets công khai
+    if (!isHoOC && !isSameDepartment) {
+      filter.isPublic = true;
+    }
+
+    // HoOC không được xem draft budgets (budgets đã bị thu hồi)
+    if (isHoOC) {
+      filter.status = { $ne: 'draft' };
+    }
+
+    // Tối ưu: Chỉ select những trường cần thiết cho danh sách (bao gồm isPublic)
+    const selectFields = '_id name status submittedAt createdAt updatedAt isPublic departmentId createdBy';
     
     const [budgets, total] = await Promise.all([
       EventBudgetPlan.find(filter)
@@ -1155,6 +1273,7 @@ export const getAllBudgetsForDepartment = async (req, res) => {
         name: budget.name || 'Budget Ban',
         creatorName: budget.createdBy?.fullName || budget.createdBy?.name || null,
         status: budget.status,
+        isPublic: budget.isPublic || false,
         totalCost: totalCost,
         totalItems: budgetItems.length,
         submittedAt: budget.submittedAt || budget.createdAt,
@@ -1406,7 +1525,7 @@ export const updateCategories = async (req, res) => {
 };
 
 // GET /api/events/:eventId/budgets/statistics
-// Lấy thống kê thu chi cho event
+// Lấy Thống kê chi tiêu cho event
 export const getBudgetStatistics = async (req, res) => {
   try {
     const { eventId } = req.params;

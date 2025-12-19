@@ -227,12 +227,19 @@ export default function HoDTaskPage() {
       .getTaskByEvent(eventId)
       .then((apiRes) => {
         const arr = apiRes?.data || [];
+        console.log(`[HoDTaskPage] Fetched ${arr.length} tasks from API for eventId=${eventId}, departmentId=${departmentId}`);
 
         // Filter tasks by departmentId - chỉ hiển thị tasks của ban mình
         const deptTasks = arr.filter(task => {
           const taskDeptId = task.departmentId?._id || task.departmentId || task.department?._id || task.department;
-          return String(taskDeptId) === String(departmentId);
+          const matches = String(taskDeptId) === String(departmentId);
+          if (!matches && task.taskType === 'normal') {
+            console.log(`[HoDTaskPage] Task "${task.title}" (${task._id}) filtered out: taskDeptId=${taskDeptId}, departmentId=${departmentId}`);
+          }
+          return matches;
         });
+        
+        console.log(`[HoDTaskPage] After filtering: ${deptTasks.length} tasks for department ${departmentId}`);
 
         const titleMap = new Map(deptTasks.map((t) => [String(t?._id), t?.title || ""]));
         const mapped = deptTasks.map((task) => {

@@ -14,7 +14,7 @@ import ConfirmModal from "../../components/ConfirmModal";
 const ListBudgetsPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { fetchEventRole, getEventRole } = useEvents();
+  const { fetchEventRole, getEventRole, forceCheckEventAccess } = useEvents();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState([]);
@@ -37,7 +37,12 @@ const ListBudgetsPage = () => {
       if (eventId) {
         try {
           setCheckingRole(true);
-          const role = await fetchEventRole(eventId);
+          // Dùng forceCheckEventAccess để đảm bảo lấy role mới nhất từ server
+          // (quan trọng khi vừa được chuyển ban hoặc thay đổi vai trò)
+          let role = await forceCheckEventAccess(eventId);
+          if (!role || role === '') {
+            role = await fetchEventRole(eventId);
+          }
           setEventRole(role);
           
           // Cho phép HoOC và HoD truy cập
@@ -60,7 +65,7 @@ const ListBudgetsPage = () => {
               if (userDepartment) {
                 setHodDepartmentId(userDepartment._id || userDepartment.id);
               } else {
-                toast.error("Không tìm thấy ban mà bạn là trưởng ban");
+               
                 navigate(`/events/${eventId}/hod-event-detail`);
                 return;
               }
@@ -178,7 +183,7 @@ const ListBudgetsPage = () => {
           budgetId: budget._id || budget.id,
           departmentId: budget.departmentId || hodDepartmentId,
           departmentName: budget.departmentName || "Ban của tôi",
-          name: budget.name || "Budget Ban",
+          name: budget.name || "Ngân sách dự trù của Ban",
           creatorName: budget.creatorName || "Trưởng ban",
           totalCost: budget.totalCost || 0,
           status: budget.status,

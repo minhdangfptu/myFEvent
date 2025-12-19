@@ -13,6 +13,7 @@ import { findEventById } from '../services/eventService.js';
 import EventMember from '../models/eventMember.js';
 import Event from '../models/event.js';
 import Task from '../models/task.js';
+import Department from '../models/department.js';
 import { ensureDepartmentInEvent } from '../services/departmentService.js';
 import { createNotification, createNotificationsForUsers } from '../services/notificationService.js';
 import { invalidateDashboardCache } from '../utils/dashboardCache.js';
@@ -148,6 +149,32 @@ export const updateMemberRole = async (req, res) => {
       .populate('userId', 'fullName email avatarUrl') // Cloudinary URL, không còn base64
       .populate('departmentId', 'name')
       .lean();
+
+    // Nếu đổi role lên HoD và member có departmentId, tự động gán leaderId cho department
+    if (normalizedRole === 'HoD' && updatedMember.departmentId) {
+      try {
+        const departmentId = updatedMember.departmentId._id || updatedMember.departmentId;
+        const userId = updatedMember.userId._id || updatedMember.userId;
+        
+        // Kiểm tra xem department có tồn tại trong event này không
+        const department = await Department.findOne({
+          _id: departmentId,
+          eventId: new mongoose.Types.ObjectId(eventId)
+        });
+        
+        if (department) {
+          // Gán leaderId cho department (nếu chưa có hoặc đang là leader khác)
+          await Department.findOneAndUpdate(
+            { _id: departmentId, eventId: new mongoose.Types.ObjectId(eventId) },
+            { $set: { leaderId: userId } },
+            { new: true }
+          );
+        }
+      } catch (deptError) {
+        console.error('Error updating department leaderId:', deptError);
+        // Không throw error, chỉ log để không ảnh hưởng đến việc update role
+      }
+    }
 
     invalidateDashboardCache(eventId);
 

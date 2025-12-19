@@ -300,7 +300,14 @@ const MilestoneDetail = () => {
               })()})
             </h4>
 
-            <div className="d-flex flex-column gap-3">
+            <div
+              className="d-flex flex-column gap-3"
+              style={{
+                maxHeight: '400px',
+                overflowY: 'auto',
+                paddingRight: '8px'
+              }}
+            >
               {(() => {
                 // Filter tasks based on role
                 let filteredTasks = [];

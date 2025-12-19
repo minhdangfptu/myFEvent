@@ -269,28 +269,15 @@ export default function HoDSideBar({
       return;
     }
     
-    try {
-      // Tìm department của user
-      const userDepartment = await findUserDepartment(currentEventId, userId);
-      
-      if (userDepartment?._id || userDepartment?.id) {
-        navigate(`/events/${currentEventId}/budgets/departments`);
-      } else {
-        // Nếu không tìm thấy, điều hướng đến trang departments
-        navigate(`/events/${currentEventId}/departments`);
-        toast.info("Vui lòng chọn ban để xem budget");
-      }
-    } catch (error) {
-      console.error("Error fetching departments:", error);
-      // Fallback: điều hướng đến trang departments
-      navigate(`/events/${currentEventId}/departments`);
-      toast.error("Không thể tải thông tin ban. Vui lòng chọn ban từ danh sách.");
-    }
+    // Navigate trực tiếp đến trang budgets/departments
+    // Trang đó sẽ tự kiểm tra role và department, và xử lý nếu không tìm thấy
+    navigate(`/events/${currentEventId}/budgets/departments`);
   };
 
   const financeSubItems = [
-    { id: "budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
-    { id: "finance-statistics", label: "Thống kê thu chi", path: `/events/${eventId || ''}/budgets/departments/statistics` },
+    // id khớp với activePage="finance-budget" để highlight đúng khi ở trang Ngân sách
+    { id: "finance-budget", label: "Ngân sách", path: null, onClick: handleBudgetClick },
+    { id: "finance-statistics", label: "Thống kê chi tiêu", path: `/events/${eventId || ''}/budgets/departments/statistics` },
   ];
 
   const exportSubItems = [

@@ -5,9 +5,9 @@ let listenersRegistered = false;
 
 const connectDB = async () => {
   const options = {
-    serverSelectionTimeoutMS: 30000, // Tăng lên 30s để xử lý network chậm
-    connectTimeoutMS: 30000, // Tăng lên 30s
-    socketTimeoutMS: 75000, // Tăng lên 75s cho các query phức tạp
+    serverSelectionTimeoutMS: 60000, // Tăng lên 60s để xử lý network chậm
+    connectTimeoutMS: 60000, // Tăng lên 60s
+    socketTimeoutMS: 120000, // Tăng lên 120s cho các query phức tạp
     maxPoolSize: 10, // Tăng pool size cho production
     minPoolSize: 2,
     maxIdleTimeMS: 60000, // Tăng idle time lên 60s

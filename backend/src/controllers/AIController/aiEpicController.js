@@ -92,7 +92,23 @@ export const aiBulkCreateEpics = async (req, res) => {
         createdBy: req.user.id,   // Người apply plan sẽ là người tạo EPIC
       });
 
-      createdEpics.push(taskDoc);
+      // Convert sang plain object để đảm bảo _id được serialize đúng khi trả về JSON
+      // Sử dụng toObject() với option để include tất cả fields
+      const epicObj = taskDoc.toObject ? taskDoc.toObject({ virtuals: false }) : {
+        _id: taskDoc._id,
+        title: taskDoc.title,
+        description: taskDoc.description,
+        eventId: taskDoc.eventId,
+        departmentId: taskDoc.departmentId,
+        parentId: taskDoc.parentId,
+        assigneeId: taskDoc.assigneeId,
+        status: taskDoc.status,
+        taskType: taskDoc.taskType,
+        createdBy: taskDoc.createdBy,
+        createdAt: taskDoc.createdAt,
+        updatedAt: taskDoc.updatedAt,
+      };
+      createdEpics.push(epicObj);
     }
 
     return res.status(201).json({

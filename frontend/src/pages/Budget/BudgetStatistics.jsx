@@ -78,14 +78,14 @@ const BudgetStatistics = () => {
   if (loading || !eventRole) {
     return (
       <UserLayout
-        title="Thống kê thu chi"
-        activePage="budget"
+        title="Thống kê chi tiêu"
+        activePage={eventRole === 'HoD' ? 'finance-statistics' : 'finance-stats'}
         sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
         eventId={eventId}
       >
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
           <Loading />
-          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải thống kê thu chi...</div>
+          <div className="text-muted mt-3" style={{ fontSize: 16, fontWeight: 500 }}>Đang tải Thống kê chi tiêu...</div>
         </div>
       </UserLayout>
     );
@@ -99,8 +99,8 @@ const BudgetStatistics = () => {
 
   return (
     <UserLayout
-      title="Thống kê thu chi"
-      activePage="budget"
+      title="Thống kê chi tiêu"
+      activePage={eventRole === 'HoD' ? 'finance-statistics' : 'finance-stats'}
       sidebarType={eventRole === 'HoD' ? 'hod' : 'hooc'}
       eventId={eventId}
     >
@@ -108,7 +108,7 @@ const BudgetStatistics = () => {
         {/* Title Section */}
         <div className="mb-4">
           <h2 className="fw-bold mb-2" style={{ fontSize: "28px", color: "#111827" }}>
-            {eventRole === 'HoD' ? 'Thống kê thu chi của ban' : 'Thống kê thu chi'}
+            {eventRole === 'HoD' ? 'Thống kê chi tiêu của ban' : 'Thống kê chi tiêu'}
           </h2>
           <p className="text-muted mb-0">
             {eventRole === 'HoD' 

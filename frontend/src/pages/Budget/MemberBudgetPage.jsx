@@ -66,31 +66,33 @@ const MemberBudgetPage = () => {
       setDepartment(userDepartment);
       const deptId = userDepartment._id || userDepartment.id;
 
-      // Lấy tất cả budgets của department
+      // Lấy tất cả budgets mà Member được phép xem trong event:
+      // - Budget đã được HoOC duyệt của ban mình
+      // - + tất cả budget đã được duyệt và "Công khai" (isPublic = true) của các ban khác
       try {
-        const budgetsResponse = await budgetApi.getAllBudgetsForDepartment(eventId, deptId, {
+        const budgetsResponse = await budgetApi.getAllBudgetsForEvent(eventId, {
+          status: 'approved',
           page: 1,
-          limit: 1000
+          limit: 1000,
+          includeItems: false,
         });
         
         const budgetsList = Array.isArray(budgetsResponse) 
           ? budgetsResponse 
           : (budgetsResponse?.data || budgetsResponse?.budgets || []);
         
-        // Lọc chỉ lấy budgets đã được HoOC duyệt (status = 'approved')
-        const approvedBudgets = budgetsList.filter(budget => budget.status === 'approved');
-        
-        // Format budgets để hiển thị
-        const formattedBudgets = approvedBudgets.map((budget) => ({
+        // Format budgets để hiển thị, giữ cả isPublic để xử lý quyền xem chi tiết
+        const formattedBudgets = budgetsList.map((budget) => ({
           budgetId: budget._id || budget.id,
-          departmentId: budget.departmentId || deptId,
-          departmentName: budget.departmentName || userDepartment.name || "Ban của tôi",
-          requestName: (budget.name && budget.name.trim()) || "Budget Ban",
+          departmentId: budget.departmentId?._id || budget.departmentId,
+          departmentName: budget.departmentName || budget.departmentId?.name || userDepartment.name || "Ban",
+          requestName: (budget.name && budget.name.trim()) || "Ngân sách dự trù của Ban",
           budgetStatus: budget.status || null,
           totalItems: budget.totalItems || 0,
           totalCost: budget.totalCost || 0,
           createdAt: budget.createdAt,
           submittedAt: budget.submittedAt,
+          isPublic: !!budget.isPublic,
         }));
         
         setBudgets(formattedBudgets);
@@ -234,12 +236,17 @@ const MemberBudgetPage = () => {
                       <tr key={budget.budgetId}>
                         <td style={{ padding: "12px", maxWidth: 240 }}>
                           <span className="fw-semibold" style={{ fontSize: "16px", color: "#3B82F6" }}>
-                            {budget.requestName || "Budget Ban"}
+                            {budget.requestName || "Ngân sách dự trù của Ban"}
                           </span>
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span className="text-muted">
                             {budget.departmentName}
+                            {budget.isPublic && (
+                              <span className="badge ms-2" style={{ background: '#DBEAFE', color: '#1D4ED8' }}>
+                                Công khai
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td style={{ padding: "12px" }}>
@@ -276,14 +283,15 @@ const MemberBudgetPage = () => {
                           <button
                             className="btn btn-primary btn-sm"
                             onClick={() => {
-                              // Đảm bảo chỉ xem budget của ban mình
                               const userDeptId = department?._id || department?.id;
                               const budgetDeptId = budget.departmentId;
+                              const isSameDept = String(userDeptId) === String(budgetDeptId);
                               
-                              if (String(userDeptId) === String(budgetDeptId)) {
+                              // Cho phép xem nếu là budget của ban mình HOẶC budget đã được HoOC công khai
+                              if (isSameDept || budget.isPublic) {
                                 navigate(`/events/${eventId}/departments/${budget.departmentId}/budget/${budget.budgetId}`);
                               } else {
-                                toast.error("Bạn chỉ được xem budget của ban mình");
+                                toast.error("Bạn chỉ được xem budget của ban mình hoặc budget được công khai");
                               }
                             }}
                             style={{ borderRadius: "8px" }}
