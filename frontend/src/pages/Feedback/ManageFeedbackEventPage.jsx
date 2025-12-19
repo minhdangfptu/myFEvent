@@ -310,41 +310,29 @@ export default function ManageFeedbackEventPage() {
                           </button>
                         </>
                       )}
-                      {form.status !== 'draft' && (
+                      {/* Ẩn nút "Xem biểu mẫu" và "Xoá" khi biểu mẫu đã được xuất bản */}
+                      {form.status === 'draft' && (
                         <button
-                          onClick={() => navigate(`/events/${eventId}/feedback/${form._id}/edit`)}
+                          onClick={() => handleDeleteForm(form._id)}
+                          disabled={actionState.id === form._id && actionState.type === 'delete'}
                           style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#2563eb',
-                            cursor: 'pointer',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #9ca3af',
+                            color: '#6b7280',
+                            borderRadius: '6px',
+                            padding: '6px 16px',
                             fontSize: '14px',
-                            padding: '6px 12px'
+                            cursor: actionState.id === form._id && actionState.type === 'delete' ? 'not-allowed' : 'pointer',
+                            opacity: actionState.id === form._id && actionState.type === 'delete' ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}
                         >
-                          Xem biểu mẫu
+                          {actionState.id === form._id && actionState.type === 'delete' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
+                          {actionState.id === form._id && actionState.type === 'delete' ? 'Đang xoá...' : 'Xoá'}
                         </button>
                       )}
-                      <button
-                        onClick={() => handleDeleteForm(form._id)}
-                        disabled={actionState.id === form._id && actionState.type === 'delete'}
-                        style={{
-                          backgroundColor: 'transparent',
-                          border: '1px solid #9ca3af',
-                          color: '#6b7280',
-                          borderRadius: '6px',
-                          padding: '6px 16px',
-                          fontSize: '14px',
-                          cursor: actionState.id === form._id && actionState.type === 'delete' ? 'not-allowed' : 'pointer',
-                          opacity: actionState.id === form._id && actionState.type === 'delete' ? 0.6 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        {actionState.id === form._id && actionState.type === 'delete' && <i className="bi bi-arrow-clockwise spin-animation"></i>}
-                        {actionState.id === form._id && actionState.type === 'delete' ? 'Đang xoá...' : 'Xoá'}
-                      </button>
                       {form.status === 'open' && (
                         <button
                           onClick={() => handleCloseForm(form._id)}
