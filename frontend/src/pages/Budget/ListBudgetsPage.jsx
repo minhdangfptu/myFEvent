@@ -30,7 +30,7 @@ const ListBudgetsPage = () => {
   const [budgetToDelete, setBudgetToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 5;
-  
+
   // Use ref to prevent multiple role checks
   const roleCheckedRef = useRef(false);
   const eventIdRef = useRef(null);
@@ -52,68 +52,68 @@ const ListBudgetsPage = () => {
     }
 
     const checkRole = async () => {
-      try {
+        try {
         roleCheckedRef.current = true;
-        setCheckingRole(true);
+          setCheckingRole(true);
         
         // Check cache first
         let role = getEventRole(eventId);
         
         // If not in cache, fetch it
-        if (!role || role === '') {
-          role = await fetchEventRole(eventId);
-        }
-        
+          if (!role || role === '') {
+            role = await fetchEventRole(eventId);
+          }
+          
         // If still empty, wait a bit and try once more
-        if (!role || role === '') {
+          if (!role || role === '') {
           await new Promise(resolve => setTimeout(resolve, 300));
           role = await fetchEventRole(eventId);
-        }
-        
-        setEventRole(role || '');
-        
-        // Cho phép HoOC và HoD truy cập
-        if (role !== 'HoOC' && role !== 'HoD') {
-          // Nếu role vẫn empty, có thể là vấn đề với cache, thử navigate về trang chính
-          if (!role || role === '') {
-            console.error('Cannot determine role, redirecting to event detail');
-            navigate(`/events/${eventId}`);
-            return;
           }
-          toast.error("Bạn không có quyền truy cập trang này");
-          navigate(`/events/${eventId}/hod-event-detail`);
-          return;
-        }
-        
-        // Nếu là HoD, lấy department mà họ là leader
-        if (role === 'HoD' && user) {
-          try {
-            const departments = await departmentService.getDepartments(eventId);
-            const userId = user._id || user.id;
-            const userDepartment = departments.find(dept => {
-              const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
-              return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
-            });
-            
-            if (userDepartment) {
-              setHodDepartmentId(userDepartment._id || userDepartment.id);
-            } else {
-              navigate(`/events/${eventId}/hod-event-detail`);
+          
+        setEventRole(role || '');
+          
+          // Cho phép HoOC và HoD truy cập
+          if (role !== 'HoOC' && role !== 'HoD') {
+            // Nếu role vẫn empty, có thể là vấn đề với cache, thử navigate về trang chính
+            if (!role || role === '') {
+              console.error('Cannot determine role, redirecting to event detail');
+              navigate(`/events/${eventId}`);
               return;
             }
-          } catch (error) {
-            console.error("Error fetching HoD department:", error);
-            toast.error("Không thể tải thông tin ban");
+            toast.error("Bạn không có quyền truy cập trang này");
             navigate(`/events/${eventId}/hod-event-detail`);
             return;
           }
-        }
-      } catch (error) {
-        console.error("Error checking role:", error);
-        toast.error("Không thể kiểm tra quyền truy cập");
-        navigate(`/events/${eventId}/hod-event-detail`);
-      } finally {
-        setCheckingRole(false);
+          
+          // Nếu là HoD, lấy department mà họ là leader
+          if (role === 'HoD' && user) {
+            try {
+              const departments = await departmentService.getDepartments(eventId);
+              const userId = user._id || user.id;
+              const userDepartment = departments.find(dept => {
+                const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+                return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
+              });
+              
+              if (userDepartment) {
+                setHodDepartmentId(userDepartment._id || userDepartment.id);
+              } else {
+                navigate(`/events/${eventId}/hod-event-detail`);
+                return;
+              }
+            } catch (error) {
+              console.error("Error fetching HoD department:", error);
+              toast.error("Không thể tải thông tin ban");
+              navigate(`/events/${eventId}/hod-event-detail`);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("Error checking role:", error);
+          toast.error("Không thể kiểm tra quyền truy cập");
+          navigate(`/events/${eventId}/hod-event-detail`);
+        } finally {
+          setCheckingRole(false);
       }
     };
     

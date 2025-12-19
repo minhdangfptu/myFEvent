@@ -541,17 +541,30 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
   
   if (task.createdBy && userId) {
     // Xử lý cả trường hợp createdBy là ObjectId hoặc đã được populate
-    const taskCreatorId = task.createdBy._id 
-      ? String(task.createdBy._id) 
-      : String(task.createdBy);
-    const currentUserId = String(userId);
+    let taskCreatorId = null;
+    
+    // Nếu createdBy đã được populate (có _id property)
+    if (task.createdBy._id) {
+      taskCreatorId = String(task.createdBy._id);
+    } 
+    // Nếu createdBy là ObjectId (chưa populate)
+    else if (task.createdBy.toString) {
+      taskCreatorId = task.createdBy.toString();
+    } 
+    // Nếu createdBy đã là string (từ lean query)
+    else {
+      taskCreatorId = String(task.createdBy);
+    }
+    
+    // Convert userId sang string để so sánh
+    const currentUserId = userId.toString ? userId.toString() : String(userId);
     
     // So sánh string sau khi convert
     isTaskCreator = taskCreatorId === currentUserId;
     
-    // Nếu so sánh string không match, thử so sánh ObjectId trực tiếp (nếu cả hai đều là ObjectId)
-    if (!isTaskCreator && task.createdBy.toString && userId.toString) {
-      isTaskCreator = task.createdBy.toString() === userId.toString();
+    // Log để debug nếu cần
+    if (!isTaskCreator) {
+      console.log(`[deleteTaskService] So sánh createdBy: taskCreatorId="${taskCreatorId}", currentUserId="${currentUserId}", match=${isTaskCreator}`);
     }
   }
 
