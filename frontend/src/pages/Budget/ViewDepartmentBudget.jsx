@@ -213,7 +213,7 @@ const ViewDepartmentBudget = () => {
           if (budgetData.status === 'sent_to_members') {
             membersData = await eventApi.getMembersByEvent(eventId);
           } else {
-            membersData = await departmentService.getMembersByDepartment(eventId, departmentId);
+          membersData = await departmentService.getMembersByDepartment(eventId, departmentId);
           }
         } catch (error) {
           console.warn("Failed to load members, will load when needed:", error);
@@ -2252,16 +2252,16 @@ const ViewDepartmentBudget = () => {
                                   }
                                 }
                                 
-        const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
-        
-        const isMemberAssigned = !isHoD && 
-          assignedMemberId && 
-          currentMemberId && 
-          String(assignedMemberId) === String(currentMemberId);
-        
-        // Kiểm tra xem người được giao đã nộp expense chưa
-        const hasExpenseSubmitted = actualAmount > 0;
-        
+                                const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
+                                
+                                const isMemberAssigned = !isHoD && 
+                                  assignedMemberId && 
+                                  currentMemberId && 
+                                  String(assignedMemberId) === String(currentMemberId);
+                                
+                                // Kiểm tra xem người được giao đã nộp expense chưa
+                                const hasExpenseSubmitted = actualAmount > 0;
+                                
         // Cho phép HoD chỉnh sửa/đính kèm bằng chứng nếu budget đã approved/sent_to_members,
         // ngay cả khi giao cho người ngoài ban (case đã mở rộng assign).
         // Member được chỉnh sửa nếu được assign cho mình.
