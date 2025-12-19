@@ -297,7 +297,29 @@ export const buildBudgetWithExpenses = async (budget) => {
 export const loadMembership = async (eventId, userId, context = 'expense') => {
   if (!userId) return null;
   try {
-    return await getRequesterMembership(eventId, userId);
+    // Thử tìm với userId dạng ObjectId trước
+    const EventMember = (await import('../models/eventMember.js')).default;
+    let membership = await EventMember.findOne({ 
+      eventId: new mongoose.Types.ObjectId(eventId), 
+      userId: new mongoose.Types.ObjectId(userId),
+      status: { $ne: 'deactive' }
+    }).lean();
+    
+    // Nếu không tìm thấy, thử với userId dạng string
+    if (!membership) {
+      membership = await EventMember.findOne({ 
+        eventId: new mongoose.Types.ObjectId(eventId), 
+        userId: userId,
+        status: { $ne: 'deactive' }
+      }).lean();
+    }
+    
+    // Fallback: dùng getRequesterMembership
+    if (!membership) {
+      membership = await getRequesterMembership(eventId, userId);
+    }
+    
+    return membership;
   } catch (error) {
     console.warn(`${context}: unable to load membership`, error?.message);
     return null;

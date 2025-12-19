@@ -1313,9 +1313,46 @@ export const getAllBudgetsForEvent = async (req, res) => {
     await ensureEventExists(eventId);
 
     const userId = req.user?.userId || req.user?._id || req.user?.id;
+    console.log('[getAllBudgetsForEvent] req.user:', req.user, 'userId:', userId);
+    
+    if (!userId) {
+      console.error('[getAllBudgetsForEvent] No userId found in req.user');
+      return res.status(403).json({ message: 'Bạn cần đăng nhập để xem ngân sách' });
+    }
+    
     const membership = await loadMembership(eventId, userId, 'getAllBudgetsForEvent');
-    const isHoOC = membership?.role === 'HoOC';
-    const membershipDeptId = getIdString(membership?.departmentId);
+    console.log('[getAllBudgetsForEvent] userId:', userId, 'eventId:', eventId, 'membership:', membership);
+    
+    let finalMembership = membership;
+    
+    if (!finalMembership) {
+      console.error('[getAllBudgetsForEvent] No membership found for userId:', userId, 'eventId:', eventId);
+      // Thử tìm trực tiếp để debug - kiểm tra cả userId dạng string và ObjectId
+      const EventMember = (await import('../models/eventMember.js')).default;
+      const directCheck1 = await EventMember.findOne({ 
+        eventId: new mongoose.Types.ObjectId(eventId), 
+        userId: new mongoose.Types.ObjectId(userId),
+        status: { $ne: 'deactive' }
+      }).lean();
+      const directCheck2 = await EventMember.findOne({ 
+        eventId: new mongoose.Types.ObjectId(eventId), 
+        userId: userId,
+        status: { $ne: 'deactive' }
+      }).lean();
+      console.log('[getAllBudgetsForEvent] Direct check with ObjectId:', directCheck1);
+      console.log('[getAllBudgetsForEvent] Direct check with string:', directCheck2);
+      
+      // Nếu tìm thấy bằng cách khác, dùng nó
+      finalMembership = directCheck1 || directCheck2;
+      if (!finalMembership) {
+        return res.status(403).json({ message: 'Bạn không phải là thành viên của sự kiện này' });
+      }
+      console.log('[getAllBudgetsForEvent] Found membership via direct check, using it');
+    }
+    
+    const isHoOC = finalMembership?.role === 'HoOC';
+    const membershipDeptId = getIdString(finalMembership?.departmentId);
+    console.log('[getAllBudgetsForEvent] isHoOC:', isHoOC, 'role:', finalMembership?.role);
 
     // Build filter - HoOC xem tất cả budgets của tất cả departments (KHÔNG bao gồm draft - budgets đã bị thu hồi)
     const filter = {

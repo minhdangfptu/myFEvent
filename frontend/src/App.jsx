@@ -753,11 +753,11 @@ export default function App() {
             } 
           />
 
-          {/* Budget Routes - HoOC */}
+          {/* Budget Routes - HoOC và HoD */}
           <Route 
             path="/events/:eventId/budgets" 
             element={
-              <ProtectedRoute requiredEventRoles={['HoOC']}>
+              <ProtectedRoute requiredEventRoles={['HoOC', 'HoD']}>
                 <ListBudgetsPage />
               </ProtectedRoute>
             } 
@@ -888,11 +888,11 @@ export default function App() {
             } 
           />
 
-          {/* Budget Routes - HoOC */}
+          {/* Budget Routes - HoOC và HoD */}
           <Route 
             path="/events/:eventId/budgets" 
             element={
-              <ProtectedRoute requiredEventRoles={['HoOC']}>
+              <ProtectedRoute requiredEventRoles={['HoOC', 'HoD']}>
                 <ListBudgetsPage />
               </ProtectedRoute>
             } 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import UserLayout from "../../components/UserLayout";
 import { budgetApi } from "../../apis/budgetApi";
@@ -14,7 +14,7 @@ import ConfirmModal from "../../components/ConfirmModal";
 const ListBudgetsPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { fetchEventRole, getEventRole, forceCheckEventAccess } = useEvents();
+  const { fetchEventRole, getEventRole } = useEvents();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState([]);
@@ -30,64 +30,96 @@ const ListBudgetsPage = () => {
   const [budgetToDelete, setBudgetToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 5;
+  
+  // Use ref to prevent multiple role checks
+  const roleCheckedRef = useRef(false);
+  const eventIdRef = useRef(null);
 
-  // Kiểm tra role khi component mount
+  // Kiểm tra role khi component mount - chỉ một lần
   useEffect(() => {
+    // Reset if eventId changes
+    if (eventIdRef.current !== eventId) {
+      eventIdRef.current = eventId;
+      roleCheckedRef.current = false;
+      setEventRole("");
+      setCheckingRole(true);
+      setHodDepartmentId(null);
+    }
+
+    // Only check role once per eventId
+    if (!eventId || roleCheckedRef.current) {
+      return;
+    }
+
     const checkRole = async () => {
-      if (eventId) {
-        try {
-          setCheckingRole(true);
-          // Dùng forceCheckEventAccess để đảm bảo lấy role mới nhất từ server
-          // (quan trọng khi vừa được chuyển ban hoặc thay đổi vai trò)
-          let role = await forceCheckEventAccess(eventId);
+      try {
+        roleCheckedRef.current = true;
+        setCheckingRole(true);
+        
+        // Check cache first
+        let role = getEventRole(eventId);
+        
+        // If not in cache, fetch it
+        if (!role || role === '') {
+          role = await fetchEventRole(eventId);
+        }
+        
+        // If still empty, wait a bit and try once more
+        if (!role || role === '') {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          role = await fetchEventRole(eventId);
+        }
+        
+        setEventRole(role || '');
+        
+        // Cho phép HoOC và HoD truy cập
+        if (role !== 'HoOC' && role !== 'HoD') {
+          // Nếu role vẫn empty, có thể là vấn đề với cache, thử navigate về trang chính
           if (!role || role === '') {
-            role = await fetchEventRole(eventId);
-          }
-          setEventRole(role);
-          
-          // Cho phép HoOC và HoD truy cập
-          if (role !== 'HoOC' && role !== 'HoD') {
-            toast.error("Bạn không có quyền truy cập trang này");
-            navigate(`/events/${eventId}/hod-event-detail`);
+            console.error('Cannot determine role, redirecting to event detail');
+            navigate(`/events/${eventId}`);
             return;
           }
-          
-          // Nếu là HoD, lấy department mà họ là leader
-          if (role === 'HoD' && user) {
-            try {
-              const departments = await departmentService.getDepartments(eventId);
-              const userId = user._id || user.id;
-              const userDepartment = departments.find(dept => {
-                const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
-                return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
-              });
-              
-              if (userDepartment) {
-                setHodDepartmentId(userDepartment._id || userDepartment.id);
-              } else {
-               
-                navigate(`/events/${eventId}/hod-event-detail`);
-                return;
-              }
-            } catch (error) {
-              console.error("Error fetching HoD department:", error);
-              toast.error("Không thể tải thông tin ban");
+          toast.error("Bạn không có quyền truy cập trang này");
+          navigate(`/events/${eventId}/hod-event-detail`);
+          return;
+        }
+        
+        // Nếu là HoD, lấy department mà họ là leader
+        if (role === 'HoD' && user) {
+          try {
+            const departments = await departmentService.getDepartments(eventId);
+            const userId = user._id || user.id;
+            const userDepartment = departments.find(dept => {
+              const leaderId = dept.leaderId?._id || dept.leaderId || dept.leader?._id || dept.leader;
+              return leaderId && (leaderId.toString() === userId?.toString() || leaderId === userId);
+            });
+            
+            if (userDepartment) {
+              setHodDepartmentId(userDepartment._id || userDepartment.id);
+            } else {
               navigate(`/events/${eventId}/hod-event-detail`);
               return;
             }
+          } catch (error) {
+            console.error("Error fetching HoD department:", error);
+            toast.error("Không thể tải thông tin ban");
+            navigate(`/events/${eventId}/hod-event-detail`);
+            return;
           }
-        } catch (error) {
-          console.error("Error checking role:", error);
-          toast.error("Không thể kiểm tra quyền truy cập");
-          navigate(`/events/${eventId}/hod-event-detail`);
-        } finally {
-          setCheckingRole(false);
         }
+      } catch (error) {
+        console.error("Error checking role:", error);
+        toast.error("Không thể kiểm tra quyền truy cập");
+        navigate(`/events/${eventId}/hod-event-detail`);
+      } finally {
+        setCheckingRole(false);
       }
     };
     
     checkRole();
-  }, [eventId, fetchEventRole, navigate, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, navigate, user]);
 
   useEffect(() => {
     if (!checkingRole && (eventRole === 'HoOC' || (eventRole === 'HoD' && hodDepartmentId))) {
