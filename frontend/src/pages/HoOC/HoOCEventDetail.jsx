@@ -1395,21 +1395,12 @@ const handleImageUpload = async () => {
                 </div>
               </div>
 
-              {/* Join Code */}
+              {/* Join Code (only code, hide invite link) */}
               <div className="join-code-card">
                 <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem" }}>
                   <Link size={20} />
                   Mã mời tham gia
                 </h3>
-                <div style={{ marginBottom: "1rem" }}>
-                  <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Đường dẫn mời</div>
-                  <div className="join-code-input-group">
-                    <input type="text" className="join-code-input" value={`https://myfevent.vn/e/${event.joinCode}`} readOnly />
-                    <button className="copy-btn-modern" onClick={() => copyToClipboard(`https://myfevent.vn/e/${event.joinCode}`)}>
-                      <Copy size={24} />
-                    </button>
-                  </div>
-                </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Mã tham gia</div>
                   <div className="join-code-input-group">

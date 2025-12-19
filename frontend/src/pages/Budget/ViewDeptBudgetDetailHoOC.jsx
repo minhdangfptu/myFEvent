@@ -798,7 +798,7 @@ const ViewDeptBudgetDetailHoOC = () => {
                     Trạng Thái
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
-                  Phản hồi từ tưởng ban tổ chức
+                  Phản hồi từ trưởng ban tổ chức
                   </th>
                   <th style={{ padding: "12px", fontWeight: "600", color: "#374151" }}>
                     Thao tác

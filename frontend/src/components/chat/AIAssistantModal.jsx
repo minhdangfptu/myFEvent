@@ -613,7 +613,7 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                           res?.tasksCreated ??
                           0;
                         const msg =
-                          `Đã áp dụng các công việc lớn, các công việc từ MyFE-AI hoàn tất. ` +
+                          `Đã áp dụng các công việc lớn, các công việc từ MyFE-AI đã hoàn tất. ` +
                           `Đã tạo ${epicsCreated} Công việc lớn và ${tasksCreated} Công việc vào Danh sách công việc.`;
                         
                         // Đánh dấu plans đã được áp dụng trong message
