@@ -833,15 +833,16 @@ export const runEventPlannerAgent = async (req, res) => {
             `- Người tổ chức: ${event.organizerName || 'N/A'}`,
             ``,
             `HƯỚNG DẪN QUAN TRỌNG:`,
-            `- Bạn đã có đầy đủ thông tin về sự kiện "${event.name}" (eventId: ${eventId}) trong context này`,
-            `- eventStartDate đã có sẵn trong context (phần "Ngày bắt đầu (yyyy-mm-dd)") - KHÔNG hỏi lại người dùng về ngày bắt đầu sự kiện, hãy lấy trực tiếp từ context.`,
-            `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn", hãy tạo NGAY LẬP TỨC dựa trên thông tin sự kiện đã có`,
-            `- KHÔNG hỏi lại người dùng về ban nào, việc gì, mô tả gì, ngày bắt đầu - hãy tự suy luận từ thông tin sự kiện và tạo công việc phù hợp`,
+            `- Bạn đang hỗ trợ lập kế hoạch cho sự kiện "${event.name}" (eventId: ${eventId})`,
+            `- QUAN TRỌNG NHẤT: Khi người dùng có yêu cầu CỤ THỂ về chủ đề, nội dung, hoặc loại công việc, BẮT BUỘC phải tạo công việc theo đúng yêu cầu đó`,
+            `- Ví dụ: Nếu user yêu cầu "tạo công việc về làm người tuyết trang trí" → phải tạo công việc về làm người tuyết trang trí, KHÔNG được tạo về chủ đề khác`,
+            `- Nếu user yêu cầu "tạo 4 công việc lớn về đồ uống" → phải tạo đúng 4 công việc lớn về đồ uống`,
+            `- Chỉ khi user yêu cầu chung chung (ví dụ: "tạo công việc") mà không có chủ đề cụ thể, mới dùng thông tin sự kiện để suy luận`,
+            `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn" với yêu cầu cụ thể, hãy tạo NGAY LẬP TỨC theo đúng yêu cầu đó`,
+            `- KHÔNG hỏi lại người dùng về ban nào, việc gì, mô tả gì, ngày bắt đầu - hãy tự suy luận từ yêu cầu của user và thông tin sự kiện`,
             `- KHÔNG đặt deadline cho công việc - để trống để Trưởng ban tổ chức hoặc Trưởng ban chỉnh sau`,
             `- Ưu tiên gán công việc vào ban của người dùng hiện tại (nếu có), nếu không có ban thì để công việc chung của sự kiện`,
             `- Khi tạo công việc/công việc lớn, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
-            `- Nếu cần thông tin chi tiết hơn về ban, thành viên, công việc lớn hiện có, bạn có thể gọi tool get_event_detail_for_ai với eventId = "${eventId}"`,
-            `- NHƯNG nếu đã có đủ thông tin để tạo công việc, hãy tạo ngay mà không cần gọi tool`,
           ].join('\n');
 
             const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -1356,6 +1357,18 @@ export const applyEventPlannerPlan = async (req, res) => {
     console.log(`[applyEventPlannerPlan] Bắt đầu xử lý tasks_plan. Tổng số plans: ${plans.length}`);
     console.log(`[applyEventPlannerPlan] epicIdMap có ${epicIdMap.size} entries:`, Array.from(epicIdMap.entries()).map(([k, v]) => `${k} -> ${v}`));
     
+    // Kiểm tra số lượng tasks_plan so với số lượng epic đã tạo
+    const tasksPlansCount = plans.filter(p => p?.type === 'tasks_plan').length;
+    const epicsCreatedCount = summary.epicsCreated;
+    if (epicsCreatedCount > 0 && tasksPlansCount < epicsCreatedCount) {
+      console.warn(`[applyEventPlannerPlan] ⚠️ Có ${epicsCreatedCount} EPIC đã được tạo nhưng chỉ có ${tasksPlansCount} tasks_plan. Có thể AI Agent chưa gen đủ tasks_plan cho tất cả epics.`);
+      summary.errors.push(
+        `Cảnh báo: Có ${epicsCreatedCount} công việc lớn nhưng chỉ có ${tasksPlansCount} kế hoạch công việc con. ` +
+        `Một số công việc lớn có thể không có công việc con được tạo. ` +
+        `Vui lòng kiểm tra lại hoặc yêu cầu AI tạo thêm công việc con cho các công việc lớn còn thiếu.`
+      );
+    }
+    
     for (const rawPlan of plans) {
       if (!rawPlan || typeof rawPlan !== 'object') {
         console.warn('[applyEventPlannerPlan] Bỏ qua plan không hợp lệ:', rawPlan);
@@ -1441,6 +1454,12 @@ export const applyEventPlannerPlan = async (req, res) => {
             console.log(`[applyEventPlannerPlan] Sử dụng EPIC mới nhất trong department từ map: ${epicId} (vì chỉ có 1 EPIC trong department "${deptName}")`);
             // Lưu vào map với key hiện tại để dùng cho lần sau
             epicIdMap.set(key1, String(epicId));
+          } else if (epicIdsForDept && epicIdsForDept.size > 1) {
+            // ❗ Nếu có nhiều EPIC cùng department, KHÔNG tự động chọn - yêu cầu epicTitle chính xác
+            console.warn(`[applyEventPlannerPlan] Có ${epicIdsForDept.size} EPIC trong department "${deptName}", không thể tự động map. Cần epicTitle chính xác để map tasks_plan.`);
+            console.warn(`[applyEventPlannerPlan] EpicTitle hiện tại: "${epicTitle}"`);
+            console.warn(`[applyEventPlannerPlan] Các EPIC trong department:`, Array.from(epicIdsForDept));
+            // Không báo lỗi ngay, tiếp tục tìm trong database với epicTitle
           }
         }
 
@@ -1469,17 +1488,20 @@ export const applyEventPlannerPlan = async (req, res) => {
                 console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong database. Sẽ tự động tạo EPIC mới nếu là HoOC.`);
               }
 
-              // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (nếu chỉ có 1 EPIC)
+              // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (CHỈ KHI có đúng 1 EPIC)
+              // Không fallback khi có nhiều EPIC vì có thể map sai
               if (!existingEpic) {
                 const allEpicsInDept = await Task.find({
                   eventId: planEventId,
                   taskType: 'epic',
                   departmentId: department._id,
-                }).sort({ createdAt: -1 }).limit(1).lean();
+                }).sort({ createdAt: -1 }).lean();
                 
                 if (allEpicsInDept.length === 1) {
                   existingEpic = allEpicsInDept[0];
-                  console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${existingEpic.title}`);
+                  console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${existingEpic.title} (vì chỉ có 1 EPIC)`);
+                } else if (allEpicsInDept.length > 1) {
+                  console.warn(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong department "${deptName}". Department này có ${allEpicsInDept.length} EPIC, không thể tự động map. Cần epicTitle chính xác.`);
                 }
               }
 
@@ -1661,17 +1683,20 @@ export const applyEventPlannerPlan = async (req, res) => {
                     console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong database. Sẽ tự động tạo EPIC mới nếu là HoOC.`);
                   }
 
-                  // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (nếu chỉ có 1 EPIC)
+                  // Nếu vẫn không tìm thấy, thử lấy EPIC mới nhất trong department (CHỈ KHI có đúng 1 EPIC)
+                  // Không fallback khi có nhiều EPIC vì có thể map sai
                   if (!foundEpic) {
                     const allEpicsInDept = await Task.find({
                       eventId: planEventId,
                       taskType: 'epic',
                       departmentId: department._id,
-                    }).sort({ createdAt: -1 }).limit(1).lean();
+                    }).sort({ createdAt: -1 }).lean();
                     
                     if (allEpicsInDept.length === 1) {
                       foundEpic = allEpicsInDept[0];
-                      console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${foundEpic.title}`);
+                      console.log(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}", sử dụng EPIC mới nhất trong department: ${foundEpic.title} (vì chỉ có 1 EPIC)`);
+                    } else if (allEpicsInDept.length > 1) {
+                      console.warn(`[applyEventPlannerPlan] Không tìm thấy EPIC với title="${epicTitle}" trong department "${deptName}". Department này có ${allEpicsInDept.length} EPIC, không thể tự động map. Cần epicTitle chính xác.`);
                     }
                   }
 

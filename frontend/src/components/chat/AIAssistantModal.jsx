@@ -232,6 +232,18 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
           ? response.plans
           : [];
       
+      // Debug: Log plans để kiểm tra cấu trúc
+      console.log('[AIAssistantModal] Plans nhận được từ AI:', {
+        totalPlans: nextPlans.length,
+        plans: nextPlans.map(p => ({
+          type: p.type,
+          epicTitle: p.epicTitle,
+          department: p.department,
+          epicsCount: p.type === 'epics_plan' ? (p.plan?.epics?.length || 0) : null,
+          tasksCount: p.type === 'tasks_plan' ? (p.plan?.tasks?.length || 0) : null,
+        }))
+      });
+      
       setPlans(nextPlans);
 
       // Lưu plans vào message data để hiển thị nút "Áp dụng" ngay trong message
@@ -541,6 +553,30 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
               // Chỉ hiển thị nếu có plans và chưa được áp dụng
               if (activePlans.length === 0) return null;
               
+              // Debug: Log activePlans để kiểm tra
+              const epicsPlans = activePlans.filter(p => p.type === 'epics_plan');
+              const tasksPlans = activePlans.filter(p => p.type === 'tasks_plan');
+              const totalEpics = epicsPlans.reduce((sum, p) => sum + (p.plan?.epics?.length || 0), 0);
+              
+              console.log('[AIAssistantModal] Active plans để hiển thị:', {
+                totalPlans: activePlans.length,
+                epicsPlansCount: epicsPlans.length,
+                tasksPlansCount: tasksPlans.length,
+                totalEpics: totalEpics,
+                plans: activePlans.map(p => ({
+                  type: p.type,
+                  epicTitle: p.epicTitle,
+                  department: p.department,
+                  epicsCount: p.type === 'epics_plan' ? (p.plan?.epics?.length || 0) : null,
+                  tasksCount: p.type === 'tasks_plan' ? (p.plan?.tasks?.length || 0) : null,
+                }))
+              });
+              
+              // Cảnh báo nếu số lượng tasks_plan không khớp với số lượng epic
+              if (totalEpics > 0 && tasksPlans.length < totalEpics) {
+                console.warn(`[AIAssistantModal] ⚠️ Có ${totalEpics} epic nhưng chỉ có ${tasksPlans.length} tasks_plan. Có thể AI Agent chưa gen đủ tasks_plan cho tất cả epics.`);
+              }
+              
               return (
                 <div
                   style={{
@@ -556,24 +592,11 @@ export default function AIAssistantModal({ isOpen, onClose, eventId = null }) {
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>
                     Kế hoạch công việc đã được AI đề xuất
                   </div>
-                  <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
+                    <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
                     {activePlans.map((p, idx) => {
+                      // Bỏ qua epics_plan, chỉ hiển thị tasks_plan
                       if (p.type === 'epics_plan') {
-                        const epics =
-                          p.plan?.epics && Array.isArray(p.plan.epics)
-                            ? p.plan.epics
-                            : [];
-                        const eventLabel =
-                          p.eventName ||
-                          resolvedEventName ||
-                          p.eventId ||
-                          eventId ||
-                          'sự kiện này';
-                        return (
-                          <li key={`${p.type}-${idx}`}>
-                            {`Công việc lớn cho sự kiện ${eventLabel}`}
-                          </li>
-                        );
+                        return null;
                       }
                       if (p.type === 'tasks_plan') {
                         const tasks =
