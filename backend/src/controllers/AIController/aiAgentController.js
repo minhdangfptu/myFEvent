@@ -16,8 +16,7 @@ import { fetchExpensesForBudgets, decimalToNumber } from '../../services/expense
 
 const AI_AGENT_BASE_URL = config.AI_AGENT_BASE_URL || 'http://localhost:9000';
 const CHANNEL_AGENT = 'event_planner_agent';
-const SELF_BASE_URL =
-config.SELF_BASE_URL || `https://myfevent-ai-assistant-production.up.railway.app/`;
+const SELF_BASE_URL = (config.SELF_BASE_URL || `https://myfevent-production.up.railway.app`).replace(/\/$/, '');
 const BACKEND_BASE_URL = config.BACKEND_BASE_URL || 'http://localhost:8080'; // Thêm dòng này
 
 // Hiển thị nhãn tiếng Việt cho role
