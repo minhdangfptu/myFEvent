@@ -26,7 +26,7 @@ import ensureEventRole from '../../utils/ensureEventRole.js';
 export const aiBulkCreateTasksForEpic = async (req, res) => {
   try {
     const { eventId, epicId } = req.params;
-    const { tasks, eventStartDate, epicTitle, department } = req.body || {};
+    const { tasks, eventStartDate, epicTitle, department, userId: bodyUserId } = req.body || {}; // Lấy userId từ body
 
     if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
       return res.status(400).json({ message: 'tasks must be a non-empty array' });
@@ -167,7 +167,7 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
         startDate,
         dueDate,
 
-        createdBy: req.user.id,
+        createdBy: bodyUserId || req.user?.id, // Ưu tiên userId từ body, fallback về req.user.id
       });
 
       meta.push({ planIndex: index });

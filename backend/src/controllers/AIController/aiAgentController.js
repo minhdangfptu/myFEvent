@@ -42,6 +42,109 @@ const generateTitleFromText = (text = '') => {
 };
 
 /**
+ * Format lại assistant_reply từ plans để đảm bảo số lượng epics/tasks khớp với plans
+ * @param {string} originalReply - Response text gốc từ AI Agent
+ * @param {Array} plans - Mảng plans từ AI Agent
+ * @returns {string} - Response text đã được format lại
+ */
+const formatReplyFromPlans = (originalReply = '', plans = []) => {
+  if (!Array.isArray(plans) || plans.length === 0) {
+    console.log('[formatReplyFromPlans] Không có plans, trả về reply gốc');
+    return originalReply;
+  }
+
+  // Lấy tất cả epics từ epics_plan
+  const epicsPlans = plans.filter(p => p?.type === 'epics_plan');
+  const allEpics = epicsPlans.flatMap(plan => 
+    Array.isArray(plan?.plan?.epics) ? plan.plan.epics : []
+  );
+
+  console.log(`[formatReplyFromPlans] Tìm thấy ${allEpics.length} epics từ ${epicsPlans.length} epics_plan`);
+  allEpics.forEach((epic, idx) => {
+    console.log(`[formatReplyFromPlans]   Epic ${idx + 1}: "${epic.title}" (department: "${epic.department}")`);
+  });
+
+  // Lấy tất cả tasks từ tasks_plan, nhóm theo epicTitle (normalize để match)
+  const tasksPlans = plans.filter(p => p?.type === 'tasks_plan');
+  const tasksByEpic = new Map();
+  tasksPlans.forEach(plan => {
+    const epicTitle = (plan?.epicTitle || '').trim().toLowerCase();
+    const tasks = Array.isArray(plan?.plan?.tasks) ? plan.plan.tasks : [];
+    console.log(`[formatReplyFromPlans] tasks_plan: epicTitle="${plan?.epicTitle}", tasks count=${tasks.length}`);
+    if (epicTitle && tasks.length > 0) {
+      if (!tasksByEpic.has(epicTitle)) {
+        tasksByEpic.set(epicTitle, []);
+      }
+      tasksByEpic.get(epicTitle).push(...tasks);
+    }
+  });
+
+  console.log(`[formatReplyFromPlans] Tổng số tasks_plan: ${tasksPlans.length}, tasksByEpic keys:`, Array.from(tasksByEpic.keys()));
+
+  // Nếu không có epics, trả về reply gốc
+  if (allEpics.length === 0) {
+    console.log('[formatReplyFromPlans] Không có epics, trả về reply gốc');
+    return originalReply;
+  }
+
+  // Tìm event name từ original reply (nếu có)
+  const eventNameMatch = originalReply.match(/"([^"]+)"/);
+  const eventName = eventNameMatch ? eventNameMatch[1] : '';
+
+  // Format lại response text với đầy đủ epics và tasks
+  let formattedReply = eventName 
+    ? `Tôi đã tạo các kế hoạch công việc cho sự kiện "${eventName}" với các phòng ban như sau:\n\n`
+    : `Tôi đã tạo các kế hoạch công việc cho sự kiện với các phòng ban như sau:\n\n`;
+
+  allEpics.forEach((epic, index) => {
+    const epicTitle = (epic.title || '').trim();
+    const epicDescription = (epic.description || '').trim();
+    const epicDepartment = (epic.department || '').trim();
+    
+    // In đậm tên công việc lớn
+    formattedReply += `${index + 1}. Công việc lớn: **${epicTitle}**${epicDepartment ? ` (${epicDepartment})` : ''}\n`;
+    
+    // Thêm tasks cho epic này (nếu có)
+    // Tìm tasks bằng cách match epicTitle (normalize)
+    const epicTitleLower = epicTitle.toLowerCase().replace(/\s+/g, ' ');
+    let epicTasks = tasksByEpic.get(epicTitleLower) || [];
+    
+    // Nếu không tìm thấy exact match, thử tìm partial match
+    if (epicTasks.length === 0) {
+      for (const [key, tasks] of tasksByEpic.entries()) {
+        // Kiểm tra nếu epicTitle chứa key hoặc key chứa epicTitle
+        if (epicTitleLower.includes(key) || key.includes(epicTitleLower)) {
+          console.log(`[formatReplyFromPlans] Tìm thấy partial match: epicTitle="${epicTitleLower}" với key="${key}"`);
+          epicTasks = tasks;
+          break;
+        }
+      }
+    }
+    
+    console.log(`[formatReplyFromPlans] Epic "${epicTitle}" (normalized: "${epicTitleLower}") có ${epicTasks.length} tasks`);
+    
+    if (epicTasks.length > 0) {
+      epicTasks.forEach((task, taskIndex) => {
+        const taskTitle = (task.title || '').trim();
+        const taskDescription = (task.description || '').trim();
+        // In đậm tên công việc con
+        formattedReply += `   - Công việc ${taskIndex + 1}: **${taskTitle}**${taskDescription ? `: ${taskDescription}` : ''}\n`;
+      });
+    } else if (epicDescription) {
+      // Nếu không có tasks nhưng có description, hiển thị description
+      formattedReply += `   - ${epicDescription}\n`;
+    }
+    
+    formattedReply += '\n';
+  });
+
+  formattedReply += `Bạn có thể bấm nút "Áp dụng" trong giao diện để thêm các công việc này vào sự kiện. Nếu cần thêm thông tin gì, hãy cho tôi biết nhé! 😊`;
+
+  console.log(`[formatReplyFromPlans] Đã format lại reply với ${allEpics.length} epics`);
+  return formattedReply;
+};
+
+/**
  * Helper function để lấy thông tin chi tiết đầy đủ của sự kiện cho AI
  * Tương tự như getEventDetailForAI nhưng được gọi nội bộ
  */
@@ -635,9 +738,9 @@ const formatEventContextForAI = (eventData) => {
     lines.push(`- Tổng ngân sách dự kiến: ${budgets.totalEstimated.toLocaleString('vi-VN')} VNĐ`);
     lines.push(`- Tổng ngân sách thực tế: ${budgets.totalActual ? budgets.totalActual.toLocaleString('vi-VN') : 0} VNĐ`);
     lines.push(`- Tổng số đơn ngân sách: ${budgets.totalBudgets}`);
-    lines.push(`- Số đơn chưa duyệt: ${budgets.summary?.pending || 0}`);
-    lines.push(`- Số đơn đã duyệt: ${budgets.summary?.approved || 0}`);
-    lines.push(`- Số đơn từ chối: ${budgets.summary?.rejected || 0}`);
+    lines.push(`- Số đơn chưa duyệt: ${budgets?.summary?.pending || 0}`);
+    lines.push(`- Số đơn đã duyệt: ${budgets?.summary?.approved || 0}`);
+    lines.push(`- Số đơn từ chối: ${budgets?.summary?.rejected || 0}`);
     lines.push(`- Theo trạng thái chi tiết:`);
     lines.push(`  + Đã gửi (chưa duyệt): ${budgets.byStatus.submitted || 0}`);
     lines.push(`  + Đã duyệt: ${budgets.byStatus.approved || 0}`);
@@ -689,6 +792,23 @@ const formatEventContextForAI = (eventData) => {
   }
 
   lines.push(
+    `=== ĐỊNH NGHĨA EPIC VÀ TASK (QUAN TRỌNG) ===`,
+    `- EPIC (Công việc lớn): Là một công việc lớn, tổng thể, có phạm vi rộng, có thể bao gồm nhiều task con.`,
+    `  Ví dụ EPIC: "Phát động chiến dịch truyền thông tuyển quân", "Bảo đảm an ninh sự kiện", "Đánh giá và báo cáo sự kiện"`,
+    `- TASK (Công việc con): Là các công việc nhỏ, cụ thể, chi tiết, thuộc về một EPIC.`,
+    `  Ví dụ TASK (thuộc EPIC "Phát động chiến dịch truyền thông tuyển quân"):`,
+    `    - "Tạo và triển khai kế hoạch truyền thông cho sự kiện tuyển quân gen 7"`,
+    `    - "Chuẩn bị tài liệu truyền thông: Thiết kế và in ấn các tài liệu quảng bá"`,
+    `    - "Tổ chức đội ngũ truyền thông sự kiện: Xây dựng đội ngũ nhân viên truyền thông"`,
+    ``,
+    `QUY TẮC QUAN TRỌNG:`,
+    `- Khi người dùng yêu cầu "tạo công việc lớn và công việc con":`,
+    `  + Bước 1: Gọi tool "ai_generate_epics_for_event" để tạo EPIC (công việc lớn)`,
+    `  + Bước 2: Sau khi có EPIC, gọi tool "ai_generate_tasks_for_epic" cho TỪNG EPIC để tạo TASK (công việc con)`,
+    `- KHÔNG BAO GIỜ tạo các công việc con thành EPIC riêng biệt`,
+    `- Các công việc con (như "Chuẩn bị tài liệu truyền thông", "Tổ chức đội ngũ truyền thông") PHẢI là TASK, không phải EPIC`,
+    `- Mỗi EPIC có thể có nhiều TASK, nhưng mỗi TASK chỉ thuộc về một EPIC`,
+    ``,
     `=== HƯỚNG DẪN ===`,
     `- QUAN TRỌNG: eventId của sự kiện hiện tại là: ${event._id}`,
     `- Khi người dùng nói "sự kiện này" thì hiểu là eventId = ${event._id}`,
@@ -832,6 +952,23 @@ export const runEventPlannerAgent = async (req, res) => {
             `- Ngày kết thúc (yyyy-mm-dd): ${event.eventEndDate ? new Date(event.eventEndDate).toISOString().split('T')[0] : 'N/A'}`,
             `- Người tổ chức: ${event.organizerName || 'N/A'}`,
             ``,
+            `=== ĐỊNH NGHĨA EPIC VÀ TASK (QUAN TRỌNG) ===`,
+            `- EPIC (Công việc lớn): Là một công việc lớn, tổng thể, có phạm vi rộng, có thể bao gồm nhiều task con.`,
+            `  Ví dụ EPIC: "Phát động chiến dịch truyền thông tuyển quân", "Bảo đảm an ninh sự kiện", "Đánh giá và báo cáo sự kiện"`,
+            `- TASK (Công việc con): Là các công việc nhỏ, cụ thể, chi tiết, thuộc về một EPIC.`,
+            `  Ví dụ TASK (thuộc EPIC "Phát động chiến dịch truyền thông tuyển quân"):`,
+            `    - "Tạo và triển khai kế hoạch truyền thông cho sự kiện tuyển quân gen 7"`,
+            `    - "Chuẩn bị tài liệu truyền thông: Thiết kế và in ấn các tài liệu quảng bá"`,
+            `    - "Tổ chức đội ngũ truyền thông sự kiện: Xây dựng đội ngũ nhân viên truyền thông"`,
+            ``,
+            `QUY TẮC QUAN TRỌNG:`,
+            `- Khi người dùng yêu cầu "tạo công việc lớn và công việc con":`,
+            `  + Bước 1: Gọi tool "ai_generate_epics_for_event" để tạo EPIC (công việc lớn)`,
+            `  + Bước 2: Sau khi có EPIC, gọi tool "ai_generate_tasks_for_epic" cho TỪNG EPIC để tạo TASK (công việc con)`,
+            `- KHÔNG BAO GIỜ tạo các công việc con thành EPIC riêng biệt`,
+            `- Các công việc con (như "Chuẩn bị tài liệu truyền thông", "Tổ chức đội ngũ truyền thông") PHẢI là TASK, không phải EPIC`,
+            `- Mỗi EPIC có thể có nhiều TASK, nhưng mỗi TASK chỉ thuộc về một EPIC`,
+            ``,
             `HƯỚNG DẪN QUAN TRỌNG:`,
             `- Bạn đang hỗ trợ lập kế hoạch cho sự kiện "${event.name}" (eventId: ${eventId})`,
             `- QUAN TRỌNG NHẤT: Khi người dùng có yêu cầu CỤ THỂ về chủ đề, nội dung, hoặc loại công việc, BẮT BUỘC phải tạo công việc theo đúng yêu cầu đó`,
@@ -841,8 +978,14 @@ export const runEventPlannerAgent = async (req, res) => {
             `- Khi người dùng yêu cầu "tạo công việc" hoặc "tạo công việc lớn" với yêu cầu cụ thể, hãy tạo NGAY LẬP TỨC theo đúng yêu cầu đó`,
             `- KHÔNG hỏi lại người dùng về ban nào, việc gì, mô tả gì, ngày bắt đầu - hãy tự suy luận từ yêu cầu của user và thông tin sự kiện`,
             `- KHÔNG đặt deadline cho công việc - để trống để Trưởng ban tổ chức hoặc Trưởng ban chỉnh sau`,
-            `- Ưu tiên gán công việc vào ban của người dùng hiện tại (nếu có), nếu không có ban thì để công việc chung của sự kiện`,
-            `- Khi tạo công việc/công việc lớn, luôn gắn với eventId = ${eventId} (qua các tool tương ứng)`,
+            `- Ưu tiên gán công việc vào ban của người dùng hiện tại nếu họ thuộc một ban; nếu không có ban, tạo công việc chung của sự kiện.`,
+            `- Sử dụng ngữ cảnh sự kiện hiện tại (danh sách ban, công việc lớn đã có, mô tả sự kiện, ngày bắt đầu/kết thúc) để tự suy luận và tạo công việc phù hợp, tránh hỏi thêm.`,
+            ``,
+            `=== QUY TẮC TRẢ LỜI VỀ NGÂN SÁCH/TÀI CHÍNH ===`,
+            `- ${currentUser?.role === 'HoOC' ? 'Bạn là Trưởng ban tổ chức, có thể xem và trả lời về ngân sách của TẤT CẢ các ban trong sự kiện.' : currentUser?.role === 'HoD' ? 'Bạn là Trưởng ban, có thể xem và trả lời về ngân sách của ban mình (' + (currentUser?.departmentName || 'ban hiện tại') + ').' : 'Bạn là Thành viên, có thể xem và trả lời về ngân sách của ban mình (nếu có).'}`,
+            `- Khi người dùng hỏi về "thống kê ngân sách", "ngân sách", "budget", "chi phí", "tài chính": hãy trả lời DỰA TRÊN DỮ LIỆU ĐÃ CÓ trong context này.`,
+            `- ${currentUser?.role === 'HoOC' ? 'Bạn có thể liệt kê ngân sách của từng ban, tổng ngân sách, số lượng đơn ngân sách theo trạng thái (đã gửi, đã duyệt, yêu cầu chỉnh sửa, ...).' : 'Bạn chỉ có thể trả lời về ngân sách của ban mình, không được hỏi hoặc xem ngân sách của ban khác.'}`,
+            `- Sử dụng thông tin ngân sách đã có trong context để trả lời chính xác, không từ chối hoặc nói "không thể cung cấp thông tin tài chính".`,
           ].join('\n');
 
             const hasSystemMessage = history_messages.some(msg => msg.role === 'system');
@@ -873,6 +1016,23 @@ export const runEventPlannerAgent = async (req, res) => {
             `- Loại: ${event.type}`,
             `- Địa điểm: ${event.location || 'N/A'}`,
             `- Thời gian: ${event.eventStartDate || 'N/A'} → ${event.eventEndDate || 'N/A'}`,
+            ``,
+            `=== ĐỊNH NGHĨA EPIC VÀ TASK (QUAN TRỌNG) ===`,
+            `- EPIC (Công việc lớn): Là một công việc lớn, tổng thể, có phạm vi rộng, có thể bao gồm nhiều task con.`,
+            `  Ví dụ EPIC: "Phát động chiến dịch truyền thông tuyển quân", "Bảo đảm an ninh sự kiện", "Đánh giá và báo cáo sự kiện"`,
+            `- TASK (Công việc con): Là các công việc nhỏ, cụ thể, chi tiết, thuộc về một EPIC.`,
+            `  Ví dụ TASK (thuộc EPIC "Phát động chiến dịch truyền thông tuyển quân"):`,
+            `    - "Tạo và triển khai kế hoạch truyền thông cho sự kiện tuyển quân gen 7"`,
+            `    - "Chuẩn bị tài liệu truyền thông: Thiết kế và in ấn các tài liệu quảng bá"`,
+            `    - "Tổ chức đội ngũ truyền thông sự kiện: Xây dựng đội ngũ nhân viên truyền thông"`,
+            ``,
+            `QUY TẮC QUAN TRỌNG:`,
+            `- Khi người dùng yêu cầu "tạo công việc lớn và công việc con":`,
+            `  + Bước 1: Gọi tool "ai_generate_epics_for_event" để tạo EPIC (công việc lớn)`,
+            `  + Bước 2: Sau khi có EPIC, gọi tool "ai_generate_tasks_for_epic" cho TỪNG EPIC để tạo TASK (công việc con)`,
+            `- KHÔNG BAO GIỜ tạo các công việc con thành EPIC riêng biệt`,
+            `- Các công việc con (như "Chuẩn bị tài liệu truyền thông", "Tổ chức đội ngũ truyền thông") PHẢI là TASK, không phải EPIC`,
+            `- Mỗi EPIC có thể có nhiều TASK, nhưng mỗi TASK chỉ thuộc về một EPIC`,
             ``,
             `HƯỚNG DẪN QUAN TRỌNG:`,
             `- Bạn đã có thông tin cơ bản về sự kiện "${event.name}" (eventId: ${eventId}) trong context này`,
@@ -926,7 +1086,11 @@ export const runEventPlannerAgent = async (req, res) => {
     console.log(`[runEventPlannerAgent] Hoàn thành gọi AI agent sau ${duration}s`);
 
     const agentData = pythonRes.data || {};
-    const assistantReply = agentData.assistant_reply || '';
+    const originalReply = agentData.assistant_reply || '';
+    const plans = Array.isArray(agentData.plans) ? agentData.plans : [];
+    
+    // Format lại assistant_reply từ plans để đảm bảo số lượng epics/tasks khớp
+    const assistantReply = formatReplyFromPlans(originalReply, plans);
 
     // Xác định sessionId cho cuộc trò chuyện hiện tại
     const sessionId =
@@ -1016,9 +1180,10 @@ export const runEventPlannerAgent = async (req, res) => {
       }
     }
 
-    // Bao luôn sessionId trong response cho FE
+    // Bao luôn sessionId trong response cho FE, với assistant_reply đã được format lại
     return res.status(200).json({
       ...agentData,
+      assistant_reply: assistantReply, // Sử dụng reply đã được format lại
       sessionId,
     });
   } catch (err) {
@@ -1239,7 +1404,10 @@ export const applyEventPlannerPlan = async (req, res) => {
         
         const resp = await axios.post(
           apiUrl,
-          { epics },
+          { 
+            epics,
+            userId: userId, // Thêm userId vào body
+          },
           {
             headers: {
               Authorization: authHeader,
@@ -1822,6 +1990,7 @@ export const applyEventPlannerPlan = async (req, res) => {
         eventStartDate: rawPlan.eventStartDate || null,
         epicTitle: epicTitle,
         department: deptName,
+        userId: userId, // Thêm userId vào body
       };
 
       try {

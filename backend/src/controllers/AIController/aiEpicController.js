@@ -8,7 +8,7 @@ import Event from '../../models/event.js';
 export const aiBulkCreateEpics = async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { epics } = req.body || {};
+    const { epics, userId: bodyUserId } = req.body || {}; // Lấy userId từ body
 
     if (!epics || !Array.isArray(epics) || epics.length === 0) {
       return res.status(400).json({ message: 'epics must be a non-empty array' });
@@ -89,7 +89,7 @@ export const aiBulkCreateEpics = async (req, res) => {
         assigneeId: null,
         status: 'chua_bat_dau',  // task do AI sinh ra → trạng thái "chưa bắt đầu" (thay vì 'suggested' vì không có trong enum)
         taskType: 'epic',         // giữ taskType để phân biệt
-        createdBy: req.user.id,   // Người apply plan sẽ là người tạo EPIC
+        createdBy: bodyUserId || req.user?.id, // Ưu tiên userId từ body, fallback về req.user.id
       });
 
       // Convert sang plain object để đảm bảo _id được serialize đúng khi trả về JSON
