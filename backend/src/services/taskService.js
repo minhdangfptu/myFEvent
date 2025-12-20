@@ -568,9 +568,28 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
     }
   }
 
-  // Chỉ người tạo task mới có thể xóa (áp dụng cho cả HoOC và HoD)
+  // HoOC có thể xóa bất kỳ task nào, HoD chỉ có thể xóa task do họ tạo hoặc task trong ban của họ
+  const isHoOC = member?.role === 'HoOC';
+  const isHoD = member?.role === 'HoD';
+  
   if (!isTaskCreator) {
-    throw makeError('Chỉ người tạo công việc mới có thể xóa công việc này.', 403);
+    // HoOC luôn có quyền xóa
+    if (isHoOC) {
+      // Cho phép HoOC xóa bất kỳ task nào
+    } else if (isHoD) {
+      // HoD chỉ có thể xóa task trong ban của mình (nếu task có departmentId)
+      if (task.departmentId && member?.departmentId) {
+        const taskDeptId = String(task.departmentId);
+        const memberDeptId = String(member.departmentId);
+        if (taskDeptId !== memberDeptId) {
+          throw makeError('Bạn chỉ có thể xóa công việc trong ban của mình.', 403);
+        }
+      } else {
+        throw makeError('Chỉ người tạo công việc hoặc Trưởng ban tổ chức mới có thể xóa công việc này.', 403);
+      }
+    } else {
+      throw makeError('Chỉ người tạo công việc hoặc Trưởng ban tổ chức mới có thể xóa công việc này.', 403);
+    }
   }
 
   // Kiểm tra xem task có phải là EPIC không
