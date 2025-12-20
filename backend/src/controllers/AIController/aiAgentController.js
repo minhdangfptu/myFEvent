@@ -1232,7 +1232,7 @@ export const applyEventPlannerPlan = async (req, res) => {
       console.log(`[applyEventPlannerPlan] Xử lý epics_plan với ${epics.length} epics, department: "${rawPlan.department || 'N/A'}"`);
 
       try {
-        const apiUrl = `${SELF_BASE_URL}/api/events/${planEventId}/epics/ai-bulk-create`;
+        const apiUrl = `${SELF_BASE_URL}api/events/${planEventId}/epics/ai-bulk-create`;
         console.log(`[applyEventPlannerPlan] Gọi API tạo EPIC: ${apiUrl}`);
         console.log(`[applyEventPlannerPlan] Số lượng EPIC cần tạo: ${epics.length}`);
         console.log(`[applyEventPlannerPlan] User ID: ${userId}, Event ID: ${planEventId}`);
