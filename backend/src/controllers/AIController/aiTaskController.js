@@ -124,7 +124,7 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
 
       const offset = plan.offset_days_from_event;
       let startDate;
-      let dueDate;
+      let dueDate = null; // Không đặt deadline cho task (giống như epic)
 
       // Nếu có baseDate & offset_days_from_event → compute startDate
       if (
@@ -135,8 +135,8 @@ export const aiBulkCreateTasksForEpic = async (req, res) => {
         const date = new Date(baseDate);
         date.setDate(date.getDate() + offset);
         startDate = date;
-        // đơn giản: để dueDate = startDate (vì chỉ là task gợi ý)
-        dueDate = date;
+        // Không đặt dueDate - để trống như epic task
+        dueDate = null;
       }
 
       // Đảm bảo departmentId được convert đúng (có thể là ObjectId hoặc string)

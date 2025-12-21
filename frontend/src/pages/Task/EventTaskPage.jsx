@@ -211,7 +211,8 @@ export default function EventTaskPage() {
             id: task?._id,
             name: task?.title || "",
             description: task?.description || "",
-            department: task?.departmentId?.name || "----",
+            department: task?.departmentName || task?.departmentId?.name || "----",
+            departmentName: task?.departmentName || task?.departmentId?.name || null, // Lưu tên ban để dùng khi ban bị xóa
             departmentId: task?.departmentId?._id || task?.departmentId || null,
             assignee: task?.assigneeId?.userId?.fullName || "----",
             assigneeId: task?.assigneeId?._id || task?.assigneeId || null,
@@ -1295,7 +1296,7 @@ const closeAddTaskModal = () => {
                             <div className="col-4">
                               <div className="fw-semibold">{epic?.name || "Công việc chưa thuộc Công việc lớn"}</div>
                               <div className="text-muted small">
-                                Ban: {epic?.department || "----"} • Deadline: {epic?.due || "Chưa thiết lập"}
+                                Ban: {epic?.department || "----"} • Deadline: {epic?.due || epic?.dueDateRaw ? new Date(epic.dueDateRaw).toLocaleDateString("vi-VN") : "Chưa thiết lập"}
                               </div>
                             </div>
                             <div className="col-2 text-center">
@@ -1829,7 +1830,12 @@ const closeAddTaskModal = () => {
                             title: epicEditForm.title.trim(),
                             description: epicEditForm.description || "",
                             departmentId: epicEditForm.departmentId,
-                            milestoneId: epicEditForm.milestoneId,
+                            // Normalize milestoneId: gửi null nếu empty string hoặc "Chưa có"
+                            milestoneId: epicEditForm.milestoneId && 
+                                         epicEditForm.milestoneId.trim() !== "" && 
+                                         epicEditForm.milestoneId !== "Chưa có"
+                              ? epicEditForm.milestoneId 
+                              : null,
                             startDate: epicEditForm.startDate || null,
                             dueDate: epicEditForm.dueDate,
                           };
@@ -1892,7 +1898,7 @@ const closeAddTaskModal = () => {
                       <div className="alert alert-info d-flex align-items-center gap-2 mb-3">
                         <Info size={18} />
                         <div>
-                          Thêm công việc cho <strong>{epicContext.name}</strong> • Ban: {epicContext.department || "----"}
+                          Thêm công việc cho <strong>{epicContext.name}</strong> • Ban: {epicContext.department || epicContext.departmentName || "----"}
                         </div>
                       </div>
                     )}
@@ -1948,8 +1954,8 @@ const closeAddTaskModal = () => {
                             // Tìm epic task từ parents list hoặc tasks list
                             const epicTask = parents.find(p => String(p._id || p.id) === String(epicId)) ||
                                            tasks.find(t => (t.id === epicId || t._id === epicId) && t.taskType === "epic");
-                            const departmentName = epicTask?.departmentId?.name || epicTask?.department || 
-                                                  epicContext?.department || "Chưa xác định";
+                            const departmentName = epicTask?.departmentName || epicTask?.departmentId?.name || epicTask?.department || 
+                                                  epicContext?.departmentName || epicContext?.department || "Chưa xác định";
                             return departmentName;
                           })()}
                         </div>

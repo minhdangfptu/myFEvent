@@ -1984,8 +1984,14 @@ export const applyEventPlannerPlan = async (req, res) => {
         continue;
       }
 
+      // Loại bỏ deadline/dueDate từ tasks (giống như epic - không có deadline)
+      const tasksWithoutDeadline = tasks.map(task => {
+        const { dueDate, deadline, ...taskWithoutDeadline } = task;
+        return taskWithoutDeadline;
+      });
+
       const payload = {
-        tasks,
+        tasks: tasksWithoutDeadline,
         eventStartDate: rawPlan.eventStartDate || null,
         epicTitle: epicTitle,
         department: deptName,

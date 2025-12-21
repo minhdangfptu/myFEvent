@@ -290,10 +290,16 @@ const validateDate = (dateString) => {
   // === Utility: find index by _id from fresh agendaData ===
   const findDateAndItemIndexById = (agendaDataObj, dateId, itemId) => {
     if (!agendaDataObj || !agendaDataObj.agenda) return { dateIndex: -1, itemIndex: -1 };
-    const dateIndex = agendaDataObj.agenda.findIndex(d => d._id === dateId);
+    
+    // Convert to string for reliable comparison (MongoDB _id can be ObjectId or string)
+    const dateIdStr = String(dateId);
+    const itemIdStr = String(itemId);
+    
+    const dateIndex = agendaDataObj.agenda.findIndex(d => String(d._id) === dateIdStr);
     if (dateIndex === -1) return { dateIndex: -1, itemIndex: -1 };
+    
     const dateItems = agendaDataObj.agenda[dateIndex].items || [];
-    const itemIndex = dateItems.findIndex(item => item._id === itemId);
+    const itemIndex = dateItems.findIndex(item => String(item._id) === itemIdStr);
     return { dateIndex, itemIndex };
   };
 
@@ -334,11 +340,13 @@ const validateDate = (dateString) => {
 
       debugLog("Deleting schedule by index resolved from _id", { dateIndex, itemIndex, itemId: scheduleToDelete.itemId });
 
+      // Pass itemId to backend for verification (more reliable than index alone)
       await removeDayItem(
         eventId,
         milestoneId,
         dateIndex,
-        itemIndex
+        itemIndex,
+        scheduleToDelete.itemId
       );
 
       await fetchAgendaData(); // Refresh data

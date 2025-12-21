@@ -407,10 +407,10 @@ export default function HoDTaskPage() {
     
   const taskStats = {
     total: tasks.filter((t) => t.taskType === "normal").length,
-    completed: tasks.filter((t) => t.statusCode === "hoan_thanh").length,
-    inProgress: tasks.filter((t) => t.statusCode === "da_bat_dau").length,
-    notStarted: tasks.filter((t) => t.statusCode === "chua_bat_dau").length,
-    cancelled: tasks.filter((t) => t.statusCode === "huy").length,
+    completed: tasks.filter((t) => t.taskType === "normal" && t.statusCode === "hoan_thanh").length,
+    inProgress: tasks.filter((t) => t.taskType === "normal" && t.statusCode === "da_bat_dau").length,
+    notStarted: tasks.filter((t) => t.taskType === "normal" && t.statusCode === "chua_bat_dau").length,
+    cancelled: tasks.filter((t) => t.taskType === "normal" && t.statusCode === "huy").length,
   };
 
   const handleUpdateTaskStatus = async (taskId, newStatusCode) => {
@@ -1156,17 +1156,6 @@ export default function HoDTaskPage() {
                   className="form-control soft-input"
                   style={{ width: 250, paddingLeft: 16 }}
                 />
-
-                <select
-                  className="form-select form-select-sm soft-input"
-                  style={{ width: 140, height: 40 }}
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                >
-                  <option value="all">Tất cả loại</option>
-                  <option value="epic">Công việc lớn</option>
-                  <option value="normal">Công việc</option>
-                </select>
 
                 <select
                   className="form-select form-select-sm soft-input"

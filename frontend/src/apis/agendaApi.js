@@ -79,12 +79,16 @@ export const updateDayItem = async (eventId, milestoneId, dateIndex, itemIndex, 
   return res.data;
 };
 
-// DELETE /api/events/:eventId/milestones/:milestoneId/agenda/items - Xóa item by index
-export const removeDayItem = async (eventId, milestoneId, dateIndex, itemIndex) => {
+// DELETE /api/events/:eventId/milestones/:milestoneId/agenda/items - Xóa item by index (with itemId for verification)
+export const removeDayItem = async (eventId, milestoneId, dateIndex, itemIndex, itemId = null) => {
   const requestBody = {
     dateIndex,
     itemIndex
   };
+  // Include itemId if provided for more reliable deletion
+  if (itemId) {
+    requestBody.itemId = itemId;
+  }
   const res = await axiosClient.delete(`/api/events/${eventId}/milestones/${milestoneId}/agenda/items`, {
     data: requestBody
   });

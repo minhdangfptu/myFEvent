@@ -129,6 +129,16 @@ export const getDepartmentBudget = async (req, res) => {
           select: 'fullName email',
           options: { strictPopulate: false }
         })
+        .populate({
+          path: 'reviewedBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'sentToMembersBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
         .lean();
     }
 
@@ -151,6 +161,16 @@ export const getDepartmentBudget = async (req, res) => {
           select: 'fullName email',
           options: { strictPopulate: false }
         })
+        .populate({
+          path: 'reviewedBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'sentToMembersBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
         .lean();
     }
     
@@ -168,6 +188,16 @@ export const getDepartmentBudget = async (req, res) => {
         })
         .populate({
           path: 'createdBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'reviewedBy',
+          select: 'fullName email',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'sentToMembersBy',
           select: 'fullName email',
           options: { strictPopulate: false }
         })
@@ -325,8 +355,8 @@ export const createDepartmentBudget = async (req, res) => {
     console.error('Error stack:', error.stack);
     console.error('Error details:', {
       eventId: eventIdParam || eventId,
-      departmentId: departmentIdParam ,
-      itemsCount: req.body?.items?.length,
+      departmentId: departmentIdParam || departmentId,
+      itemsCount: items?.length,
       errorName: error.name,
       errorMessage: error.message
     });
@@ -369,24 +399,6 @@ export const updateDepartmentBudget = async (req, res) => {
       return res.status(404).json({ message: 'Department not found' });
     }
 
-    // Kiểm tra quyền của user
-    const membership = await loadMembership(eventId, userId, 'updateDepartmentBudget');
-    if (!membership) {
-      return res.status(403).json({ message: 'Bạn không phải là thành viên của sự kiện này' });
-    }
-
-    const membershipDeptId = getIdString(membership?.departmentId);
-    const isHoOC = membership?.role === 'HoOC';
-    const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
-    
-    // Kiểm tra xem user có phải là HoD của department này không
-    let isHoD = false;
-    if (department.leaderId) {
-      const leaderIdStr = getIdString(department.leaderId);
-      const userIdStr = getIdString(userId);
-      isHoD = leaderIdStr === userIdStr;
-    }
-
     // Find budget
     const budget = await EventBudgetPlan.findOne({
       _id: new mongoose.Types.ObjectId(budgetId),
@@ -398,68 +410,14 @@ export const updateDepartmentBudget = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    // Kiểm tra quyền update budget:
-    // - HoOC: có thể update bất kỳ budget nào
-    // - HoD: chỉ có thể update budget của department mình
-    // - Member: chỉ có thể update evidence của items được assign cho mình (khi budget đã được sent_to_members hoặc approved)
-    if (!isHoOC && !isSameDepartment) {
-      return res.status(403).json({ message: 'Bạn không có quyền cập nhật budget của ban này' });
-    }
-
-    // Nếu là Member (không phải HoD), chỉ cho phép update evidence của items được assign
-    if (!isHoOC && !isHoD && items && Array.isArray(items)) {
-      // Kiểm tra xem budget đã được sent_to_members hoặc approved chưa
-      if (budget.status !== 'sent_to_members' && budget.status !== 'approved') {
-        return res.status(403).json({ 
-          message: 'Chỉ có thể thêm bằng chứng khi budget đã được phê duyệt hoặc gửi xuống thành viên' 
-        });
-      }
-
-      // Kiểm tra từng item xem có được assign cho user này không
-      for (const item of items) {
-        const oldItem = budget.items?.find(old => 
-          old.itemId?.toString() === item.itemId?.toString()
-        );
-        
-        if (!oldItem) {
-          return res.status(400).json({ message: `Item ${item.itemId} không tồn tại trong budget` });
-        }
-
-        // Nếu item có assignedTo, phải khớp với user này
-        if (oldItem.assignedTo) {
-          const assignedToId = getIdString(oldItem.assignedTo);
-          const userMemberId = getIdString(membership._id);
-          if (assignedToId !== userMemberId) {
-            return res.status(403).json({ 
-              message: `Bạn không được assign cho item "${oldItem.name || item.itemId}"` 
-            });
-          }
-        }
-
-        // Member chỉ có thể update evidence, không được update các field khác
-        const allowedFields = ['evidence', 'itemId'];
-        const updatedFields = Object.keys(item).filter(key => !allowedFields.includes(key) && item[key] !== undefined);
-        if (updatedFields.length > 0) {
-          return res.status(403).json({ 
-            message: `Thành viên chỉ có thể cập nhật bằng chứng (evidence), không thể cập nhật các trường khác: ${updatedFields.join(', ')}` 
-          });
-        }
-      }
-    }
-
-    // Cho phép update nếu status là draft, changes_requested, submitted, sent_to_members, hoặc approved
-    // - draft/changes_requested/submitted: HoOC và HoD có thể chỉnh sửa và submit lại
-    // - sent_to_members/approved: HoD và Member có thể thêm evidence (không thay đổi status)
-    const allowedStatuses = ['draft', 'changes_requested', 'submitted', 'sent_to_members', 'approved'];
-    if (!allowedStatuses.includes(budget.status)) {
-      return res.status(400).json({ 
-        message: `Không thể cập nhật budget với trạng thái ${budget.status}. Chỉ có thể cập nhật khi budget ở trạng thái: ${allowedStatuses.join(', ')}` 
-      });
+    // Cho phép update nếu status là draft, changes_requested, hoặc submitted (để chỉnh sửa và gửi lại)
+    // Khi update từ submitted, sẽ tự động chuyển về draft để có thể submit lại
+    if (budget.status !== 'draft' && budget.status !== 'changes_requested' && budget.status !== 'submitted') {
+      return res.status(400).json({ message: 'Cannot update budget that is not in draft, changes_requested, or submitted status' });
     }
     
-    // Nếu đang ở submitted và update bởi HoOC/HoD, tự động chuyển về draft để có thể submit lại
-    // Member không được phép thay đổi status
-    if (budget.status === 'submitted' && items && Array.isArray(items) && (isHoOC || isHoD)) {
+    // Nếu đang ở submitted và update, tự động chuyển về draft để có thể submit lại
+    if (budget.status === 'submitted' && items && Array.isArray(items)) {
       budget.status = 'draft';
     }
 
@@ -503,32 +461,6 @@ export const updateDepartmentBudget = async (req, res) => {
           (item.itemId && old.itemId?.toString() === new mongoose.Types.ObjectId(item.itemId).toString())
         );
         
-        if (!oldItem) {
-          // Nếu không tìm thấy item cũ và không phải HoOC/HoD, không cho phép tạo item mới
-          if (!isHoOC && !isHoD) {
-            throw new Error(`Không tìm thấy item ${item.itemId} trong budget`);
-          }
-        }
-        
-        // Nếu là Member và chỉ update evidence, giữ nguyên tất cả các field khác
-        if (!isHoOC && !isHoD && oldItem) {
-          return {
-            itemId: oldItem.itemId,
-            category: oldItem.category,
-            name: oldItem.name,
-            unit: oldItem.unit,
-            qty: oldItem.qty,
-            unitCost: oldItem.unitCost,
-            total: oldItem.total,
-            note: oldItem.note,
-            feedback: oldItem.feedback,
-            status: oldItem.status,
-            assignedTo: oldItem.assignedTo,
-            evidence: item.evidence !== undefined ? normalizeEvidenceArray(item.evidence) : oldItem.evidence,
-          };
-        }
-        
-        // HoOC và HoD có thể update tất cả các field
         // Nếu budget chưa được approved, không cho phép set item.status thành "approved"
         let itemStatus = item.status || oldItem?.status || 'pending';
         const currentBudgetStatus = budget.status || 'draft';
@@ -549,28 +481,25 @@ export const updateDepartmentBudget = async (req, res) => {
             inputEvidence: evidenceInput,
             normalizedEvidence: normalizedEvidence,
             inputLength: evidenceInput.length,
-            normalizedLength: normalizedEvidence.length,
-            userRole: isHoOC ? 'HoOC' : (isHoD ? 'HoD' : 'Member'),
-            budgetStatus: budget.status
+            normalizedLength: normalizedEvidence.length
           });
         }
         
-        const qty = parseFloat(item.qty) || (oldItem ? decimalToNumber(oldItem.qty) : 1);
-        const unitCost = parseFloat(item.unitCost) || (oldItem ? decimalToNumber(oldItem.unitCost) : 0);
+        const qty = parseFloat(item.qty) || 1;
+        const unitCost = parseFloat(item.unitCost) || 0;
         const total = item.total ? parseFloat(item.total) : (qty * unitCost);
         
         return {
-          itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : (oldItem?.itemId || new mongoose.Types.ObjectId()),
-          category: item.category || oldItem?.category || 'general',
-          name: item.name || oldItem?.name,
-          unit: item.unit?.trim() || oldItem?.unit || 'cái',
+          itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
+          category: item.category || 'general',
+          name: item.name,
+          unit: item.unit?.trim() || 'cái',
           qty: toDecimal128(qty, '1'),
           unitCost: toDecimal128(unitCost, '0'),
           total: toDecimal128(total, '0'),
-          note: item.note !== undefined ? item.note : (oldItem?.note || ''),
-          feedback: item.feedback !== undefined ? item.feedback : (oldItem?.feedback || ''),
-          status: itemStatus,
-          assignedTo: item.assignedTo !== undefined ? item.assignedTo : oldItem?.assignedTo,
+          note: item.note || '',
+          feedback: item.feedback || oldItem?.feedback || '', // Giữ lại feedback cũ nếu không có feedback mới
+          status: itemStatus, // Đảm bảo status hợp lệ
           evidence: normalizedEvidence
         };
       });
@@ -604,6 +533,8 @@ export const submitBudget = async (req, res) => {
     const { eventId, departmentId, budgetId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
 
+    console.log('submitBudget called:', { eventId, departmentId, budgetId, userId });
+
     // Validate budgetId
     if (!mongoose.Types.ObjectId.isValid(budgetId)) {
       return res.status(400).json({ message: 'Invalid budget ID format' });
@@ -629,9 +560,12 @@ export const submitBudget = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
+    console.log('Budget found:', { status: budget.status, itemsCount: budget.items?.length });
+
     // Cho phép submit từ draft, changes_requested, hoặc submitted (để gửi lại sau khi chỉnh sửa)
     // Nếu đang ở submitted, có nghĩa là đã chỉnh sửa và muốn gửi lại
     if (budget.status !== 'draft' && budget.status !== 'changes_requested' && budget.status !== 'submitted') {
+      console.log('Invalid status for submit:', budget.status);
       return res.status(400).json({ 
         message: `Only draft, changes_requested, or submitted budgets can be submitted. Current status: ${budget.status}` 
       });
@@ -799,7 +733,23 @@ export const submitBudget = async (req, res) => {
 
     // Validate trước khi save
     try {
+      // Log để debug
+      console.log('Budget before save:', {
+        status: budget.status,
+        itemsCount: budget.items?.length,
+        firstItem: budget.items?.[0] ? {
+          itemId: budget.items[0].itemId?.toString(),
+          name: budget.items[0].name,
+          qty: budget.items[0].qty?.toString(),
+          unitCost: budget.items[0].unitCost?.toString(),
+          total: budget.items[0].total?.toString(),
+          actualAmount: budget.items[0].actualAmount?.toString(),
+          evidence: budget.items[0].evidence
+        } : null
+      });
+      
       await budget.save();
+      console.log('Budget submitted successfully:', { budgetId: budget._id, status: budget.status });
     } catch (saveError) {
       console.error('Save error:', saveError);
       console.error('Save error name:', saveError.name);
@@ -1048,11 +998,8 @@ export const saveReviewDraft = async (req, res) => {
         budget.status = 'approved';
       } else if (hasPending) {
         // Còn items pending → set về submitted để HoOC tiếp tục duyệt
-        // Chỉ set về submitted nếu budget đang ở trạng thái có thể review
-        if (budget.status === 'submitted' || budget.status === 'changes_requested' || budget.status === 'draft') {
-          budget.status = 'submitted';
-        }
-        // Nếu đã approved và có pending items, giữ nguyên approved (không downgrade)
+        // Reset về submitted kể cả khi budget đã approved (cho phép review lại sau khi hoàn tác)
+        budget.status = 'submitted';
       }
     }
 
@@ -1069,21 +1016,22 @@ export const saveReviewDraft = async (req, res) => {
 };
 
 // POST /api/events/:eventId/departments/:departmentId/budget/:budgetId/review/complete
-
 export const completeReview = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
-
     const { items } = req.body;
 
+    // Ensure event exists
     await ensureEventExists(eventId);
-
+    
+    // Ensure department exists and belongs to event
     const department = await ensureDepartmentInEvent(eventId, departmentId);
     if (!department) {
       return res.status(404).json({ message: 'Department not found' });
     }
 
+    // Find budget
     const budget = await EventBudgetPlan.findOne({
       _id: new mongoose.Types.ObjectId(budgetId),
       eventId: new mongoose.Types.ObjectId(eventId),
@@ -1094,24 +1042,44 @@ export const completeReview = async (req, res) => {
       return res.status(404).json({ message: 'Budget not found' });
     }
 
-    // Allow review for submitted budgets or changes_requested budgets (if resubmitted)
-    // Note: changes_requested budgets can be reviewed again if HoD has made changes and resubmitted
-    if (budget.status !== 'submitted' && budget.status !== 'changes_requested') {
+    // Allow review for submitted, changes_requested, or approved budgets
+    // - submitted/changes_requested: Initial review
+    // - approved: Re-review (e.g., after undoing item status)
+    if (budget.status !== 'submitted' && budget.status !== 'changes_requested' && budget.status !== 'approved') {
+      console.log('completeReview: Invalid budget status', {
+        budgetId: budget._id,
+        currentStatus: budget.status,
+        allowedStatuses: ['submitted', 'changes_requested', 'approved']
+      });
       return res.status(400).json({ 
-        message: `Only submitted or changes_requested budgets can be reviewed. Current status: ${budget.status}` 
+        message: `Only submitted, changes_requested, or approved budgets can be reviewed. Current status: ${budget.status}` 
       });
     }
 
     // Validate items array
     if (!items || !Array.isArray(items)) {
+      console.log('completeReview: Invalid items format', {
+        budgetId: budget._id,
+        itemsType: typeof items,
+        isArray: Array.isArray(items)
+      });
       return res.status(400).json({ 
         message: 'Items must be an array' 
       });
     }
 
+    // Log for debugging
+    console.log('completeReview: Processing review', {
+      budgetId: budget._id,
+      status: budget.status,
+      itemsCount: items.length,
+      budgetItemsCount: budget.items?.length
+    });
+
     // Update items with review status and feedback
     if (items && Array.isArray(items)) {
       const updatedItems = budget.items.map(budgetItem => {
+        // Tìm review item tương ứng
         const reviewItem = items.find(item => {
           const reviewItemId = item.itemId?.toString() || item.itemId?._id?.toString() || item.itemId;
           const budgetItemId = budgetItem.itemId?.toString() || budgetItem._id?.toString() || budgetItem.itemId;
@@ -1119,6 +1087,7 @@ export const completeReview = async (req, res) => {
         });
 
         if (reviewItem) {
+          // Cập nhật feedback và status từ review
           return {
             itemId: budgetItem.itemId,
             category: budgetItem.category || 'general',
@@ -1132,6 +1101,7 @@ export const completeReview = async (req, res) => {
             status: reviewItem.status || 'pending'
           };
         }
+        // Giữ nguyên item nếu không có review
         return {
           itemId: budgetItem.itemId,
           category: budgetItem.category || 'general',
@@ -1149,33 +1119,56 @@ export const completeReview = async (req, res) => {
       budget.items = updatedItems;
     }
 
+    // Determine overall budget status based on items
+    // Nếu có ít nhất 1 item bị rejected → budget bị từ chối (changes_requested)
+    // Nếu tất cả items đều approved → budget được duyệt (approved)
+    // Nếu có items pending → giữ nguyên submitted (chưa duyệt hết)
     const hasRejected = budget.items.some(item => item.status === 'rejected');
     const allApproved = budget.items.every(item => item.status === 'approved');
     const hasPending = budget.items.some(item => item.status === 'pending');
-
-    let newStatus = budget.status;
+    
+    let newStatus = budget.status; // Giữ nguyên status mặc định
     if (hasRejected) {
+      // Có item bị từ chối → budget bị từ chối
       newStatus = 'changes_requested';
     } else if (allApproved) {
+      // Tất cả items đều được duyệt → budget được duyệt
       newStatus = 'approved';
     } else if (hasPending) {
+      // Còn items pending → giữ nguyên submitted để HoOC tiếp tục duyệt
       newStatus = 'submitted';
     } else {
+      // Trường hợp khác (có thể có approved và pending) → giữ submitted
       newStatus = 'submitted';
     }
 
     budget.status = newStatus;
+    // Note: reviewedBy and reviewedAt fields are not in schema, removed to prevent errors
 
+    // Add audit log
     budget.audit = budget.audit || [];
     budget.audit.push({
       at: new Date(),
-      by: userId ? new mongoose.Types.ObjectId(userId) : null,
+      by: new mongoose.Types.ObjectId(userId),
       action: newStatus === 'approved' ? 'approved' : (newStatus === 'changes_requested' ? 'changes_requested' : 'submitted'),
       comment: `Budget review completed - ${newStatus}`
     });
 
+    // Đảm bảo budget được lưu với status mới
     const savedBudget = await budget.save();
+    
+    // Log để debug
+    console.log('Budget saved after review:', {
+      budgetId: savedBudget._id,
+      departmentId: savedBudget.departmentId,
+      status: savedBudget.status,
+      itemsCount: savedBudget.items?.length,
+      hasRejected,
+      allApproved,
+      hasPending
+    });
 
+    // Send notification based on review result
     try {
       if (newStatus === 'approved') {
         await notifyBudgetApproved(eventId, departmentId, budgetId);
@@ -1184,10 +1177,10 @@ export const completeReview = async (req, res) => {
       }
     } catch (notifError) {
       console.error('Error sending budget review notification:', notifError);
+      // Don't fail the request if notification fails
     }
 
-    return res.status(200).json({ data: savedBudget || budget });
-
+    return res.status(200).json({ data: budget });
   } catch (error) {
     console.error('completeReview error:', error);
     if (error.message === 'Event not found' || error.message === 'Department not found') {
@@ -1208,30 +1201,13 @@ export const getAllBudgetsForDepartment = async (req, res) => {
     await ensureEventExists(eventId);
     await ensureDepartmentInEvent(eventId, departmentId);
 
-    // Kiểm tra quyền của user
-    const userId = req.user?.userId || req.user?._id || req.user?.id;
-    const membership = await loadMembership(eventId, userId, 'getAllBudgetsForDepartment');
-    const isHoOC = membership?.role === 'HoOC';
-    const membershipDeptId = getIdString(membership?.departmentId);
-    const isSameDepartment = membershipDeptId && membershipDeptId === getIdString(departmentId);
-
     const filter = {
       eventId: new mongoose.Types.ObjectId(eventId),
       departmentId: new mongoose.Types.ObjectId(departmentId)
     };
 
-    // Nếu không phải HoOC và không phải cùng department, chỉ xem budgets công khai
-    if (!isHoOC && !isSameDepartment) {
-      filter.isPublic = true;
-    }
-
-    // HoOC không được xem draft budgets (budgets đã bị thu hồi)
-    if (isHoOC) {
-      filter.status = { $ne: 'draft' };
-    }
-
-    // Tối ưu: Chỉ select những trường cần thiết cho danh sách (bao gồm isPublic)
-    const selectFields = '_id name status submittedAt createdAt updatedAt isPublic departmentId createdBy';
+    // Tối ưu: Chỉ select những trường cần thiết cho danh sách
+    const selectFields = '_id name status submittedAt createdAt updatedAt departmentId createdBy';
     
     const [budgets, total] = await Promise.all([
       EventBudgetPlan.find(filter)
@@ -1273,7 +1249,6 @@ export const getAllBudgetsForDepartment = async (req, res) => {
         name: budget.name || 'Budget Ban',
         creatorName: budget.createdBy?.fullName || budget.createdBy?.name || null,
         status: budget.status,
-        isPublic: budget.isPublic || false,
         totalCost: totalCost,
         totalItems: budgetItems.length,
         submittedAt: budget.submittedAt || budget.createdAt,
@@ -1313,46 +1288,9 @@ export const getAllBudgetsForEvent = async (req, res) => {
     await ensureEventExists(eventId);
 
     const userId = req.user?.userId || req.user?._id || req.user?.id;
-    console.log('[getAllBudgetsForEvent] req.user:', req.user, 'userId:', userId);
-    
-    if (!userId) {
-      console.error('[getAllBudgetsForEvent] No userId found in req.user');
-      return res.status(403).json({ message: 'Bạn cần đăng nhập để xem ngân sách' });
-    }
-    
     const membership = await loadMembership(eventId, userId, 'getAllBudgetsForEvent');
-    console.log('[getAllBudgetsForEvent] userId:', userId, 'eventId:', eventId, 'membership:', membership);
-    
-    let finalMembership = membership;
-    
-    if (!finalMembership) {
-      console.error('[getAllBudgetsForEvent] No membership found for userId:', userId, 'eventId:', eventId);
-      // Thử tìm trực tiếp để debug - kiểm tra cả userId dạng string và ObjectId
-      const EventMember = (await import('../models/eventMember.js')).default;
-      const directCheck1 = await EventMember.findOne({ 
-        eventId: new mongoose.Types.ObjectId(eventId), 
-        userId: new mongoose.Types.ObjectId(userId),
-        status: { $ne: 'deactive' }
-      }).lean();
-      const directCheck2 = await EventMember.findOne({ 
-        eventId: new mongoose.Types.ObjectId(eventId), 
-        userId: userId,
-        status: { $ne: 'deactive' }
-      }).lean();
-      console.log('[getAllBudgetsForEvent] Direct check with ObjectId:', directCheck1);
-      console.log('[getAllBudgetsForEvent] Direct check with string:', directCheck2);
-      
-      // Nếu tìm thấy bằng cách khác, dùng nó
-      finalMembership = directCheck1 || directCheck2;
-      if (!finalMembership) {
-        return res.status(403).json({ message: 'Bạn không phải là thành viên của sự kiện này' });
-      }
-      console.log('[getAllBudgetsForEvent] Found membership via direct check, using it');
-    }
-    
-    const isHoOC = finalMembership?.role === 'HoOC';
-    const membershipDeptId = getIdString(finalMembership?.departmentId);
-    console.log('[getAllBudgetsForEvent] isHoOC:', isHoOC, 'role:', finalMembership?.role);
+    const isHoOC = membership?.role === 'HoOC';
+    const membershipDeptId = getIdString(membership?.departmentId);
 
     // Build filter - HoOC xem tất cả budgets của tất cả departments (KHÔNG bao gồm draft - budgets đã bị thu hồi)
     const filter = {
@@ -1562,7 +1500,7 @@ export const updateCategories = async (req, res) => {
 };
 
 // GET /api/events/:eventId/budgets/statistics
-// Lấy Thống kê chi tiêu cho event
+// Lấy thống kê thu chi cho event
 export const getBudgetStatistics = async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -1854,6 +1792,7 @@ export const sendBudgetToMembers = async (req, res) => {
     }
 
     budget.status = 'sent_to_members';
+    // Note: sentToMembersAt and sentToMembersBy fields are not in schema, removed to prevent errors
 
     budget.audit = budget.audit || [];
     budget.audit.push({
@@ -1920,6 +1859,7 @@ export const updateBudgetVisibility = async (req, res) => {
     }
 
     budget.isPublic = isPublic;
+    // Note: publicAt and publicBy fields are not in schema, removed to prevent errors
 
     budget.audit = budget.audit || [];
     budget.audit.push({
@@ -2012,7 +1952,10 @@ export const assignItem = async (req, res) => {
     } catch (e) {
       searchItemId = String(itemId).trim();
     }
-
+    
+    console.log('Searching for itemId:', searchItemId);
+    console.log('Budget items count:', budget.items?.length || 0);
+    
     const itemIndex = budget.items.findIndex(it => {
       if (!it.itemId) return false;
       
@@ -2038,12 +1981,29 @@ export const assignItem = async (req, res) => {
         console.warn('Error converting itemId:', e);
         itItemId = String(it.itemId);
       }
-
+      
       const match = itItemId && String(itItemId).trim() === searchItemId;
+      if (match) {
+        console.log('Found matching item:', { itemId: itItemId, name: it.name });
+      }
       return match;
     });
 
     if (itemIndex === -1) {
+      console.error('Item not found. Searching for itemId:', searchItemId);
+      console.error('Available itemIds:', budget.items.map((it, idx) => {
+        let id = 'null';
+        try {
+          if (it.itemId instanceof mongoose.Types.ObjectId) {
+            id = it.itemId.toString();
+          } else if (it.itemId) {
+            id = String(it.itemId);
+          }
+        } catch (e) {
+          id = 'error';
+        }
+        return { index: idx, itemId: id, name: it.name };
+      }));
       return res.status(404).json({ 
         message: 'Item not found in budget',
         searchedItemId: searchItemId,
@@ -2061,6 +2021,7 @@ export const assignItem = async (req, res) => {
     }
 
     const item = budget.items[itemIndex];
+    console.log('Found item at index:', itemIndex, 'Item name:', item.name);
 
     // Validate memberId if provided (null/empty string is allowed to unassign)
     let memberIdObj = null;
@@ -2119,9 +2080,18 @@ export const assignItem = async (req, res) => {
       
       // Mark items array as modified
       budget.markModified('items');
+      
+      console.log('Updating item:', {
+        itemIndex,
+        itemName: item.name,
+        itemId: searchItemId,
+        assignedTo: memberIdObj ? memberIdObj.toString() : 'null',
+        assignedBy: userIdObj.toString()
+      });
 
       // Save the budget
       const savedBudget = await budget.save();
+      console.log('Assignment saved successfully');
 
       // Send notification to assigned member if memberIdObj is provided
       if (memberIdObj) {

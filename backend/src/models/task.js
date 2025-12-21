@@ -22,6 +22,7 @@ const TaskSchema = new Schema({
   assigneeId:   { type: Types.ObjectId, ref: 'EventMember' },
   eventId:      { type: Types.ObjectId, ref: 'Event' },       // (O) như ERD
   departmentId: { type: Types.ObjectId, ref: 'Department' },  // (O)
+  departmentName: { type: String }, // Lưu tên ban để giữ nguyên khi ban bị xóa (chủ yếu cho epic tasks)
   milestoneId:  { type: Types.ObjectId, ref: 'Milestone' },
   parentId:     { type: Types.ObjectId, ref: 'Task' }, // Cho normal task: parentId = epicTaskId
   dependencies: [{ type: Types.ObjectId, ref: 'Task' }],
