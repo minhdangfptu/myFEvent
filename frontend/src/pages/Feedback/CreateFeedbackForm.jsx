@@ -50,11 +50,17 @@ export default function CreateFeedbackForm() {
 
   const clampToFuture = (value) => {
     if (!value) return currentMinDate;
-    const date = new Date(value);
-    const minDate = new Date(currentMinDate);
-    minDate.setHours(0, 0, 0, 0);
+    // Parse date string theo local timezone (giống parseLocalDate)
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     date.setHours(0, 0, 0, 0);
-    if (date < minDate) {
+    
+    // Tạo ngày hiện tại theo local timezone
+    const today = new Date();
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    todayLocal.setHours(0, 0, 0, 0);
+    
+    if (date.getTime() < todayLocal.getTime()) {
       toast.info('Ngày mở không được trước hiện tại, đã tự động điều chỉnh.');
       return currentMinDate;
     }
@@ -404,12 +410,13 @@ export default function CreateFeedbackForm() {
     }
 
     // Parse date string (YYYY-MM-DD) in local timezone
-    const parseLocalDate = (dateString) => {
-      const [year, month, day] = dateString.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      date.setHours(0, 0, 0, 0);
-      return date;
-    };
+  const parseLocalDate = (dateString) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setHours(0, 0, 0, 0);
+    date.setMilliseconds(0);
+    return date;
+  };
 
     // If only updating closeTime for published form - simplified validation
     if (canEditCloseTime) {
@@ -439,11 +446,16 @@ export default function CreateFeedbackForm() {
       }
 
       // Parse dates properly to avoid timezone issues
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
+      // Tạo ngày hiện tại theo local timezone (chỉ lấy ngày, không có giờ)
+      const today = new Date();
+      const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      todayLocal.setHours(0, 0, 0, 0);
+      todayLocal.setMilliseconds(0);
 
       const openTimeDate = parseLocalDate(formData.openTime);
+      openTimeDate.setMilliseconds(0);
       const closeTimeDate = parseLocalDate(formData.closeTime);
+      closeTimeDate.setMilliseconds(0);
 
       // So sánh ngày (không so sánh giờ)
       if (openTimeDate.getTime() >= closeTimeDate.getTime()) {
@@ -452,7 +464,9 @@ export default function CreateFeedbackForm() {
       }
 
       // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
-      if (openTimeDate.getTime() < now.getTime()) {
+      // So sánh timestamp để đảm bảo chính xác
+      // Sử dụng <= thay vì < để cho phép ngày hiện tại
+      if (openTimeDate.getTime() < todayLocal.getTime()) {
         toast.error('Ngày mở phải ở hiện tại hoặc tương lai');
         return;
       }
@@ -461,13 +475,14 @@ export default function CreateFeedbackForm() {
       // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
       // So sánh bằng cách so sánh timestamp của ngày (không có giờ)
       const openTimeTimestamp = openTimeDate.getTime();
-      const nowTimestamp = now.getTime();
+      const nowTimestamp = todayLocal.getTime();
 
       if (openTimeTimestamp === nowTimestamp) {
-        // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
-        const tomorrow = new Date(now);
+        // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi (cho phép bằng ngày mai)
+        const tomorrow = new Date(todayLocal);
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(0, 0, 0, 0);
+        tomorrow.setMilliseconds(0);
         const tomorrowTimestamp = tomorrow.getTime();
 
         if (closeTimeDate.getTime() < tomorrowTimestamp) {

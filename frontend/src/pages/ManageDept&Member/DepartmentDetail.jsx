@@ -982,89 +982,103 @@ const DepartmentDetail = () => {
               <div className="d-flex flex-column gap-4 h-100">
                 {/* Department Leader */}
                 <div className="bg-light rounded-3 p-4">
-                  <h5
-                    style={{
-                      color: "#1f2937",
-                      fontWeight: "600",
-                      marginBottom: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8
-                    }}
-                  >
-                    <Users size={18} />
-                    Trưởng ban
-                  </h5>
-                  <div className="d-flex align-items-center mb-3">
-                    <div
-                      className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                      style={{
-                        width: "60px",
-                        height: "60px",
-                        backgroundColor: "#f3f4f6",
-                        fontSize: "1.5rem",
-                        fontWeight: "600",
-                        color: "#6b7280",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {department.leader ? (
-                        <img
-                          src={getLeaderAvatar(department.leader)}
-                          alt={getLeaderDisplayName(department.leader)}
-                          className="rounded-circle"
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            const displayName = department.leader.fullName || department.leader.name || department.leader.email || 'User';
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`;
-                          }}
-                        />
-                      ) : (
-                        "?"
-                      )}
-                    </div>
-                    <div className="flex-grow-1">
-                      <div className="fw-semibold">
-                        {getLeaderDisplayName(department.leader)}
-                      </div>
-                      <div className="small text-muted">
-                        {department.leader?.email || ""}
-                      </div>
-                    </div>
-                  </div>
+                  {(() => {
+                    // Xác định trưởng ban thực tế từ danh sách members
+                    const hodMember = members.find(m => m.role === 'HoD');
+                    const effectiveLeader = hodMember
+                      ? (hodMember.userId && typeof hodMember.userId === 'object'
+                          ? hodMember.userId
+                          : hodMember)
+                      : null;
 
-                  {eventRole === 'HoOC' && (
-                    department.leader ? (
-                      <button
-                        className="btn btn-outline-danger d-flex align-items-center"
-                        style={{ borderRadius: "8px", fontWeight: "400" }}
-                        onClick={() => setShowChangeLeaderModal(true)}
-                        disabled={changingLeader}
-                      >
-                        {changingLeader ? (
-                          <RotateCw size={16} className="me-2 spin-animation" />
-                        ) : (
-                          <RotateCw size={16} className="me-2" />
+                    return (
+                      <>
+                        <h5
+                          style={{
+                            color: "#1f2937",
+                            fontWeight: "600",
+                            marginBottom: "20px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8
+                          }}
+                        >
+                          <Users size={18} />
+                          Trưởng ban
+                        </h5>
+                        <div className="d-flex align-items-center mb-3">
+                          <div
+                            className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                            style={{
+                              width: "60px",
+                              height: "60px",
+                              backgroundColor: "#f3f4f6",
+                              fontSize: "1.5rem",
+                              fontWeight: "600",
+                              color: "#6b7280",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {effectiveLeader ? (
+                              <img
+                                src={getLeaderAvatar(effectiveLeader)}
+                                alt={getLeaderDisplayName(effectiveLeader)}
+                                className="rounded-circle"
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  const displayName = getLeaderDisplayName(effectiveLeader);
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&size=60`;
+                                }}
+                              />
+                            ) : (
+                              "?"
+                            )}
+                          </div>
+                          <div className="flex-grow-1">
+                            <div className="fw-semibold">
+                              {getLeaderDisplayName(effectiveLeader)}
+                            </div>
+                            <div className="small text-muted">
+                              {effectiveLeader?.email || ""}
+                            </div>
+                          </div>
+                        </div>
+
+                        {eventRole === 'HoOC' && (
+                          effectiveLeader ? (
+                            <button
+                              className="btn btn-outline-danger d-flex align-items-center"
+                              style={{ borderRadius: "8px", fontWeight: "400" }}
+                              onClick={() => setShowChangeLeaderModal(true)}
+                              disabled={changingLeader}
+                            >
+                              {changingLeader ? (
+                                <RotateCw size={16} className="me-2 spin-animation" />
+                              ) : (
+                                <RotateCw size={16} className="me-2" />
+                              )}
+                              {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-success d-flex align-items-center"
+                              style={{ borderRadius: "8px", fontWeight: "400" }}
+                              onClick={openAssignLeaderModal}
+                              disabled={assigningLeader}
+                            >
+                              {assigningLeader ? (
+                                <RotateCw size={16} className="me-2 spin-animation" />
+                              ) : (
+                                <Users size={16} className="me-2" />
+                              )}
+                              {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
+                            </button>
+                          )
                         )}
-                        {changingLeader ? "Đang đổi..." : "Đổi trưởng ban"}
-                      </button>
-                    ) : (
-                      <button
-                        className="btn btn-success d-flex align-items-center"
-                        style={{ borderRadius: "8px", fontWeight: "400" }}
-                        onClick={openAssignLeaderModal}
-                        disabled={assigningLeader}
-                      >
-                        {assigningLeader ? (
-                          <RotateCw size={16} className="me-2 spin-animation" />
-                        ) : (
-                          <Users size={16} className="me-2" />
-                        )}
-                        {assigningLeader ? "Đang gán..." : "Gán trưởng ban"}
-                      </button>
-                    )
-                  )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Delete Department - Only HoOC can see this */}

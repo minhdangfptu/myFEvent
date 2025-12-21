@@ -221,6 +221,42 @@ export const removeItemFromAgenda = async (milestoneId, dateIndex, itemIndex) =>
     return agendaDoc.toObject();
 }
 
+// Xóa item khỏi agenda (by itemId - more reliable than index)
+export const removeItemFromAgendaById = async (milestoneId, dateIndex, itemId) => {
+    // validateRole(userRole);
+    
+    const agendaDoc = await Agenda.findOne({ milestoneId });
+    if (!agendaDoc || !agendaDoc.agenda[dateIndex]) {
+        throw new Error('Date not found in agenda');
+    }
+    
+    // Sort items first (same as getAgendaByMilestoneId)
+    if (agendaDoc.agenda[dateIndex].items && agendaDoc.agenda[dateIndex].items.length > 0) {
+        agendaDoc.agenda[dateIndex].items.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    }
+    
+    // Find item by itemId (convert to string for comparison)
+    const itemIdStr = String(itemId);
+    const itemIndex = agendaDoc.agenda[dateIndex].items.findIndex(
+        item => String(item._id) === itemIdStr
+    );
+    
+    if (itemIndex === -1) {
+        throw new Error('Item not found in agenda');
+    }
+    
+    // Remove the item
+    agendaDoc.agenda[dateIndex].items.splice(itemIndex, 1);
+    
+    // Nếu date không còn item nào, xóa luôn date đó
+    if (agendaDoc.agenda[dateIndex].items.length === 0) {
+        agendaDoc.agenda.splice(dateIndex, 1);
+    }
+    
+    await agendaDoc.save();
+    return agendaDoc.toObject();
+}
+
 
 // Update một item cụ thể (by index)
 export const updateItemInAgenda = async (milestoneId, dateIndex, itemIndex, updates) => {

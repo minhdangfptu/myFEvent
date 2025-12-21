@@ -243,6 +243,18 @@ export default function ManageFeedbackEventPage() {
                           <i className="bi bi-calendar"></i>
                           <span>Tạo ngày {formatDate(form.createdAt)}</span>
                         </div>
+                        {form.openTime && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '14px' }}>
+                            <i className="bi bi-calendar-check"></i>
+                            <span>Mở: {formatDate(form.openTime)}</span>
+                          </div>
+                        )}
+                        {form.closeTime && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '14px' }}>
+                            <i className="bi bi-calendar-x"></i>
+                            <span>Kết thúc: {formatDate(form.closeTime)}</span>
+                          </div>
+                        )}
                         {getStatusBadge(form.status)}
                       </div>
                     </div>

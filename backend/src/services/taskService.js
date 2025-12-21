@@ -275,11 +275,21 @@ export const createTaskService = async ({ eventId, userId, member, body }) => {
     throw makeError('Dữ liệu không hợp lệ', 400, { errors });
   }
 
+  // Lấy tên ban để lưu vào departmentName (chủ yếu cho epic tasks)
+  let departmentNameToSave = null;
+  if (finalDepartmentId) {
+    const dept = departmentDoc || await Department.findOne({ _id: finalDepartmentId, eventId }).select('name').lean();
+    if (dept && dept.name) {
+      departmentNameToSave = dept.name;
+    }
+  }
+
   const task = await Task.create({
     title,
     description,
     eventId,
     departmentId: finalDepartmentId,
+    departmentName: departmentNameToSave || undefined, // Lưu tên ban để giữ nguyên khi ban bị xóa
     taskType: normalizedTaskType,
     status: TASK_STATUSES.NOT_STARTED, // Luôn bắt đầu với trạng thái "Chưa bắt đầu"
     assigneeId: isEpic ? undefined : assigneeId || undefined,
@@ -371,25 +381,31 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
   // Validation startDate
   if (update.startDate) {
     const taskStartDate = new Date(update.startDate);
-    const now = new Date();
+    
+    // Kiểm tra Date hợp lệ
+    if (isNaN(taskStartDate.getTime())) {
+      errors.push('Thời gian bắt đầu không hợp lệ');
+    } else {
+      const now = new Date();
 
-    // Chỉ validate thời gian phải sau hiện tại nếu thời gian đã thay đổi
-    const isStartDateChanged = !currentTask.startDate ||
-      new Date(currentTask.startDate).getTime() !== taskStartDate.getTime();
+      // Chỉ validate thời gian phải sau hiện tại nếu thời gian đã thay đổi
+      const isStartDateChanged = !currentTask.startDate ||
+        (currentTask.startDate && new Date(currentTask.startDate).getTime() !== taskStartDate.getTime());
 
-    if (isStartDateChanged && taskStartDate <= now) {
-      errors.push('Thời gian bắt đầu phải sau thời điểm hiện tại');
-    }
+      if (isStartDateChanged && taskStartDate <= now) {
+        errors.push('Thời gian bắt đầu phải sau thời điểm hiện tại');
+      }
 
-    if (event) {
-      if (event.createdAt) {
-        const eventCreated = new Date(event.createdAt);
-        if (taskStartDate < eventCreated) {
-          errors.push(
-            `Thời gian bắt đầu phải sau hoặc bằng thời gian tạo sự kiện (${eventCreated.toLocaleString(
-              'vi-VN'
-            )})`
-          );
+      if (event) {
+        if (event.createdAt) {
+          const eventCreated = new Date(event.createdAt);
+          if (taskStartDate < eventCreated) {
+            errors.push(
+              `Thời gian bắt đầu phải sau hoặc bằng thời gian tạo sự kiện (${eventCreated.toLocaleString(
+                'vi-VN'
+              )})`
+            );
+          }
         }
       }
     }
@@ -398,46 +414,63 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
   // Validation dueDate
   if (update.dueDate) {
     const taskDueDate = new Date(update.dueDate);
-    const now = new Date();
+    
+    // Kiểm tra Date hợp lệ
+    if (isNaN(taskDueDate.getTime())) {
+      errors.push('Deadline không hợp lệ');
+    } else {
+      const now = new Date();
 
-    // Chỉ validate thời gian phải sau hiện tại nếu thời gian đã thay đổi
-    const isDueDateChanged = !currentTask.dueDate ||
-      new Date(currentTask.dueDate).getTime() !== taskDueDate.getTime();
+      // Chỉ validate thời gian phải sau hiện tại nếu thời gian đã thay đổi
+      const isDueDateChanged = !currentTask.dueDate ||
+        (currentTask.dueDate && new Date(currentTask.dueDate).getTime() !== taskDueDate.getTime());
 
-    if (isDueDateChanged && taskDueDate <= now) {
-      errors.push('Deadline phải sau thời điểm hiện tại');
-    }
+      if (isDueDateChanged && taskDueDate <= now) {
+        errors.push('Deadline phải sau thời điểm hiện tại');
+      }
 
-    if (event) {
-      if (event.createdAt) {
-        const eventCreated = new Date(event.createdAt);
-        if (taskDueDate < eventCreated) {
-          errors.push(
-            `Deadline phải sau hoặc bằng thời gian tạo sự kiện (${eventCreated.toLocaleString(
-              'vi-VN'
-            )})`
-          );
+      if (event) {
+        if (event.createdAt) {
+          const eventCreated = new Date(event.createdAt);
+          if (taskDueDate < eventCreated) {
+            errors.push(
+              `Deadline phải sau hoặc bằng thời gian tạo sự kiện (${eventCreated.toLocaleString(
+                'vi-VN'
+              )})`
+            );
+          }
         }
       }
     }
   }
 
   // Kiểm tra startDate < dueDate
-  const taskForValidation = update.startDate || update.dueDate ? currentTask : null;
+  // Chỉ validate nếu cả startDate và dueDate đều có giá trị hợp lệ
   const finalStartDate = update.startDate
     ? new Date(update.startDate)
-    : taskForValidation?.startDate
-    ? new Date(taskForValidation.startDate)
+    : currentTask?.startDate
+    ? new Date(currentTask.startDate)
     : null;
   const finalDueDate = update.dueDate
     ? new Date(update.dueDate)
-    : taskForValidation?.dueDate
-    ? new Date(taskForValidation.dueDate)
+    : currentTask?.dueDate
+    ? new Date(currentTask.dueDate)
     : null;
 
-  if (finalStartDate && finalDueDate && finalStartDate >= finalDueDate) {
-    errors.push('Thời gian bắt đầu phải trước deadline');
+  // Chỉ validate nếu cả hai đều có giá trị và là Date hợp lệ
+  if (finalStartDate && finalDueDate && !isNaN(finalStartDate.getTime()) && !isNaN(finalDueDate.getTime())) {
+    if (finalStartDate >= finalDueDate) {
+      errors.push('Thời gian bắt đầu phải trước deadline');
+    }
   }
+
+  // Validate và normalize milestoneId trước khi query
+  const milestoneIdValue = update.milestoneId;
+  const isValidMilestoneId = milestoneIdValue && 
+    typeof milestoneIdValue === 'string' && 
+    milestoneIdValue.trim() !== '' && 
+    milestoneIdValue !== 'Chưa có' &&
+    mongoose.Types.ObjectId.isValid(milestoneIdValue);
 
   const [deptDoc, assigneeDoc, milestoneOk, parentDoc, depFound] = await Promise.all([
     update.departmentId ? Department.findOne({ _id: update.departmentId, eventId }).lean() : null,
@@ -450,7 +483,7 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
           .select('departmentId')
           .lean()
       : null,
-    update.milestoneId ? Milestone.exists({ _id: update.milestoneId, eventId }) : Promise.resolve(true),
+    isValidMilestoneId ? Milestone.exists({ _id: milestoneIdValue, eventId }) : Promise.resolve(true),
     update.parentId ? Task.findOne({ _id: update.parentId, eventId }).lean() : null,
     deps.length
       ? Task.find({ _id: { $in: deps }, eventId })
@@ -461,7 +494,13 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
 
   if (update.departmentId && !deptDoc) errors.push('departmentId không tồn tại trong event này');
   if (update.assigneeId && !assigneeDoc) errors.push('assigneeId không tồn tại trong event này');
-  if (!milestoneOk) errors.push('milestoneId không tồn tại trong event này');
+  // Chỉ validate milestone nếu có giá trị hợp lệ
+  if (isValidMilestoneId && !milestoneOk) {
+    errors.push('milestoneId không tồn tại trong event này');
+  } else if (milestoneIdValue && !isValidMilestoneId) {
+    // Nếu có giá trị nhưng không hợp lệ (empty string, "Chưa có", hoặc không phải ObjectId)
+    errors.push('milestoneId không hợp lệ');
+  }
   if (update.parentId && !parentDoc) errors.push('parentId không tồn tại trong event này');
 
   if (assigneeDoc && targetDepartmentId) {
@@ -501,6 +540,27 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
 
   if (errors.length) {
     throw makeError('Tham chiếu không hợp lệ', 400, { errors });
+  }
+
+  // Normalize milestoneId: nếu không hợp lệ hoặc empty, set thành null
+  if (update.milestoneId !== undefined) {
+    if (isValidMilestoneId) {
+      update.milestoneId = milestoneIdValue;
+    } else {
+      // Nếu là empty string, "Chưa có", hoặc không hợp lệ, set thành null
+      update.milestoneId = null;
+    }
+  }
+
+  // Nếu cập nhật departmentId, cập nhật luôn departmentName
+  if (update.departmentId) {
+    const dept = deptDoc || await Department.findOne({ _id: update.departmentId, eventId }).select('name').lean();
+    if (dept && dept.name) {
+      update.departmentName = dept.name;
+    } else {
+      // Nếu không tìm thấy department (có thể đã bị xóa), giữ nguyên departmentName cũ
+      // Không set update.departmentName để giữ nguyên giá trị cũ
+    }
   }
 
   const result = await Task.findOneAndUpdate(

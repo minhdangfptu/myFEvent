@@ -174,16 +174,32 @@ export const feedbackService = {
       if (!dateString) return null;
       // If dateString is already a Date object, convert to string first
       let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
-      // Extract date part from ISO string (YYYY-MM-DD)
-      dateStr = dateStr.split('T')[0];
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const localDate = new Date(year, month - 1, day);
-      localDate.setHours(0, 0, 0, 0);
-      return localDate;
+      
+      // Handle ISO string (e.g., "2025-12-21T00:00:00.000Z" or "2025-12-20T17:00:00.000Z")
+      // For ISO strings, we need to parse the UTC date and convert to local
+      if (dateStr.includes('T') && (dateStr.includes('Z') || dateStr.includes('+'))) {
+        // ISO string with timezone - parse as UTC first, then get local date
+        const utcDate = new Date(dateStr);
+        const localDate = new Date(utcDate.getFullYear(), utcDate.getMonth(), utcDate.getDate());
+        localDate.setHours(0, 0, 0, 0);
+        localDate.setMilliseconds(0);
+        return localDate;
+      } else {
+        // Simple date string (YYYY-MM-DD) - parse directly
+        dateStr = dateStr.split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        localDate.setHours(0, 0, 0, 0);
+        localDate.setMilliseconds(0);
+        return localDate;
+      }
     };
     
-    const nowDateOnly = new Date(now);
+    // Tạo ngày hiện tại theo local timezone (giống parseLocalDate)
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     nowDateOnly.setHours(0, 0, 0, 0);
+    nowDateOnly.setMilliseconds(0);
+    
     const openTimeDateOnly = parseLocalDate(openTime);
     const closeTimeDateOnly = parseLocalDate(closeTime);
     
@@ -192,6 +208,9 @@ export const feedbackService = {
       err.status = 400;
       throw err;
     }
+    
+    // Đảm bảo cả hai đều có milliseconds = 0 để so sánh chính xác
+    openTimeDateOnly.setMilliseconds(0);
     
     // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
     // So sánh timestamp để tránh vấn đề timezone
@@ -202,14 +221,16 @@ export const feedbackService = {
     }
     
     // Ngày đóng phải sau ngày mở
-    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+    // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi (cho phép bằng ngày mai)
     // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
     if (openTimeDateOnly.getTime() === nowDateOnly.getTime()) {
-      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+      // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi (>= ngày mai)
       const tomorrow = new Date(nowDateOnly);
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0);
-      if (closeTimeDateOnly.getTime() <= tomorrow.getTime()) {
+      tomorrow.setMilliseconds(0);
+      closeTimeDateOnly.setMilliseconds(0);
+      if (closeTimeDateOnly.getTime() < tomorrow.getTime()) {
         const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
         err.status = 400;
         throw err;
@@ -308,16 +329,31 @@ export const feedbackService = {
       if (!dateString) return null;
       // If dateString is already a Date object, convert to string first
       let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
-      // Extract date part from ISO string (YYYY-MM-DD)
-      dateStr = dateStr.split('T')[0];
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const localDate = new Date(year, month - 1, day);
-      localDate.setHours(0, 0, 0, 0);
-      return localDate;
+      
+      // Handle ISO string (e.g., "2025-12-21T00:00:00.000Z" or "2025-12-20T17:00:00.000Z")
+      // For ISO strings, we need to parse the UTC date and convert to local
+      if (dateStr.includes('T') && (dateStr.includes('Z') || dateStr.includes('+'))) {
+        // ISO string with timezone - parse as UTC first, then get local date
+        const utcDate = new Date(dateStr);
+        const localDate = new Date(utcDate.getFullYear(), utcDate.getMonth(), utcDate.getDate());
+        localDate.setHours(0, 0, 0, 0);
+        localDate.setMilliseconds(0);
+        return localDate;
+      } else {
+        // Simple date string (YYYY-MM-DD) - parse directly
+        dateStr = dateStr.split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        localDate.setHours(0, 0, 0, 0);
+        localDate.setMilliseconds(0);
+        return localDate;
+      }
     };
     
-    const nowDateOnly = new Date(now);
+    // Tạo ngày hiện tại theo local timezone (giống parseLocalDate)
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     nowDateOnly.setHours(0, 0, 0, 0);
+    nowDateOnly.setMilliseconds(0);
     
     // Get next openTime and closeTime (either from body or keep existing)
     const nextOpenTime = openTime !== undefined ? openTime : form.openTime;
@@ -332,6 +368,10 @@ export const feedbackService = {
       err.status = 400;
       throw err;
     }
+
+    // Đảm bảo cả hai đều có milliseconds = 0 để so sánh chính xác
+    nextOpenTimeDateOnly.setMilliseconds(0);
+    nextCloseTimeDateOnly.setMilliseconds(0);
 
     // So sánh timestamp để tránh vấn đề timezone
     if (nextOpenTimeDateOnly.getTime() >= nextCloseTimeDateOnly.getTime()) {
@@ -351,14 +391,15 @@ export const feedbackService = {
       }
 
       // Ngày đóng phải sau ngày mở
-      // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi
+      // Nếu ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi (cho phép bằng ngày mai)
       // Nếu ngày mở là tương lai, ngày đóng chỉ cần sau ngày mở
       if (nextOpenTimeDateOnly.getTime() === nowDateOnly.getTime()) {
-        // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi
+        // Ngày mở là hôm nay - ngày đóng phải là ngày mai trở đi (>= ngày mai)
         const tomorrow = new Date(nowDateOnly);
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(0, 0, 0, 0);
-        if (nextCloseTimeDateOnly.getTime() <= tomorrow.getTime()) {
+        tomorrow.setMilliseconds(0);
+        if (nextCloseTimeDateOnly.getTime() < tomorrow.getTime()) {
           const err = new Error('Khi ngày mở là hôm nay, ngày đóng phải là ngày mai trở đi');
           err.status = 400;
           throw err;

@@ -2,6 +2,7 @@
 import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import EventMember from '../models/eventMember.js';
+import Event from '../models/event.js';
 import { config } from '../config/environment.js';
 import { uploadImageIfNeeded } from './cloudinaryService.js';
 
@@ -226,9 +227,15 @@ export const getProfileService = async (userId) => {
     throw err;
   }
 
-  const totalEvents = await EventMember.countDocuments({
+  // Đếm số lượng Event unique và còn tồn tại
+  const eventIds = await EventMember.distinct('eventId', {
     userId,
     status: { $ne: 'deactive' },
+  });
+
+  // Kiểm tra các event có tồn tại trong hệ thống
+  const totalEvents = await Event.countDocuments({
+    _id: { $in: eventIds },
   });
 
   return {
@@ -315,9 +322,15 @@ export const updateProfileService = async (userId, payload) => {
     throw err;
   }
 
-  const totalEvents = await EventMember.countDocuments({
+  // Đếm số lượng Event unique và còn tồn tại
+  const eventIds = await EventMember.distinct('eventId', {
     userId,
     status: { $ne: 'deactive' },
+  });
+
+  // Kiểm tra các event có tồn tại trong hệ thống
+  const totalEvents = await Event.countDocuments({
+    _id: { $in: eventIds },
   });
 
   return {

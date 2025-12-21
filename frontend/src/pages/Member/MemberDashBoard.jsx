@@ -720,7 +720,7 @@ export default function MemberDashBoard() {
                 <div className="card-body p-4" style={{ cursor: "pointer", minHeight: "458px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937", cursor: "pointer" }}>
-                      Lịch họp sắp tới
+                      Lịch trình sắp tới
                     </h6>
                     <span className="text-muted" style={{ fontSize: "14px" }}>
                       Tháng {new Date().getMonth() + 1}

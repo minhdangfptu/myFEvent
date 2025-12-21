@@ -6,6 +6,7 @@ import calendarService from "../../services/calendarService"
 import { taskApi } from "../../apis/taskApi"
 import { budgetApi } from "../../apis/budgetApi"
 import { milestoneService } from "../../services/milestoneService"
+import { departmentApi } from "../../apis/departmentApi"
 import Loading from "../../components/Loading"
 import DashboardSkeleton from "../../components/DashboardSkeleton"
 import { formatDate } from "../../utils/formatDate"
@@ -189,7 +190,12 @@ export default function HoOCDashBoard() {
         const memberCount = data?.stats?.members?.total || 0
         setMembers(Array(memberCount).fill({ _id: 'placeholder' }))
 
-        // Map departments (use topDepartments + stats)
+        // Save total departments for stats card
+        if (data?.stats?.departments?.total != null) {
+          setDepartmentTotal(data.stats.departments.total)
+        }
+
+        // Map departments (use topDepartments temporarily, will be replaced by all departments)
         if (data?.highlights?.topDepartments) {
           const depts = data.highlights.topDepartments.map(d => ({
             _id: d.id,
@@ -200,11 +206,6 @@ export default function HoOCDashBoard() {
             spent: data.stats?.budget?.spent || 0
           }))
           setDepartments(depts)
-        }
-
-        // Save total departments for stats card
-        if (data?.stats?.departments?.total != null) {
-          setDepartmentTotal(data.stats.departments.total)
         }
 
         // Show dashboard immediately
@@ -299,6 +300,33 @@ export default function HoOCDashBoard() {
             .catch(err => {
               if (!cancelled) {
                 console.error("Error loading budget statistics:", err)
+              }
+            })
+
+          // Fetch all departments to show complete list
+          departmentApi.getDepartments(eventId, 1, 100)
+            .then(deptResponse => {
+              if (!cancelled) {
+                const deptData = unwrapApiData(deptResponse)
+                const deptArray = Array.isArray(deptData) ? deptData : (deptData?.data || deptData?.departments || deptData?.items || [])
+                
+                // Map all departments with their data
+                const allDepts = deptArray.map(dept => ({
+                  _id: dept._id || dept.id,
+                  name: dept.name || "Ban chưa đặt tên",
+                  progress: dept.progress || dept.progressPercent || dept.progressPercentage || dept.completionRate || 0,
+                  budget: dept.budget || dept.allocatedBudget || dept.totalBudget || dept.planBudget || 0,
+                  spent: dept.spent || dept.budgetSpent || dept.actualBudget || dept.actualSpending || 0
+                }))
+
+                if (!cancelled) {
+                  setDepartments(allDepts)
+                }
+              }
+            })
+            .catch(err => {
+              if (!cancelled) {
+                console.error("Error loading departments:", err)
               }
             })
         }
@@ -627,7 +655,7 @@ export default function HoOCDashBoard() {
                     {totalDepartments}
                   </div>
                   <div className="text-muted" style={{ fontSize: "13px" }}>
-                    Ban tổ chức
+                    Ban sự kiện
                   </div>
                 </div>
               </div>
@@ -755,13 +783,15 @@ export default function HoOCDashBoard() {
             {/* Progress Section */}
             <div className="col-12 col-lg-6">
               <div className="card shadow-sm border-0 rounded-3" style={{ height: "100%" }}>
-                <div className="card-body p-4" style={{ minHeight: "320px" }}>
+                <div className="card-body p-4" style={{ minHeight: "320px", display: "flex", flexDirection: "column" }}>
                   <h6 className="fw-semibold mb-4" style={{ fontSize: "16px", color: "#1f2937" }}>
                     Tiến độ của các ban
                   </h6>
 
+                  <div style={{ flex: 1, overflowY: "auto", maxHeight: "240px", paddingRight: "8px" }}>
                   {(() => {
-                    // Calculate progress for each department based on epic tasks
+                    // Calculate progress for each department
+                    // Use department's own progress if available, otherwise calculate from epic tasks
                     const departmentProgress = departments.map(dept => {
                       const deptId = dept?._id || dept?.id
                       if (!deptId) return null
@@ -778,9 +808,13 @@ export default function HoOCDashBoard() {
                         return isCompletedStatus(status)
                       }).length
 
-                      const progressPercent = totalEpicTasks > 0
-                        ? Math.round((completedEpicTasks / totalEpicTasks) * 100)
-                        : 0
+                      // Use department's progress if available, otherwise calculate from epic tasks
+                      const deptProgress = typeof dept?.progress === "number" ? dept.progress : null
+                      const progressPercent = deptProgress !== null
+                        ? Math.max(0, Math.min(100, Math.round(deptProgress)))
+                        : (totalEpicTasks > 0
+                          ? Math.round((completedEpicTasks / totalEpicTasks) * 100)
+                          : 0)
 
                       return {
                         departmentId: deptId,
@@ -792,7 +826,7 @@ export default function HoOCDashBoard() {
                     }).filter(Boolean)
 
                     if (departmentProgress.length > 0) {
-                      return departmentProgress.slice(0, 2).map((dept, index) => (
+                      return departmentProgress.map((dept, index) => (
                         <div key={dept.departmentId || index} className={index !== departmentProgress.length - 1 ? "mb-4" : ""}>
                           <div className="d-flex justify-content-between align-items-center mb-2">
                             <div className="d-flex align-items-center">
@@ -839,6 +873,7 @@ export default function HoOCDashBoard() {
                       )
                     }
                   })()}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1049,7 +1084,7 @@ export default function HoOCDashBoard() {
                 <div className="card-body p-4" style={{ cursor: "pointer", minHeight: "458px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
-                      Lịch họp sắp tới
+                      Lịch trình sắp tới
                     </h6>
                     <span className="text-muted" style={{ fontSize: "14px" }}>
                       Tháng {new Date().getMonth() + 1}

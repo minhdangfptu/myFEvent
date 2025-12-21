@@ -307,17 +307,38 @@ export default function HoDDashBoard() {
 
   // Calculate stats
   const totalMembers = members.length
-  const totalTasks = tasks.length
-  const completedTasks = useMemo(
-    () => tasks.filter((t) => isCompletedStatus(t?.status)).length,
+  
+  // Tách riêng normal tasks và epic tasks
+  const normalTasks = useMemo(
+    () => tasks.filter((t) => {
+      const taskType = String(t?.taskType || "").toLowerCase()
+      return taskType === "normal" || !!t?.parentId
+    }),
     [tasks]
   )
-  const completedTasksPercent = totalTasks > 0
-    ? Math.round((completedTasks / totalTasks) * 100)
+  
+  const epicTasks = useMemo(
+    () => tasks.filter((t) => {
+      const taskType = String(t?.taskType || "").toLowerCase()
+      return taskType === "epic" && !t?.parentId
+    }),
+    [tasks]
+  )
+  
+  const totalNormalTasks = normalTasks.length
+  const totalEpicTasks = epicTasks.length
+  const totalTasks = tasks.length // Giữ lại để tương thích với code cũ
+  
+  const completedTasks = useMemo(
+    () => normalTasks.filter((t) => isCompletedStatus(t?.status)).length,
+    [normalTasks]
+  )
+  const completedTasksPercent = totalNormalTasks > 0
+    ? Math.round((completedTasks / totalNormalTasks) * 100)
     : 0
   const overdueTasks = useMemo(
-    () => tasks.filter((t) => isOverdue(t)).length,
-    [tasks]
+    () => normalTasks.filter((t) => isOverdue(t)).length,
+    [normalTasks]
   )
 
   // Major tasks (only epic/parent tasks)
@@ -593,7 +614,7 @@ export default function HoDDashBoard() {
 
           {/* Stats Cards */}
           <div className="row g-4 mb-4">
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col" style={{ flex: '0 0 20%', maxWidth: '20%' }}>
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -613,13 +634,13 @@ export default function HoDDashBoard() {
                     {totalMembers}
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
-                    Số thành viên
+                    Số thành viên trong ban
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col" style={{ flex: '0 0 20%', maxWidth: '20%' }}>
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -636,7 +657,7 @@ export default function HoDDashBoard() {
                     </div>
                   </div>
                   <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
-                    {totalTasks}
+                    {totalNormalTasks}
                   </div>
                   <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
                     Tổng số công việc
@@ -645,7 +666,33 @@ export default function HoDDashBoard() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col" style={{ flex: '0 0 20%', maxWidth: '20%' }}>
+              <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+                <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-3"
+                      style={{
+                        width: "56px",
+                        height: "56px",
+                        backgroundColor: "#fef3c7",
+                        fontSize: "24px",
+                      }}
+                    >
+                      <Goal style={{ color: "#f59e0b" }} />
+                    </div>
+                  </div>
+                  <div className="fw-bold mb-1" style={{ fontSize: "36px", color: "#1f2937", lineHeight: "1" }}>
+                    {totalEpicTasks}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "14px", fontWeight: "500" }}>
+                    Tổng số công việc lớn
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col" style={{ flex: '0 0 20%', maxWidth: '20%' }}>
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -671,7 +718,7 @@ export default function HoDDashBoard() {
               </div>
             </div>
 
-            <div className="col-12 col-sm-6 col-md-6 col-lg-3">
+            <div className="col" style={{ flex: '0 0 20%', maxWidth: '20%' }}>
               <div className="card shadow-sm border-0 rounded-4" style={{ transition: "transform 0.2s ease", cursor: "default", height: "100%" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="card-body p-4" style={{ minHeight: "160px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div className="d-flex justify-content-between align-items-center mb-3">
@@ -842,7 +889,7 @@ export default function HoDDashBoard() {
                 <div className="card-body p-4" style={{ cursor: "pointer", minHeight: "458px", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={() => navigate(`/events/${eventId}/my-calendar`)}>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h6 className="fw-semibold mb-0" style={{ fontSize: "16px", color: "#1f2937" }}>
-                      Lịch họp sắp tới
+                      Lịch trình sắp tới
                     </h6>
                     <span className="text-muted" style={{ fontSize: "14px" }}>
                       Tháng {new Date().getMonth() + 1}

@@ -314,14 +314,14 @@ export const updateDayItem = async (req, res) => {
     }
 };
 
-// Xóa item khỏi agenda (by index)
+// Xóa item khỏi agenda (by index, but verify by itemId if provided)
 export const removeDayItem = async (req, res) => {
     try {
         const validationError = handleValidationErrors(req, res);
         if (validationError) return validationError;
 
         const { milestoneId } = req.params;
-        const { dateIndex, itemIndex } = req.body;
+        const { dateIndex, itemIndex, itemId } = req.body;
         
         if (dateIndex === undefined || itemIndex === undefined) {
             return res.status(400).json({
@@ -330,11 +330,18 @@ export const removeDayItem = async (req, res) => {
             });
         }
         
-        const agenda = await agendaService.removeItemFromAgenda(
-            milestoneId,
-            dateIndex,
-            itemIndex
-        );
+        // If itemId is provided, use it to find the correct item (more reliable)
+        const agenda = itemId 
+            ? await agendaService.removeItemFromAgendaById(
+                milestoneId,
+                dateIndex,
+                itemId
+              )
+            : await agendaService.removeItemFromAgenda(
+                milestoneId,
+                dateIndex,
+                itemIndex
+              );
         
         res.status(200).json({
             success: true,
