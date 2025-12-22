@@ -1,4 +1,5 @@
 import ensureEventRole from '../utils/ensureEventRole.js';
+import EventMember from '../models/eventMember.js';
 import {
   ensureEventExists,
   ensureDepartmentInEvent,
@@ -21,7 +22,6 @@ import {
   countDepartmentMembersExcludingHoOC,
   getMembersByDepartmentRaw,
 } from '../services/eventMemberService.js';
-import EventMember from '../models/eventMember.js';
 
 // GET /api/events/:eventId/departments
 export const listDepartmentsByEvent = async (req, res) => {
@@ -226,7 +226,52 @@ export const editDepartment = async (req, res) => {
     }
 
     if (typeof description === 'string') set.description = description.trim();
-    if (leaderId) set.leaderId = leaderId;
+    
+    // Nếu đổi leaderId, cần đảm bảo một ban chỉ có 1 trưởng ban
+    if (leaderId) {
+      // Chỉ HoOC mới có quyền đổi leaderId
+      if (!isHoOC) {
+        return res.status(403).json({ message: 'Chỉ HoOC mới có quyền đổi trưởng ban' });
+      }
+      
+      // Tìm tất cả các EventMember có role 'HoD' trong ban này
+      const currentHoDs = await EventMember.find({
+        eventId,
+        departmentId: departmentId,
+        role: 'HoD',
+        status: { $ne: 'deactive' }
+      });
+
+      // Đổi tất cả các trưởng ban hiện tại thành Member (trừ người mới được assign nếu đã là HoD)
+      const newLeaderIdStr = leaderId.toString();
+      for (const hodMember of currentHoDs) {
+        const hodUserId = hodMember.userId?.toString() || hodMember.userId;
+        // Chỉ đổi thành Member nếu không phải người mới được assign
+        if (hodUserId !== newLeaderIdStr) {
+          await EventMember.findOneAndUpdate(
+            { _id: hodMember._id },
+            { $set: { role: 'Member' } }
+          );
+        }
+      }
+
+      // Đảm bảo người mới được assign có role 'HoD'
+      const newLeaderMembership = await EventMember.findOne({
+        eventId,
+        userId: leaderId,
+        status: { $ne: 'deactive' }
+      });
+      
+      if (newLeaderMembership) {
+        await EventMember.findOneAndUpdate(
+          { _id: newLeaderMembership._id },
+          { $set: { departmentId: departmentId, role: 'HoD' } }
+        );
+      }
+      
+      set.leaderId = leaderId;
+    }
+    
     const updated = await updateDepartmentDoc(departmentId, set);
     return res.status(200).json({ data: updated });
   } catch (error) {

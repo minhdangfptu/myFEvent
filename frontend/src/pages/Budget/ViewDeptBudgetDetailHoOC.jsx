@@ -92,11 +92,6 @@ const ViewDeptBudgetDetailHoOC = () => {
     };
   }, [hasChanges]);
 
-  // Debug: Log when showRejectModal changes
-  useEffect(() => {
-    console.log("showRejectModal changed to:", showRejectModal);
-    console.log("rejectItemId:", rejectItemId);
-  }, [showRejectModal, rejectItemId]);
 
   const fetchData = async () => {
     if (!departmentId || departmentId === "current" || departmentId === "") {
@@ -263,7 +258,6 @@ const ViewDeptBudgetDetailHoOC = () => {
   };
 
   const handleRejectItem = (itemId) => {
-    console.log("handleRejectItem called with itemId:", itemId);
     setRejectItemId(itemId);
 
     // Nếu đã có phản hồi ở ô "Phản hồi từ trưởng ban tổ chức" thì tự động
@@ -284,7 +278,6 @@ const ViewDeptBudgetDetailHoOC = () => {
 
     setRejectReason(existingReason || "");
     setShowRejectModal(true);
-    console.log("showRejectModal should be set to true");
   };
 
   const handleConfirmReject = async () => {
@@ -523,23 +516,6 @@ const ViewDeptBudgetDetailHoOC = () => {
       const rejectedItems = items.filter(item => item.status === 'rejected');
       const approvedItems = items.filter(item => item.status === 'approved');
       
-      // Log for debugging
-      console.log('Complete Review - Items Status:', {
-        total: items.length,
-        approved: approvedItems.length,
-        rejected: rejectedItems.length,
-        rejectedItemIds: rejectedItems.map(item => item.itemId),
-        expectedBudgetStatus: rejectedItems.length > 0 ? 'changes_requested' : 'approved'
-      });
-
-      // Important: Backend should set budget status based on items:
-      // - If ALL items are approved → budget status = "approved"
-      // - If ANY items are rejected → budget status = "changes_requested"
-      // If backend sets status incorrectly, this will help identify the issue
-      if (rejectedItems.length > 0) {
-        console.warn('⚠️ Budget has rejected items. Backend should set budget status to "changes_requested", not "approved"');
-      }
-
       const response = await budgetApi.completeReview(eventId, departmentId, budget._id, { items });
       
       // Verify the response status matches expected status
@@ -551,20 +527,10 @@ const ViewDeptBudgetDetailHoOC = () => {
       const expectedStatus = rejectedItems.length > 0 ? 'changes_requested' : 'approved';
       
       if (returnedStatus && returnedStatus !== expectedStatus) {
-        console.error('❌ Budget status mismatch!', {
-          expected: expectedStatus,
-          actual: returnedStatus,
-          hasRejectedItems: rejectedItems.length > 0,
-          rejectedCount: rejectedItems.length,
-          approvedCount: approvedItems.length
-        });
-        
         // Show warning to user if status is incorrect
         if (rejectedItems.length > 0 && returnedStatus === 'approved') {
           toast.warning('Cảnh báo: Budget có items bị từ chối nhưng status hiển thị là "Đã duyệt". Vui lòng kiểm tra lại.');
         }
-      } else if (rejectedItems.length > 0) {
-        console.log('✅ Budget status correctly set to "changes_requested"');
       }
       
       toast.success("Hoàn tất duyệt ngân sách thành công!");

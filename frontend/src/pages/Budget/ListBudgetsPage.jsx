@@ -172,13 +172,6 @@ const ListBudgetsPage = () => {
             rejectedBudgets.length > 0 ||
             completedBudgets.length > 0;
           
-          console.log('checkAllBudgets result:', {
-            submitted: submittedBudgets.length,
-            approved: approvedBudgets.length,
-            rejected: rejectedBudgets.length,
-            completed: completedBudgets.length,
-            hasData
-          });
           
           setHasAnyBudgets(hasData);
         }
@@ -251,20 +244,6 @@ const ListBudgetsPage = () => {
         }
       }
       
-      console.log('fetchBudgets response:', {
-        activeTab,
-        currentPage,
-        eventRole,
-        hodDepartmentId,
-        response,
-        responseType: typeof response,
-        isArray: Array.isArray(response),
-        hasData: response?.data,
-        hasItems: response?.items,
-        hasBudgets: response?.budgets,
-        responseKeys: response && typeof response === 'object' && !Array.isArray(response) ? Object.keys(response) : []
-      });
-      
       if (response) {
         // Response có thể là { data: [...], pagination: {...} } hoặc array trực tiếp sau khi unwrap
         let budgetsData = [];
@@ -286,14 +265,7 @@ const ListBudgetsPage = () => {
           budgetsData = [];
         }
         
-        console.log('fetchBudgets processed:', {
-          budgetsDataLength: budgetsData.length,
-          budgetsData: budgetsData.map(b => ({ id: b._id || b.id, departmentName: b.departmentName, status: b.status })),
-          paginationData,
-          responseType: typeof response,
-          isArray: Array.isArray(response),
-          responseKeys: response && typeof response === 'object' ? Object.keys(response) : []
-        });
+        // Process budgets data
         
         // HoOC không được xem draft budgets từ HoD - filter out draft status
         if (eventRole === 'HoOC') {

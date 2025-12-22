@@ -535,6 +535,11 @@ export default function GanttChartTaskPage() {
     // Chỉ cần eventId để load dữ liệu; role/memberId dùng cho filter nhưng không được chặn việc load
     if (!eventId) return;
 
+    // Nếu là Member nhưng chưa có memberId, đợi memberId được load
+    if (eventRole === "Member" && !memberId) {
+      return;
+    }
+
     (async () => {
       try {
         setLoading(true);
@@ -569,18 +574,22 @@ export default function GanttChartTaskPage() {
               String(taskDeptId) === String(currentDeptId)
             );
           });
-        } else if (eventRole === "Member" && memberId) {
-          const targetMemberId = String(memberId);
-          scopedTasks = normalTasks.filter((task) => {
-            // Giữ đúng logic filter như trang MemberTaskPage:
-            // taskAssigneeId = task.assigneeId?._id || task.assigneeId
-            const assigneeMemberId =
-              task.assigneeId?._id || task.assigneeId || null;
-            return (
-              assigneeMemberId &&
-              String(assigneeMemberId) === targetMemberId
-            );
-          });
+        } else if (eventRole === "Member") {
+          // Member chỉ thấy task được giao cho chính mình
+          // Sử dụng memberId từ state hoặc currentEventMemberId từ context
+          const targetMemberId = String(memberId || currentEventMemberId || "");
+          if (!targetMemberId) {
+            // Nếu không có memberId, không hiển thị task nào
+            scopedTasks = [];
+          } else {
+            scopedTasks = normalTasks.filter((task) => {
+              // Giữ đúng logic filter như trang MemberTaskPage:
+              // taskAssigneeId = task.assigneeId?._id || task.assigneeId
+              const taskAssigneeId = task.assigneeId?._id || task.assigneeId || null;
+              if (!taskAssigneeId) return false;
+              return String(taskAssigneeId) === targetMemberId;
+            });
+          }
         }
 
         const mapped = scopedTasks.map((task) => {
@@ -637,7 +646,7 @@ export default function GanttChartTaskPage() {
         setLoading(false);
       }
     })();
-  }, [eventId]);
+  }, [eventId, eventRole, memberId, getEventMember]);
 
   useEffect(() => {
     let filtered = [...allTasks];
@@ -830,7 +839,7 @@ export default function GanttChartTaskPage() {
         {/* View mode buttons */}
         <div
           className="position-fixed"
-          style={{ bottom: 24, right: 24, zIndex: 1000 }}
+          style={{ bottom: 150, right: 24, zIndex: 1000 }}
         >
           <div
             style={{

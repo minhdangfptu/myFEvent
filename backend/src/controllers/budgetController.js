@@ -470,20 +470,32 @@ export const updateDepartmentBudget = async (req, res) => {
           itemStatus = 'pending';
         }
         
-        // Xử lý evidence - đảm bảo lấy từ item mới hoặc giữ lại từ oldItem
-        const evidenceInput = item.evidence !== undefined ? item.evidence : (oldItem?.evidence || []);
+        // Xử lý evidence (bằng chứng của trưởng ban) - đảm bảo lấy từ item mới hoặc giữ lại từ oldItem
+        // Nếu budget đã được approved hoặc sent_to_members, không cho phép chỉnh sửa evidence
+        let evidenceInput;
+        if (isBudgetApproved) {
+          // Budget đã được duyệt - giữ nguyên evidence từ oldItem, không cho phép chỉnh sửa
+          evidenceInput = oldItem?.evidence || [];
+        } else if (item.evidence !== undefined) {
+          // Frontend đã gửi evidence (có thể là array hoặc undefined/null)
+          evidenceInput = item.evidence || [];
+        } else {
+          // Frontend không gửi evidence, giữ lại từ oldItem
+          evidenceInput = oldItem?.evidence || [];
+        }
         const normalizedEvidence = normalizeEvidenceArray(evidenceInput);
         
-        // Log để debug (chỉ trong development)
-        if (process.env.NODE_ENV === 'development' && evidenceInput && evidenceInput.length > 0) {
-          console.log('Evidence processing:', {
-            itemId: item.itemId,
-            inputEvidence: evidenceInput,
-            normalizedEvidence: normalizedEvidence,
-            inputLength: evidenceInput.length,
-            normalizedLength: normalizedEvidence.length
-          });
-        }
+        // Log để debug (luôn log để theo dõi)
+        console.log('Evidence processing:', {
+          itemId: item.itemId,
+          itemName: item.name,
+          hasEvidenceInItem: item.evidence !== undefined,
+          evidenceInput: evidenceInput,
+          evidenceInputLength: Array.isArray(evidenceInput) ? evidenceInput.length : 0,
+          normalizedEvidence: normalizedEvidence,
+          normalizedLength: normalizedEvidence.length,
+          oldItemHasEvidence: oldItem?.evidence ? (Array.isArray(oldItem.evidence) ? oldItem.evidence.length : 0) : 0
+        });
         
         const qty = parseFloat(item.qty) || 1;
         const unitCost = parseFloat(item.unitCost) || 0;
@@ -516,6 +528,18 @@ export const updateDepartmentBudget = async (req, res) => {
     }
 
     await budget.save();
+    
+    // Log để confirm evidence đã được lưu
+    console.log('Budget saved with items evidence:', {
+      budgetId: budget._id,
+      status: budget.status,
+      itemsCount: budget.items?.length || 0,
+      itemsWithEvidence: budget.items?.filter(item => item.evidence && Array.isArray(item.evidence) && item.evidence.length > 0).map(item => ({
+        itemId: item.itemId,
+        name: item.name,
+        evidenceCount: item.evidence.length
+      })) || []
+    });
 
     return res.status(200).json({ data: budget });
   } catch (error) {
@@ -949,7 +973,7 @@ export const saveReviewDraft = async (req, res) => {
         });
 
         if (reviewItem) {
-          // Cập nhật feedback và status từ review
+          // Cập nhật feedback và status từ review, nhưng giữ lại evidence
           return {
             itemId: budgetItem.itemId,
             category: budgetItem.category || 'general',
@@ -960,7 +984,12 @@ export const saveReviewDraft = async (req, res) => {
             total: budgetItem.total,
             note: budgetItem.note || '',
             feedback: reviewItem.feedback !== undefined ? reviewItem.feedback : (budgetItem.feedback || ''),
-            status: reviewItem.status || budgetItem.status || 'pending'
+            status: reviewItem.status || budgetItem.status || 'pending',
+            evidence: budgetItem.evidence || [], // Giữ lại evidence từ budget item
+            assignedTo: budgetItem.assignedTo, // Giữ lại assignedTo
+            assignedAt: budgetItem.assignedAt, // Giữ lại assignedAt
+            assignedBy: budgetItem.assignedBy, // Giữ lại assignedBy
+            submittedStatus: budgetItem.submittedStatus || 'draft' // Giữ lại submittedStatus
           };
         }
         // Giữ nguyên item nếu không có review
@@ -974,7 +1003,12 @@ export const saveReviewDraft = async (req, res) => {
           total: budgetItem.total,
           note: budgetItem.note || '',
           feedback: budgetItem.feedback || '',
-          status: budgetItem.status || 'pending'
+          status: budgetItem.status || 'pending',
+          evidence: budgetItem.evidence || [], // Giữ lại evidence
+          assignedTo: budgetItem.assignedTo, // Giữ lại assignedTo
+          assignedAt: budgetItem.assignedAt, // Giữ lại assignedAt
+          assignedBy: budgetItem.assignedBy, // Giữ lại assignedBy
+          submittedStatus: budgetItem.submittedStatus || 'draft' // Giữ lại submittedStatus
         };
       });
 
@@ -1087,7 +1121,7 @@ export const completeReview = async (req, res) => {
         });
 
         if (reviewItem) {
-          // Cập nhật feedback và status từ review
+          // Cập nhật feedback và status từ review, nhưng giữ lại evidence
           return {
             itemId: budgetItem.itemId,
             category: budgetItem.category || 'general',
@@ -1098,7 +1132,12 @@ export const completeReview = async (req, res) => {
             total: budgetItem.total,
             note: budgetItem.note || '',
             feedback: reviewItem.feedback !== undefined ? reviewItem.feedback : '',
-            status: reviewItem.status || 'pending'
+            status: reviewItem.status || 'pending',
+            evidence: budgetItem.evidence || [], // Giữ lại evidence từ budget item
+            assignedTo: budgetItem.assignedTo, // Giữ lại assignedTo
+            assignedAt: budgetItem.assignedAt, // Giữ lại assignedAt
+            assignedBy: budgetItem.assignedBy, // Giữ lại assignedBy
+            submittedStatus: budgetItem.submittedStatus || 'draft' // Giữ lại submittedStatus
           };
         }
         // Giữ nguyên item nếu không có review
@@ -1112,7 +1151,12 @@ export const completeReview = async (req, res) => {
           total: budgetItem.total,
           note: budgetItem.note || '',
           feedback: budgetItem.feedback || '',
-          status: budgetItem.status || 'pending'
+          status: budgetItem.status || 'pending',
+          evidence: budgetItem.evidence || [], // Giữ lại evidence
+          assignedTo: budgetItem.assignedTo, // Giữ lại assignedTo
+          assignedAt: budgetItem.assignedAt, // Giữ lại assignedAt
+          assignedBy: budgetItem.assignedBy, // Giữ lại assignedBy
+          submittedStatus: budgetItem.submittedStatus || 'draft' // Giữ lại submittedStatus
         };
       });
 

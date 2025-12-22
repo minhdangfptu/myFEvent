@@ -14,7 +14,8 @@ const EventExpenseSchema = new Schema({
 
   actualAmount:   { type: Schema.Types.Decimal128, default: 0, min: 0 },
   estimatedTotal: { type: Schema.Types.Decimal128, default: 0, min: 0 },
-  evidence:       { type: [EvidenceSchema], default: [] },
+  evidence:       { type: [EvidenceSchema], default: [] }, // Giữ lại để backward compatibility
+  memberEvidence: { type: [EvidenceSchema], default: [] }, // Bằng chứng của thành viên
   memberNote:     { type: String, default: '' },
   isPaid:         { type: Boolean, default: false },
   comparison:     { type: String, enum: ['greater', 'less', 'equal'], default: null },

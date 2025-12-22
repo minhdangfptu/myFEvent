@@ -406,10 +406,10 @@ const MemberExpensePage = () => {
     
     try {
       setLoading(true);
-      // Đảm bảo evidence là array và có format đúng
+      // Đảm bảo evidence là array và có format đúng (giống HoD)
       const evidenceToSave = Array.isArray(editFormData.evidence) 
         ? editFormData.evidence.map(ev => ({
-            type: ev.type || 'image',
+            type: ev.type || 'link',
             url: ev.url || ev,
             name: ev.name || 'Bằng chứng'
           }))
@@ -445,10 +445,10 @@ const MemberExpensePage = () => {
     try {
       setLoading(true);
       
-      // Đảm bảo evidence là array và có format đúng
+      // Đảm bảo evidence là array và có format đúng (giống HoD)
       const evidenceToSave = Array.isArray(editFormData.evidence) 
         ? editFormData.evidence.map(ev => ({
-            type: ev.type || 'image',
+            type: ev.type || 'link',
             url: ev.url || ev,
             name: ev.name || 'Bằng chứng'
           }))

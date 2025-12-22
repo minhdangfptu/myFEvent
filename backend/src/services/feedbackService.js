@@ -214,6 +214,7 @@ export const feedbackService = {
     
     // Cho phép chọn ngày hôm nay cho ngày mở (>= nghĩa là cho phép bằng)
     // So sánh timestamp để tránh vấn đề timezone
+    // Chỉ throw error nếu ngày mở ở quá khứ (nhỏ hơn thời điểm hiện tại)
     if (openTimeDateOnly.getTime() < nowDateOnly.getTime()) {
       const err = new Error('Thời gian mở phải ở hiện tại hoặc tương lai');
       err.status = 400;

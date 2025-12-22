@@ -102,16 +102,7 @@ export default function ProtectedRoute({ children, requiredRole = null, required
 
   // Log only once when role is checked
   // MUST be called before any early returns to follow Rules of Hooks
-  useEffect(() => {
-    if (requiredEventRoles && eventRoleChecked && eventId && roleToCheck !== null) {
-      console.log('[ProtectedRoute] Role check result:', {
-        eventId,
-        roleToCheck,
-        hasAccess,
-        requiredEventRoles
-      });
-    }
-  }, [requiredEventRoles, eventRoleChecked, eventId, roleToCheck, hasAccess]);
+  // Role check logic handled in hasAccess calculation
 
   // Now we can do early returns after all hooks are called
   if (loading || (requiredEventRoles && eventRoleLoading)) {

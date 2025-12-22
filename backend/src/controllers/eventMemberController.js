@@ -163,7 +163,25 @@ export const updateMemberRole = async (req, res) => {
         });
         
         if (department) {
-          // Gán leaderId cho department (nếu chưa có hoặc đang là leader khác)
+          // Tìm tất cả các EventMember có role 'HoD' trong ban này (trừ người hiện tại)
+          // Để đảm bảo một ban chỉ có 1 trưởng ban
+          const currentHoDs = await EventMember.find({
+            eventId,
+            departmentId: departmentId,
+            role: 'HoD',
+            status: { $ne: 'deactive' },
+            _id: { $ne: updatedMember._id } // Loại trừ người hiện tại
+          });
+
+          // Đổi tất cả các trưởng ban hiện tại thành Member
+          for (const hodMember of currentHoDs) {
+            await EventMember.findOneAndUpdate(
+              { _id: hodMember._id },
+              { $set: { role: 'Member' } }
+            );
+          }
+
+          // Gán leaderId cho department
           await Department.findOneAndUpdate(
             { _id: departmentId, eventId: new mongoose.Types.ObjectId(eventId) },
             { $set: { leaderId: userId } },
