@@ -96,27 +96,44 @@ export const deleteDepartmentDoc = async (departmentId) => {
 };
 
 export const assignHoDToDepartment = async (eventId, department, userId) => {
-  const previousLeaderId = department.leaderId?.toString();
+  // Tìm tất cả các EventMember có role 'HoD' trong ban này (bao gồm cả trưởng ban hiện tại)
+  // Để đảm bảo một ban chỉ có 1 trưởng ban
+  const currentHoDs = await EventMember.find({
+    eventId,
+    departmentId: department._id,
+    role: 'HoD',
+    status: { $ne: 'deactive' }
+  });
+
+  // Đổi tất cả các trưởng ban hiện tại thành Member (trừ người mới được assign nếu đã là HoD)
+  const userIdStr = userId.toString();
+  for (const hodMember of currentHoDs) {
+    const hodUserId = hodMember.userId?.toString() || hodMember.userId;
+    // Chỉ đổi thành Member nếu không phải người mới được assign
+    if (hodUserId !== userIdStr) {
+      await EventMember.findOneAndUpdate(
+        { _id: hodMember._id },
+        { $set: { role: 'Member' } }
+      );
+    }
+  }
+
+  // Cập nhật leaderId của department
   department.leaderId = userId;
   await department.save();
 
+  // Tìm và cập nhật EventMember của người mới được assign
   const targetMembership = await EventMember.findOne({ eventId, userId, status: { $ne: 'deactive' } });
   if (!targetMembership) {
     throw new Error('Người dùng chưa tham gia sự kiện');
   }
 
+  // Đảm bảo người mới có departmentId và role 'HoD'
   await EventMember.findOneAndUpdate(
     { _id: targetMembership._id },
     { $set: { departmentId: department._id, role: 'HoD' } },
     { new: true }
   );
-
-  if (previousLeaderId && previousLeaderId !== userId) {
-    await EventMember.findOneAndUpdate(
-      { eventId, userId: previousLeaderId, status: { $ne: 'deactive' } },
-      { $set: { departmentId: department._id, role: 'Member' } }
-    );
-  }
 
   return await Department.findById(department._id)
     .populate({ path: 'leaderId', select: 'fullName' })

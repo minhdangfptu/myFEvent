@@ -155,11 +155,33 @@ export const fetchExpensesForBudgets = async (budgetIds) => {
 
 // Helper: Merge item with expense data
 export const mergeItemWithExpense = (item, expense) => {
+  // Tách riêng bằng chứng của trưởng ban (HoD) và bằng chứng của thành viên (Member)
+  // Bằng chứng của trưởng ban: từ budget item (item.evidence)
+  // Bằng chứng của thành viên: từ expense record (expense.memberEvidence)
+  
+  // Xử lý item có thể là mongoose document hoặc plain object
+  const itemObj = item && typeof item.toObject === 'function' ? item.toObject() : item;
+  
+  // Bằng chứng của trưởng ban (HoD) - từ budget item
+  const hodEvidence = normalizeEvidenceArray(itemObj?.evidence || item?.evidence || []);
+  
+  // Bằng chứng của thành viên - từ expense record
+  let memberEvidence = [];
+  if (expense) {
+    // Ưu tiên memberEvidence mới, nếu không có thì fallback về evidence cũ (backward compatibility)
+    memberEvidence = normalizeEvidenceArray(
+      expense.memberEvidence && expense.memberEvidence.length > 0 
+        ? expense.memberEvidence 
+        : (expense.evidence || [])
+    );
+  }
+  
   if (!expense) {
     return {
-      ...item,
+      ...itemObj,
       actualAmount: 0,
-      evidence: [],
+      hodEvidence: hodEvidence,        // Bằng chứng của trưởng ban
+      memberEvidence: [],               // Bằng chứng của thành viên (chưa có)
       memberNote: '',
       isPaid: false,
       comparison: null,
@@ -169,27 +191,13 @@ export const mergeItemWithExpense = (item, expense) => {
     };
   }
   
-  // Chỉ merge dữ liệu nếu expense đã được submit (submittedStatus === 'submitted')
-  // Nếu expense ở trạng thái draft, không hiển thị dữ liệu cho HoD
   const submittedStatus = expense.submittedStatus || 'draft';
-  if (submittedStatus !== 'submitted') {
-    return {
-      ...item,
-      actualAmount: 0,
-      evidence: [],
-      memberNote: '',
-      isPaid: false,
-      comparison: null,
-      reportedBy: null,
-      reportedAt: null,
-      submittedStatus: submittedStatus
-    };
-  }
   
   return {
-    ...item,
+    ...itemObj,
     actualAmount: decimalToNumber(expense.actualAmount),
-    evidence: normalizeEvidenceArray(expense.evidence || []),
+    hodEvidence: hodEvidence,           // Bằng chứng của trưởng ban (từ budget item)
+    memberEvidence: memberEvidence,     // Bằng chứng của thành viên (từ expense)
     memberNote: expense.memberNote || '',
     isPaid: expense.isPaid || false,
     comparison: expense.comparison || null,

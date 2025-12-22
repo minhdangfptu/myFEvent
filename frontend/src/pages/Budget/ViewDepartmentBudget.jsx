@@ -39,6 +39,11 @@ const ViewDepartmentBudget = () => {
   const [evidenceFormData, setEvidenceFormData] = useState({
     evidence: []
   });
+  const [showMemberEvidenceModal, setShowMemberEvidenceModal] = useState(false);
+  const [editingMemberEvidenceItem, setEditingMemberEvidenceItem] = useState(null);
+  const [memberEvidenceFormData, setMemberEvidenceFormData] = useState({
+    memberEvidence: []
+  });
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState("");
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -66,6 +71,8 @@ const ViewDepartmentBudget = () => {
     note: 200,
     assign: 200,
     evidence: 150,
+    hodEvidence: 150,
+    memberEvidence: 150,
     memberNote: 200,
     total: 130,
     actualAmount: 150,
@@ -89,6 +96,8 @@ const ViewDepartmentBudget = () => {
     note: 180,
     assign: 130,
     evidence: 130,
+    hodEvidence: 130,
+    memberEvidence: 130,
     memberNote: 180,
     total: 140,
     actualAmount: 150,
@@ -508,13 +517,22 @@ const ViewDepartmentBudget = () => {
                          editingEvidenceItem._id?.toString() ||
                          editingEvidenceItem._id;
       
+      // Đảm bảo evidence là array và có format đúng (giống Member)
+      const evidenceToSave = Array.isArray(evidenceFormData.evidence) 
+        ? evidenceFormData.evidence.map(ev => ({
+            type: ev.type || 'link',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
       await budgetApi.reportExpense(
         eventId,
         departmentId,
         budget._id,
         itemIdToUse,
         {
-          evidence: evidenceFormData.evidence || []
+          evidence: evidenceToSave
         }
       );
       toast.success("Đã lưu bằng chứng thành công!");
@@ -537,7 +555,7 @@ const ViewDepartmentBudget = () => {
 
   const handleConfirmAddLink = () => {
     if (linkInput && linkInput.trim()) {
-      // Kiểm tra xem đang ở trong Expense Modal hay Evidence Modal
+      // Kiểm tra xem đang ở trong Expense Modal, Evidence Modal, hay Member Evidence Modal
       if (showExpenseModal && editingExpenseItem) {
         setExpenseFormData(prev => ({
           ...prev,
@@ -545,6 +563,15 @@ const ViewDepartmentBudget = () => {
             type: 'link',
             url: linkInput.trim(),
             name: `Link ${(prev.evidence || []).length + 1}`
+          }]
+        }));
+      } else if (showMemberEvidenceModal && editingMemberEvidenceItem) {
+        setMemberEvidenceFormData(prev => ({
+          ...prev,
+          memberEvidence: [...(prev.memberEvidence || []), {
+            type: 'link',
+            url: linkInput.trim(),
+            name: `Link ${(prev.memberEvidence || []).length + 1}`
           }]
         }));
       } else {
@@ -589,6 +616,93 @@ const ViewDepartmentBudget = () => {
     }));
   };
 
+  const handleOpenMemberEvidenceModal = (item) => {
+    setEditingMemberEvidenceItem(item);
+    setMemberEvidenceFormData({
+      memberEvidence: item.memberEvidence || []
+    });
+    setShowMemberEvidenceModal(true);
+  };
+
+  const handleCloseMemberEvidenceModal = () => {
+    setShowMemberEvidenceModal(false);
+    setEditingMemberEvidenceItem(null);
+    setMemberEvidenceFormData({
+      memberEvidence: []
+    });
+  };
+
+  const handleSaveMemberEvidence = async () => {
+    if (!editingMemberEvidenceItem || !budget) return;
+    
+    try {
+      setIsSubmitting(true);
+      const itemIdToUse = editingMemberEvidenceItem.itemId?.toString() || 
+                         editingMemberEvidenceItem.itemId?._id?.toString() || 
+                         editingMemberEvidenceItem.itemId ||
+                         editingMemberEvidenceItem._id?.toString() ||
+                         editingMemberEvidenceItem._id;
+      
+      const memberEvidenceToSave = Array.isArray(memberEvidenceFormData.memberEvidence) 
+        ? memberEvidenceFormData.memberEvidence.map(ev => ({
+            type: ev.type || 'link',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
+      await budgetApi.reportExpense(
+        eventId,
+        departmentId,
+        budget._id,
+        itemIdToUse,
+        {
+          memberEvidence: memberEvidenceToSave
+        }
+      );
+      toast.success("Đã lưu bằng chứng thành công!");
+      handleCloseMemberEvidenceModal();
+      await fetchData();
+    } catch (error) {
+      console.error("Error saving member evidence:", error);
+      toast.error(error?.response?.data?.message || "Lưu bằng chứng thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddMemberEvidenceLink = () => {
+    setLinkInput("");
+    setShowLinkModal(true);
+  };
+
+  const handleAddMemberEvidenceFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileType = file.type.startsWith('image/') ? 'image' : 
+                      file.type === 'application/pdf' ? 'pdf' : 'doc';
+      setMemberEvidenceFormData(prev => ({
+        ...prev,
+        memberEvidence: [...(prev.memberEvidence || []), {
+          type: fileType,
+          url: event.target.result,
+          name: file.name
+        }]
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveMemberEvidence = (idx) => {
+    setMemberEvidenceFormData(prev => ({
+      ...prev,
+      memberEvidence: (prev.memberEvidence || []).filter((_, i) => i !== idx)
+    }));
+  };
+
   const handleOpenExpenseModal = (item) => {
     setEditingExpenseItem(item);
     setExpenseFormData({
@@ -620,6 +734,15 @@ const ViewDepartmentBudget = () => {
                          editingExpenseItem._id?.toString() ||
                          editingExpenseItem._id;
       
+      // Đảm bảo evidence là array và có format đúng (giống Member)
+      const evidenceToSave = Array.isArray(expenseFormData.evidence) 
+        ? expenseFormData.evidence.map(ev => ({
+            type: ev.type || 'link',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
       await budgetApi.reportExpense(
         eventId,
         departmentId,
@@ -628,7 +751,7 @@ const ViewDepartmentBudget = () => {
         {
           actualAmount: parseFloat(expenseFormData.actualAmount) || 0,
           memberNote: expenseFormData.memberNote || "",
-          evidence: expenseFormData.evidence || []
+          evidence: evidenceToSave
         }
       );
       toast.success("Đã lưu chi tiêu thành công!");
@@ -652,6 +775,15 @@ const ViewDepartmentBudget = () => {
                          item._id?.toString() ||
                          item._id;
       
+      // Đảm bảo evidence là array và có format đúng (giống Member)
+      const evidenceToSave = Array.isArray(item.evidence) 
+        ? item.evidence.map(ev => ({
+            type: ev.type || 'link',
+            url: ev.url || ev,
+            name: ev.name || 'Bằng chứng'
+          }))
+        : [];
+      
       await budgetApi.reportExpense(
         eventId,
         departmentId,
@@ -660,7 +792,7 @@ const ViewDepartmentBudget = () => {
         {
           actualAmount: parseFloat(inlineFormData.actualAmount) || 0,
           memberNote: inlineFormData.memberNote || "",
-          evidence: item.evidence || []
+          evidence: evidenceToSave
         }
       );
       setEditingInlineItem(null);
@@ -696,6 +828,15 @@ const ViewDepartmentBudget = () => {
           return;
         }
         
+        // Đảm bảo evidence là array và có format đúng (giống Member)
+        const evidenceToSave = Array.isArray(item.evidence) 
+          ? item.evidence.map(ev => ({
+              type: ev.type || 'link',
+              url: ev.url || ev,
+              name: ev.name || 'Bằng chứng'
+            }))
+          : [];
+        
         await budgetApi.reportExpense(
           eventId,
           departmentId,
@@ -704,7 +845,7 @@ const ViewDepartmentBudget = () => {
           {
             actualAmount: parseFloat(inlineFormData.actualAmount) || 0,
             memberNote: inlineFormData.memberNote || "",
-            evidence: item.evidence || []
+            evidence: evidenceToSave
           }
         );
         
@@ -928,7 +1069,7 @@ const ViewDepartmentBudget = () => {
               <h2 className="fw-bold mb-0" style={{ fontSize: "28px", color: "#111827" }}>
                 {budgetName}
               </h2>
-              {isHoD && (
+              {isHoD && !isApproved && (
                 <button
                   className="btn btn-link p-0"
                   onClick={handleRenameBudget}
@@ -1907,7 +2048,7 @@ const ViewDepartmentBudget = () => {
                       userSelect: "none",
                       whiteSpace: "nowrap"
                     }}>
-                      Bằng chứng
+                      Bằng chứng trưởng ban
                       <div
                         style={{
                           position: "absolute",
@@ -1916,10 +2057,45 @@ const ViewDepartmentBudget = () => {
                           bottom: 0,
                           width: "5px",
                           cursor: "col-resize",
-                          backgroundColor: resizing.column === "evidence" ? "#3B82F6" : "transparent",
+                          backgroundColor: resizing.column === "hodEvidence" ? "#3B82F6" : "transparent",
                           zIndex: 10
                         }}
-                        onMouseDown={(e) => handleMouseDown(e, "evidence")}
+                        onMouseDown={(e) => handleMouseDown(e, "hodEvidence")}
+                        onMouseEnter={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "#E5E7EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!resizing.column) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      />
+                    </th>
+                    <th style={{ 
+                      padding: "12px", 
+                      fontWeight: "600", 
+                      color: "#374151", 
+                      width: `${widths.evidence}px`,
+                      minWidth: `${minWidths.evidence || 130}px`,
+                      position: "relative",
+                      userSelect: "none",
+                      whiteSpace: "nowrap"
+                    }}>
+                      Bằng chứng thành viên
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "5px",
+                          cursor: "col-resize",
+                          backgroundColor: resizing.column === "memberEvidence" ? "#3B82F6" : "transparent",
+                          zIndex: 10
+                        }}
+                        onMouseDown={(e) => handleMouseDown(e, "memberEvidence")}
                         onMouseEnter={(e) => {
                           if (!resizing.column) {
                             e.currentTarget.style.backgroundColor = "#E5E7EB";
@@ -2039,7 +2215,7 @@ const ViewDepartmentBudget = () => {
                 <tbody>
                   {filteredItems.length === 0 ? (
                     <tr>
-                      <td colSpan={isApproved && isHoD ? 13 : 12} className="text-center text-muted py-4">
+                      <td colSpan={isApproved && isHoD ? 14 : 13} className="text-center text-muted py-4">
                         Không tìm thấy mục nào
                       </td>
                     </tr>
@@ -2139,6 +2315,7 @@ const ViewDepartmentBudget = () => {
                               </select>
                             </td>
                           )}
+                          {/* Cột 1: Bằng chứng trưởng ban (HoD) */}
                           <td style={{ 
                             padding: "12px", 
                             width: "150px",
@@ -2150,9 +2327,9 @@ const ViewDepartmentBudget = () => {
                             verticalAlign: "top"
                           }}>
                             <div className="d-flex flex-column gap-1">
-                              {item.evidence && item.evidence.length > 0 ? (
+                              {item.hodEvidence && item.hodEvidence.length > 0 ? (
                                 <div className="d-flex flex-wrap gap-1">
-                                  {item.evidence.map((ev, idx) => {
+                                  {item.hodEvidence.map((ev, idx) => {
                                     const isImage = ev.type === 'image';
                                     const evidenceName = ev.name || `Bằng chứng ${idx + 1}`;
                                     return isImage ? (
@@ -2207,95 +2384,104 @@ const ViewDepartmentBudget = () => {
                                   })}
                                 </div>
                               ) : (
-                                <span className="text-muted">—</span>
+                                <span className="text-muted">Chưa có</span>
+                              )}
+                              {/* Không có nút chỉnh sửa - bằng chứng trưởng ban không thể chỉnh sửa sau khi approved */}
+                            </div>
+                          </td>
+                          {/* Cột 2: Bằng chứng thành viên (Member) */}
+                          <td style={{ 
+                            padding: "12px", 
+                            width: "150px",
+                            minWidth: "150px",
+                            maxWidth: "150px",
+                            wordWrap: "break-word",
+                            wordBreak: "break-word",
+                            whiteSpace: "normal",
+                            verticalAlign: "top"
+                          }}>
+                            <div className="d-flex flex-column gap-1">
+                              {item.memberEvidence && item.memberEvidence.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-1">
+                                  {item.memberEvidence.map((ev, idx) => {
+                                    const isImage = ev.type === 'image';
+                                    const evidenceName = ev.name || `Bằng chứng ${idx + 1}`;
+                                    return isImage ? (
+                                      <button
+                                        key={idx}
+                                        className="badge"
+                                        onClick={() => {
+                                          setSelectedImage(ev.url);
+                                          setShowImageModal(true);
+                                        }}
+                                        style={{
+                                          background: "#D1FAE5",
+                                          color: "#065F46",
+                                          border: "none",
+                                          cursor: "pointer",
+                                          fontSize: "11px",
+                                          wordWrap: "break-word",
+                                          wordBreak: "break-word",
+                                          whiteSpace: "normal",
+                                          marginBottom: "4px"
+                                        }}
+                                        title="Click để xem ảnh"
+                                      >
+                                        <i className="bi bi-image me-1"></i>
+                                        {evidenceName}
+                                      </button>
+                                    ) : (
+                                      <a
+                                        key={idx}
+                                        href={ev.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="badge"
+                                        style={{
+                                          background: "#D1FAE5",
+                                          color: "#065F46",
+                                          textDecoration: "none",
+                                          fontSize: "11px",
+                                          wordWrap: "break-word",
+                                          wordBreak: "break-word",
+                                          whiteSpace: "normal",
+                                          display: "inline-block",
+                                          marginBottom: "4px"
+                                        }}
+                                      >
+                                        {ev.type === 'pdf' && <i className="bi bi-file-pdf me-1"></i>}
+                                        {ev.type === 'doc' && <i className="bi bi-file-word me-1"></i>}
+                                        {ev.type === 'link' && <i className="bi bi-link-45deg me-1"></i>}
+                                        {evidenceName}
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span className="text-muted">Chưa có</span>
                               )}
                               {(() => {
-                                // Kiểm tra xem có thể chỉnh sửa bằng chứng không
-                                // Logic mới:
-                                // 1. Nếu HoD tự giao công việc cho mình (assignedTo = currentMemberId của HoD hoặc userId) thì được chỉnh sửa như member
-                                // 2. Nếu công việc không giao cho mình thì không được chỉnh sửa
-                                // 3. Nếu người được giao đã nộp expense (actualAmount > 0) thì HoD không được chỉnh sửa
-                                
-                                // Lấy userId của HoD để so sánh
-                                const hodUserId = user?._id || user?.id;
-                                
-                                // Kiểm tra xem item có được giao cho HoD không
-                                // Có thể giao bằng memberId (nếu HoD có trong members) hoặc userId
-                                let isAssignedToHoD = false;
-                                
-                                if (assignedMemberId && isHoD) {
-                                  // Trường hợp 1: Giao cho memberId của HoD (nếu HoD có trong members)
-                                  if (currentMemberId && String(assignedMemberId) === String(currentMemberId)) {
-                                    isAssignedToHoD = true;
-                                  }
-                                  // Trường hợp 2: Kiểm tra qua assignedToInfo (thông tin người được giao)
-                                  // Nếu HoD không có trong members, kiểm tra qua assignedToInfo
-                                  if (!isAssignedToHoD && item.assignedToInfo) {
-                                    const assignedUserId = item.assignedToInfo?.userId?._id || 
-                                                          item.assignedToInfo?.userId || 
-                                                          item.assignedToInfo?.userId?.id;
-                                    const assignedMemberIdFromInfo = item.assignedToInfo?._id || 
-                                                                     item.assignedToInfo?.id;
-                                    
-                                    // So sánh với userId của HoD (nếu assignedToInfo có userId)
-                                    if (hodUserId && assignedUserId && String(assignedUserId) === String(hodUserId)) {
-                                      isAssignedToHoD = true;
-                                    }
-                                    // So sánh với memberId của HoD (nếu assignedToInfo có memberId)
-                                    else if (currentMemberId && assignedMemberIdFromInfo && String(assignedMemberIdFromInfo) === String(currentMemberId)) {
-                                      isAssignedToHoD = true;
-                                    }
-                                    // So sánh assignedMemberId với memberId từ info (nếu cả hai đều là memberId)
-                                    else if (currentMemberId && String(assignedMemberId) === String(assignedMemberIdFromInfo) && String(assignedMemberId) === String(currentMemberId)) {
-                                      isAssignedToHoD = true;
-                                    }
-                                  }
-                                }
-                                
-                                const isHoDAssignedToSelf = isHoD && isAssignedToHoD;
-                                
-                                const isMemberAssigned = !isHoD && 
-                                  assignedMemberId && 
+                                // Chỉ người được assign mới có thể chỉnh sửa bằng chứng thành viên
+                                const isMemberAssigned = assignedMemberId && 
                                   currentMemberId && 
                                   String(assignedMemberId) === String(currentMemberId);
                                 
-                                // Kiểm tra xem người được giao đã nộp expense chưa
-                                const hasExpenseSubmitted = actualAmount > 0;
+                                const canEditMemberEvidence = isMemberAssigned && (isApproved || isSentToMembers);
                                 
-        // Cho phép HoD chỉnh sửa/đính kèm bằng chứng nếu budget đã approved/sent_to_members,
-        // ngay cả khi giao cho người ngoài ban (case đã mở rộng assign).
-        // Member được chỉnh sửa nếu được assign cho mình.
-        const canEditEvidence = (isHoD && (isApproved || isSentToMembers)) || isMemberAssigned;
-                                
-                                // Debug log để kiểm tra
-                                if (isHoD && assignedMemberId) {
-                                  console.log('Debug edit evidence:', {
-                                    isHoD,
-                                    assignedMemberId: String(assignedMemberId),
-                                    currentMemberId: currentMemberId ? String(currentMemberId) : 'null',
-                                    isHoDAssignedToSelf,
-                                    hasExpenseSubmitted,
-                                    canEditEvidence,
-                                    actualAmount,
-                                    isApproved,
-                                    isSentToMembers
-                                  });
-                                }
-                                
-                                if ((isApproved || isSentToMembers) && canEditEvidence) {
+                                if (canEditMemberEvidence) {
                                   return (
                                     <button
-                                      className="btn btn-sm btn-outline-primary"
-                                      onClick={() => handleOpenEvidenceModal(item)}
+                                      className="btn btn-sm btn-outline-success"
+                                      onClick={() => handleOpenMemberEvidenceModal(item)}
                                       style={{
                                         fontSize: "11px",
                                         padding: "2px 8px",
                                         marginTop: "4px"
                                       }}
-                                      title="Thêm/sửa bằng chứng"
+                                      title="Thêm/sửa bằng chứng thành viên"
                                     >
                                       <i className="bi bi-plus-circle me-1"></i>
-                                      {item.evidence && item.evidence.length > 0 ? "Sửa" : "Thêm"}
+                                      {item.memberEvidence && item.memberEvidence.length > 0 ? "Sửa" : "Thêm"}
                                     </button>
                                   );
                                 }
@@ -2884,6 +3070,127 @@ const ViewDepartmentBudget = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSaveEvidence}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Member Evidence Modal - Cho phép member chỉnh sửa bằng chứng của mình */}
+      {showMemberEvidenceModal && editingMemberEvidenceItem && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 9999 }}
+          onClick={handleCloseMemberEvidenceModal}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Thêm/Sửa Bằng Chứng Thành Viên</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={handleCloseMemberEvidenceModal}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-file-earmark-text me-2"></i>
+                    Mục: {editingMemberEvidenceItem.name}
+                  </label>
+                </div>
+
+                {/* Member Evidence */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-paperclip me-2"></i>
+                    Bằng chứng thành viên
+                  </label>
+                  {memberEvidenceFormData.memberEvidence && memberEvidenceFormData.memberEvidence.length > 0 && (
+                    <div className="mb-3">
+                      {memberEvidenceFormData.memberEvidence.map((ev, idx) => (
+                        <div key={idx} className="d-flex justify-content-between align-items-center p-2 mb-2" style={{ background: "#f9fafb", borderRadius: "8px" }}>
+                          <div className="d-flex align-items-center gap-2">
+                            {ev.type === 'image' && <i className="bi bi-image text-primary"></i>}
+                            {ev.type === 'pdf' && <i className="bi bi-file-pdf text-danger"></i>}
+                            {ev.type === 'doc' && <i className="bi bi-file-word text-info"></i>}
+                            {ev.type === 'link' && <i className="bi bi-link-45deg text-success"></i>}
+                            <span>{ev.name}</span>
+                          </div>
+                          <div className="d-flex gap-2">
+                            {ev.type === 'image' && (
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => {
+                                  setSelectedImage(ev.url);
+                                  setShowImageModal(true);
+                                }}
+                              >
+                                <Eye size={18} />
+                              </button>
+                            )}
+                            {(ev.type === 'pdf' || ev.type === 'doc' || ev.type === 'link') && (
+                              <a
+                                href={ev.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-outline-primary"
+                              >
+                                <ExternalLink size={18} />
+                              </a>
+                            )}
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleRemoveMemberEvidence(idx)}
+                            >
+                              <Trash size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-outline-success"
+                      onClick={handleAddMemberEvidenceLink}
+                    >
+                      <i className="bi bi-link-45deg me-2"></i>
+                      Thêm link
+                    </button>
+                    <label className="btn btn-outline-success">
+                      <i className="bi bi-upload me-2"></i>
+                      Tải file lên
+                      <input
+                        type="file"
+                        className="d-none"
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onChange={handleAddMemberEvidenceFile}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseMemberEvidenceModal}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleSaveMemberEvidence}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Đang lưu..." : "Lưu"}

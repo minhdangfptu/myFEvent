@@ -40,10 +40,11 @@ export const findMilestoneDetail = async (eventId, milestoneId) => {
   const milestone = await Milestone.findOne({ _id: milestoneId, eventId }).lean();
   if (!milestone) return null;
 
-  // Query tasks
+  // Query tasks - CHỈ LẤY EPIC TASKS (công việc lớn)
   const allTasks = await Task.find({
     milestoneId: milestoneId,
-    eventId: eventId
+    eventId: eventId,
+    taskType: 'epic' // Chỉ lấy công việc lớn (epic tasks)
   }).lean();
 
   // Select only needed fields

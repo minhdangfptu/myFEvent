@@ -336,9 +336,58 @@ export const editTaskService = async ({ eventId, taskId, userId, member, body })
   if (isEpic && member?.role !== 'HoOC') {
     throw makeError('Chỉ HoOC có quyền chỉnh sửa Epic task.', 403);
   }
-  // Normal task: Chỉ HoD có quyền chỉnh sửa (HoOC không thể chỉnh sửa task thường)
-  if (isNormal && member?.role !== 'HoD') {
-    throw makeError('Chỉ HoD có quyền chỉnh sửa task thường.', 403);
+  
+  // Normal task: Kiểm tra quyền chỉnh sửa
+  if (isNormal) {
+    // Kiểm tra: HoD không thể chỉnh sửa task được HoOC tạo và giao cho họ
+    // PHẢI CHECK TRƯỚC khi cho phép HoD chỉnh sửa
+    if (member?.role === 'HoD') {
+      // Kiểm tra xem task có được assign cho HoD này không
+      const taskAssigneeId = currentTask.assigneeId ? String(currentTask.assigneeId) : null;
+      const hodMemberId = member._id ? String(member._id) : null;
+      
+      if (taskAssigneeId && hodMemberId && taskAssigneeId === hodMemberId) {
+        // Task được assign cho HoD này - kiểm tra xem có phải do HoOC tạo không
+        if (currentTask.createdBy) {
+          const User = (await import('../models/user.js')).default;
+          let taskCreatorId = null;
+          
+          // Xử lý cả trường hợp createdBy là ObjectId hoặc đã được populate
+          if (currentTask.createdBy._id) {
+            taskCreatorId = String(currentTask.createdBy._id);
+          } else if (currentTask.createdBy.toString) {
+            taskCreatorId = String(currentTask.createdBy.toString());
+          } else {
+            taskCreatorId = String(currentTask.createdBy);
+          }
+          
+          const currentUserId = userId ? String(userId) : null;
+          
+          // Chỉ check nếu người tạo không phải là HoD hiện tại (nếu HoD tự tạo thì cho phép)
+          if (taskCreatorId !== currentUserId) {
+            const taskCreator = await User.findById(taskCreatorId).lean();
+            
+            if (taskCreator) {
+              // Kiểm tra xem người tạo có phải là HoOC trong event này không
+              const creatorMember = await EventMember.findOne({
+                userId: taskCreator._id,
+                eventId: eventId,
+                role: 'HoOC'
+              }).lean();
+              
+              if (creatorMember) {
+                throw makeError('Bạn không có quyền chỉnh sửa công việc được HoOC giao.', 403);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Sau khi đã check quyền HoOC, mới cho phép HoD chỉnh sửa
+    if (member?.role !== 'HoD') {
+      throw makeError('Chỉ HoD có quyền chỉnh sửa task thường.', 403);
+    }
   }
 
   const update = { ...(body || {}) };
@@ -637,6 +686,48 @@ export const deleteTaskService = async ({ eventId, taskId, userId, member }) => 
     if (isHoOC) {
       // Cho phép HoOC xóa bất kỳ task nào
     } else if (isHoD) {
+      // PHẢI CHECK TRƯỚC: HoD không thể xóa task được HoOC tạo và giao cho họ
+      const taskAssigneeId = task.assigneeId ? String(task.assigneeId) : null;
+      const hodMemberId = member._id ? String(member._id) : null;
+      
+      if (taskAssigneeId && hodMemberId && taskAssigneeId === hodMemberId) {
+        // Task được assign cho HoD này - kiểm tra xem có phải do HoOC tạo không
+        if (task.createdBy) {
+          const User = (await import('../models/user.js')).default;
+          let taskCreatorId = null;
+          
+          // Xử lý cả trường hợp createdBy là ObjectId hoặc đã được populate
+          if (task.createdBy._id) {
+            taskCreatorId = String(task.createdBy._id);
+          } else if (task.createdBy.toString) {
+            taskCreatorId = String(task.createdBy.toString());
+          } else {
+            taskCreatorId = String(task.createdBy);
+          }
+          
+          // Chỉ check nếu người tạo không phải là HoD hiện tại (nếu HoD tự tạo thì cho phép)
+          const currentUserId = userId ? String(userId) : null;
+          if (taskCreatorId !== currentUserId) {
+            const taskCreator = await User.findById(taskCreatorId).lean();
+            
+            if (taskCreator) {
+              // Kiểm tra xem người tạo có phải là HoOC trong event này không
+              const creatorMember = await EventMember.findOne({
+                userId: taskCreator._id,
+                eventId: eventId,
+                role: 'HoOC'
+              }).lean();
+              
+              if (creatorMember) {
+                // THROW ERROR NGAY LẬP TỨC - không check department nữa
+                throw makeError('Bạn không có quyền xóa công việc được HoOC giao.', 403);
+              }
+            }
+          }
+        }
+      }
+      
+      // Sau khi đã check HoOC, mới check department
       // HoD chỉ có thể xóa task trong ban của mình (nếu task có departmentId)
       if (task.departmentId && member?.departmentId) {
         const taskDeptId = String(task.departmentId);

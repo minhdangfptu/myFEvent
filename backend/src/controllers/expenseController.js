@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import EventExpense from '../models/expense.js';
 import EventBudgetPlan from '../models/budgetPlanDep.js';
+import EventMember from '../models/eventMember.js';
 import { ensureEventExists, ensureDepartmentInEvent } from '../services/departmentService.js';
 import { getRequesterMembership } from '../services/eventMemberService.js';
 import {
@@ -20,7 +21,7 @@ export const reportExpense = async (req, res) => {
   try {
     const { eventId, departmentId, budgetId, itemId } = req.params;
     const userId = req.user?.userId || req.user?._id || req.user?.id;
-    const { actualAmount, evidence, memberNote, isPaid } = req.body;
+    const { actualAmount, evidence, memberEvidence, memberNote, isPaid } = req.body;
 
     await ensureEventExists(eventId);
     const department = await ensureDepartmentInEvent(eventId, departmentId);
@@ -105,6 +106,49 @@ export const reportExpense = async (req, res) => {
           return res.status(403).json({ message: 'You are not assigned to this item' });
         }
       }
+    } else {
+      // HoD: chỉ có thể nhập bằng chứng cho item được assign cho họ hoặc cho member trong ban của họ
+      if (!userMember) {
+        return res.status(403).json({ message: 'You are not a member of this event' });
+      }
+
+      // HoD chỉ có thể nhập bằng chứng nếu:
+      // 1. Item được assign cho chính HoD
+      // 2. Item được assign cho member trong ban của HoD
+      // 3. Item chưa được assign cho ai (null/undefined) - cho phép HoD nhập
+      if (item.assignedTo) {
+        const assignedToId = getItemKey(item.assignedTo);
+        const hodMemberId = getItemKey(userMember._id);
+        
+        // Nếu item được assign cho HoD, cho phép
+        if (assignedToId === hodMemberId) {
+          // OK - HoD được assign
+        } else {
+          // Kiểm tra xem item có được assign cho member trong ban của HoD không
+          // assignedToId là EventMember ID, cần tìm EventMember để kiểm tra departmentId
+          const assignedMember = await EventMember.findOne({
+            _id: toObjectId(assignedToId),
+            eventId: toObjectId(eventId)
+          }).lean();
+          
+          if (!assignedMember) {
+            return res.status(403).json({ message: 'You can only report expense for items assigned to you or members in your department' });
+          }
+          
+          // Nếu assignedMember không có departmentId hoặc departmentId khác với ban của HoD → CHẶN
+          if (!assignedMember.departmentId) {
+            return res.status(403).json({ message: 'You can only report expense for items assigned to you or members in your department' });
+          }
+          
+          const assignedMemberDeptId = getItemKey(assignedMember.departmentId);
+          const hodDeptId = getItemKey(departmentId);
+          
+          if (assignedMemberDeptId !== hodDeptId) {
+            return res.status(403).json({ message: 'You can only report expense for items assigned to you or members in your department' });
+          }
+        }
+      }
+      // Nếu item.assignedTo không tồn tại (null/undefined), cho phép HoD nhập (item chưa được assign)
     }
 
     // Tìm hoặc tạo expense record
@@ -132,8 +176,29 @@ export const reportExpense = async (req, res) => {
     if (actualAmount !== undefined) {
       expense.actualAmount = toDecimal128(actualAmount, '0');
     }
-    if (evidence !== undefined && Array.isArray(evidence)) {
-      expense.evidence = normalizeEvidenceArray(evidence);
+    // Đảm bảo memberEvidence được normalize và lưu đúng cách (bằng chứng của thành viên)
+    if (memberEvidence !== undefined) {
+      // Xử lý cả trường hợp memberEvidence là array, object, hoặc null/undefined
+      if (memberEvidence === null || memberEvidence === '') {
+        expense.memberEvidence = [];
+      } else if (Array.isArray(memberEvidence)) {
+        expense.memberEvidence = normalizeEvidenceArray(memberEvidence);
+      } else {
+        // Nếu là object đơn lẻ, chuyển thành array
+        expense.memberEvidence = normalizeEvidenceArray([memberEvidence]);
+      }
+    }
+    
+    // Giữ lại logic cũ cho evidence (backward compatibility)
+    // Nếu không có memberEvidence nhưng có evidence, lưu vào evidence cũ
+    if (evidence !== undefined && memberEvidence === undefined) {
+      if (evidence === null || evidence === '') {
+        expense.evidence = [];
+      } else if (Array.isArray(evidence)) {
+        expense.evidence = normalizeEvidenceArray(evidence);
+      } else {
+        expense.evidence = normalizeEvidenceArray([evidence]);
+      }
     }
     if (memberNote !== undefined) {
       expense.memberNote = memberNote;

@@ -41,6 +41,13 @@ const PlanItemSchema = new Schema({
   feedback: { type: String, default: '' },
   status:   { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   
+  // Evidence field - lưu bằng chứng từ HoD khi tạo budget
+  evidence: [{
+    type: { type: String, enum: ['image', 'pdf', 'doc', 'link'], default: 'link' },
+    url: { type: String, required: true },
+    name: { type: String, default: 'Evidence' }
+  }],
+  
   // Assignment fields
   assignedTo: { type: Types.ObjectId, ref: 'EventMember' },
   assignedAt: Date,

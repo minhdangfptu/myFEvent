@@ -65,24 +65,20 @@ export function EventProvider({ children }) {
   // Initialize eventRoles from user-scoped localStorage with TTL
   const [eventRoles, setEventRoles] = useState(() => {
     if (!currentUserId) {
-      console.log('[EventContext Init] No userId, starting with empty eventRoles');
       return {};
     }
     const cacheKey = getCacheKey('eventRoles', currentUserId);
     const cached = loadCacheWithTTL(cacheKey);
-    console.log(`[EventContext Init] 📦 Loaded eventRoles cache for user ${currentUserId}:`, cached);
     return cached;
   });
 
   // Store full member info (role + departmentId) for each event
   const [eventMembers, setEventMembers] = useState(() => {
     if (!currentUserId) {
-      console.log('[EventContext Init] No userId, starting with empty eventMembers');
       return {};
     }
     const cacheKey = getCacheKey('eventMembers', currentUserId);
     const cached = loadCacheWithTTL(cacheKey);
-    console.log(`[EventContext Init] 📦 Loaded eventMembers cache for user ${currentUserId}:`, cached);
     return cached;
   });
 
@@ -423,27 +419,20 @@ export function EventProvider({ children }) {
   // Fetch role for a specific eventId with simple caching
   const fetchEventRole = useCallback(async (eventId) => {
     if (!eventId) {
-      console.log('[fetchEventRole] No eventId provided');
       return "";
     }
 
     // Return cached role if available (check with 'in' to handle empty string)
     if (eventId in eventRoles) {
       const cachedRole = eventRoles[eventId];
-      console.log(`[fetchEventRole] 📦 Cache HIT for event ${eventId}: role="${cachedRole}"`);
       return cachedRole;
     }
 
-    console.log(`[fetchEventRole] 🌐 Cache MISS for event ${eventId}, calling API...`);
-
     try {
       const res = await userApi.getUserRoleByEvent(eventId);
-      console.log(`[fetchEventRole] API response for event ${eventId}:`, res);
 
       const role = res?.role || res?.data?.role || "";
       const departmentId = res?.departmentId || res?.data?.departmentId || null;
-
-      console.log(`[fetchEventRole] ✅ Parsed role="${role}", departmentId="${departmentId}" for event ${eventId}`);
 
       // Cache both role and full member info
       setEventRoles((prev) => ({ ...prev, [eventId]: role }));
@@ -456,7 +445,6 @@ export function EventProvider({ children }) {
         }
       }));
 
-      console.log(`[fetchEventRole] 💾 Cached role for event ${eventId}`);
       return role;
     } catch (e) {
       console.error(`[fetchEventRole] ❌ Error fetching role for event ${eventId}:`, e);
@@ -515,11 +503,9 @@ export function EventProvider({ children }) {
   // Utility to get role synchronously from cache (may be empty string if not fetched yet)
   const getEventRole = useCallback((eventId) => {
     if (!eventId) {
-      console.log('[getEventRole] No eventId provided');
       return "";
     }
     const role = eventRoles[eventId] || "";
-    console.log(`[getEventRole] 🔍 Reading role for event ${eventId}: "${role}" (from cache)`);
     return role;
   }, [eventRoles]);
 

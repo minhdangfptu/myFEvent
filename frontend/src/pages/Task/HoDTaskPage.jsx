@@ -1547,22 +1547,9 @@ export default function HoDTaskPage() {
                     <label className="text-muted small mb-2">
                       Người phụ trách
                     </label>
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center gap-2">
-                        <User size={20} />
-                        <span>{selectedTask.assignee === "----" ? "Chưa phân công" : selectedTask.assignee}</span>
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTask(selectedTask);
-                          setNewAssigneeId(selectedTask.assigneeId || "");
-                          setShowEditAssigneeModal(true);
-                        }}
-                      >
-                        ✏️ Chỉnh sửa
-                      </button>
+                    <div className="d-flex align-items-center gap-2">
+                      <User size={20} />
+                      <span>{selectedTask.assignee === "----" ? "Chưa phân công" : selectedTask.assignee}</span>
                     </div>
                   </div>
 
@@ -1770,19 +1757,26 @@ export default function HoDTaskPage() {
                         />
                         {eventInfo && (
                           <div className="form-text small text-muted">
-                            Lưu ý: Thời gian bắt đầu phải sau thời điểm
-                            {` ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`}
                             {addTaskMode === "normal" && (() => {
                               const effectiveParentId = addTaskForm.parentId || (epicContext ? (epicContext.id || epicContext._id) : null);
                               if (effectiveParentId) {
                                 const parentTask = parents.find((p) => String(p._id || p.id) === String(effectiveParentId)) ||
                                                  tasks.find((t) => (t.id === effectiveParentId || t._id === effectiveParentId) && t.taskType === "epic");
-                                if (parentTask && parentTask.dueDate) {
-                                  return ` và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                if (parentTask) {
+                                  // Nếu là công việc con, hiển thị theo thời gian bắt đầu của công việc lớn
+                                  if (parentTask.startDate) {
+                                    return `Lưu ý: Thời gian bắt đầu phải sau thời gian bắt đầu của công việc lớn (${new Date(parentTask.startDate).toLocaleString('vi-VN')})`;
+                                  } else if (parentTask.dueDate) {
+                                    return `Lưu ý: Thời gian bắt đầu phải sau thời điểm ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')} và không được vượt quá deadline của công việc lớn (${new Date(parentTask.dueDate).toLocaleString('vi-VN')})`;
+                                  }
                                 }
                               }
-                              return "";
+                              // Nếu không phải công việc con hoặc không có parent task, hiển thị theo thời điểm tạo sự kiện
+                              return `Lưu ý: Thời gian bắt đầu phải sau thời điểm ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`;
                             })()}
+                            {addTaskMode !== "normal" && (
+                              `Lưu ý: Thời gian bắt đầu phải sau thời điểm ${new Date(eventInfo.createdAt).toLocaleString('vi-VN')}`
+                            )}
                           </div>
                         )}
                       </div>
